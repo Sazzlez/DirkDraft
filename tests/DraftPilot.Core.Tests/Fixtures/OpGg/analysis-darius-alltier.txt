@@ -1,0 +1,11 @@
+﻿class LolGetChampionAnalysis: data
+class Data: summary,damage_type,strong_counters,counters_meta
+class Summary: positions
+class Position: name,stats,counters
+class Stats: win_rate,role_rate
+class Counter: champion_name,play,win
+class Position1: name,stats
+class StrongCounter: champion_name,play,my_win_rate
+class CountersMeta: message
+
+LolGetChampionAnalysis(Data(Summary([Position("TOP",Stats(0.47,0.87),[Counter("Jax",47,14),Counter("Yorick",30,9),Counter("Malphite",53,18)]),Position1("JUNGLE",Stats(0.45,0.1))]),"AD",[StrongCounter("Nasus",111,0.5)],CountersMeta("Insufficient matchup sample. See data.summary.positions[].counters[] for raw matchup data (smaller sample).")))

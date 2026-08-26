@@ -1,0 +1,12 @@
+﻿class LolGetChampionAnalysis: data
+class Data: summary,damage_type,weak_counters,synergies
+class Summary: positions
+class Position: name,stats,counters
+class Stats: win_rate,role_rate
+class Counter: champion_name,play,win
+class WeakCounter: champion_name,play,my_win_rate
+class Synergies: adc
+class Adc: synergy_champion_name,play,win_rate,synergy_tier_data
+class SynergyTierData: tier
+
+LolGetChampionAnalysis(Data(Summary([Position("SUPPORT",Stats(0.51,0.99),[Counter("Senna",57,24),Counter("Nami",42,18),Counter("Morgana",116,50)])]),"AP",[WeakCounter("Morgana",116,0.43),WeakCounter("Seraphine",114,0.46),WeakCounter("Lulu",165,0.48)],Synergies([Adc("Xayah",15,0.67,SynergyTierData(1)),Adc("Caitlyn",32,0.63,SynergyTierData(1)),Adc("Tristana",16,0.63,SynergyTierData(1))])))

@@ -1,0 +1,35 @@
+{
+  "$comment": [
+    "P(lane | position of the seat within the enemy team), one row per seat in the order the client",
+    "lists them. Columns are top, jungle, mid, adc, support.",
+    "",
+    "SHIPPED FLAT ON PURPOSE. Every row is 0.2, which means the seat index contributes nothing and",
+    "the prediction rests entirely on what the champion itself says about the lanes it plays.",
+    "",
+    "Why: the original guess was that the client lists a team in canonical role order, so seat 2",
+    "would be mid and seat 3 adc. A recorded 5v5 tournament draft says otherwise — the client listed",
+    "the team as top, jungle, BOTTOM, MIDDLE, utility. Seats 0, 1 and 4 matched the guess; 2 and 3",
+    "were swapped.",
+    "",
+    "That measurement is one sample from a custom game (isCustomGame=true, queueId=3110), where",
+    "positions are not handed out by matchmaking, so it does not settle what ranked solo/duo does.",
+    "It does settle that the canonical order cannot simply be assumed. And the ordering that actually",
+    "matters is the ENEMY team's, which the client never reveals — it can only be checked after a game",
+    "against the match history.",
+    "",
+    "So: no hint until it is measured, rather than a hint that is known to be partly wrong.",
+    "",
+    "To re-enable after measuring real ranked drafts, raise the diagonal — 0.36 with 0.16 elsewhere",
+    "is a mild nudge that cannot overrule the champion's own role distribution. Keep the rows summing",
+    "to 1; the loader normalises them anyway."
+  ],
+  "version": 2,
+  "lanes": ["top", "jungle", "mid", "adc", "support"],
+  "rows": [
+    [0.2, 0.2, 0.2, 0.2, 0.2],
+    [0.2, 0.2, 0.2, 0.2, 0.2],
+    [0.2, 0.2, 0.2, 0.2, 0.2],
+    [0.2, 0.2, 0.2, 0.2, 0.2],
+    [0.2, 0.2, 0.2, 0.2, 0.2]
+  ]
+}

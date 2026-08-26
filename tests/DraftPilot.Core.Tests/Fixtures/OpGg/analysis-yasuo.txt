@@ -1,0 +1,8 @@
+﻿class LolGetChampionAnalysis: data
+class Data: summary,weak_counters
+class Summary: positions
+class Position: counters
+class Counter: champion_name,play,win
+class WeakCounter: champion_name,play,my_win_rate
+
+LolGetChampionAnalysis(Data(Summary([Position([Counter("Lissandra",48,16),Counter("Nasus",31,11),Counter("Malzahar",67,28)]),Position([Counter("Malphite",32,9),Counter("Renekton",44,17),Counter("Nasus",51,21)]),Position([Counter("Kai'Sa",73,31),Counter("Jhin",44,23),Counter("Jinx",34,20)])]),[WeakCounter("Yone",167,0.48)]))

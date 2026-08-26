@@ -1,0 +1,6 @@
+﻿class LolGetChampionSynergies: data
+class Data: synergies
+class Synergie: synergy_champion_name,score,play,win_rate,synergy_tier_data
+class SynergyTierData: tier
+
+LolGetChampionSynergies(Data([Synergie("Xerath",0,53,0.47,SynergyTierData(3)),Synergie("Bard",0,49,0.55,SynergyTierData(3)),Synergie("Thresh",0,33,0.58,SynergyTierData(1)),Synergie("Alistar",0,32,0.78,SynergyTierData(1)),Synergie("Karma",0,32,0.41,SynergyTierData(2)),Synergie("Leona",0,30,0.47,SynergyTierData(2)),Synergie("Blitzcrank",0,29,0.41,SynergyTierData(1)),Synergie("Nautilus",0,27,0.41,SynergyTierData(1)),Synergie("Pantheon",0,25,0.36,SynergyTierData(3)),Synergie("Senna",0,22,0.59,SynergyTierData(3))]))

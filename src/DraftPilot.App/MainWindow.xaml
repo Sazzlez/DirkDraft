@@ -1,0 +1,924 @@
+<Window x:Class="DraftPilot.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:DraftPilot.App.ViewModels"
+        Title="DraftPilot"
+        Width="430" Height="860"
+        MinWidth="400" MinHeight="300"
+        WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
+        Background="Transparent"
+        AllowsTransparency="True"
+        ShowInTaskbar="True"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Ideal">
+
+    <Window.Resources>
+        <!-- Icon tile. Sits behind the portrait and stands in for it while a seat is still hidden. -->
+        <Style x:Key="IconTile" TargetType="Border">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasChampion}" Value="False">
+                    <Setter Property="Background" Value="#171A20" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Champion name: dimmed until the pick is locked, so a hover reads as provisional. -->
+        <Style x:Key="ChampionName" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsLocked}" Value="False">
+                    <Setter Property="Foreground" Value="{StaticResource Faint}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Border Background="{StaticResource Bg}" BorderBrush="{StaticResource Line}"
+            BorderThickness="1" CornerRadius="10">
+        <Grid Margin="14,10,14,12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <!-- MinHeight lives on the DockPanel below: a row minimum would hold 130 empty
+                     pixels open even while the list is hidden in the idle view. -->
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- ===================== Title bar ===================== -->
+            <Grid Grid.Row="0" x:Name="TitleBar" Background="Transparent" Height="32"
+                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Connection state as a coloured dot; the text beside it stays secondary. -->
+                    <Ellipse Width="8" Height="8" Margin="0,1,9,0" VerticalAlignment="Center">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="{StaticResource Faint}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding StatusTone}" Value="Ok">
+                                        <Setter Property="Fill" Value="{StaticResource Good}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding StatusTone}" Value="Warn">
+                                        <Setter Property="Fill" Value="{StaticResource Warn}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+
+                    <TextBlock Text="DraftPilot" Style="{StaticResource Title}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding StatusText}" Style="{StaticResource Small}"
+                               Foreground="{StaticResource Faint}" Margin="9,3,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <Button Grid.Column="1" Style="{StaticResource IconButton}"
+                        Command="{Binding TogglePinCommand}"
+                        ToolTip="Empfehlung auf diesem Slot festhalten, statt dem Zug zu folgen">
+                    <!-- A filled dot in a ring: unmistakable at this size, unlike a pin glyph. -->
+                    <Grid Width="16" Height="16">
+                        <Ellipse Width="14" Height="14" StrokeThickness="1.4">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Stroke" Value="{StaticResource Faint}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                                            <Setter Property="Stroke" Value="{StaticResource Accent}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                        <Ellipse Width="6" Height="6">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="Transparent" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource Accent}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                    </Grid>
+                </Button>
+
+                <Button Grid.Column="2" Style="{StaticResource IconButton}" Margin="2,0,0,0"
+                        Click="Hide_Click" ToolTip="In den Infobereich minimieren">
+                    <Path Data="M 0 0 L 9 9 M 9 0 L 0 9" Stroke="{StaticResource Muted}"
+                          StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                </Button>
+            </Grid>
+
+            <!-- ===================== Turn card (only while a draft runs) ===================== -->
+            <Border Grid.Row="1" Background="{StaticResource Surface}"
+                    BorderThickness="1" CornerRadius="10" Padding="13,9" Margin="0,3,0,0"
+                    Visibility="{Binding IsDraftActive, Converter={StaticResource BoolToVisibility}}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="BorderBrush" Value="{StaticResource LineSoft}" />
+                        <Style.Triggers>
+                            <!-- Your own turn is the one moment the panel must not be overlooked. -->
+                            <DataTrigger Binding="{Binding IsMyTurn}" Value="True">
+                                <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding TurnText}" Style="{StaticResource Title}" />
+                        <TextBlock Text="{Binding PhaseText}" Style="{StaticResource Small}"
+                                   Foreground="{StaticResource Faint}" Margin="0,1,0,0" />
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1" Text="{Binding SecondsText}" VerticalAlignment="Center"
+                               FontSize="27" FontWeight="Light"
+                               FontFamily="{StaticResource NumFont}" Margin="10,0,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource Text}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsTimeCritical}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource Bad}" />
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <!--
+                        Phase timer, scaled rather than width-bound: a ScaleTransform takes the
+                        fraction directly, so no converter is needed to turn it into pixels. Hidden
+                        outside a draft, where it would read as a stalled bar.
+                    -->
+                    <Border Grid.Row="1" Grid.ColumnSpan="2" Height="3" CornerRadius="2" Margin="0,9,0,0"
+                            Background="{StaticResource SurfaceHi}" ClipToBounds="True"
+                            Visibility="{Binding IsDraftActive, Converter={StaticResource BoolToVisibility}}">
+                        <Border CornerRadius="2"
+                                HorizontalAlignment="Stretch" RenderTransformOrigin="0,0.5">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{StaticResource Accent}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsTimeCritical}" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource Bad}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Border.RenderTransform>
+                                <ScaleTransform ScaleX="{Binding PhaseFraction}" ScaleY="1" />
+                            </Border.RenderTransform>
+                        </Border>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!--
+                ===================== Idle card =====================
+                Replaces the turn card while no draft runs: a checklist that answers the three
+                questions an idle window raises — is the client connected, are there data, and what
+                happens next. The build line settles "which version is this" at a glance.
+            -->
+            <Border Grid.Row="1" Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
+                    BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,3,0,0"
+                    Visibility="{Binding IsDraftActive, Converter={StaticResource InverseBoolToVisibility}}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="18" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Ellipse Width="8" Height="8" VerticalAlignment="Center" HorizontalAlignment="Left">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="{StaticResource Faint}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding StatusTone}" Value="Ok">
+                                            <Setter Property="Fill" Value="{StaticResource Good}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StatusTone}" Value="Warn">
+                                            <Setter Property="Fill" Value="{StaticResource Warn}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                        <TextBlock Grid.Column="1" Style="{StaticResource Small}" VerticalAlignment="Center">
+                            <Run Text="League-Client: " Foreground="{StaticResource Muted}" /><Run Text="{Binding StatusText, Mode=OneWay}" />
+                        </TextBlock>
+                    </Grid>
+
+                    <Grid Margin="0,7,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="18" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Ellipse Width="8" Height="8" VerticalAlignment="Center" HorizontalAlignment="Left">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="{StaticResource Warn}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasMeta}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource Good}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                        <TextBlock Grid.Column="1" Text="{Binding SnapshotText}"
+                                   VerticalAlignment="Center" ToolTip="{Binding SnapshotDetail}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasMeta}" Value="False">
+                                            <Setter Property="Foreground" Value="{StaticResource Warn}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+
+                    <TextBlock Text="Sobald ein Champ Select beginnt, füllt sich das Fenster automatisch."
+                               Style="{StaticResource Small}" Foreground="{StaticResource Faint}"
+                               TextWrapping="Wrap" Margin="18,9,0,0" />
+
+                    <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,10,0,7" />
+
+                    <TextBlock Text="{Binding BuildInfoText}" FontSize="10"
+                               Foreground="{StaticResource Faint}" Margin="18,0,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!--
+                Both teams, collapsed as a block when no draft is running. Ten empty rows outside a
+                champion select are 400 pixels that say nothing.
+            -->
+            <StackPanel Grid.Row="2"
+                        Visibility="{Binding IsDraftActive, Converter={StaticResource BoolToVisibility}}">
+
+            <!-- ===================== Enemies ===================== -->
+            <Grid Margin="2,13,2,3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="GEGNER" Style="{StaticResource Caption}" />
+                <Border Grid.Column="1" Height="1" Background="{StaticResource LineSoft}" VerticalAlignment="Center" />
+            </Grid>
+
+            <ItemsControl ItemsSource="{Binding Enemies}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:SlotViewModel}">
+                        <Grid Height="33">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="68" />
+                                <ColumnDefinition Width="32" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="90" />
+                                <ColumnDefinition Width="40" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="{Binding Label}" Style="{StaticResource Small}"
+                                       Foreground="{StaticResource Faint}" VerticalAlignment="Center" />
+
+                            <Border Grid.Column="1" Style="{StaticResource IconTile}" Width="26" Height="26">
+                                <Image Source="{Binding Icon}" Stretch="UniformToFill"
+                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                            </Border>
+
+                            <TextBlock Grid.Column="2" Text="{Binding Champion}"
+                                       Style="{StaticResource ChampionName}" Margin="4,0,8,0" />
+
+                            <!--
+                                Lane override. Shows the lane in effect, predicted or overridden, and
+                                turns accent-coloured once it is set by hand. One-way bound: the edit
+                                is applied in code-behind so a refresh cannot loop back into it.
+
+                                Hidden until a champion is revealed. A lane shown for a seat that has
+                                picked nothing would be a guess presented as a reading, and there is
+                                nothing useful to override yet either.
+                            -->
+                            <ComboBox Grid.Column="3"
+                                      ItemsSource="{x:Static vm:SlotViewModel.LaneOptions}"
+                                      SelectedIndex="{Binding LaneIndex, Mode=OneWay}"
+                                      SelectionChanged="LaneOverride_SelectionChanged"
+                                      Tag="{Binding}"
+                                      VerticalAlignment="Center" Height="26"
+                                      Visibility="{Binding HasChampion, Converter={StaticResource BoolToVisibility}}"
+                                      ToolTip="Lane manuell festlegen. „automatisch“ gibt sie an die Vorhersage zurück.">
+                                <ComboBox.Style>
+                                    <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsManualLane}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ComboBox.Style>
+                            </ComboBox>
+
+                            <TextBlock Grid.Column="4" Text="{Binding Confidence}"
+                                       HorizontalAlignment="Right" VerticalAlignment="Center"
+                                       FontFamily="{StaticResource NumFont}" FontSize="12">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsUncertain}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource Warn}" />
+                                                <Setter Property="ToolTip" Value="Unsichere Vorhersage — bitte selbst prüfen" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- ===================== Own team ===================== -->
+            <Grid Margin="2,11,2,3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="DEIN TEAM" Style="{StaticResource Caption}" />
+                <Border Grid.Column="1" Height="1" Background="{StaticResource LineSoft}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="Klick wählt den Slot" Style="{StaticResource Small}"
+                           Foreground="{StaticResource Faint}" FontSize="11" Margin="10,0,0,0" />
+            </Grid>
+
+            <ItemsControl ItemsSource="{Binding Allies}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:SlotViewModel}">
+                        <Button Style="{StaticResource RowButton}"
+                                Command="{Binding DataContext.SelectSlotCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}">
+                            <Border CornerRadius="8">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsTarget}" Value="True">
+                                                <Setter Property="Background" Value="{StaticResource AccentSoft}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+
+                                <Grid Height="33">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="3" />
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="58" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Accent bar marks the seat the list is advising. -->
+                                    <Border Width="3" CornerRadius="2" Margin="0,6">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="Transparent" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsTarget}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource Accent}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                    </Border>
+
+                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0"
+                                               Text="{Binding Label}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsLocalPlayer}" Value="True">
+                                                        <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                                        <Setter Property="FontWeight" Value="Bold" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <Border Grid.Column="2" Style="{StaticResource IconTile}" Width="26" Height="26">
+                                        <Image Source="{Binding Icon}" Stretch="UniformToFill"
+                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                    </Border>
+
+                                    <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="4,0,8,0">
+                                        <TextBlock Text="{Binding Champion}" Style="{StaticResource ChampionName}" />
+                                        <TextBlock Text="hovert" FontSize="10" Foreground="{StaticResource Faint}"
+                                                   Visibility="{Binding HasHover, Converter={StaticResource BoolToVisibility}}" />
+                                    </StackPanel>
+
+                                    <Border Grid.Column="4" Background="{StaticResource BadSoft}" CornerRadius="9"
+                                            Padding="8,2" VerticalAlignment="Center" Margin="0,0,8,0"
+                                            Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibility}}">
+                                        <TextBlock Text="{Binding Warning}" FontSize="11"
+                                                   Foreground="{StaticResource Bad}" />
+                                    </Border>
+
+                                    <TextBlock Grid.Column="5" Text="{Binding LaneText}" Style="{StaticResource Small}"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Margin="0,0,8,0" />
+                                </Grid>
+                            </Border>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Composition gaps, as chips. -->
+            <ItemsControl ItemsSource="{Binding Warnings}" Margin="2,9,2,0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{StaticResource WarnSoft}" CornerRadius="10"
+                                Padding="10,3" Margin="0,0,6,5">
+                            <TextBlock Text="{Binding}" FontSize="12" Foreground="{StaticResource Warn}" />
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- ===================== Recommendations ===================== -->
+            </StackPanel>
+
+            <!--
+                ===================== Your build =====================
+                Runes, shards and shopping order for the locked pick. Shown inside the draft once
+                the matchup is known, and kept on screen as a card after the draft, so the item
+                path is still there when tabbing out mid-game.
+            -->
+            <Border Grid.Row="3" Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
+                    BorderThickness="1" CornerRadius="10" Padding="13,9" Margin="0,11,0,0"
+                    Visibility="{Binding ShowBuildSection, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="DEIN BUILD" Style="{StaticResource Caption}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding BuildTitle}" Style="{StaticResource Small}"
+                                   Foreground="{StaticResource Muted}" Margin="10,0,0,0" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                        <ToggleButton Grid.Column="2" Style="{StaticResource Chevron}"
+                                      IsChecked="{Binding IsBuildExpanded, Mode=TwoWay}"
+                                      ToolTip="Build ein-/ausklappen"
+                                      Visibility="{Binding HasBuild, Converter={StaticResource BoolToVisibility}}" />
+                        <Button Grid.Column="3" Style="{StaticResource IconButton}" Margin="2,0,0,0"
+                                Command="{Binding CloseBuildCommand}" ToolTip="Build-Karte schließen"
+                                Visibility="{Binding ShowBuildClose, Converter={StaticResource BoolToVisibility}}">
+                            <Path Data="M 0 0 L 8 8 M 8 0 L 0 8" Stroke="{StaticResource Muted}"
+                                  StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                        </Button>
+                    </Grid>
+
+                    <!-- Hint while nothing is loaded yet (draft only). -->
+                    <TextBlock Text="{Binding BuildHint}"
+                               Foreground="{StaticResource Faint}" TextWrapping="Wrap" Margin="0,7,0,2">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasBuild}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <!--
+                        Capped and scrollable while a draft runs, so an opened build can never push
+                        the recommendation list or the footer out of the window. The post-draft
+                        card has the window to itself and shows everything.
+                    -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ScrollViewer.Style>
+                            <Style TargetType="ScrollViewer">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding HasBuild}" Value="True" />
+                                            <Condition Binding="{Binding IsBuildExpanded}" Value="True" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </MultiDataTrigger>
+                                    <DataTrigger Binding="{Binding IsDraftActive}" Value="True">
+                                        <Setter Property="MaxHeight" Value="240" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ScrollViewer.Style>
+                    <StackPanel Margin="0,0,6,0">
+                        <TextBlock Text="{Binding BuildSubtitle}" Style="{StaticResource Small}" FontSize="11"
+                                   Foreground="{StaticResource Faint}" Margin="0,5,0,0" />
+
+                        <TextBlock Text="{Binding BuildRunesPrimary}" Style="{StaticResource Small}"
+                                   TextWrapping="Wrap" Margin="0,7,0,0" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding BuildRunesSecondary}" Style="{StaticResource Small}"
+                                   TextWrapping="Wrap" Margin="0,2,0,0" Foreground="{StaticResource Muted}" />
+
+                        <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,8,0,7" />
+
+                        <TextBlock Text="{Binding BuildStarter}" Style="{StaticResource Small}"
+                                   Foreground="{StaticResource Muted}" />
+
+                        <ItemsControl ItemsSource="{Binding BuildCoreLines}" Margin="0,5,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" Style="{StaticResource Small}"
+                                               TextWrapping="Wrap" Margin="0,1,0,1" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="{Binding BuildSpells}" Style="{StaticResource Small}"
+                                   Foreground="{StaticResource Muted}" Margin="0,5,0,0" />
+
+                        <!-- Situational pointers from the enemy composition. -->
+                        <ItemsControl ItemsSource="{Binding BuildHints}" Margin="0,7,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource AccentSoft}" CornerRadius="9"
+                                            Padding="8,2" Margin="0,0,5,4">
+                                        <TextBlock Text="{Binding Text}" FontSize="11"
+                                                   Foreground="{StaticResource Accent}" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+
+            <DockPanel Grid.Row="4" LastChildFill="True" Margin="0,11,0,0" MinHeight="130"
+                       Visibility="{Binding IsDraftActive, Converter={StaticResource BoolToVisibility}}">
+                <Grid DockPanel.Dock="Top" Margin="2,0,2,7">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding ListHeader}" Style="{StaticResource Caption}"
+                               Foreground="{StaticResource Muted}" VerticalAlignment="Center" />
+                    <Border Grid.Column="1" Height="1" Background="{StaticResource LineSoft}" VerticalAlignment="Center" />
+
+                    <!--
+                        The one deliberate network access inside a draft: fresh counters for the
+                        enemies actually on the board, plus the build for the locked pick. Never
+                        fires without this click.
+                    -->
+                    <Button Grid.Column="2" Style="{StaticResource Ghost}" Margin="8,0,0,0"
+                            Content="{Binding DraftFetchText}"
+                            Command="{Binding FetchDraftDataCommand}"
+                            Visibility="{Binding ShowDraftFetchButton, Converter={StaticResource BoolToVisibility}}"
+                            ToolTip="Holt aktuelle Counter-Daten für die aufgedeckten Gegner und den Build für deinen Pick — ein gezielter OP.GG-Abruf, nur auf diesen Klick." />
+                </Grid>
+
+                <Grid>
+                    <!-- Empty state instead of a blank gap. -->
+                    <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
+                            BorderThickness="1" CornerRadius="10" Padding="18" VerticalAlignment="Top">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasRecommendations}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding EmptyHint}" Style="{StaticResource Small}"
+                                   TextWrapping="Wrap" TextAlignment="Center"
+                                   Foreground="{StaticResource Faint}" />
+                    </Border>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                  Visibility="{Binding HasRecommendations, Converter={StaticResource BoolToVisibility}}">
+                        <!-- Right margin keeps the scrollbar clear of the cards instead of over them. -->
+                        <ItemsControl ItemsSource="{Binding Recommendations}" Margin="0,0,10,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:RecommendationViewModel}">
+                                    <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
+                                            BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,0,0,6">
+                                        <StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="20" />
+                                                    <ColumnDefinition Width="40" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="26" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Text="{Binding Rank}" Style="{StaticResource Small}"
+                                                           Foreground="{StaticResource Faint}"
+                                                           FontFamily="{StaticResource NumFont}"
+                                                           VerticalAlignment="Center" />
+
+                                                <Border Grid.Column="1" Width="32" Height="32" CornerRadius="7"
+                                                        Background="{StaticResource SurfaceAlt}"
+                                                        HorizontalAlignment="Left" ClipToBounds="True">
+                                                    <Image Source="{Binding Icon}" Stretch="UniformToFill"
+                                                           RenderOptions.BitmapScalingMode="HighQuality" />
+                                                </Border>
+
+                                                <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="15"
+                                                           FontWeight="SemiBold" VerticalAlignment="Center"
+                                                           Margin="2,0,8,0" />
+
+                                                <!-- Score pill, tinted by how strong the pick is. -->
+                                                <Border Grid.Column="3" CornerRadius="7" Padding="9,3"
+                                                        VerticalAlignment="Center">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="{StaticResource SurfaceHi}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Tone}" Value="Strong">
+                                                                    <Setter Property="Background" Value="{StaticResource GoodSoft}" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Tone}" Value="Fair">
+                                                                    <Setter Property="Background" Value="{StaticResource AccentSoft}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock Text="{Binding Score}" FontFamily="{StaticResource NumFont}"
+                                                               FontSize="13" FontWeight="SemiBold">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Tone}" Value="Strong">
+                                                                        <Setter Property="Foreground" Value="{StaticResource Good}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Tone}" Value="Fair">
+                                                                        <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
+
+                                                <ToggleButton Grid.Column="4" Style="{StaticResource Chevron}"
+                                                              IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                                                              ToolTip="Aufschlüsselung des Scores" />
+                                            </Grid>
+
+                                            <!-- Reason chips, coloured by whether they argue for or against. -->
+                                            <ItemsControl ItemsSource="{Binding Reasons}" Margin="62,6,0,0">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border CornerRadius="9" Padding="8,2" Margin="0,0,5,4">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding Tone}" Value="Pro">
+                                                                            <Setter Property="Background" Value="{StaticResource GoodSoft}" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding Tone}" Value="Contra">
+                                                                            <Setter Property="Background" Value="{StaticResource BadSoft}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+                                                            <TextBlock Text="{Binding Text}" FontSize="11">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Tone}" Value="Pro">
+                                                                                <Setter Property="Foreground" Value="{StaticResource Good}" />
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding Tone}" Value="Contra">
+                                                                                <Setter Property="Foreground" Value="{StaticResource Bad}" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <Border Margin="62,5,0,0" Padding="10,7" CornerRadius="7"
+                                                    Background="{StaticResource Bg}"
+                                                    Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
+                                                <ItemsControl ItemsSource="{Binding Breakdown}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="{x:Type vm:TermViewModel}">
+                                                            <Grid Margin="0,1">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="92" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Text="{Binding Label}" Style="{StaticResource Small}"
+                                                                           FontSize="11" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding Detail}"
+                                                                           Style="{StaticResource Mono}" FontSize="11"
+                                                                           HorizontalAlignment="Right" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </DockPanel>
+
+            <!-- ===================== Footer ===================== -->
+            <StackPanel Grid.Row="5" Margin="0,10,0,0">
+                <!-- Named, because three bare buttons do not explain that they change the scoring. -->
+                <Grid Margin="2,0,2,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="GEWICHTUNG" Style="{StaticResource Caption}" />
+                    <Border Grid.Column="1" Height="1" Background="{StaticResource LineSoft}" VerticalAlignment="Center" />
+                </Grid>
+
+                <!-- Preset switch as a segmented control; each segment lights itself up. -->
+                <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
+                        BorderThickness="1" CornerRadius="8" Padding="3">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button Content="Meta" Command="{Binding SetPresetCommand}" CommandParameter="Meta"
+                                ToolTip="Gewichtet die Tierlist am stärksten">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource Segment}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PresetName}" Value="Meta">
+                                            <Setter Property="Background" Value="{StaticResource AccentSoft}" />
+                                            <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Grid.Column="1" Content="Counter" Command="{Binding SetPresetCommand}"
+                                CommandParameter="Counter"
+                                ToolTip="Gewichtet das direkte Lane-Matchup am stärksten">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource Segment}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PresetName}" Value="Counter">
+                                            <Setter Property="Background" Value="{StaticResource AccentSoft}" />
+                                            <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Grid.Column="2" Content="Teamcomp" Command="{Binding SetPresetCommand}"
+                                CommandParameter="Teamcomp"
+                                ToolTip="Gewichtet Synergien und Comp-Bedarf am stärksten">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource Segment}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PresetName}" Value="Teamcomp">
+                                            <Setter Property="Background" Value="{StaticResource AccentSoft}" />
+                                            <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding SnapshotText}" FontSize="11"
+                                   ToolTip="{Binding SnapshotDetail}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
+                                    <Setter Property="Foreground" Value="{StaticResource Faint}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasMeta}" Value="False">
+                                            <Setter Property="Foreground" Value="{StaticResource Warn}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text="{Binding UpdateStatus}" Style="{StaticResource Small}"
+                                   Foreground="{StaticResource Accent}" FontSize="11"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <Button Grid.Column="1" Command="{Binding UpdateDataCommand}" Margin="8,0,0,0">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource Primary}">
+                                <Setter Property="Content" Value="Daten aktualisieren" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsUpdating}" Value="True">
+                                        <Setter Property="Content" Value="Aktualisiere…" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <Button.ToolTip>
+                            <TextBlock Text="Holt Tierlist, Counter, Synergien und Icons von OP.GG. Der einzige Netzzugriff des Tools. Während eines Champ Select gesperrt." />
+                        </Button.ToolTip>
+                    </Button>
+
+                    <Button Grid.Column="2" Style="{StaticResource Ghost}" Content="Abbrechen"
+                            Command="{Binding CancelUpdateCommand}" Margin="6,0,0,0"
+                            Visibility="{Binding IsUpdating, Converter={StaticResource BoolToVisibility}}" />
+                </Grid>
+
+                <!-- Progress of the running update. Four minutes without visible movement reads as a hang. -->
+                <Border Height="3" CornerRadius="2" Margin="0,7,0,0"
+                        Background="{StaticResource SurfaceHi}" ClipToBounds="True"
+                        Visibility="{Binding IsUpdating, Converter={StaticResource BoolToVisibility}}">
+                    <Border Background="{StaticResource Accent}" CornerRadius="2"
+                            HorizontalAlignment="Stretch" RenderTransformOrigin="0,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform ScaleX="{Binding UpdateFraction}" ScaleY="1" />
+                        </Border.RenderTransform>
+                    </Border>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

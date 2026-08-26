@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Pinned so the LCU's self-signed certificate can be verified without a network round trip. -->
+    <EmbeddedResource Include="Lcu\Resources\riotgames.pem" />
+  </ItemGroup>
+
+</Project>

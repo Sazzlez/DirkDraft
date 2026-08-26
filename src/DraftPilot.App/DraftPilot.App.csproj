@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- Only for the notification-area icon; WPF has no equivalent. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>DraftPilot</AssemblyName>
+    <RootNamespace>DraftPilot.App</RootNamespace>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+
+    <!-- Keep the idle footprint small: workstation GC, no background collection thread. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WinForms stays out of the implicit using set: only TrayPresence needs it, and its
+         Application, ComboBox and Label types otherwise collide with the WPF ones. -->
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DraftPilot.Core\DraftPilot.Core.csproj" />
+    <ProjectReference Include="..\DraftPilot.Meta\DraftPilot.Meta.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Curated, read-only data files ship next to the executable. -->
+    <Content Include="$(MSBuildThisFileDirectory)..\..\data\*.json"
+             Link="data\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
