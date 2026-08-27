@@ -2,11 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:DraftPilot.App.ViewModels"
-        Title="DraftPilot"
-        Width="430" Height="860"
-        MinWidth="400" MinHeight="300"
+        Title="DirkDraft"
+        Width="860" Height="900"
         WindowStyle="None"
-        ResizeMode="CanResizeWithGrip"
+        ResizeMode="NoResize"
         Background="Transparent"
         AllowsTransparency="True"
         ShowInTaskbar="True"
@@ -37,18 +36,116 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <!--
+            One item/rune/spell tile: the icon with the name on hover, falling back to a text chip
+            while the icon has not been downloaded yet. The build view must work from the first
+            second — text first, pictures when they land.
+        -->
+        <DataTemplate x:Key="IconChip" DataType="{x:Type vm:IconChipViewModel}">
+            <Border Margin="0,0,6,4" CornerRadius="7" ClipToBounds="True"
+                    Background="{StaticResource SurfaceAlt}"
+                    ToolTip="{Binding Hint}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsHighlighted}" Value="True">
+                                <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+                                <Setter Property="BorderThickness" Value="1" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <Image Source="{Binding Icon}" Width="34" Height="34" Stretch="UniformToFill"
+                           RenderOptions.BitmapScalingMode="HighQuality">
+                        <Image.Style>
+                            <Style TargetType="Image">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Icon}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Image.Style>
+                    </Image>
+                    <TextBlock Text="{Binding Label}" FontSize="11" Margin="8,2"
+                               Foreground="{StaticResource Muted}" VerticalAlignment="Center"
+                               MaxWidth="150" TextTrimming="CharacterEllipsis">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Icon}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- A horizontal row of icon chips. -->
+        <ItemsPanelTemplate x:Key="ChipRow">
+            <WrapPanel Orientation="Horizontal" />
+        </ItemsPanelTemplate>
+
+        <!-- The same tile at 26 px, for the narrow build column during the draft. -->
+        <DataTemplate x:Key="IconChipSmall" DataType="{x:Type vm:IconChipViewModel}">
+            <Border Margin="0,0,5,3" CornerRadius="6" ClipToBounds="True"
+                    Background="{StaticResource SurfaceAlt}"
+                    ToolTip="{Binding Hint}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsHighlighted}" Value="True">
+                                <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+                                <Setter Property="BorderThickness" Value="1" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <Image Source="{Binding Icon}" Width="26" Height="26" Stretch="UniformToFill"
+                           RenderOptions.BitmapScalingMode="HighQuality">
+                        <Image.Style>
+                            <Style TargetType="Image">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Icon}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Image.Style>
+                    </Image>
+                    <TextBlock Text="{Binding Label}" FontSize="10" Margin="6,2"
+                               Foreground="{StaticResource Muted}" VerticalAlignment="Center"
+                               MaxWidth="84" TextTrimming="CharacterEllipsis">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Icon}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </Border>
+        </DataTemplate>
     </Window.Resources>
 
     <Border Background="{StaticResource Bg}" BorderBrush="{StaticResource Line}"
             BorderThickness="1" CornerRadius="10">
         <Grid Margin="14,10,14,12">
             <Grid.RowDefinitions>
+                <!-- Title bar · turn card (or idle checklist) · two-column content · footer. -->
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <!-- MinHeight lives on the DockPanel below: a row minimum would hold 130 empty
-                     pixels open even while the list is hidden in the idle view. -->
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
@@ -58,7 +155,6 @@
                   MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
@@ -80,44 +176,12 @@
                         </Ellipse.Style>
                     </Ellipse>
 
-                    <TextBlock Text="DraftPilot" Style="{StaticResource Title}" VerticalAlignment="Center" />
+                    <TextBlock Text="DirkDraft" Style="{StaticResource Title}" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding StatusText}" Style="{StaticResource Small}"
                                Foreground="{StaticResource Faint}" Margin="9,3,0,0" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <Button Grid.Column="1" Style="{StaticResource IconButton}"
-                        Command="{Binding TogglePinCommand}"
-                        ToolTip="Empfehlung auf diesem Slot festhalten, statt dem Zug zu folgen">
-                    <!-- A filled dot in a ring: unmistakable at this size, unlike a pin glyph. -->
-                    <Grid Width="16" Height="16">
-                        <Ellipse Width="14" Height="14" StrokeThickness="1.4">
-                            <Ellipse.Style>
-                                <Style TargetType="Ellipse">
-                                    <Setter Property="Stroke" Value="{StaticResource Faint}" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsPinned}" Value="True">
-                                            <Setter Property="Stroke" Value="{StaticResource Accent}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Ellipse.Style>
-                        </Ellipse>
-                        <Ellipse Width="6" Height="6">
-                            <Ellipse.Style>
-                                <Style TargetType="Ellipse">
-                                    <Setter Property="Fill" Value="Transparent" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsPinned}" Value="True">
-                                            <Setter Property="Fill" Value="{StaticResource Accent}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Ellipse.Style>
-                        </Ellipse>
-                    </Grid>
-                </Button>
-
-                <Button Grid.Column="2" Style="{StaticResource IconButton}" Margin="2,0,0,0"
+                <Button Grid.Column="1" Style="{StaticResource IconButton}" Margin="2,0,0,0"
                         Click="Hide_Click" ToolTip="In den Infobereich minimieren">
                     <Path Data="M 0 0 L 9 9 M 9 0 L 0 9" Stroke="{StaticResource Muted}"
                           StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
@@ -205,9 +269,12 @@
                 questions an idle window raises — is the client connected, are there data, and what
                 happens next. The build line settles "which version is this" at a glance.
             -->
+            <!-- Capped: at the window's new width a full-width card would be a 830 px band
+                 holding four short lines. -->
             <Border Grid.Row="1" Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
                     BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,3,0,0"
-                    Visibility="{Binding IsDraftActive, Converter={StaticResource InverseBoolToVisibility}}">
+                    MaxWidth="520" HorizontalAlignment="Left"
+                    Visibility="{Binding ShowIdleCard, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -277,10 +344,246 @@
             </Border>
 
             <!--
+                ===================== In-game build view =====================
+                Shown while the game runs: the drafted matchup's runes, purchase order with item
+                pictures, and the level-by-level skill table. Same row as the idle card — the two
+                are mutually exclusive by ShowIdleCard/ShowGameView.
+            -->
+            <Border Grid.Row="1" Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
+                    BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,3,0,0"
+                    Visibility="{Binding ShowGameView, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding GameBuild.Title}" Style="{StaticResource Title}" />
+                        <TextBlock Grid.Column="1" Text="{Binding GameBuild.Subtitle}"
+                                   Style="{StaticResource Small}" Foreground="{StaticResource Faint}"
+                                   VerticalAlignment="Center" Margin="0,0,10,0" />
+                        <Button Grid.Column="2" Style="{StaticResource IconButton}"
+                                Command="{Binding CloseBuildCommand}"
+                                ToolTip="Build-Ansicht schließen">
+                            <Path Data="M 0 0 L 9 9 M 9 0 L 0 9" Stroke="{StaticResource Muted}"
+                                  StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                        </Button>
+                    </Grid>
+
+                    <!-- Runes: keystone ringed, shards as text (their icons are generic arrows). -->
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="RUNEN" Style="{StaticResource Caption}" VerticalAlignment="Top"
+                                   Margin="0,10,14,0" />
+                        <StackPanel Grid.Column="1">
+                            <DockPanel LastChildFill="False">
+                                <TextBlock Text="{Binding GameBuild.PrimaryPath}" Style="{StaticResource Small}"
+                                           Foreground="{StaticResource Faint}" FontSize="11"
+                                           VerticalAlignment="Center" Margin="0,0,8,4" MinWidth="70" />
+                                <ItemsControl ItemsSource="{Binding GameBuild.PrimaryRunes}"
+                                              ItemTemplate="{StaticResource IconChip}"
+                                              ItemsPanel="{StaticResource ChipRow}" />
+                            </DockPanel>
+                            <DockPanel LastChildFill="False">
+                                <TextBlock Text="{Binding GameBuild.SecondaryPath}" Style="{StaticResource Small}"
+                                           Foreground="{StaticResource Faint}" FontSize="11"
+                                           VerticalAlignment="Center" Margin="0,0,8,4" MinWidth="70" />
+                                <ItemsControl ItemsSource="{Binding GameBuild.SecondaryRunes}"
+                                              ItemTemplate="{StaticResource IconChip}"
+                                              ItemsPanel="{StaticResource ChipRow}" />
+                                <TextBlock Text="{Binding GameBuild.ShardText}" Style="{StaticResource Small}"
+                                           FontSize="11" VerticalAlignment="Center" Margin="10,0,0,4"
+                                           ToolTip="Stat-Shards: die drei kleinen Zusatzwerte unter den Runen." />
+                            </DockPanel>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,8,0,10" />
+
+                    <!-- Purchase order. -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="KAUFEN" Style="{StaticResource Caption}" VerticalAlignment="Top"
+                                   Margin="0,10,14,0"
+                                   ToolTip="Reihenfolge: Start-Items → Schuhe → die drei Kern-Items → späte Optionen." />
+                        <!--
+                            Each purchase row is a Grid, not a StackPanel or DockPanel: only the
+                            star column bounds the wrap panel (a StackPanel measured it with
+                            infinity, so it never wrapped), and only Auto columns keep the
+                            trailing label and chips alive (a DockPanel squeezed them to zero
+                            width once the leading chips filled the line in the text fallback).
+                        -->
+                        <StackPanel Grid.Column="1">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Start" Style="{StaticResource Small}" FontSize="11"
+                                           Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                           Margin="0,7,8,4" MinWidth="70" />
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding GameBuild.StartItems}"
+                                              ItemTemplate="{StaticResource IconChip}"
+                                              ItemsPanel="{StaticResource ChipRow}" />
+                                <TextBlock Grid.Column="2" Text="Schuhe" Style="{StaticResource Small}" FontSize="11"
+                                           Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                           Margin="16,7,8,4" />
+                                <ItemsControl Grid.Column="3" ItemsSource="{Binding GameBuild.BootItems}"
+                                              ItemTemplate="{StaticResource IconChip}"
+                                              ItemsPanel="{StaticResource ChipRow}" />
+                            </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Kern" Style="{StaticResource Small}" FontSize="11"
+                                           Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                           Margin="0,7,8,4" MinWidth="70"
+                                           ToolTip="In dieser Reihenfolge kaufen — die meistgespielte Kombination dieses Matchups." />
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding GameBuild.CoreItems}"
+                                              ItemTemplate="{StaticResource IconChip}"
+                                              ItemsPanel="{StaticResource ChipRow}" />
+                                <TextBlock Grid.Column="2" Text="{Binding GameBuild.CoreStats}" Style="{StaticResource Small}"
+                                           FontSize="11" Foreground="{StaticResource Faint}"
+                                           VerticalAlignment="Top" Margin="10,7,0,4" />
+                            </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Spät" Style="{StaticResource Small}" FontSize="11"
+                                           Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                           Margin="0,7,8,4" MinWidth="70"
+                                           ToolTip="Häufige Käufe für die letzten Slots — Optionen, keine feste Reihenfolge." />
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding GameBuild.LateItems}"
+                                              ItemTemplate="{StaticResource IconChip}"
+                                              ItemsPanel="{StaticResource ChipRow}" />
+                                <TextBlock Grid.Column="2" Text="Spells" Style="{StaticResource Small}" FontSize="11"
+                                           Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                           Margin="16,7,8,4" />
+                                <ItemsControl Grid.Column="3" ItemsSource="{Binding GameBuild.Spells}"
+                                              ItemTemplate="{StaticResource IconChip}"
+                                              ItemsPanel="{StaticResource ChipRow}" />
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,8,0,10"
+                            Visibility="{Binding GameBuild.HasSkillOrder, Converter={StaticResource BoolToVisibility}}" />
+
+                    <!-- Skill table: which ability gets the point at each level. -->
+                    <Grid Visibility="{Binding GameBuild.HasSkillOrder, Converter={StaticResource BoolToVisibility}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="SKILLS" Style="{StaticResource Caption}" VerticalAlignment="Center"
+                                   Margin="0,0,14,0"
+                                   ToolTip="Welche Fähigkeit auf welcher Stufe einen Punkt bekommt. Stufen 16–18 sind abgeleitet (blasser), nicht gemessen — die Daten reichen bis 15." />
+                        <ItemsControl Grid.Column="1" ItemsSource="{Binding GameBuild.SkillCells}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:SkillCellViewModel}">
+                                    <StackPanel Margin="0,0,7,0">
+                                        <TextBlock Text="{Binding Level}" FontSize="10" TextAlignment="Center"
+                                                   Foreground="{StaticResource Faint}"
+                                                   FontFamily="{StaticResource NumFont}" />
+                                        <Border Width="24" Height="24" CornerRadius="5" Margin="0,2,0,0">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsUlt}" Value="True">
+                                                            <Setter Property="Background" Value="{StaticResource AccentSoft}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding Ability}" FontSize="12" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{StaticResource Text}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsUlt}" Value="True">
+                                                                <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsDerived}" Value="True">
+                                                                <Setter Property="Foreground" Value="{StaticResource Faint}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+
+                    <!-- Situational hints from the enemy composition, same chips as in the draft. -->
+                    <ItemsControl ItemsSource="{Binding BuildHints}" Margin="0,10,0,0">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource AccentSoft}" CornerRadius="9"
+                                        Padding="8,2" Margin="0,0,5,4"
+                                        ToolTip="{Binding Hint}">
+                                    <TextBlock Text="{Binding Text}" FontSize="11" TextWrapping="Wrap"
+                                               Foreground="{StaticResource Accent}" />
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!--
+                ===================== Content: two columns =====================
+                Left: enemies, own team, build. Right: the recommendation list over the full
+                height. Stacked in one column, everything together needed ~1190 px and the list —
+                the whole point of the window — was the part that got cut off and scrolled.
+            -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="336" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <!-- Filler keeps both columns pinned to the top. -->
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+            <!--
                 Both teams, collapsed as a block when no draft is running. Ten empty rows outside a
                 champion select are 400 pixels that say nothing.
             -->
-            <StackPanel Grid.Row="2"
+            <StackPanel Grid.Row="0" Grid.Column="0"
                         Visibility="{Binding IsDraftActive, Converter={StaticResource BoolToVisibility}}">
 
             <!-- ===================== Enemies ===================== -->
@@ -298,7 +601,7 @@
                     <DataTemplate DataType="{x:Type vm:SlotViewModel}">
                         <Grid Height="33">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="68" />
+                                <ColumnDefinition Width="62" />
                                 <ColumnDefinition Width="32" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="90" />
@@ -369,12 +672,12 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="DEIN TEAM" Style="{StaticResource Caption}" />
+                <!-- The click hint lives in the tooltip: in the narrow column the visible text
+                     squeezed the divider to nothing. -->
+                <TextBlock Text="DEIN TEAM" Style="{StaticResource Caption}"
+                           ToolTip="Klick auf einen Slot zeigt Empfehlungen für ihn — bis der nächste Zug beginnt." />
                 <Border Grid.Column="1" Height="1" Background="{StaticResource LineSoft}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="2" Text="Klick wählt den Slot" Style="{StaticResource Small}"
-                           Foreground="{StaticResource Faint}" FontSize="11" Margin="10,0,0,0" />
             </Grid>
 
             <ItemsControl ItemsSource="{Binding Allies}">
@@ -477,36 +780,42 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-
-            <!-- ===================== Recommendations ===================== -->
             </StackPanel>
 
             <!--
                 ===================== Your build =====================
-                Runes, shards and shopping order for the locked pick. Shown inside the draft once
-                the matchup is known, and kept on screen as a card after the draft, so the item
-                path is still there when tabbing out mid-game.
+                Runes and shopping order for the locked pick, as icon tiles — the same content the
+                in-game view shows, sized for the column. Always open: this is what the user came
+                for once their pick is locked, and hiding it behind a chevron only cost a click.
             -->
-            <Border Grid.Row="3" Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
+            <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource Surface}"
+                    BorderBrush="{StaticResource LineSoft}"
                     BorderThickness="1" CornerRadius="10" Padding="13,9" Margin="0,11,0,0"
                     Visibility="{Binding ShowBuildSection, Converter={StaticResource BoolToVisibility}}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Style.Triggers>
+                            <!-- After the draft the teams and the list are gone; the surviving
+                                 build card takes the full width instead of one narrow column. -->
+                            <DataTrigger Binding="{Binding IsDraftActive}" Value="False">
+                                <Setter Property="Grid.ColumnSpan" Value="2" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="DEIN BUILD" Style="{StaticResource Caption}" VerticalAlignment="Center" />
                         <TextBlock Grid.Column="1" Text="{Binding BuildTitle}" Style="{StaticResource Small}"
                                    Foreground="{StaticResource Muted}" Margin="10,0,0,0" VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis" />
-                        <ToggleButton Grid.Column="2" Style="{StaticResource Chevron}"
-                                      IsChecked="{Binding IsBuildExpanded, Mode=TwoWay}"
-                                      ToolTip="Build ein-/ausklappen"
-                                      Visibility="{Binding HasBuild, Converter={StaticResource BoolToVisibility}}" />
-                        <Button Grid.Column="3" Style="{StaticResource IconButton}" Margin="2,0,0,0"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding BuildSubtitle}" />
+                        <Button Grid.Column="2" Style="{StaticResource IconButton}" Margin="2,0,0,0"
                                 Command="{Binding CloseBuildCommand}" ToolTip="Build-Karte schließen"
                                 Visibility="{Binding ShowBuildClose, Converter={StaticResource BoolToVisibility}}">
                             <Path Data="M 0 0 L 8 8 M 8 0 L 0 8" Stroke="{StaticResource Muted}"
@@ -529,57 +838,106 @@
                         </TextBlock.Style>
                     </TextBlock>
 
-                    <!--
-                        Capped and scrollable while a draft runs, so an opened build can never push
-                        the recommendation list or the footer out of the window. The post-draft
-                        card has the window to itself and shows everything.
-                    -->
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <ScrollViewer.Style>
-                            <Style TargetType="ScrollViewer">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding HasBuild}" Value="True" />
-                                            <Condition Binding="{Binding IsBuildExpanded}" Value="True" />
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </MultiDataTrigger>
-                                    <DataTrigger Binding="{Binding IsDraftActive}" Value="True">
-                                        <Setter Property="MaxHeight" Value="240" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </ScrollViewer.Style>
-                    <StackPanel Margin="0,0,6,0">
-                        <TextBlock Text="{Binding BuildSubtitle}" Style="{StaticResource Small}" FontSize="11"
-                                   Foreground="{StaticResource Faint}" Margin="0,5,0,0" />
+                    <StackPanel Visibility="{Binding HasBuild, Converter={StaticResource BoolToVisibility}}">
+                        <!-- Runes as tiles, keystone ringed; shards as text (their icons say nothing). -->
+                        <ItemsControl ItemsSource="{Binding GameBuild.PrimaryRunes}"
+                                      ItemTemplate="{StaticResource IconChipSmall}"
+                                      ItemsPanel="{StaticResource ChipRow}" Margin="0,8,0,0" />
+                        <ItemsControl ItemsSource="{Binding GameBuild.SecondaryRunes}"
+                                      ItemTemplate="{StaticResource IconChipSmall}"
+                                      ItemsPanel="{StaticResource ChipRow}" />
+                        <TextBlock Text="{Binding GameBuild.ShardText}" Style="{StaticResource Small}"
+                                   FontSize="10" Margin="0,1,0,0" TextWrapping="Wrap"
+                                   Foreground="{StaticResource Faint}"
+                                   ToolTip="Stat-Shards: die drei kleinen Zusatzwerte unter den Runen." />
 
-                        <TextBlock Text="{Binding BuildRunesPrimary}" Style="{StaticResource Small}"
-                                   TextWrapping="Wrap" Margin="0,7,0,0" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding BuildRunesSecondary}" Style="{StaticResource Small}"
-                                   TextWrapping="Wrap" Margin="0,2,0,0" Foreground="{StaticResource Muted}" />
+                        <!--
+                            The tool's ONE write to the client: creates/replaces the page
+                            "DirkRunen · …" and selects it. Deletes only its own page; a foreign
+                            page falls only after a yes in a dialog that names it.
+                        -->
+                        <DockPanel LastChildFill="False" Margin="0,5,0,0">
+                            <Button Style="{StaticResource Ghost}" Content="Runen übertragen"
+                                    Command="{Binding ImportRunesCommand}"
+                                    ToolTip="Legt diese Runenseite im League-Client an und wählt sie aus. Ersetzt nur die eigene DirkRunen-Seite; eine fremde Seite wird nie ohne Nachfrage gelöscht. Funktioniert bis zum Ladebildschirm." />
+                            <TextBlock Text="{Binding RuneImportText}" Style="{StaticResource Small}"
+                                       FontSize="11" VerticalAlignment="Center" Margin="9,0,0,0"
+                                       TextTrimming="CharacterEllipsis" />
+                        </DockPanel>
 
                         <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,8,0,7" />
 
-                        <TextBlock Text="{Binding BuildStarter}" Style="{StaticResource Small}"
-                                   Foreground="{StaticResource Muted}" />
+                        <!--
+                            Purchase order, same tiles as the in-game view — and the same Grid
+                            reasoning: the star column bounds the wrap panel, the Auto columns
+                            keep trailing labels and chips from being squeezed to zero when the
+                            text fallback fills the narrow column.
+                        -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Start" Style="{StaticResource Small}" FontSize="10"
+                                       Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                       Margin="0,6,7,3" MinWidth="34" />
+                            <ItemsControl Grid.Column="1" ItemsSource="{Binding GameBuild.StartItems}"
+                                          ItemTemplate="{StaticResource IconChipSmall}"
+                                          ItemsPanel="{StaticResource ChipRow}" />
+                            <TextBlock Grid.Column="2" Text="Schuhe" Style="{StaticResource Small}" FontSize="10"
+                                       Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                       Margin="10,6,7,3" />
+                            <ItemsControl Grid.Column="3" ItemsSource="{Binding GameBuild.BootItems}"
+                                          ItemTemplate="{StaticResource IconChipSmall}"
+                                          ItemsPanel="{StaticResource ChipRow}" />
+                        </Grid>
+                        <Grid Margin="0,3,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Kern" Style="{StaticResource Small}" FontSize="10"
+                                       Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                       Margin="0,6,7,3" MinWidth="34"
+                                       ToolTip="In dieser Reihenfolge kaufen — die meistgespielte Kombination dieses Matchups." />
+                            <ItemsControl Grid.Column="1" ItemsSource="{Binding GameBuild.CoreItems}"
+                                          ItemTemplate="{StaticResource IconChipSmall}"
+                                          ItemsPanel="{StaticResource ChipRow}" />
+                            <TextBlock Grid.Column="2" Text="{Binding GameBuild.CoreStats}" Style="{StaticResource Small}"
+                                       FontSize="10" Foreground="{StaticResource Faint}"
+                                       VerticalAlignment="Top" Margin="6,6,0,3" />
+                        </Grid>
+                        <Grid Margin="0,3,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Spät" Style="{StaticResource Small}" FontSize="10"
+                                       Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                       Margin="0,6,7,3" MinWidth="34"
+                                       ToolTip="Häufige Käufe für die letzten Slots — Optionen, keine feste Reihenfolge." />
+                            <ItemsControl Grid.Column="1" ItemsSource="{Binding GameBuild.LateItems}"
+                                          ItemTemplate="{StaticResource IconChipSmall}"
+                                          ItemsPanel="{StaticResource ChipRow}" />
+                            <TextBlock Grid.Column="2" Text="Spells" Style="{StaticResource Small}" FontSize="10"
+                                       Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                       Margin="10,6,7,3" />
+                            <ItemsControl Grid.Column="3" ItemsSource="{Binding GameBuild.Spells}"
+                                          ItemTemplate="{StaticResource IconChipSmall}"
+                                          ItemsPanel="{StaticResource ChipRow}" />
+                        </Grid>
 
-                        <ItemsControl ItemsSource="{Binding BuildCoreLines}" Margin="0,5,0,0">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding}" Style="{StaticResource Small}"
-                                               TextWrapping="Wrap" Margin="0,1,0,1" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <TextBlock Text="{Binding BuildSpells}" Style="{StaticResource Small}"
-                                   Foreground="{StaticResource Muted}" Margin="0,5,0,0" />
+                        <TextBlock Text="{Binding GameBuild.SkillText}" Style="{StaticResource Small}"
+                                   FontSize="11" Margin="0,4,0,0" Foreground="{StaticResource Muted}"
+                                   ToolTip="Reihenfolge, in der die Fähigkeiten gemaxt werden. Die Tabelle für jede einzelne Stufe zeigt das Fenster nach Spielstart." />
 
                         <!-- Situational pointers from the enemy composition. -->
-                        <ItemsControl ItemsSource="{Binding BuildHints}" Margin="0,7,0,0">
+                        <ItemsControl ItemsSource="{Binding BuildHints}" Margin="0,6,0,0">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel />
@@ -588,19 +946,20 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Background="{StaticResource AccentSoft}" CornerRadius="9"
-                                            Padding="8,2" Margin="0,0,5,4">
-                                        <TextBlock Text="{Binding Text}" FontSize="11"
+                                            Padding="8,2" Margin="0,0,5,4"
+                                            ToolTip="{Binding Hint}">
+                                        <TextBlock Text="{Binding Text}" FontSize="11" TextWrapping="Wrap"
                                                    Foreground="{StaticResource Accent}" />
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
-                    </ScrollViewer>
                 </StackPanel>
             </Border>
 
-            <DockPanel Grid.Row="4" LastChildFill="True" Margin="0,11,0,0" MinHeight="130"
+            <DockPanel Grid.Row="0" Grid.RowSpan="3" Grid.Column="1" LastChildFill="True"
+                       Margin="14,13,0,0"
                        Visibility="{Binding IsDraftActive, Converter={StaticResource BoolToVisibility}}">
                 <Grid DockPanel.Dock="Top" Margin="2,0,2,7">
                     <Grid.ColumnDefinitions>
@@ -613,15 +972,25 @@
                     <Border Grid.Column="1" Height="1" Background="{StaticResource LineSoft}" VerticalAlignment="Center" />
 
                     <!--
-                        The one deliberate network access inside a draft: fresh counters for the
-                        enemies actually on the board, plus the build for the locked pick. Never
-                        fires without this click.
+                        Progress of the automatic draft fetch. Not a button: the data for the
+                        champions on the board is pulled after every pick by itself, and a button
+                        only meant the advice was quietly worse until somebody pressed it.
                     -->
-                    <Button Grid.Column="2" Style="{StaticResource Ghost}" Margin="8,0,0,0"
-                            Content="{Binding DraftFetchText}"
-                            Command="{Binding FetchDraftDataCommand}"
-                            Visibility="{Binding ShowDraftFetchButton, Converter={StaticResource BoolToVisibility}}"
-                            ToolTip="Holt aktuelle Counter-Daten für die aufgedeckten Gegner und den Build für deinen Pick — ein gezielter OP.GG-Abruf, nur auf diesen Klick." />
+                    <TextBlock Grid.Column="2" Margin="8,0,0,0" FontSize="11" VerticalAlignment="Center"
+                               Text="{Binding DraftFetchText}"
+                               TextTrimming="CharacterEllipsis"
+                               Visibility="{Binding ShowDraftFetchStatus, Converter={StaticResource BoolToVisibility}}"
+                               ToolTip="Sobald ein Champion aufgedeckt wird, holt DirkDraft dessen aktuelle Counter-Zahlen von OP.GG — und nach deinem eigenen Pick den passenden Build.">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DraftFetchFailed}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource Warn}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </Grid>
 
                 <Grid>
@@ -679,7 +1048,8 @@
 
                                                 <!-- Score pill, tinted by how strong the pick is. -->
                                                 <Border Grid.Column="3" CornerRadius="7" Padding="9,3"
-                                                        VerticalAlignment="Center">
+                                                        VerticalAlignment="Center"
+                                                        ToolTip="{Binding ScoreHint}">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Background" Value="{StaticResource SurfaceHi}" />
@@ -713,7 +1083,7 @@
 
                                                 <ToggleButton Grid.Column="4" Style="{StaticResource Chevron}"
                                                               IsChecked="{Binding IsExpanded, Mode=TwoWay}"
-                                                              ToolTip="Aufschlüsselung des Scores" />
+                                                              ToolTip="Zeigt, was für und gegen diesen Pick spricht" />
                                             </Grid>
 
                                             <!-- Reason chips, coloured by whether they argue for or against. -->
@@ -725,7 +1095,9 @@
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border CornerRadius="9" Padding="8,2" Margin="0,0,5,4">
+                                                        <!-- Hover explains where the number comes from; null Hint simply shows none. -->
+                                                        <Border CornerRadius="9" Padding="8,2" Margin="0,0,5,4"
+                                                                ToolTip="{Binding Hint}">
                                                             <Border.Style>
                                                                 <Style TargetType="Border">
                                                                     <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
@@ -739,7 +1111,8 @@
                                                                     </Style.Triggers>
                                                                 </Style>
                                                             </Border.Style>
-                                                            <TextBlock Text="{Binding Text}" FontSize="11">
+                                                            <TextBlock Text="{Binding Text}" FontSize="11"
+                                                                       TextWrapping="Wrap">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock">
                                                                         <Setter Property="Foreground" Value="{StaticResource Muted}" />
@@ -759,26 +1132,120 @@
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
 
-                                            <Border Margin="62,5,0,0" Padding="10,7" CornerRadius="7"
+                                            <!--
+                                                Breakdown. Every line names the criterion, says in
+                                                words what it found, and shows how far it moved the
+                                                score - the bare arithmetic that used to stand here
+                                                was unreadable. The raw numbers live in the tooltip.
+                                            -->
+                                            <Border Margin="62,5,0,0" Padding="10,8" CornerRadius="7"
                                                     Background="{StaticResource Bg}"
                                                     Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
-                                                <ItemsControl ItemsSource="{Binding Breakdown}">
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate DataType="{x:Type vm:TermViewModel}">
-                                                            <Grid Margin="0,1">
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="92" />
-                                                                    <ColumnDefinition Width="*" />
-                                                                </Grid.ColumnDefinitions>
-                                                                <TextBlock Text="{Binding Label}" Style="{StaticResource Small}"
-                                                                           FontSize="11" />
-                                                                <TextBlock Grid.Column="1" Text="{Binding Detail}"
-                                                                           Style="{StaticResource Mono}" FontSize="11"
-                                                                           HorizontalAlignment="Right" />
-                                                            </Grid>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
+                                                <StackPanel>
+                                                    <TextBlock Text="WAS DAFÜR UND DAGEGEN SPRICHT"
+                                                               Style="{StaticResource Caption}"
+                                                               Margin="0,0,0,6" />
+
+                                                    <ItemsControl ItemsSource="{Binding Breakdown}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate DataType="{x:Type vm:TermViewModel}">
+                                                                <Grid Margin="0,2" Background="Transparent"
+                                                                      ToolTip="{Binding Hint}">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="98" />
+                                                                        <ColumnDefinition Width="70" />
+                                                                        <ColumnDefinition Width="*" />
+                                                                        <ColumnDefinition Width="Auto" />
+                                                                    </Grid.ColumnDefinitions>
+
+                                                                    <TextBlock Text="{Binding Label}" FontSize="11"
+                                                                               VerticalAlignment="Center"
+                                                                               TextTrimming="CharacterEllipsis">
+                                                                        <TextBlock.Style>
+                                                                            <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding HasData}" Value="False">
+                                                                                        <Setter Property="Foreground" Value="{StaticResource Faint}" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </TextBlock.Style>
+                                                                    </TextBlock>
+
+                                                                    <!-- Zero-centred bar: green to the right, red to the left. -->
+                                                                    <Grid Grid.Column="1" Height="7" Margin="0,0,9,0"
+                                                                          VerticalAlignment="Center">
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="*" />
+                                                                            <ColumnDefinition Width="1" />
+                                                                            <ColumnDefinition Width="*" />
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <Rectangle Grid.Column="1" Fill="{StaticResource Line}" />
+                                                                        <Rectangle HorizontalAlignment="Right" RadiusX="2" RadiusY="2"
+                                                                                   Width="{Binding BarNegative}"
+                                                                                   Fill="{StaticResource Bad}" />
+                                                                        <Rectangle Grid.Column="2" HorizontalAlignment="Left"
+                                                                                   RadiusX="2" RadiusY="2"
+                                                                                   Width="{Binding BarPositive}"
+                                                                                   Fill="{StaticResource Good}" />
+                                                                    </Grid>
+
+                                                                    <TextBlock Grid.Column="2" Text="{Binding Verdict}"
+                                                                               FontSize="11" VerticalAlignment="Center"
+                                                                               TextTrimming="CharacterEllipsis">
+                                                                        <TextBlock.Style>
+                                                                            <Style TargetType="TextBlock">
+                                                                                <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding Tone}" Value="Pro">
+                                                                                        <Setter Property="Foreground" Value="{StaticResource Good}" />
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding Tone}" Value="Contra">
+                                                                                        <Setter Property="Foreground" Value="{StaticResource Bad}" />
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding HasData}" Value="False">
+                                                                                        <Setter Property="Foreground" Value="{StaticResource Faint}" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </TextBlock.Style>
+                                                                    </TextBlock>
+
+                                                                    <TextBlock Grid.Column="3" Text="{Binding Value}"
+                                                                               Style="{StaticResource Mono}" FontSize="11"
+                                                                               MinWidth="38" TextAlignment="Right"
+                                                                               VerticalAlignment="Center"
+                                                                               Foreground="{StaticResource Faint}" />
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+
+                                                    <Border Height="1" Background="{StaticResource Line}"
+                                                            Margin="0,7,0,6" />
+
+                                                    <Grid ToolTip="Alle Kriterien zusammengerechnet: die geschätzte Siegquote dieser Aufstellung. 50 % wäre ausgeglichen.">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding TotalLabel}" FontSize="11" FontWeight="SemiBold"
+                                                                   VerticalAlignment="Center" />
+                                                        <!-- Right-aligned next to the number: the verdict needs the
+                                                             room more than it needs to line up with the rows above. -->
+                                                        <TextBlock Grid.Column="1" Text="{Binding ScoreVerdict}"
+                                                                   Style="{StaticResource Small}" FontSize="11"
+                                                                   VerticalAlignment="Center" Margin="10,0,9,0"
+                                                                   TextAlignment="Right"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding Score}"
+                                                                   Style="{StaticResource Mono}" FontSize="11"
+                                                                   FontWeight="SemiBold" MinWidth="38"
+                                                                   TextAlignment="Right" VerticalAlignment="Center"
+                                                                   Foreground="{StaticResource Text}" />
+                                                    </Grid>
+                                                </StackPanel>
                                             </Border>
                                         </StackPanel>
                                     </Border>
@@ -788,79 +1255,11 @@
                     </ScrollViewer>
                 </Grid>
             </DockPanel>
+            </Grid>
 
             <!-- ===================== Footer ===================== -->
-            <StackPanel Grid.Row="5" Margin="0,10,0,0">
-                <!-- Named, because three bare buttons do not explain that they change the scoring. -->
-                <Grid Margin="2,0,2,4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="GEWICHTUNG" Style="{StaticResource Caption}" />
-                    <Border Grid.Column="1" Height="1" Background="{StaticResource LineSoft}" VerticalAlignment="Center" />
-                </Grid>
-
-                <!-- Preset switch as a segmented control; each segment lights itself up. -->
-                <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
-                        BorderThickness="1" CornerRadius="8" Padding="3">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <Button Content="Meta" Command="{Binding SetPresetCommand}" CommandParameter="Meta"
-                                ToolTip="Gewichtet die Tierlist am stärksten">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource Segment}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding PresetName}" Value="Meta">
-                                            <Setter Property="Background" Value="{StaticResource AccentSoft}" />
-                                            <Setter Property="Foreground" Value="{StaticResource Accent}" />
-                                            <Setter Property="FontWeight" Value="SemiBold" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
-
-                        <Button Grid.Column="1" Content="Counter" Command="{Binding SetPresetCommand}"
-                                CommandParameter="Counter"
-                                ToolTip="Gewichtet das direkte Lane-Matchup am stärksten">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource Segment}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding PresetName}" Value="Counter">
-                                            <Setter Property="Background" Value="{StaticResource AccentSoft}" />
-                                            <Setter Property="Foreground" Value="{StaticResource Accent}" />
-                                            <Setter Property="FontWeight" Value="SemiBold" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
-
-                        <Button Grid.Column="2" Content="Teamcomp" Command="{Binding SetPresetCommand}"
-                                CommandParameter="Teamcomp"
-                                ToolTip="Gewichtet Synergien und Comp-Bedarf am stärksten">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource Segment}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding PresetName}" Value="Teamcomp">
-                                            <Setter Property="Background" Value="{StaticResource AccentSoft}" />
-                                            <Setter Property="Foreground" Value="{StaticResource Accent}" />
-                                            <Setter Property="FontWeight" Value="SemiBold" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
-                    </Grid>
-                </Border>
-
-                <Grid Margin="0,8,0,0">
+            <StackPanel Grid.Row="3" Margin="0,10,0,0">
+                <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -898,7 +1297,7 @@
                             </Style>
                         </Button.Style>
                         <Button.ToolTip>
-                            <TextBlock Text="Holt Tierlist, Counter, Synergien und Icons von OP.GG. Der einzige Netzzugriff des Tools. Während eines Champ Select gesperrt." />
+                            <TextBlock Text="Holt Tierlist, Counter, Synergien und Icons von OP.GG. Während eines Champ Select gesperrt." />
                         </Button.ToolTip>
                     </Button>
 

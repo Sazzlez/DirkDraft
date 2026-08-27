@@ -23,6 +23,9 @@ public sealed record SnapshotBuildOptions
     /// <summary>Fetch champion portraits that are not cached yet.</summary>
     public bool DownloadIcons { get; init; } = true;
 
+    /// <summary>Language for item, rune and spell names, matching the user's client.</summary>
+    public string Language { get; init; } = "de_DE";
+
     /// <summary>Concurrent requests. Deliberately low; this is somebody else's free endpoint.</summary>
     public int MaxConcurrency { get; init; } = 3;
 }
@@ -131,6 +134,12 @@ public sealed class SnapshotBuilder : IDisposable
 
             if (added > 0)
                 snapshot.Warnings.Add($"{added} Champion-Icons neu geladen.");
+
+            // Rune/spell icons and localised names for the in-game build view. ~85 small files
+            // once per install, then only what a new patch renames.
+            await new AssetDownloader(_staticData)
+                .DownloadRuneAndSpellAssetsAsync(snapshot.Patch, options.Language, snapshot.Warnings, progress, ct)
+                .ConfigureAwait(false);
         }
 
         Deduplicate(snapshot);
@@ -151,8 +160,12 @@ public sealed class SnapshotBuilder : IDisposable
             var json = await _staticData.GetStringAsync(VersionsUrl, ct).ConfigureAwait(false);
             using var document = JsonDocument.Parse(json);
 
-            if (document.RootElement.ValueKind == JsonValueKind.Array && document.RootElement.GetArrayLength() > 0)
+            if (document.RootElement.ValueKind == JsonValueKind.Array
+                && document.RootElement.GetArrayLength() > 0
+                && document.RootElement[0].ValueKind == JsonValueKind.String)
+            {
                 return document.RootElement[0].GetString() ?? string.Empty;
+            }
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
         {
@@ -239,16 +252,22 @@ public sealed class SnapshotBuilder : IDisposable
                     }
                 }
 
+                // TryGet variants: a field Data Dragon ships as a string (it has happened) must
+                // cost that one champion's statics, not abort the whole minutes-long update.
                 if (entry.Value.TryGetProperty("stats", out var stats)
-                    && stats.TryGetProperty("attackrange", out var range))
+                    && stats.TryGetProperty("attackrange", out var range)
+                    && range.ValueKind == JsonValueKind.Number
+                    && range.TryGetDouble(out var rangeValue))
                 {
-                    champion.AttackRange = (int)Math.Round(range.GetDouble());
+                    champion.AttackRange = (int)Math.Round(rangeValue);
                 }
 
                 if (entry.Value.TryGetProperty("info", out var info)
-                    && info.TryGetProperty("defense", out var defense))
+                    && info.TryGetProperty("defense", out var defense)
+                    && defense.ValueKind == JsonValueKind.Number
+                    && defense.TryGetInt32(out var defenseValue))
                 {
-                    champion.Defense = defense.GetInt32();
+                    champion.Defense = defenseValue;
                 }
 
                 matched++;

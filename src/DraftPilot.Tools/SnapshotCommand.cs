@@ -115,7 +115,8 @@ internal static class SnapshotCommand
     private static void Summarise(MetaSnapshot snapshot, SnapshotStore store)
     {
         var lookup = new MetaLookup(snapshot);
-        var sizeKb = new FileInfo(store.Path).Length / 1024.0;
+        var info = new FileInfo(store.Path);
+        var sizeKb = info.Exists ? info.Length / 1024.0 : 0;
 
         Console.WriteLine();
         Console.WriteLine($"Patch {snapshot.Patch}   gebaut {snapshot.BuiltAtUtc:yyyy-MM-dd HH:mm}Z   {sizeKb:F0} KB");

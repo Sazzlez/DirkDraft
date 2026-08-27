@@ -9,12 +9,14 @@ namespace DraftPilot.App;
 
 public partial class App : Application
 {
-    private const string InstanceMutexName = @"Local\DraftPilot.SingleInstance";
-    private const string ShowSignalName = @"Local\DraftPilot.ShowWindow";
+    private const string InstanceMutexName = @"Local\DirkDraft.SingleInstance";
+    private const string ShowSignalName = @"Local\DirkDraft.ShowWindow";
 
     private Mutex? _instanceMutex;
     private EventWaitHandle? _showSignal;
+    private string? _phase;
     private CancellationTokenSource? _signalListener;
+    private Thread? _signalThread;
     private MainViewModel? _model;
     private MainWindow? _window;
     private TrayPresence? _tray;
@@ -51,6 +53,7 @@ public partial class App : Application
             // re-enter the failing layout pass and throw a second time.
             try
             {
+                _window?.AllowClose();
                 _window?.Close();
             }
             catch (Exception teardown)
@@ -61,8 +64,8 @@ public partial class App : Application
             _window = null;
 
             MessageBox.Show(
-                $"DraftPilot konnte nicht starten.\n\n{exception.Message}\n\nDetails: {CrashLog.Path}",
-                "DraftPilot",
+                $"DirkDraft konnte nicht starten.\n\n{exception.Message}\n\nDetails: {CrashLog.Path}",
+                "DirkDraft",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
 
@@ -82,6 +85,7 @@ public partial class App : Application
             RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
 
         var dev = DevHarness.Parse(Environment.GetCommandLineArgs());
+        DevHarness.SuppressPlacementSave = dev.IsDemo || dev.IsScreenshot;
 
         // The development harness stays out of the single-instance handshake entirely: a replay or
         // screenshot run must neither be swallowed by a running instance (it would silently produce
@@ -107,7 +111,7 @@ public partial class App : Application
 
         _window = new MainWindow(_model);
 
-        _tray = new TrayPresence("DraftPilot");
+        _tray = new TrayPresence("DirkDraft");
 
         // The close glyph hides into the tray rather than quitting. Said once, out loud, because a
         // user who believes the tool is closed will keep talking to a stale instance forever.
@@ -119,43 +123,72 @@ public partial class App : Application
             _model.Settings.TrayHintShown = true;
             _model.Settings.Save();
             _tray?.ShowHint(
-                "DraftPilot läuft weiter",
+                "DirkDraft läuft weiter",
                 "Das Tool liegt jetzt im Infobereich. Beenden: Rechtsklick auf das Symbol → Beenden.");
         };
-        _tray.ShowRequested += ShowWindow;
+        _tray.ShowRequested += () => ShowWindow();
         _tray.UpdateRequested += () =>
         {
             ShowWindow();
             if (_model.UpdateDataCommand.CanExecute(null))
                 _model.UpdateDataCommand.Execute(null);
         };
-        _tray.ExitRequested += () => Shutdown();
+        _tray.ExitRequested += () =>
+        {
+            // Without this the Closing handler would turn the shutdown's close into a hide.
+            _window?.AllowClose();
+            Shutdown();
+        };
 
         _model.DraftActiveChanged += OnDraftActiveChanged;
+
+        // The build view is only useful if it is actually on screen when the game loads — but a
+        // window that is already visible must not move, resize or steal focus from the game. Only
+        // one hidden in the tray (or minimised — IsVisible stays true then) comes back, and
+        // deliberately without Activate.
+        _model.GameActiveChanged += isRunning => Dispatcher.Invoke(() =>
+        {
+            if (!isRunning || !_model.Settings.AutoShowOnGameStart || _window is null)
+                return;
+
+            if (!_window.IsVisible)
+                _window.Show();
+
+            if (_window.WindowState == WindowState.Minimized)
+                _window.WindowState = WindowState.Normal;
+        });
         _model.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(MainViewModel.StatusText))
-                _tray?.SetTooltip($"DraftPilot — {_model.StatusText}");
+                _tray?.SetTooltip($"DirkDraft — {_model.StatusText}");
         };
 
         if (_showSignal is not null)
             StartSignalListener();
 
-        // Somebody just double-clicked the shortcut, so show them something. It stays on screen from
-        // here on, shrinking to a compact status card outside a draft.
-        ShowWindow();
+        // Somebody just double-clicked the shortcut, so show them something. StartAsync loads the
+        // snapshot right after, so there is nothing to reload yet.
+        ShowWindow(reloadSnapshot: false);
 
-        _ = _model.StartAsync();
+        // Fire and forget, but never unobserved: a broken lockfile path used to fail in here
+        // without a trace, leaving the panel on "Starte…" forever with an empty crash log.
+        _ = _model.StartAsync().ContinueWith(
+            task => CrashLog.Write("Session-Quelle", task.Exception!.GetBaseException()),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default);
+
+        _phase = dev.Phase;
 
         if (dev.IsScreenshot)
-            ScheduleScreenshot(dev.ScreenshotPath!, dev.ScreenshotDelaySeconds);
+            ScheduleScreenshot(dev.ScreenshotPath!, dev.ScreenshotDelaySeconds, dev.ExpandRows);
     }
 
     /// <summary>
     /// Renders the window to a file once it has settled, then exits. Development only: it is the
     /// only way to actually look at the panel's layout and contrast.
     /// </summary>
-    private void ScheduleScreenshot(string path, double delaySeconds)
+    private void ScheduleScreenshot(string path, double delaySeconds, int expandRows)
     {
         _ = Dispatcher.InvokeAsync(async () =>
         {
@@ -163,8 +196,19 @@ public partial class App : Application
             // local countdown observable instead of assumed.
             await Task.Delay(TimeSpan.FromSeconds(Math.Max(0.2, delaySeconds))).ConfigureAwait(true);
 
+            // Preparation inside the try too: if expanding a row or forcing a phase throws, the
+            // harness must still shut down instead of hanging as an invisible process.
             try
             {
+                if (_model is not null)
+                {
+                    foreach (var row in _model.Recommendations.Take(Math.Max(0, expandRows)))
+                        row.IsExpanded = true;
+
+                    if (_phase is { Length: > 0 })
+                        _model.OnGameflowPhase(_phase);
+                }
+
                 if (_window is not null)
                     DevHarness.Capture(_window, path);
             }
@@ -173,20 +217,27 @@ public partial class App : Application
                 CrashLog.Write("Screenshot", exception);
             }
 
+            _window?.AllowClose();
             Shutdown();
         });
     }
 
     private void OnDraftActiveChanged(bool isActive)
     {
-        Dispatcher.Invoke(() =>
+        // Background priority on purpose: this event fires from inside the view-model's own
+        // update pass, BEFORE it has cleared the draft collections. Running inline meant the
+        // aggressive collection below walked a heap where everything was still reachable — and
+        // froze the UI mid-event for the privilege.
+        _ = Dispatcher.InvokeAsync(() =>
         {
             if (_model is null || _window is null)
                 return;
 
             if (isActive && _model.Settings.AutoShowOnChampSelect)
             {
-                ShowWindow();
+                // No snapshot reload here: it would throw away the live matchup data this very
+                // draft just fetched.
+                ShowWindow(reloadSnapshot: false);
                 return;
             }
 
@@ -198,29 +249,42 @@ public partial class App : Application
                 // Champion select is the memory high-water mark. Hand the pages back rather than
                 // sitting on them until the next draft.
                 //
-                // Blocking on purpose: GCCollectionMode.Aggressive rejects a non-blocking collection
-                // outright, and the original non-blocking call threw every single time a draft ended.
-                // Nothing is on screen at this point, so blocking costs nothing visible.
-                GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-                GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+                // Blocking is mandatory (GCCollectionMode.Aggressive rejects non-blocking calls),
+                // so the collection runs on a worker: several hundred milliseconds of blocking
+                // belong to a pool thread, not to the dispatcher — even with nothing on screen.
+                _ = Task.Run(() =>
+                {
+                    GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+                    GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+                });
             }
-        });
+        }, System.Windows.Threading.DispatcherPriority.Background);
     }
 
-    private void ShowWindow()
+    private void ShowWindow(bool reloadSnapshot = true)
     {
         Dispatcher.Invoke(() =>
         {
             if (_window is null)
                 return;
 
-            _window.Show();
-            _window.WindowState = WindowState.Normal;
-            _window.Activate();
+            // A window that is already on screen stays exactly as it is — no focus grab, no state
+            // reset. Activate only what was actually hidden or minimised.
+            var wasPresented = _window.IsVisible && _window.WindowState == WindowState.Normal;
 
-            // Somebody may have double-clicked the desktop icon precisely because the display looks
-            // stale. Re-reading the snapshot is nearly free and repairs that without a restart.
-            _model?.RequestSnapshotReload();
+            _window.Show();
+
+            if (!wasPresented)
+            {
+                _window.WindowState = WindowState.Normal;
+                _window.Activate();
+            }
+
+            // Somebody may have double-clicked the desktop icon precisely because the display
+            // looks stale. Re-reading the snapshot repairs that without a restart — but only on
+            // those user-initiated paths; automatic shows must not touch the loaded data.
+            if (reloadSnapshot)
+                _model?.RequestSnapshotReload();
         });
     }
 
@@ -237,26 +301,61 @@ public partial class App : Application
 
             while (!token.IsCancellationRequested)
             {
-                if (WaitHandle.WaitAny(handles) == 0)
-                    ShowWindow();
+                try
+                {
+                    if (WaitHandle.WaitAny(handles) == 0)
+                        ShowWindow();
+                }
+                catch (Exception ex) when (ex is ObjectDisposedException or OperationCanceledException or InvalidOperationException)
+                {
+                    // Shutdown race: the handles or the dispatcher went away while we were
+                    // waiting. On a background thread this would otherwise kill the process.
+                    return;
+                }
             }
         })
         {
             IsBackground = true,
-            Name = "DraftPilot single-instance listener",
+            Name = "DirkDraft single-instance listener",
         };
 
+        _signalThread = thread;
         thread.Start();
+    }
+
+    /// <summary>
+    /// Windows log-off/restart: WPF calls Shutdown() itself afterwards, and that ignores the
+    /// Closing handler's cancel but still runs its body — which would hide the window into the
+    /// tray and burn the one-off "still running" hint on the way out.
+    /// </summary>
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        _window?.AllowClose();
+        base.OnSessionEnding(e);
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         _window?.SavePlacement();
+
+        // Wake the listener and give it a moment to leave WaitAny BEFORE its handles are
+        // disposed below — disposing under a waiter throws on a background thread.
         _signalListener?.Cancel();
+        _signalThread?.Join(500);
+
         _tray?.Dispose();
 
-        if (_model is not null)
-            _model.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2));
+        try
+        {
+            if (_model is not null)
+                _model.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2));
+        }
+        catch (AggregateException exception)
+        {
+            // OnExit is past the dispatcher's exception handling; a teardown failure here must
+            // not turn a clean quit into a crash dialog.
+            CrashLog.Write("Beenden", exception.GetBaseException());
+        }
 
         _signalListener?.Dispose();
         _showSignal?.Dispose();

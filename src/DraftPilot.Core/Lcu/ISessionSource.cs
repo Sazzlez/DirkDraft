@@ -28,6 +28,12 @@ public interface ISessionSource : IAsyncDisposable
 
     event Action<ClientStatus>? StatusChanged;
 
+    /// <summary>
+    /// Raw gameflow phase (<c>ChampSelect</c>, <c>GameStart</c>, <c>InProgress</c>, …) whenever the
+    /// client reports a change. Only the live source raises it; recordings carry no phase.
+    /// </summary>
+    event Action<string>? GameflowPhase;
+
     /// <summary>Runs until <paramref name="ct"/> fires.</summary>
     Task RunAsync(CancellationToken ct);
 }

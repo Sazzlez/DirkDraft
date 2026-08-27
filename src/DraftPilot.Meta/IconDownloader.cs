@@ -32,7 +32,7 @@ public sealed class IconDownloader(HttpClient http)
         Directory.CreateDirectory(AppPaths.IconDirectory);
 
         var missing = champions
-            .Where(champion => !string.IsNullOrEmpty(champion.Key) && !File.Exists(PathFor(champion.Id)))
+            .Where(champion => !string.IsNullOrEmpty(champion.Key) && !IsUsableFile(PathFor(champion.Id)))
             .ToList();
 
         if (missing.Count == 0)
@@ -73,11 +73,31 @@ public sealed class IconDownloader(HttpClient http)
         return added;
     }
 
+    /// <summary>
+    /// Exists AND is plausibly a real image. A zero-byte or truncated file (disk full, killed
+    /// mid-write) would otherwise never be repaired — the plain Exists check skipped it forever.
+    /// </summary>
+    private static bool IsUsableFile(string path)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            return info.Exists && info.Length >= 256;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     private async Task<bool> TryDownloadAsync(ChampionEntry champion, string patch, CancellationToken ct)
     {
         var url = $"https://ddragon.leagueoflegends.com/cdn/{patch}/img/champion/{champion.Key}.png";
         var target = PathFor(champion.Id);
-        var temporary = target + ".tmp";
+
+        // Process-unique temp name: the app and the CLI tool can both be downloading, and a
+        // shared name meant sharing violations or moving each other's half-written files.
+        var temporary = $"{target}.{Environment.ProcessId}.tmp";
 
         try
         {
@@ -91,7 +111,21 @@ public sealed class IconDownloader(HttpClient http)
             File.Move(temporary, target, overwrite: true);
             return true;
         }
-        catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Cancelling the update must stay a cancellation — but not leave the .tmp behind.
+            TryDelete(temporary);
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            // NOT a user cancellation: HttpClient reports its own request timeout as a
+            // TaskCanceledException. Rethrown, one slow icon killed the whole minutes-long
+            // update through Task.WhenAll; a timeout costs exactly this one file.
+            TryDelete(temporary);
+            return false;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException)
         {
             TryDelete(temporary);
             return false;

@@ -178,4 +178,49 @@ public class DraftStateTests
 
         Assert.Equal(266, DraftState.From(session).Allies[0].EffectiveChampionId);
     }
+
+    [Fact]
+    public void ExplicitJsonNulls_DoNotThrow()
+    {
+        // The LCU sends explicit nulls (that is why the scrubber exists), and System.Text.Json
+        // writes them straight over any initializer default. "Never throws on odd input" has to
+        // survive that.
+        const string json = """
+            {
+                "localPlayerCellId": 2,
+                "myTeam": null,
+                "theirTeam": null,
+                "actions": null,
+                "bans": null,
+                "timer": null,
+                "isSpectating": false
+            }
+            """;
+
+        var session = System.Text.Json.JsonSerializer.Deserialize(json, Core.Lcu.Models.LcuJson.Default.ChampSelectSession);
+
+        Assert.False(DraftState.From(session).IsActive);
+    }
+
+    [Fact]
+    public void NullActionGroupsAndPlayers_AreSkipped()
+    {
+        const string json = """
+            {
+                "localPlayerCellId": 0,
+                "myTeam": [ { "cellId": 0, "championId": 122 }, null ],
+                "theirTeam": [ { "cellId": 5 } ],
+                "actions": [ null, [ null, { "actorCellId": 0, "type": "ban", "championId": 51, "completed": true, "isAllyAction": true } ] ],
+                "bans": { "myTeamBans": [], "theirTeamBans": [] },
+                "timer": { "phase": "BAN_PICK", "adjustedTimeLeftInPhase": 10000 }
+            }
+            """;
+
+        var session = System.Text.Json.JsonSerializer.Deserialize(json, Core.Lcu.Models.LcuJson.Default.ChampSelectSession);
+        var state = DraftState.From(session);
+
+        Assert.True(state.IsActive);
+        Assert.Single(state.Allies);
+        Assert.Contains(51, state.AllyBans);
+    }
 }

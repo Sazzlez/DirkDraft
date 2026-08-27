@@ -24,6 +24,30 @@ public static class AppPaths
 
     public static string IconDirectory => Path.Combine(DataDirectory, "icons");
 
+    /// <summary>Item icons, one PNG per item id, fetched on demand with a build plan.</summary>
+    public static string ItemIconDirectory => Path.Combine(DataDirectory, "items");
+
+    /// <summary>Rune icons, one PNG per perk id, fetched with the big update.</summary>
+    public static string RuneIconDirectory => Path.Combine(DataDirectory, "runes");
+
+    /// <summary>Summoner-spell icons, one PNG per spell id, fetched with the big update.</summary>
+    public static string SpellIconDirectory => Path.Combine(DataDirectory, "spells");
+
+    /// <summary>
+    /// Localised display names for items, runes and spells, one file per language. The locale
+    /// lands in a file name and comes from user-editable JSON, so it is validated here:
+    /// "..\\evil" or "de:DE" must not leave the data directory or crash File.Create.
+    /// </summary>
+    public static string NamesPath(string language)
+    {
+        var safe = language.Length == 5
+            && char.IsAsciiLetterLower(language[0]) && char.IsAsciiLetterLower(language[1])
+            && language[2] == '_'
+            && char.IsAsciiLetterUpper(language[3]) && char.IsAsciiLetterUpper(language[4]);
+
+        return Path.Combine(DataDirectory, $"names-{(safe ? language : "de_DE")}.json");
+    }
+
     public static string SettingsPath => Path.Combine(SettingsDirectory, "settings.json");
 
     public static string OverridesPath => Path.Combine(SettingsDirectory, "overrides.json");

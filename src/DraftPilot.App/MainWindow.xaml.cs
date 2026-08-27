@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -8,9 +9,7 @@ namespace DraftPilot.App;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _model;
-
-    /// <summary>The height the user chose, kept while the window is auto-sized down.</summary>
-    private double _draftHeight;
+    private bool _allowClose;
 
     public MainWindow(MainViewModel model)
     {
@@ -20,17 +19,44 @@ public partial class MainWindow : Window
 
         Topmost = model.Settings.AlwaysOnTop;
         RestorePlacement(model.Settings);
-
-        _draftHeight = Height;
-        _model.DraftActiveChanged += OnDraftActiveChanged;
-
-        // Start compact: outside a draft there is nothing to fill a tall window with.
-        ApplyCompactMode(isDraftActive: false);
     }
 
-    /// <summary>Stores the window placement so the panel comes back where the user put it.</summary>
+    /// <summary>Lets the next close request through; called right before a real shutdown.</summary>
+    public void AllowClose() => _allowClose = true;
+
+    /// <summary>
+    /// Alt+F4 and the taskbar's "close window" bypass our title-bar glyph and genuinely close the
+    /// window — after which the process (ShutdownMode is explicit) lived on as a zombie: the tray
+    /// icon stayed, but "Öffnen" hit a closed window and threw forever. Closing now means the same
+    /// as the glyph: hide into the tray. A real exit announces itself via <see cref="AllowClose"/>.
+    /// </summary>
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+
+        SavePlacement();
+
+        if (_allowClose)
+            return;
+
+        e.Cancel = true;
+        Hide();
+        HiddenToTray?.Invoke();
+    }
+
+    /// <summary>Stores the window position so the panel comes back where the user put it.</summary>
+    /// <remarks>
+    /// Position only: the size is fixed at 860 × 900 for every view. The window used to shrink to
+    /// its content outside a draft and grow back when one started — which read as the tool
+    /// "minimising itself" whenever the game began. Now nothing about the window ever moves or
+    /// resizes unless the user drags it.
+    /// </remarks>
     public void SavePlacement()
     {
+        // Harness runs share the settings file with a possibly live instance; see the flag.
+        if (DevHarness.SuppressPlacementSave)
+            return;
+
         // Only a normal window has meaningful bounds; a minimised one would store garbage.
         if (WindowState != WindowState.Normal)
             return;
@@ -38,44 +64,11 @@ public partial class MainWindow : Window
         var settings = _model.Settings;
         settings.WindowLeft = Left;
         settings.WindowTop = Top;
-        settings.WindowWidth = Width;
-
-        // While compact the height is whatever the content needs, which is not what the user picked.
-        settings.WindowHeight = SizeToContent == SizeToContent.Manual ? Height : _draftHeight;
         settings.Save();
-    }
-
-    private void OnDraftActiveChanged(bool isActive) => Dispatcher.Invoke(() => ApplyCompactMode(isActive));
-
-    /// <summary>
-    /// Shrinks the window to its content while no draft is running and restores the chosen height
-    /// once one starts. Keeps a status card on screen instead of a mostly empty panel.
-    /// </summary>
-    private void ApplyCompactMode(bool isDraftActive)
-    {
-        if (isDraftActive)
-        {
-            if (SizeToContent == SizeToContent.Manual)
-                return;
-
-            SizeToContent = SizeToContent.Manual;
-            Height = Math.Max(MinHeight, _draftHeight);
-            return;
-        }
-
-        if (SizeToContent != SizeToContent.Manual)
-            return;
-
-        // Remember the draft-time height before letting the window collapse.
-        _draftHeight = Height;
-        SizeToContent = SizeToContent.Height;
     }
 
     private void RestorePlacement(Core.Config.AppSettings settings)
     {
-        Width = Math.Max(MinWidth, settings.WindowWidth);
-        Height = Math.Max(MinHeight, settings.WindowHeight);
-
         if (double.IsNaN(settings.WindowLeft) || double.IsNaN(settings.WindowTop))
         {
             // First run: park it against the right edge of the working area, clear of the client.
@@ -93,11 +86,12 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Pulls the window back onto a visible monitor. A stored position can point at a screen that
-    /// is no longer attached, which would leave the panel invisible with no way to get it back.
+    /// is no longer attached, or half below the bottom edge — with a fixed, non-resizable window
+    /// that would leave the footer (and its buttons) permanently unreachable.
     /// </summary>
     private void EnsureOnScreen()
     {
-        var area = SystemParameters.VirtualScreenWidth > 0
+        var virtualArea = SystemParameters.VirtualScreenWidth > 0
             ? new Rect(
                 SystemParameters.VirtualScreenLeft,
                 SystemParameters.VirtualScreenTop,
@@ -105,19 +99,31 @@ public partial class MainWindow : Window
                 SystemParameters.VirtualScreenHeight)
             : SystemParameters.WorkArea;
 
-        const double Margin = 40;
+        // Horizontally any monitor is fine.
+        Left = Math.Max(virtualArea.Left, Math.Min(Left, virtualArea.Right - Width));
 
-        if (Left + Margin > area.Right || Left + Width - Margin < area.Left)
-            Left = Math.Max(area.Left, area.Right - Width - 24);
+        // Vertically the taskbar matters, and it lives on the PRIMARY monitor: clamping against
+        // the virtual screen parked the footer underneath it. WPF only exposes the primary's
+        // work area without a window handle, so: primary monitor → its work area, any other →
+        // the virtual screen (secondary monitors have no taskbar by default). Math.Max last, so
+        // the title bar wins on screens shorter than the window.
+        var primary = SystemParameters.WorkArea;
+        var centreX = Left + (Width / 2);
+        var vertical = centreX >= primary.Left && centreX <= primary.Right ? primary : virtualArea;
 
-        if (Top + Margin > area.Bottom || Top + Height - Margin < area.Top)
-            Top = area.Top + 80;
+        Top = Math.Max(vertical.Top, Math.Min(Top, vertical.Bottom - Height));
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ButtonState == MouseButtonState.Pressed)
-            DragMove();
+        if (e.ButtonState != MouseButtonState.Pressed)
+            return;
+
+        DragMove();
+
+        // DragMove returns after the drop. Persisting here means the position survives even a
+        // hard process kill — publish.ps1 does exactly that, and OnExit never runs then.
+        SavePlacement();
     }
 
     /// <summary>Raised when the user hides the window into the tray via the close glyph.</summary>

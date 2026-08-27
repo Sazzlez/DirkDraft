@@ -5,22 +5,50 @@ namespace DraftPilot.Core.Lcu.Models;
 /// <summary>
 /// The subset of <c>/lol-champ-select/v1/session</c> we actually use. Everything is optional and
 /// defaulted: Riot adds and removes fields between patches, and a missing field must degrade the
-/// display rather than break the parse.
+/// display rather than break the parse. The setters coalesce <see langword="null"/> because the
+/// LCU sends explicit nulls (that is why the scrubber exists), and System.Text.Json writes those
+/// straight over any initializer default — the initializers alone protect nothing.
 /// </summary>
 public sealed class ChampSelectSession
 {
+    private List<ChampSelectPlayer> _myTeam = [];
+    private List<ChampSelectPlayer> _theirTeam = [];
+    private List<List<ChampSelectAction>> _actions = [];
+    private ChampSelectBans _bans = new();
+    private ChampSelectTimer _timer = new();
+
     public long LocalPlayerCellId { get; set; } = -1;
 
-    public List<ChampSelectPlayer> MyTeam { get; set; } = [];
+    public List<ChampSelectPlayer> MyTeam
+    {
+        get => _myTeam;
+        set => _myTeam = value ?? [];
+    }
 
-    public List<ChampSelectPlayer> TheirTeam { get; set; } = [];
+    public List<ChampSelectPlayer> TheirTeam
+    {
+        get => _theirTeam;
+        set => _theirTeam = value ?? [];
+    }
 
     /// <summary>Outer list is the action group (ban round, pick round, …), inner one the simultaneous actions.</summary>
-    public List<List<ChampSelectAction>> Actions { get; set; } = [];
+    public List<List<ChampSelectAction>> Actions
+    {
+        get => _actions;
+        set => _actions = value ?? [];
+    }
 
-    public ChampSelectBans Bans { get; set; } = new();
+    public ChampSelectBans Bans
+    {
+        get => _bans;
+        set => _bans = value ?? new();
+    }
 
-    public ChampSelectTimer Timer { get; set; } = new();
+    public ChampSelectTimer Timer
+    {
+        get => _timer;
+        set => _timer = value ?? new();
+    }
 
     public bool IsSpectating { get; set; }
 }
@@ -61,9 +89,20 @@ public sealed class ChampSelectAction
 
 public sealed class ChampSelectBans
 {
-    public List<int> MyTeamBans { get; set; } = [];
+    private List<int> _myTeamBans = [];
+    private List<int> _theirTeamBans = [];
 
-    public List<int> TheirTeamBans { get; set; } = [];
+    public List<int> MyTeamBans
+    {
+        get => _myTeamBans;
+        set => _myTeamBans = value ?? [];
+    }
+
+    public List<int> TheirTeamBans
+    {
+        get => _theirTeamBans;
+        set => _theirTeamBans = value ?? [];
+    }
 
     public int NumBans { get; set; }
 }

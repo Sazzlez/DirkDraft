@@ -11,7 +11,7 @@ internal static class DraftStatePrinter
 {
     public static void Print(DraftSnapshot snapshot)
     {
-        var (state, target, status) = snapshot;
+        var (state, target, status, _) = snapshot;
 
         if (!state.IsActive)
         {

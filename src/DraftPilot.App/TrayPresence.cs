@@ -11,13 +11,18 @@ public sealed class TrayPresence : IDisposable
 {
     private readonly NotifyIcon _icon;
 
+    /// <summary>Whether the icon handle is ours to dispose. False for the shared
+    /// <see cref="SystemIcons.Application"/> fallback — disposing that would corrupt a
+    /// process-wide cached instance.</summary>
+    private readonly bool _ownsIcon;
+
     public TrayPresence(string tooltip)
     {
         _icon = new NotifyIcon
         {
             Text = tooltip,
             Visible = true,
-            Icon = LoadIcon(),
+            Icon = LoadIcon(out _ownsIcon),
         };
 
         var menu = new ContextMenuStrip();
@@ -43,11 +48,18 @@ public sealed class TrayPresence : IDisposable
     /// <summary>Short line shown on hover; kept to the connection state.</summary>
     public void SetTooltip(string text)
     {
-        // NotifyIcon truncates past 63 characters and throws on longer text in some versions.
-        _icon.Text = text.Length <= 63 ? text : text[..63];
+        // .NET's NotifyIcon caps the text at 127 characters; longer throws. Never cut through a
+        // surrogate pair — a half character renders as a broken glyph.
+        if (text.Length > 127)
+        {
+            var cut = char.IsHighSurrogate(text[126]) ? 126 : 127;
+            text = text[..cut];
+        }
+
+        _icon.Text = text;
     }
 
-    private static Icon LoadIcon()
+    private static Icon LoadIcon(out bool owned)
     {
         // The icon is embedded in the executable, so this is the same image the taskbar shows.
         var path = Environment.ProcessPath;
@@ -56,15 +68,28 @@ public sealed class TrayPresence : IDisposable
         {
             var extracted = Icon.ExtractAssociatedIcon(path);
             if (extracted is not null)
+            {
+                owned = true;
                 return extracted;
+            }
         }
 
+        owned = false;
         return SystemIcons.Application;
     }
 
     public void Dispose()
     {
         _icon.Visible = false;
+
+        // NotifyIcon.Dispose releases neither the menu nor the icon handle. The menu is always
+        // ours; the icon only when we extracted it ourselves. Icon last — it must outlive the
+        // NotifyIcon that still references it.
+        var icon = _icon.Icon;
+        _icon.ContextMenuStrip?.Dispose();
         _icon.Dispose();
+
+        if (_ownsIcon)
+            icon?.Dispose();
     }
 }

@@ -5,16 +5,17 @@ namespace DraftPilot.Core.Draft;
 /// <param name="Action">Whether to show pick or ban recommendations.</param>
 /// <param name="IsFollowingTurn">
 /// True when this seat is the one actually on the clock, false when we are showing an outlook
-/// (pinned, manually selected, or nobody on our team is picking right now).
+/// (manually selected, or nobody on our team is picking right now).
 /// </param>
 public sealed record RecommendationTarget(DraftSlot Slot, TurnAction Action, bool IsFollowingTurn);
 
 /// <summary>
 /// Decides which ally seat the recommendation list should advise.
 /// <para>
-/// By default it follows whoever is on the clock. A manual selection holds until the turn moves on;
-/// a pin holds indefinitely. When nobody on our team is picking, the previous seat stays put so the
-/// list never goes blank mid-draft.
+/// By default it follows whoever is on the clock. A manual selection holds until the turn moves
+/// on. When nobody on our team is picking, the previous seat stays put so the list never goes
+/// blank mid-draft. (An indefinite "pin" existed once; its UI button read as clutter and was
+/// removed with it.)
 /// </para>
 /// </summary>
 public sealed class TurnTracker
@@ -23,42 +24,19 @@ public sealed class TurnTracker
     private long? _manualTurnCellId;
     private long? _lastResolvedCellId;
 
-    /// <summary>When set, the list stays on <see cref="PinnedCellId"/> regardless of whose turn it is.</summary>
-    public bool IsPinned { get; private set; }
-
-    public long? PinnedCellId { get; private set; }
-
     /// <summary>Switches the list to a seat. Auto-following resumes once the turn moves on.</summary>
     public void SelectManually(long cellId, DraftState state)
     {
         _manualCellId = cellId;
         _manualTurnCellId = state.Turn?.CellId;
-
-        if (IsPinned)
-            PinnedCellId = cellId;
     }
 
-    /// <summary>Pins the list to the seat it is currently showing.</summary>
-    public void Pin(long cellId)
-    {
-        IsPinned = true;
-        PinnedCellId = cellId;
-    }
-
-    public void Unpin()
-    {
-        IsPinned = false;
-        PinnedCellId = null;
-    }
-
-    /// <summary>Forgets manual selection and pin; called when a new champion select starts.</summary>
+    /// <summary>Forgets the manual selection; called when a new champion select starts.</summary>
     public void Reset()
     {
         _manualCellId = null;
         _manualTurnCellId = null;
         _lastResolvedCellId = null;
-        IsPinned = false;
-        PinnedCellId = null;
     }
 
     /// <summary>
@@ -71,10 +49,6 @@ public sealed class TurnTracker
 
         var turn = state.Turn;
         var isAllyTurn = turn is { IsAlly: true };
-
-        // A pin wins over everything, including the turn moving on.
-        if (IsPinned && PinnedCellId is { } pinned && FindAlly(state, pinned) is { } pinnedSlot)
-            return Build(pinnedSlot, turn, isFollowingTurn: isAllyTurn && turn!.CellId == pinned);
 
         // A manual click holds until the clock passes to someone else.
         if (_manualCellId is { } manual && turn?.CellId == _manualTurnCellId && FindAlly(state, manual) is { } manualSlot)

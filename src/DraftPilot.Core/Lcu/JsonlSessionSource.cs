@@ -23,14 +23,21 @@ public sealed class JsonlSessionSource : ISessionSource
     /// </param>
     public JsonlSessionSource(string path, double speed = 1.0, int maxFrames = int.MaxValue)
     {
-        var frames = Load(path);
+        var frames = Load(path, out var skipped);
         _frames = maxFrames < frames.Count ? frames.GetRange(0, Math.Max(0, maxFrames)) : frames;
         _speed = speed;
+        SkippedLines = skipped;
     }
+
+    /// <summary>Lines the recording contained but the parser could not read (e.g. a torn last
+    /// line from a killed recorder). Surfaced so the replay command can report them.</summary>
+    public int SkippedLines { get; }
 
     public event Action<string?>? SessionJson;
 
     public event Action<ClientStatus>? StatusChanged;
+
+    public event Action<string>? GameflowPhase;
 
     /// <summary>Number of payloads in the recording.</summary>
     public int FrameCount => _frames.Count;
@@ -52,28 +59,56 @@ public sealed class JsonlSessionSource : ISessionSource
             if (wait > 1)
                 await Task.Delay(TimeSpan.FromMilliseconds(wait), ct).ConfigureAwait(false);
 
+            // A phase frame drives the gameflow event; it is not a session payload (and must not
+            // read as "session ended").
+            if (frame.Phase is not null)
+            {
+                GameflowPhase?.Invoke(frame.Phase);
+                continue;
+            }
+
             SessionJson?.Invoke(frame.Json);
         }
     }
 
-    private static List<Frame> Load(string path)
+    private static List<Frame> Load(string path, out int skipped)
     {
         var frames = new List<Frame>();
+        skipped = 0;
 
         foreach (var line in File.ReadLines(path))
         {
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 
-            using var document = JsonDocument.Parse(line);
-            var root = document.RootElement;
+            // An unreadable line — typically the torn last line of a recording ended with Ctrl+C —
+            // costs that frame, not the whole replay.
+            try
+            {
+                using var document = JsonDocument.Parse(line);
+                var root = document.RootElement;
 
-            var offset = root.TryGetProperty("offsetMs", out var offsetElement) ? offsetElement.GetInt64() : 0;
-            var session = root.TryGetProperty("session", out var sessionElement) && sessionElement.ValueKind is not JsonValueKind.Null
-                ? sessionElement.GetRawText()
-                : null;
+                var offset = root.TryGetProperty("offsetMs", out var offsetElement)
+                    && offsetElement.ValueKind == JsonValueKind.Number
+                    && offsetElement.TryGetInt64(out var parsedOffset)
+                        ? parsedOffset
+                        : 0;
 
-            frames.Add(new Frame(offset, session));
+                var phase = root.TryGetProperty("phase", out var phaseElement)
+                    && phaseElement.ValueKind == JsonValueKind.String
+                        ? phaseElement.GetString()
+                        : null;
+
+                var session = root.TryGetProperty("session", out var sessionElement) && sessionElement.ValueKind is not JsonValueKind.Null
+                    ? sessionElement.GetRawText()
+                    : null;
+
+                frames.Add(new Frame(offset, session, phase));
+            }
+            catch (JsonException)
+            {
+                skipped++;
+            }
         }
 
         return frames;
@@ -81,5 +116,5 @@ public sealed class JsonlSessionSource : ISessionSource
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    private sealed record Frame(long OffsetMs, string? Json);
+    private sealed record Frame(long OffsetMs, string? Json, string? Phase = null);
 }

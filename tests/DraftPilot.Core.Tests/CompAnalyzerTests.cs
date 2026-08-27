@@ -36,6 +36,19 @@ public class CompAnalyzerTests
 
     private static CompAnalyzer Analyzer(TraitTable? traits = null) => new(Meta(), traits ?? TraitTable.Empty);
 
+    /// <summary>
+    /// Matches a chip by a distinctive fragment rather than its full wording, and insists it carries
+    /// an explanation: a chip whose text is jargon and whose tooltip is empty is unusable mid-draft.
+    /// </summary>
+    private static void AssertChip(IEnumerable<Reason> reasons, string fragment, ReasonTone tone)
+    {
+        var match = reasons.FirstOrDefault(reason =>
+            reason.Text.Contains(fragment, StringComparison.Ordinal) && reason.Tone == tone);
+
+        Assert.NotNull(match);
+        Assert.False(string.IsNullOrWhiteSpace(match.Hint), $"Chip \"{match.Text}\" braucht eine Erklärung.");
+    }
+
     [Fact]
     public void EmptyComp_HasNoFindings()
     {
@@ -194,7 +207,7 @@ public class CompAnalyzerTests
         var score = analyzer.Fit(Ap1, profile, reasons);
 
         Assert.True(score > 0);
-        Assert.Contains(reasons, reason => reason.Text == "deckt AP-Schaden" && reason.Tone == ReasonTone.Pro);
+        AssertChip(reasons, "magischen Schaden", ReasonTone.Pro);
     }
 
     [Fact]
@@ -206,7 +219,7 @@ public class CompAnalyzerTests
 
         analyzer.Fit(TankTagged, profile, reasons);
 
-        Assert.Contains(reasons, reason => reason.Text == "bringt Frontline" && reason.Tone == ReasonTone.Pro);
+        AssertChip(reasons, "vorne Schaden aus", ReasonTone.Pro);
     }
 
     [Fact]
@@ -219,7 +232,7 @@ public class CompAnalyzerTests
 
         analyzer.Fit(TankTagged, profile, reasons);
 
-        Assert.Contains(reasons, reason => reason.Text == "bringt Engage" && reason.Tone == ReasonTone.Pro);
+        AssertChip(reasons, "Kämpfe eröffnen", ReasonTone.Pro);
     }
 
     [Fact]
@@ -233,26 +246,30 @@ public class CompAnalyzerTests
         var score = analyzer.Fit(Ad4, profile, reasons);
 
         Assert.True(score < 0);
-        Assert.Contains(reasons, reason => reason.Text == "verstärkt AD-Übergewicht" && reason.Tone == ReasonTone.Contra);
+        AssertChip(reasons, "mehr physischer Schaden", ReasonTone.Contra);
     }
 
+    /// <summary>
+    /// No verdict at all rather than a zero: the breakdown shows the two differently, and claiming
+    /// "neutral" about a champion nothing is known of would be a lie.
+    /// </summary>
     [Fact]
-    public void Fit_IsNeutralForChampionsWithNoData()
+    public void Fit_SaysNothingForChampionsWithNoData()
     {
         var analyzer = Analyzer();
         var profile = analyzer.Analyze([Ad1, Ad2, Ad3]);
         var reasons = new List<Reason>();
 
-        Assert.Equal(0, analyzer.Fit(Unknown, profile, reasons));
+        Assert.Null(analyzer.Fit(Unknown, profile, reasons));
         Assert.Empty(reasons);
     }
 
     [Fact]
-    public void Fit_IsZeroAgainstAnEmptyComposition()
+    public void Fit_SaysNothingAgainstAnEmptyComposition()
     {
         var analyzer = Analyzer();
 
-        Assert.Equal(0, analyzer.Fit(Ap1, CompProfile.Empty, []));
+        Assert.Null(analyzer.Fit(Ap1, CompProfile.Empty, []));
     }
 
     [Fact]
@@ -269,5 +286,66 @@ public class CompAnalyzerTests
         var profile = Analyzer().Analyze([0, Ad1, 0, Ad2, 0]);
 
         Assert.Equal(2, profile.Count);
+    }
+
+    /// <summary>
+    /// "No data → silence": without Data Dragon statics (an update run while the CDN was down)
+    /// frontline and range are unknowable, and flagging every composition as "kein Frontline"
+    /// would be a permanent false alarm.
+    /// </summary>
+    [Fact]
+    public void MissingStaticData_KeepsFrontlineAndMeleeRulesSilent()
+    {
+        var bare = new MetaBuilder()
+            .Champion(1, "A", DamageType.Physical)
+            .Champion(2, "B", DamageType.Physical)
+            .Champion(3, "C", DamageType.Magic)
+            .Champion(4, "D", DamageType.Magic)
+            .Build();
+
+        var profile = new CompAnalyzer(bare, TraitTable.Empty).Analyze([1, 2, 3, 4]);
+
+        Assert.False(profile.Has(CompIssue.NoFrontline));
+        Assert.False(profile.Has(CompIssue.AllMelee));
+    }
+
+    [Fact]
+    public void CcFloor_IsOnePiecePerTwoChampions()
+    {
+        // Two CC points across three champions meets the documented floor of one per two.
+        var traits = Traits(("Ad1", 0, 0, 1), ("Ad2", 0, 0, 1), ("Ap1", 0, 0, 0));
+
+        var profile = Analyzer(traits).Analyze([Ad1, Ad2, Ap1]);
+
+        Assert.False(profile.Has(CompIssue.LittleCrowdControl));
+    }
+
+    [Fact]
+    public void CcClearlyBelowTheFloor_IsFlagged()
+    {
+        var traits = Traits(("Ad1", 0, 0, 1), ("Ad2", 0, 0, 0), ("Ap1", 0, 0, 0));
+
+        var profile = Analyzer(traits).Analyze([Ad1, Ad2, Ap1]);
+
+        Assert.True(profile.Has(CompIssue.LittleCrowdControl));
+    }
+
+    /// <summary>
+    /// ScoreModel.CompScale is calibrated for -1..+1 ("a covered gap ≈ +4 points, never more").
+    /// A candidate covering every gap at once must saturate there, not stack to twice that.
+    /// </summary>
+    [Fact]
+    public void Fit_IsClampedToPlusMinusOne()
+    {
+        // Three AD melee champions with no engage, peel or CC: every finding at once.
+        var traits = Traits(("Ad1", 0, 0, 0), ("Ad2", 0, 0, 0), ("Ad3", 0, 0, 0), ("TankTag", 3, 3, 3));
+        var analyzer = Analyzer(traits);
+        var profile = analyzer.Analyze([Ad1, Ad2, Ad3]);
+
+        // A ranged magic tank with hard engage, peel and CC covers all of them.
+        var fit = analyzer.Fit(TankTagged, profile, []);
+
+        Assert.NotNull(fit);
+        Assert.InRange(fit!.Value, -1, 1);
     }
 }

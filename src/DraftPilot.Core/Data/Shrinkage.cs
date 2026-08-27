@@ -35,6 +35,11 @@ public static class Shrinkage
         if (play <= 0)
             return 0.5;
 
+        // Math.Clamp(NaN, …) is NaN, and one NaN rate would ride the whole model into a NaN
+        // score. A rate that is not a number carries no information — that is the prior.
+        if (double.IsNaN(observedRate))
+            return 0.5;
+
         var clamped = Math.Clamp(observedRate, 0, 1);
         return ((clamped * play) + (0.5 * priorWeight)) / (play + priorWeight);
     }

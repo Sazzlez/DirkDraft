@@ -34,7 +34,13 @@ public sealed class LanePredictionResult
     internal LanePredictionResult(IReadOnlyList<LanePrediction> predictions)
     {
         Predictions = predictions;
-        _byCell = predictions.ToDictionary(prediction => prediction.CellId);
+
+        // TryAdd, not ToDictionary: a corrupt payload with a duplicated cell id must degrade the
+        // prediction, not throw out of a render pass.
+        _byCell = [];
+        foreach (var prediction in predictions)
+            _byCell.TryAdd(prediction.CellId, prediction);
+
         _byLane = [];
 
         // The assignment is one-to-one, so a lane maps back to exactly one seat.
@@ -95,6 +101,13 @@ public sealed class LanePredictor(MetaLookup meta, SeatPriors? seatPriors = null
         var assignment = new int[seatCount];
 
         Enumerate(0, 0, 1.0);
+
+        // Contradictory hard constraints — two seats forced onto the same lane — zero out every
+        // assignment and with it EVERY seat's prediction, including the unambiguous ones.
+        // Predicting without the manual constraints is strictly more useful than predicting
+        // nothing at all.
+        if (total <= 0 && manualLanes is { Count: > 0 })
+            return Predict(slots, manualLanes: null);
 
         var predictions = new List<LanePrediction>(slots.Count);
 

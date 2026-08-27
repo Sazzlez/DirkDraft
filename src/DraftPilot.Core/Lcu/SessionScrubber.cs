@@ -38,13 +38,6 @@ public static class SessionScrubber
     ];
 
     /// <summary>
-    /// Returns the payload without personal data. Input that is not valid JSON is passed through
-    /// unchanged rather than dropped, so a shape change never silently loses a recording — but see
-    /// <see cref="TryScrub"/> when that distinction matters.
-    /// </summary>
-    public static string Scrub(string sessionJson) => TryScrub(sessionJson, out var scrubbed) ? scrubbed : sessionJson;
-
-    /// <summary>
     /// Removes personal data, reporting whether the payload could be parsed at all.
     /// </summary>
     public static bool TryScrub(string sessionJson, out string scrubbed)

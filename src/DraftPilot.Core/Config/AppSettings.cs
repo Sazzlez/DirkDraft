@@ -6,28 +6,11 @@ namespace DraftPilot.Core.Config;
 /// <summary>User settings. Written on change, read once at start-up.</summary>
 public sealed class AppSettings
 {
-    /// <summary>Window position; NaN means "not placed yet, centre on the working area".</summary>
+    /// <summary>Window position; NaN means "not placed yet, park at the working area's edge".
+    /// The size is fixed in XAML and deliberately not stored — see MainWindow.SavePlacement.</summary>
     public double WindowLeft { get; set; } = double.NaN;
 
     public double WindowTop { get; set; } = double.NaN;
-
-    public double WindowWidth { get; set; } = 430;
-
-    public double WindowHeight { get; set; } = 790;
-
-    /// <summary>Name of the active weighting preset.</summary>
-    public string Preset { get; set; } = "Meta";
-
-    /// <summary>Custom weights, used when <see cref="Preset"/> is <c>Eigene</c>.</summary>
-    public double WeightTier { get; set; } = 1.0;
-
-    public double WeightLaneMatchup { get; set; } = 1.0;
-
-    public double WeightTeamMatchup { get; set; } = 0.4;
-
-    public double WeightSynergy { get; set; } = 0.6;
-
-    public double WeightComposition { get; set; } = 0.8;
 
     /// <summary>
     /// Show champions the account does not own. Off by default: a pick you cannot click is not a
@@ -38,6 +21,12 @@ public sealed class AppSettings
 
     /// <summary>Bring the window up by itself when champion select starts.</summary>
     public bool AutoShowOnChampSelect { get; set; } = true;
+
+    /// <summary>Bring the window up with the build view when the game starts.</summary>
+    public bool AutoShowOnGameStart { get; set; } = true;
+
+    /// <summary>Data Dragon locale for item, rune and spell names, matching the client's shop.</summary>
+    public string DataLanguage { get; set; } = "de_DE";
 
     /// <summary>
     /// Hide the window into the notification area once champion select ends. Off by default: a window
@@ -98,9 +87,11 @@ public sealed class AppSettings
 
             File.Move(temporary, AppPaths.SettingsPath, overwrite: true);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception)
         {
-            // Nothing worth interrupting the user for.
+            // Nothing worth interrupting the user for — Save is best-effort by contract. The
+            // filter is deliberately everything: the historical crash here was an
+            // ArgumentException (NaN in a double), not an IO error.
         }
     }
 }
@@ -108,6 +99,9 @@ public sealed class AppSettings
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     PropertyNameCaseInsensitive = true,
+    // WindowLeft/Top default to NaN ("not placed yet") — without this, serialising a settings
+    // object before the first placement threw instead of writing.
+    NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     WriteIndented = true)]
 [JsonSerializable(typeof(AppSettings))]
 public sealed partial class SettingsJson : JsonSerializerContext;

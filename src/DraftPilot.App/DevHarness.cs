@@ -11,12 +11,16 @@ namespace DraftPilot.App;
 /// <param name="DemoRecording">Replay this recording instead of connecting to the client.</param>
 /// <param name="DemoFrames">How many frames of the recording to play before holding.</param>
 /// <param name="ScreenshotPath">Render the window to this PNG and exit.</param>
+/// <param name="ExpandRows">Expand this many recommendation rows before capturing.</param>
+/// <param name="Phase">Simulate this gameflow phase (e.g. InProgress) before capturing.</param>
 public sealed record DevOptions(
     string? DemoRecording,
     int DemoFrames,
     string? ScreenshotPath,
     double ScreenshotDelaySeconds,
-    double DemoSpeed)
+    double DemoSpeed,
+    int ExpandRows,
+    string? Phase)
 {
     public bool IsDemo => DemoRecording is { Length: > 0 };
 
@@ -33,6 +37,13 @@ public sealed record DevOptions(
 /// </summary>
 public static class DevHarness
 {
+    /// <summary>
+    /// Set for demo/screenshot runs: they skip the single-instance handshake and may run next to
+    /// a live instance, so they must not write their throwaway window position into the real
+    /// settings.json (last full-file write wins there).
+    /// </summary>
+    public static bool SuppressPlacementSave { get; set; }
+
     public static DevOptions Parse(string[] args)
     {
         string? recording = null;
@@ -40,9 +51,20 @@ public static class DevHarness
         var frames = int.MaxValue;
         var delay = 1.5;
         var speed = double.PositiveInfinity;
+        var expand = 0;
+        string? phase = null;
+
+        // Whether one of OUR dev switches was seen yet. GetCommandLineArgs starts with the
+        // executable path, Windows and wrappers append their own tokens — none of that may
+        // abort a normal start. Only stray tokens AFTER a recognised dev switch are almost
+        // always an unquoted path that fell apart, and those must fail loudly.
+        var sawDevFlag = false;
 
         for (var i = 0; i < args.Length; i++)
         {
+            if (args[i] is "--demo" or "--frames" or "--screenshot" or "--screenshot-delay" or "--speed" or "--expand" or "--phase")
+                sawDevFlag = true;
+
             switch (args[i])
             {
                 case "--demo" when i + 1 < args.Length:
@@ -73,10 +95,44 @@ public static class DevHarness
                     speed = parsedSpeed;
                     i++;
                     break;
+
+                // The score breakdown is behind a chevron the harness cannot click, and it is
+                // exactly the part whose readability needs looking at.
+                case "--expand" when i + 1 < args.Length && int.TryParse(args[i + 1], out var parsedExpand):
+                    expand = parsedExpand;
+                    i++;
+                    break;
+
+                // A recording has no gameflow events; the in-game view needs the phase injected.
+                case "--phase" when i + 1 < args.Length:
+                    phase = args[++i];
+                    break;
+
+                // Development-only flags may still not fail silently: an unquoted path with a
+                // space arrives as several tokens and used to be truncated without a word (the
+                // crash log has a FileNotFoundException for 'D:\Claude' to prove it), and an
+                // unparsable value fell back to its default as if nothing happened.
+                default:
+                    // Unknown "--" switches and stray tokens abort only a HARNESS invocation;
+                    // in a normal start they belong to Windows or a wrapper, not to us.
+                    if (sawDevFlag && args[i].StartsWith("--", StringComparison.Ordinal))
+                        throw new ArgumentException($"Unbekannter oder unvollständiger Schalter: {args[i]}");
+
+                    if (sawDevFlag)
+                    {
+                        throw new ArgumentException(
+                            $"Unerwartetes Argument „{args[i]}“ — Pfade mit Leerzeichen in Anführungszeichen setzen.");
+                    }
+
+                    break;
             }
         }
 
-        return new DevOptions(recording, frames, screenshot, delay, speed);
+        if (recording is not null && !File.Exists(recording))
+            throw new FileNotFoundException(
+                $"Aufnahme nicht gefunden: {recording} — Pfad in Anführungszeichen setzen?", recording);
+
+        return new DevOptions(recording, frames, screenshot, delay, speed, expand, phase);
     }
 
     /// <summary>
@@ -117,7 +173,7 @@ public static class DevHarness
         // Let the popup build its visual tree before rendering it.
         window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
 
-        if (combo.Template.FindName("Popup", combo) is Popup { Child: FrameworkElement child })
+        if (combo.Template.FindName("PART_Popup", combo) is Popup { Child: FrameworkElement child })
         {
             child.UpdateLayout();
             if (child.ActualWidth > 0 && child.ActualHeight > 0)

@@ -222,6 +222,43 @@ public class LanePredictorTests
         Assert.Equal(Lane.Support, result.ForCell(5)!.Lane);
     }
 
+    /// <summary>
+    /// Two seats manually forced onto the same lane leave no valid one-to-one assignment. That
+    /// contradiction must degrade to a prediction WITHOUT the constraints — not collapse every
+    /// seat, including the unambiguous ones, to Unknown.
+    /// </summary>
+    [Fact]
+    public void ContradictoryManualLanes_DoNotCollapseEveryPrediction()
+    {
+        var slots = TestMeta.EnemySlots(TestMeta.Jax, TestMeta.Elise, TestMeta.Syndra, TestMeta.Lucian, TestMeta.Nautilus);
+        var manual = new Dictionary<long, Lane> { [5] = Lane.Mid, [6] = Lane.Mid };
+
+        var result = Predictor().Predict(slots, manual);
+
+        Assert.Equal(Lane.Mid, result.ForCell(7)!.Lane);
+        Assert.Equal(Lane.Adc, result.ForCell(8)!.Lane);
+        Assert.All(result.Predictions, prediction => Assert.NotEqual(Lane.Unknown, prediction.Lane));
+    }
+
+    /// <summary>
+    /// One NaN role rate in a snapshot must not poison the whole prediction: NaN survives the
+    /// normalisation and every comparison, and used to turn EVERY seat into Unknown.
+    /// </summary>
+    [Fact]
+    public void ANaNRoleRate_DoesNotPoisonThePrediction()
+    {
+        var meta = new MetaBuilder()
+            .Champion(1, "Sane").InLane(1, Core.Draft.Lane.Top, roleRate: 0.9)
+            .Champion(2, "Broken").InLane(2, Core.Draft.Lane.Jungle, roleRate: double.NaN)
+            .Build();
+
+        var slots = TestMeta.EnemySlots(1, 2, 0, 0, 0);
+        var result = new LanePredictor(meta).Predict(slots);
+
+        Assert.Equal(Lane.Top, result.ForCell(5)!.Lane);
+        Assert.NotEqual(Lane.Unknown, result.ForCell(6)!.Lane);
+    }
+
     private static string SeatPriorsPath
         => Path.Combine(AppContext.BaseDirectory, "Fixtures", "pick_order_priors.json");
 }

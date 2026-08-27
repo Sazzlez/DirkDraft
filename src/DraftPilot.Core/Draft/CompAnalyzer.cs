@@ -73,7 +73,7 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
             return CompProfile.Empty;
 
         double physical = 0, magic = 0, damageKnown = 0;
-        int frontline = 0, ranged = 0, maxEngage = 0, maxPeel = 0, totalCc = 0, lateScaling = 0, traitsKnown = 0;
+        int frontline = 0, ranged = 0, maxEngage = 0, maxPeel = 0, totalCc = 0, lateScaling = 0, traitsKnown = 0, staticKnown = 0;
 
         foreach (var id in ids)
         {
@@ -98,6 +98,8 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
 
             if (champion is not null && champion.HasStaticData)
             {
+                staticKnown++;
+
                 if (champion.IsTagged("Tank") || champion.Defense >= FrontlineDefense)
                     frontline++;
 
@@ -123,8 +125,8 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
         var coverage = (double)traitsKnown / ids.Count;
 
         var findings = Evaluate(
-            ids.Count, damageKnown, physicalShare, magicShare,
-            frontline, ranged, maxEngage, maxPeel, totalCc, traitsKnown);
+            damageKnown, physicalShare, magicShare,
+            frontline, ranged, maxEngage, maxPeel, totalCc, traitsKnown, staticKnown);
 
         return new CompProfile(
             ids.Count, physicalShare, magicShare, frontline, ranged,
@@ -132,7 +134,6 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
     }
 
     private static List<CompFinding> Evaluate(
-        int count,
         double damageKnown,
         double physicalShare,
         double magicShare,
@@ -141,7 +142,8 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
         int maxEngage,
         int maxPeel,
         int totalCc,
-        int traitsKnown)
+        int traitsKnown,
+        int staticKnown)
     {
         var findings = new List<CompFinding>();
 
@@ -154,10 +156,13 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
                 findings.Add(new CompFinding(CompIssue.NoPhysicalDamage, "AD-Schaden fehlt", Severity(DamageImbalance - physicalShare, DamageImbalance)));
         }
 
-        if (count >= MinimumForRoleRules && frontline == 0)
+        // Gated on champions with actual static data, not on head count: with Data Dragon
+        // missing (the update ran without a patch version), frontline and range are zero for
+        // EVERYONE, and these two fired on every composition as pure false alarms.
+        if (staticKnown >= MinimumForRoleRules && frontline == 0)
             findings.Add(new CompFinding(CompIssue.NoFrontline, "kein Frontline", 0.8));
 
-        if (count >= 4 && ranged == 0)
+        if (staticKnown >= 4 && ranged == 0)
             findings.Add(new CompFinding(CompIssue.AllMelee, "nur Nahkampf", 0.6));
 
         // Trait-driven rules need enough curated champions on the board to mean anything.
@@ -167,11 +172,11 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
         if (maxEngage == 0)
             findings.Add(new CompFinding(CompIssue.NoEngage, "kein Engage", 0.9));
 
-        if (maxPeel == 0 && count >= 4)
+        if (maxPeel == 0 && traitsKnown >= 4)
             findings.Add(new CompFinding(CompIssue.NoPeel, "kein Peel", 0.5));
 
         // Roughly one piece of hard CC per two champions is the floor for a workable team fight.
-        if (totalCc < traitsKnown)
+        if (totalCc * 2 < traitsKnown)
             findings.Add(new CompFinding(CompIssue.LittleCrowdControl, "wenig CC", 0.7));
 
         return findings;
@@ -179,28 +184,41 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
 
     /// <summary>
     /// How much a candidate would improve the composition, from -1 to about +1, with the reasons
-    /// that produced the number.
+    /// that produced the number. <see langword="null"/> when there is nothing to judge yet — no
+    /// team-mate has picked, or the champion is unknown — as opposed to a considered zero.
     /// </summary>
-    public double Fit(int candidateId, CompProfile profile, ICollection<Reason> reasons)
+    public double? Fit(int candidateId, CompProfile profile, ICollection<Reason> reasons)
     {
         var champion = _meta.Champion(candidateId);
         if (champion is null || profile.Count == 0)
-            return 0;
+            return null;
 
         var trait = _traits.For(champion.Key);
+
+        // No damage type, no static data, no curated traits: not one rule below can fire, in either
+        // direction. That is missing data, not a considered zero, and the breakdown says so.
+        if (champion.Damage == DamageType.Unknown && !champion.HasStaticData && !trait.IsKnown)
+            return null;
+
         var score = 0.0;
 
         // Covering a missing damage type is the single most valuable thing a late pick can do.
         if (profile.Has(CompIssue.NoMagicDamage) && champion.Damage is DamageType.Magic or DamageType.Mixed)
         {
             score += 0.5 * profile.SeverityOf(CompIssue.NoMagicDamage);
-            reasons.Add(Reason.Pro("deckt AP-Schaden"));
+            reasons.Add(Reason.Pro(
+                "bringt fehlenden magischen Schaden",
+                "Dein Team macht fast nur physischen Schaden. Dagegen reicht dem Gegner Rüstung — "
+                + "magischer Schaden zwingt ihn, sich gegen beides zu wappnen."));
         }
 
         if (profile.Has(CompIssue.NoPhysicalDamage) && champion.Damage is DamageType.Physical or DamageType.Mixed)
         {
             score += 0.5 * profile.SeverityOf(CompIssue.NoPhysicalDamage);
-            reasons.Add(Reason.Pro("deckt AD-Schaden"));
+            reasons.Add(Reason.Pro(
+                "bringt fehlenden physischen Schaden",
+                "Dein Team macht fast nur magischen Schaden. Dagegen reicht dem Gegner "
+                + "Magieresistenz — physischer Schaden zwingt ihn, sich gegen beides zu wappnen."));
         }
 
         if (champion.HasStaticData)
@@ -208,13 +226,19 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
             if (profile.Has(CompIssue.NoFrontline) && (champion.IsTagged("Tank") || champion.Defense >= FrontlineDefense))
             {
                 score += 0.4;
-                reasons.Add(Reason.Pro("bringt Frontline"));
+                reasons.Add(Reason.Pro(
+                    "hält vorne Schaden aus",
+                    "In deinem Team ist noch niemand, der im Teamfight vorne stehen und Schaden "
+                    + "abfangen kann — ohne so einen Champion trifft alles direkt die Carrys."));
             }
 
             if (profile.Has(CompIssue.AllMelee) && champion.IsRanged)
             {
                 score += 0.25;
-                reasons.Add(Reason.Pro("bringt Reichweite"));
+                reasons.Add(Reason.Pro(
+                    "kämpft auf Distanz",
+                    "Dein Team besteht bisher nur aus Nahkämpfern. Ein Champion mit Reichweite kann "
+                    + "Schaden machen, ohne selbst in den Nahkampf zu müssen."));
             }
         }
 
@@ -223,36 +247,56 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
             if (profile.Has(CompIssue.NoEngage) && trait.HasHardEngage)
             {
                 score += 0.45;
-                reasons.Add(Reason.Pro("bringt Engage"));
+                reasons.Add(Reason.Pro(
+                    "kann Kämpfe eröffnen",
+                    "In deinem Team kann bisher niemand einen Teamfight von sich aus starten "
+                    + "(Engage). Dann bestimmt immer der Gegner, wann gekämpft wird."));
             }
 
             if (profile.Has(CompIssue.NoPeel) && trait.HasPeel)
             {
                 score += 0.25;
-                reasons.Add(Reason.Pro("bringt Peel"));
+                reasons.Add(Reason.Pro(
+                    "schützt deine Carrys",
+                    "Niemand in deinem Team kann Gegner von den eigenen Schadensausteilern "
+                    + "wegdrängen (Peel). Ein Assassine kommt so ungestört durch."));
             }
 
             if (profile.Has(CompIssue.LittleCrowdControl) && trait.HasHardCc)
             {
                 score += 0.3;
-                reasons.Add(Reason.Pro("bringt CC"));
+                reasons.Add(Reason.Pro(
+                    "kann Gegner festsetzen",
+                    "Deinem Team fehlen Effekte, die Gegner bewegungsunfähig machen — betäuben, "
+                    + "hochwerfen, festhalten (CC). Ohne die entkommt jeder Gegner."));
             }
         }
 
-        // Deepening an existing imbalance is a real cost, not a neutral choice.
-        if (!profile.Has(CompIssue.NoPhysicalDamage) && profile.PhysicalShare >= 0.75 && champion.Damage == DamageType.Physical)
+        // Deepening an existing imbalance is a real cost, not a neutral choice. (No need to check
+        // the NoPhysicalDamage finding here: a share ≥ 0.75 rules it out by definition.)
+        if (profile.PhysicalShare >= 0.75 && champion.Damage == DamageType.Physical)
         {
             score -= 0.2;
-            reasons.Add(Reason.Contra("verstärkt AD-Übergewicht"));
+            reasons.Add(Reason.Contra(
+                "noch mehr physischer Schaden",
+                "Dein Team macht schon fast nur physischen Schaden. Ein weiterer solcher Champion "
+                + "macht es dem Gegner leicht: Er kauft Rüstung und ist gegen alles gewappnet."));
         }
 
-        if (!profile.Has(CompIssue.NoMagicDamage) && profile.MagicShare >= 0.75 && champion.Damage == DamageType.Magic)
+        if (profile.MagicShare >= 0.75 && champion.Damage == DamageType.Magic)
         {
             score -= 0.2;
-            reasons.Add(Reason.Contra("verstärkt AP-Übergewicht"));
+            reasons.Add(Reason.Contra(
+                "noch mehr magischer Schaden",
+                "Dein Team macht schon fast nur magischen Schaden. Ein weiterer solcher Champion "
+                + "macht es dem Gegner leicht: Er kauft Magieresistenz und ist gegen alles gewappnet."));
         }
 
-        return score;
+        // The documented range is -1..+1 and ScoreModel.CompScale is calibrated for it ("a
+        // covered gap ≈ +4 points, never more"). Unclamped, a candidate covering every gap at
+        // once stacked up to 2.15 — turning the one term WITHOUT a win-rate basis into the
+        // second-largest in the model.
+        return Math.Clamp(score, -1, 1);
     }
 
     private static double Severity(double excess, double scale)

@@ -32,6 +32,12 @@ public sealed class LcuEventSocket : IAsyncDisposable
     private readonly LcuCredentials _credentials;
     private ClientWebSocket? _socket;
 
+    /// <summary>Consecutive subscriber failures; only the receive loop's thread touches this.</summary>
+    private int _handlerFailures;
+
+    /// <summary>Whether at least one frame was handed to subscribers on the current link.</summary>
+    private bool _frameHandled;
+
     public LcuEventSocket(LcuCredentials credentials) => _credentials = credentials;
 
     /// <summary>Raised for every subscribed event, on the receive loop's thread.</summary>
@@ -46,54 +52,95 @@ public sealed class LcuEventSocket : IAsyncDisposable
     /// </summary>
     public async Task RunAsync(CancellationToken ct)
     {
+        // A link has to live this long before the backoff resets — a client that accepts and
+        // immediately drops the connection must not be hammered twice a second forever.
+        const long StableLinkMilliseconds = 5_000;
+
         var backoff = TimeSpan.FromMilliseconds(500);
 
         while (!ct.IsCancellationRequested)
         {
+            var connectedAt = 0L;
+            _frameHandled = false;
+
             try
             {
-                await ConnectAndPumpAsync(ct).ConfigureAwait(false);
-                backoff = TimeSpan.FromMilliseconds(500);
+                await ConnectAndPumpAsync(ct, () => connectedAt = Environment.TickCount64).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
+                // Shutdown or teardown by the owner: no drop announcement — the owner already
+                // knows, and a late "disconnected" only made the status flap back after Offline.
                 return;
             }
-            catch (Exception ex) when (ex is WebSocketException or IOException or HttpRequestException or InvalidOperationException)
+            catch (Exception)
             {
-                ConnectionChanged?.Invoke(false);
+                // Deliberately everything, not just the network types: an exception escaping a
+                // subscriber used to end this loop for good while the status kept saying
+                // "connected". Any failure now reads as a dropped link and reconnects.
             }
+
+            // One place announces the drop, whatever path got us here — the pump returning, a
+            // network error, or a subscriber giving up.
+            if (connectedAt != 0)
+                ConnectionChanged?.Invoke(false);
 
             if (ct.IsCancellationRequested)
                 return;
 
-            await Task.Delay(backoff, ct).ConfigureAwait(false);
+            // The backoff resets only when the link both lived a while AND delivered a frame the
+            // subscribers digested — a deterministic handler failure must not turn into a
+            // half-second reconnect-and-reseed loop.
+            if (connectedAt != 0 && _frameHandled && Environment.TickCount64 - connectedAt >= StableLinkMilliseconds)
+                backoff = TimeSpan.FromMilliseconds(500);
+
+            try
+            {
+                await Task.Delay(backoff, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Cancelled during the backoff; a caller awaiting RunAsync must not see a fault.
+                return;
+            }
+
             backoff = TimeSpan.FromMilliseconds(Math.Min(backoff.TotalMilliseconds * 2, 5_000));
         }
     }
 
-    private async Task ConnectAndPumpAsync(CancellationToken ct)
+    private async Task ConnectAndPumpAsync(CancellationToken ct, Action onConnected)
     {
         using var socket = new ClientWebSocket();
-        _socket = socket;
+        Volatile.Write(ref _socket, socket);
 
-        socket.Options.AddSubProtocol("wamp");
-        socket.Options.RemoteCertificateValidationCallback = RiotCertificate.ValidateSocket;
-
-        var token = Convert.ToBase64String(Encoding.ASCII.GetBytes($"riot:{_credentials.Password}"));
-        socket.Options.SetRequestHeader("Authorization", $"Basic {token}");
-
-        await socket.ConnectAsync(_credentials.WebSocketUri, ct).ConfigureAwait(false);
-
-        foreach (var subscription in Subscriptions)
+        try
         {
-            var frame = Encoding.UTF8.GetBytes($"[{SubscribeOpcode},\"{subscription}\"]");
-            await socket.SendAsync(frame, WebSocketMessageType.Text, endOfMessage: true, ct).ConfigureAwait(false);
+            socket.Options.AddSubProtocol("wamp");
+            socket.Options.RemoteCertificateValidationCallback = RiotCertificate.ValidateSocket;
+
+            var token = Convert.ToBase64String(Encoding.ASCII.GetBytes($"riot:{_credentials.Password}"));
+            socket.Options.SetRequestHeader("Authorization", $"Basic {token}");
+
+            await socket.ConnectAsync(_credentials.WebSocketUri, ct).ConfigureAwait(false);
+
+            foreach (var subscription in Subscriptions)
+            {
+                var frame = Encoding.UTF8.GetBytes($"[{SubscribeOpcode},\"{subscription}\"]");
+                await socket.SendAsync(frame, WebSocketMessageType.Text, endOfMessage: true, ct).ConfigureAwait(false);
+            }
+
+            onConnected();
+            _handlerFailures = 0;
+            ConnectionChanged?.Invoke(true);
+
+            await PumpAsync(socket, ct).ConfigureAwait(false);
         }
-
-        ConnectionChanged?.Invoke(true);
-
-        await PumpAsync(socket, ct).ConfigureAwait(false);
+        finally
+        {
+            // Otherwise the field keeps pointing at this disposed socket — and a reconnect racing
+            // DisposeAsync could have its brand-new socket torn down by mistake.
+            Interlocked.CompareExchange(ref _socket, null, socket);
+        }
     }
 
     private async Task PumpAsync(ClientWebSocket socket, CancellationToken ct)
@@ -112,11 +159,10 @@ public sealed class LcuEventSocket : IAsyncDisposable
                 {
                     result = await socket.ReceiveAsync(new ArraySegment<byte>(rent), ct).ConfigureAwait(false);
 
+                    // The reconnect loop announces the drop; announcing it here too would double
+                    // every "getrennt" downstream.
                     if (result.MessageType == WebSocketMessageType.Close)
-                    {
-                        ConnectionChanged?.Invoke(false);
                         return;
-                    }
 
                     message.Write(rent.AsSpan(0, result.Count));
                 }
@@ -142,6 +188,8 @@ public sealed class LcuEventSocket : IAsyncDisposable
     /// </summary>
     private void Dispatch(ReadOnlySpan<byte> payload)
     {
+        LcuEvent? parsed;
+
         try
         {
             using var document = JsonDocument.Parse(payload.ToArray());
@@ -169,18 +217,33 @@ public sealed class LcuEventSocket : IAsyncDisposable
                 ? dataElement.GetRawText()
                 : null;
 
-            EventReceived?.Invoke(new LcuEvent(uri, eventType, data));
+            parsed = new LcuEvent(uri, eventType, data);
         }
         catch (JsonException)
         {
             // Not JSON we understand; drop the frame.
+            return;
+        }
+
+        // Outside the parse-try on purpose: a JsonException thrown by a SUBSCRIBER must not be
+        // mistaken for a malformed frame and silently dropped.
+        try
+        {
+            EventReceived?.Invoke(parsed);
+            _handlerFailures = 0;
+            _frameHandled = true;
+        }
+        catch (Exception) when (++_handlerFailures < 10)
+        {
+            // One bad payload must not tear down a healthy link (that turned into a reconnect
+            // loop). Ten failures in a row mean the subscriber is broken for good — then the
+            // exception escapes to the reconnect loop, which treats it as a dropped link.
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        var socket = _socket;
-        _socket = null;
+        var socket = Interlocked.Exchange(ref _socket, null);
 
         if (socket is null)
             return;

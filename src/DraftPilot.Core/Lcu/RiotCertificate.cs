@@ -36,7 +36,21 @@ public static class RiotCertificate
 
     /// <summary>Callback for <see cref="RemoteCertificateValidationCallback"/> (used by the web socket).</summary>
     public static bool ValidateSocket(object _, X509Certificate? presented, X509Chain? __, SslPolicyErrors ___)
-        => IsIssuedByRiot(AsCertificate2(presented));
+    {
+        // Dispose only what AsCertificate2 created. Runs on every reconnect of the backoff loop —
+        // undisposed, each handshake leaked an unmanaged certificate handle for hours on end.
+        var converted = AsCertificate2(presented);
+
+        try
+        {
+            return IsIssuedByRiot(converted);
+        }
+        finally
+        {
+            if (!ReferenceEquals(converted, presented))
+                converted?.Dispose();
+        }
+    }
 
     /// <summary>
     /// The pinned authority, for diagnostics. <see langword="null"/> when the embedded resource is

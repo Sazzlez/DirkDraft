@@ -64,7 +64,12 @@ public sealed class SeatPriors
                     if (lane >= Lanes.Count)
                         break;
 
-                    var value = Math.Max(0, cell.GetDouble());
+                    // Only numbers; a string or null cell in a hand-edited file must fall back to
+                    // Uniform, not crash the view-model's field initialiser and with it startup.
+                    if (cell.ValueKind != JsonValueKind.Number || !cell.TryGetDouble(out var raw) || double.IsNaN(raw))
+                        return Uniform;
+
+                    var value = Math.Max(0, raw);
                     values[(seat * Lanes.Count) + lane] = value;
                     total += value;
                     lane++;
@@ -82,7 +87,7 @@ public sealed class SeatPriors
 
             return seat == Lanes.Count ? new SeatPriors(values) : Uniform;
         }
-        catch (Exception ex) when (ex is IOException or JsonException or FormatException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or JsonException or FormatException or InvalidOperationException or UnauthorizedAccessException)
         {
             return Uniform;
         }

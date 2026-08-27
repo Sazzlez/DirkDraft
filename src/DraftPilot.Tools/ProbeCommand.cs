@@ -27,7 +27,7 @@ internal static class ProbeCommand
 
         Console.WriteLine();
         Console.WriteLine("=== 2. Lockfile ===");
-        var watcher = new LockfileWatcher();
+        using var watcher = new LockfileWatcher();
         await watcher.StartAsync(ct);
         var credentials = watcher.Current;
         Console.WriteLine($"  Pfad: {watcher.LockfilePath}");
@@ -51,8 +51,6 @@ internal static class ProbeCommand
         Console.WriteLine();
         Console.WriteLine("=== 5. Event-Socket ===");
         await ReportSocketAsync(credentials, pinnedKey, ct);
-
-        watcher.Dispose();
         return 0;
     }
 
@@ -115,7 +113,15 @@ internal static class ProbeCommand
         try
         {
             using var socket = new TcpClient();
-            socket.Connect("127.0.0.1", credentials.Port);
+            socket.SendTimeout = 3_000;
+            socket.ReceiveTimeout = 3_000;
+
+            // A connect has no sync timeout of its own; a wedged port would hang the probe forever.
+            if (!socket.ConnectAsync("127.0.0.1", credentials.Port).Wait(3_000))
+            {
+                Console.WriteLine("    (Verbindung nicht innerhalb von 3 s zustande gekommen)");
+                return null;
+            }
 
             X509Certificate2? captured = null;
 
@@ -129,6 +135,13 @@ internal static class ProbeCommand
 
             ssl.AuthenticateAsClient("127.0.0.1");
             return captured;
+        }
+        catch (AggregateException aggregate) when (aggregate.InnerException is { } inner)
+        {
+            // Task.Wait wraps a refused connection in an AggregateException; unwrapped, so the
+            // probe reports "Verbindung abgelehnt" instead of aborting the whole diagnosis.
+            Console.WriteLine($"    ({inner.GetType().Name}: {inner.Message})");
+            return null;
         }
         catch (Exception ex) when (ex is SocketException or AuthenticationException or IOException)
         {

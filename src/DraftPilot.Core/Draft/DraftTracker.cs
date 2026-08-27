@@ -5,7 +5,12 @@ using DraftPilot.Core.Lcu.Models;
 namespace DraftPilot.Core.Draft;
 
 /// <summary>Everything the UI needs after one change.</summary>
-public sealed record DraftSnapshot(DraftState State, RecommendationTarget? Target, ClientStatus Status);
+/// <param name="IsNewDraft">
+/// True on the first snapshot of a fresh champion select — including the client jumping straight
+/// from one draft into the next without an inactive frame in between. Consumers reset their
+/// per-draft state on this, not on their own active-flag bookkeeping, which missed that jump.
+/// </param>
+public sealed record DraftSnapshot(DraftState State, RecommendationTarget? Target, ClientStatus Status, bool IsNewDraft = false);
 
 /// <summary>
 /// Turns raw session payloads into <see cref="DraftState"/> and resolves which seat to advise.
@@ -18,10 +23,19 @@ public sealed class DraftTracker : IAsyncDisposable
     private readonly TimeSpan _debounce;
     private readonly Lock _pendingLock = new();
 
+    /// <summary>
+    /// Serialises <see cref="Apply"/> (debounce task or socket thread) against
+    /// <see cref="RefreshTarget"/> (UI thread). Without it a click on a slot could race an
+    /// incoming event inside <see cref="TurnTracker.Resolve"/> and lose the manual selection.
+    /// </summary>
+    private readonly Lock _applyLock = new();
+
     private Pending? _pending;
     private bool _flushScheduled;
     private ClientStatus _status = ClientStatus.Offline;
     private bool _wasActive;
+    private long _lastLocalCellId = long.MinValue;
+    private int _lastProgress;
 
     /// <param name="debounceMs">
     /// Coalescing window. 100 ms keeps the panel calm during fast ban rounds; the tests use 0.
@@ -48,17 +62,25 @@ public sealed class DraftTracker : IAsyncDisposable
 
     public Task RunAsync(CancellationToken ct) => _source.RunAsync(ct);
 
-    /// <summary>Re-resolves the advised seat after the user clicked a slot or toggled the pin.</summary>
+    /// <summary>Re-resolves the advised seat after the user clicked a slot.</summary>
     public void RefreshTarget()
     {
-        Target = Turns.Resolve(State);
-        Changed?.Invoke(new DraftSnapshot(State, Target, _status));
+        lock (_applyLock)
+        {
+            Target = Turns.Resolve(State);
+            Changed?.Invoke(new DraftSnapshot(State, Target, _status));
+        }
     }
 
     private void OnStatusChanged(ClientStatus status)
     {
-        _status = status;
-        Changed?.Invoke(new DraftSnapshot(State, Target, status));
+        // Under the same lock as Apply: read outside it, State and Target could come from two
+        // different updates and publish a torn snapshot.
+        lock (_applyLock)
+        {
+            _status = status;
+            Changed?.Invoke(new DraftSnapshot(State, Target, status));
+        }
     }
 
     private void OnSessionJson(string? json)
@@ -120,18 +142,41 @@ public sealed class DraftTracker : IAsyncDisposable
 
     private void Apply(string? json)
     {
-        var session = Deserialize(json);
-        var state = DraftState.From(session);
+        lock (_applyLock)
+        {
+            DraftState state;
 
-        // A fresh champion select must not inherit the previous draft's pin or manual selection.
-        if (state.IsActive && !_wasActive)
-            Turns.Reset();
+            try
+            {
+                state = DraftState.From(Deserialize(json));
+            }
+            catch (Exception)
+            {
+                // Safety net for a payload From cannot digest. Escaping here would kill the
+                // socket's receive loop (or die unobserved in the debounce task); keeping the
+                // last good state on screen is strictly better than either.
+                return;
+            }
 
-        _wasActive = state.IsActive;
+            // A fresh champion select must not inherit the previous draft's manual selection —
+            // also when the client jumps straight from one draft into the next without a null in
+            // between. Within one draft the ban/lock count only ever grows, so a shrink means a
+            // new session; so does a different own seat.
+            var progress = state.Unavailable.Count;
+            var isNewDraft = state.IsActive
+                && (!_wasActive || progress < _lastProgress || state.LocalCellId != _lastLocalCellId);
 
-        State = state;
-        Target = Turns.Resolve(state);
-        Changed?.Invoke(new DraftSnapshot(state, Target, _status));
+            if (isNewDraft)
+                Turns.Reset();
+
+            _wasActive = state.IsActive;
+            _lastProgress = progress;
+            _lastLocalCellId = state.LocalCellId;
+
+            State = state;
+            Target = Turns.Resolve(state);
+            Changed?.Invoke(new DraftSnapshot(state, Target, _status, isNewDraft));
+        }
     }
 
     private static ChampSelectSession? Deserialize(string? json)

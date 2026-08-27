@@ -22,10 +22,16 @@ internal static class RecommendCommand
         var meta = new MetaLookup(snapshot);
         var traits = TraitTable.Load();
 
-        var lane = Lanes.FromOpGg(args.Length > 1 ? args[1].ToLowerInvariant() : "mid");
+        // Both vocabularies: the OP.GG one (mid, adc, support) AND the LCU one (middle, bottom,
+        // utility) — plus "bot", because that is what the UI itself prints.
+        var laneArgument = args.Length > 1 ? args[1].ToLowerInvariant() : "mid";
+        var lane = Lanes.FromOpGg(laneArgument);
+        if (lane == Lane.Unknown)
+            lane = Lanes.FromLcu(laneArgument == "bot" ? "bottom" : laneArgument);
+
         if (lane == Lane.Unknown)
         {
-            Console.Error.WriteLine("Lane muss top, jungle, mid, adc oder support sein.");
+            Console.Error.WriteLine("Lane muss top, jungle, mid, adc/bot oder support sein.");
             return 2;
         }
 
@@ -53,15 +59,12 @@ internal static class RecommendCommand
 
         var recommender = new Recommender(meta, traits);
 
-        foreach (var (name, weights) in ScoreWeights.Presets)
-        {
-            var set = recommender.Recommend(state, target, predictions, weights, selectable: null, limit: 8);
-            PrintRecommendations($"Picks [{name}]", set);
-        }
+        var set = recommender.Recommend(state, target, predictions, selectable: null, limit: 8);
+        PrintRecommendations("Picks", set);
 
         var banTarget = target with { Action = TurnAction.Ban };
-        var bans = recommender.Recommend(state, banTarget, predictions, ScoreWeights.Meta, selectable: null, limit: 8);
-        PrintRecommendations("Bans [Meta]", bans);
+        var bans = recommender.Recommend(state, banTarget, predictions, selectable: null, limit: 8);
+        PrintRecommendations("Bans", bans);
 
         PrintComp(bans);
         return 0;
@@ -119,16 +122,16 @@ internal static class RecommendCommand
         unknown = [];
         var result = new List<int>();
 
+        // The resolver strips punctuation and case, so "Kaisa" finds Kai'Sa and "nunu" finds
+        // Nunu & Willump — an exact-name comparison rejected exactly the names people type.
+        var resolver = new DraftPilot.Meta.ChampionResolver(meta.Champions);
+
         foreach (var raw in list.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
         {
-            var match = meta.Champions.FirstOrDefault(champion =>
-                champion.Name.Equals(raw, StringComparison.OrdinalIgnoreCase)
-                || champion.Key.Equals(raw, StringComparison.OrdinalIgnoreCase));
-
-            if (match is null)
-                unknown.Add(raw);
+            if (resolver.Resolve(raw) is { } id)
+                result.Add(id);
             else
-                result.Add(match.Id);
+                unknown.Add(raw);
         }
 
         return result;
@@ -158,7 +161,10 @@ internal static class RecommendCommand
         foreach (var item in set.Items)
         {
             var reasons = item.Reasons.Count > 0 ? string.Join(" · ", item.Reasons.Select(reason => reason.Text)) : "-";
-            Console.WriteLine($"  {item.Score,6:F2}  {item.Name,-14} {reasons}");
+
+            // Picks carry an estimated win rate; bans carry denied win-rate points.
+            var score = set.Action == TurnAction.Ban ? $"{item.Score,5:+0.0;-0.0} Pkt" : $"{item.Score,6:P1}";
+            Console.WriteLine($"  {score}  {item.Name,-14} {reasons}");
         }
 
         Console.WriteLine();

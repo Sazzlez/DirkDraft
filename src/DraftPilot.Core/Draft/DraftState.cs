@@ -138,16 +138,27 @@ public sealed class DraftState
         };
     }
 
+    /// <summary>The action groups flattened, tolerating explicit nulls at either nesting level.</summary>
+    private static IEnumerable<ChampSelectAction> AllActions(ChampSelectSession session)
+        => session.Actions
+            .Where(group => group is not null)
+            .SelectMany(group => group)
+            .Where(action => action is not null);
+
     private static List<DraftSlot> BuildSlots(List<ChampSelectPlayer> players, bool isAlly)
     {
         var slots = new List<DraftSlot>(players.Count);
 
-        for (var index = 0; index < players.Count; index++)
+        foreach (var player in players)
         {
-            var player = players[index];
+            if (player is null)
+                continue;
+
             slots.Add(new DraftSlot(
                 CellId: player.CellId,
-                Index: index,
+                // The SLOT's index, not the raw list position: a skipped null entry must not
+                // leave a gap — SeatPriors addresses seats by this value.
+                Index: slots.Count,
                 IsAlly: isAlly,
                 LockedChampionId: player.ChampionId,
                 HoverChampionId: player.ChampionPickIntent,
@@ -167,7 +178,7 @@ public sealed class DraftState
         var ally = new List<int>(session.Bans.MyTeamBans.Where(id => id != 0));
         var enemy = new List<int>(session.Bans.TheirTeamBans.Where(id => id != 0));
 
-        foreach (var action in session.Actions.SelectMany(group => group))
+        foreach (var action in AllActions(session))
         {
             if (!string.Equals(action.Type, "ban", StringComparison.OrdinalIgnoreCase))
                 continue;
@@ -192,7 +203,7 @@ public sealed class DraftState
         ActiveTurn? best = null;
         var bestRank = int.MaxValue;
 
-        foreach (var action in session.Actions.SelectMany(group => group))
+        foreach (var action in AllActions(session))
         {
             if (!action.IsInProgress || action.Completed)
                 continue;

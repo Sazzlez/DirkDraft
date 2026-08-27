@@ -76,7 +76,7 @@ public class RecommenderTests
         var target = new TurnTracker().Resolve(state)!;
         var recommender = new Recommender(MetaLookup.Empty, TraitTable.Empty);
 
-        var set = recommender.Recommend(state, target, LanePredictionResult.Empty, ScoreWeights.Meta);
+        var set = recommender.Recommend(state, target, LanePredictionResult.Empty);
 
         Assert.Empty(set.Items);
     }
@@ -86,7 +86,7 @@ public class RecommenderTests
     {
         var (state, target, lanes) = Scenario();
 
-        var set = Recommender().Recommend(state, target, lanes, ScoreWeights.Meta);
+        var set = Recommender().Recommend(state, target, lanes);
 
         Assert.Equal(Lane.Mid, set.Lane);
         Assert.Equal(2, set.CellId);
@@ -94,11 +94,11 @@ public class RecommenderTests
     }
 
     [Fact]
-    public void StrongerChampionRanksHigherUnderMetaWeights()
+    public void StrongerChampionRanksHigher()
     {
         var (state, target, lanes) = Scenario();
 
-        var items = Recommender().Recommend(state, target, lanes, ScoreWeights.Meta).Items;
+        var items = Recommender().Recommend(state, target, lanes).Items;
 
         var strong = items.Single(item => item.ChampionId == Strong);
         var weak = items.Single(item => item.ChampionId == Weak);
@@ -106,20 +106,109 @@ public class RecommenderTests
         Assert.True(strong.Score > weak.Score);
     }
 
+    /// <summary>The score is an estimated win rate: strictly a probability, never outside (0, 1).</summary>
     [Fact]
-    public void CounterWeights_PromoteTheFavourableMatchup()
+    public void PickScores_AreProbabilities()
     {
         var (state, target, lanes) = Scenario();
-        var recommender = Recommender();
 
-        var underMeta = recommender.Recommend(state, target, lanes, ScoreWeights.Meta).Items;
-        var underCounter = recommender.Recommend(state, target, lanes, ScoreWeights.Counter).Items;
+        var items = Recommender().Recommend(state, target, lanes, limit: 50).Items;
 
-        var metaGap = Score(underMeta, CounterPick) - Score(underMeta, Strong);
-        var counterGap = Score(underCounter, CounterPick) - Score(underCounter, Strong);
+        Assert.NotEmpty(items);
+        Assert.All(items, item => Assert.InRange(item.Score, 0.001, 0.999));
+    }
 
-        // The matchup does not have to win outright, but it must count for more.
-        Assert.True(counterGap > metaGap);
+    /// <summary>The pill's percentage must be exactly what the breakdown's terms add up to.</summary>
+    [Fact]
+    public void PickScore_IsTheSigmoidOfItsBreakdown()
+    {
+        var (state, target, lanes) = Scenario();
+
+        foreach (var item in Recommender().Recommend(state, target, lanes).Items)
+        {
+            var total = item.Breakdown.Sum(term => term.LogOdds ?? 0);
+            Assert.Equal(ScoreModel.Sigmoid(total), item.Score, precision: 9);
+        }
+    }
+
+    /// <summary>A favourable matchup must lift the pick above an otherwise identical champion.</summary>
+    [Fact]
+    public void FavourableMatchup_RaisesTheScore()
+    {
+        var (state, target, lanes) = Scenario();
+
+        var items = Recommender().Recommend(state, target, lanes).Items;
+
+        // CounterPick and Average share the same lane stats; only the matchup differs.
+        Assert.True(Score(items, CounterPick) > Score(items, Average));
+    }
+
+    /// <summary>
+    /// The same 62 % matchup over 3000 games must move the score more than over 30: shrinkage
+    /// weighs the evidence — but only once, not squared as the old confidence factor did.
+    /// </summary>
+    [Fact]
+    public void LargerSample_MovesTheScoreMore()
+    {
+        double MatchupPoints(int play)
+        {
+            var meta = new MetaBuilder()
+                .Champion(CounterPick, "CounterPick", DamageType.Physical, ["Assassin"], 125, 3)
+                .Champion(EnemyMid, "EnemyMid", DamageType.Magic, ["Mage"], 550, 3)
+                .InLane(CounterPick, Lane.Mid, winRate: 0.50, tier: 3, play: 2000)
+                .InLane(EnemyMid, Lane.Mid, winRate: 0.50, tier: 3, play: 2000)
+                .Matchup(CounterPick, EnemyMid, Lane.Mid, winRate: 0.62, play: play)
+                .Build();
+
+            var state = DraftState.From(new SessionBuilder()
+                .LocalPlayer(2)
+                .Locked(7, EnemyMid)
+                .OnClock(2, "pick")
+                .Build());
+
+            var target = new TurnTracker().Resolve(state)!;
+            var predictions = new LanePredictor(meta).Predict(state.Enemies);
+            var item = new Recommender(meta, TraitTable.Empty)
+                .Recommend(state, target, predictions).Items
+                .Single(i => i.ChampionId == CounterPick);
+
+            return item.Breakdown.Single(term => term.Kind == ScoreTermKind.LaneMatchup).Points;
+        }
+
+        var thin = MatchupPoints(30);
+        var thick = MatchupPoints(3000);
+
+        Assert.True(thin > 0, "Auch 30 Spiele sind Evidenz und müssen etwas zählen.");
+        Assert.True(thick > thin * 2, $"3000 Spiele müssen deutlich mehr bewegen: dünn={thin:F2}, dick={thick:F2}");
+    }
+
+    /// <summary>A duo at exactly 50 % over any sample is no evidence and must shift nothing.</summary>
+    [Fact]
+    public void EvenDuo_ChangesNothing()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Strong, "Strong", DamageType.Magic, ["Mage"], 550, 3)
+            .Champion(AllySupport, "AllySupport", DamageType.Magic, ["Tank"], 125, 6)
+            .InLane(Strong, Lane.Mid, winRate: 0.52, tier: 2, play: 2000)
+            .InLane(AllySupport, Lane.Support, winRate: 0.51, tier: 2, play: 2000)
+            .Synergy(Strong, AllySupport, winRate: 0.50, play: 2000, tier: 2)
+            .Build();
+
+        var state = DraftState.From(new SessionBuilder()
+            .LocalPlayer(2)
+            .Locked(4, AllySupport)
+            .OnClock(2, "pick")
+            .Build());
+
+        var target = new TurnTracker().Resolve(state)!;
+        var item = new Recommender(meta, TraitTable.Empty)
+            .Recommend(state, target, LanePredictionResult.Empty).Items
+            .Single(i => i.ChampionId == Strong);
+
+        var synergy = item.Breakdown.Single(term => term.Kind == ScoreTermKind.Synergy);
+
+        Assert.True(synergy.HasData);
+        Assert.Equal(0, synergy.Points, precision: 6);
     }
 
     /// <summary>
@@ -154,9 +243,9 @@ public class RecommenderTests
 
         double LaneTerm(LanePredictionResult lanes)
         {
-            var set = recommender.Recommend(state, target, lanes, ScoreWeights.Counter);
+            var set = recommender.Recommend(state, target, lanes);
             var item = set.Items.Single(i => i.ChampionId == Candidate);
-            return item.Breakdown.Single(term => term.Label == "Lane-Matchup").Normalised;
+            return item.Breakdown.Single(term => term.Kind == ScoreTermKind.LaneMatchup).LogOdds ?? 0;
         }
 
         var predictor = new LanePredictor(meta);
@@ -176,10 +265,10 @@ public class RecommenderTests
     {
         var (state, target, lanes) = Scenario();
 
-        var counter = Recommender().Recommend(state, target, lanes, ScoreWeights.Counter).Items
+        var counter = Recommender().Recommend(state, target, lanes).Items
             .Single(item => item.ChampionId == CounterPick);
 
-        var laneTerm = counter.Breakdown.Single(term => term.Label == "Lane-Matchup").Normalised;
+        var laneTerm = counter.Breakdown.Single(term => term.Kind == ScoreTermKind.LaneMatchup).LogOdds ?? 0;
         Assert.True(laneTerm > 0.2, $"Sicherer Gegner muss voll zählen, war {laneTerm:F3}");
     }
 
@@ -188,7 +277,7 @@ public class RecommenderTests
     {
         var (state, target, lanes) = Scenario();
 
-        var counter = Recommender().Recommend(state, target, lanes, ScoreWeights.Meta).Items
+        var counter = Recommender().Recommend(state, target, lanes).Items
             .Single(item => item.ChampionId == CounterPick);
 
         Assert.Contains(counter.Reasons, reason => reason.Text.Contains("EnemyMid", StringComparison.Ordinal));
@@ -199,7 +288,7 @@ public class RecommenderTests
     {
         var (state, target, lanes) = Scenario();
 
-        var strong = Recommender().Recommend(state, target, lanes, ScoreWeights.TeamComp).Items
+        var strong = Recommender().Recommend(state, target, lanes).Items
             .Single(item => item.ChampionId == Strong);
 
         Assert.Contains(strong.Reasons, reason => reason.Text.Contains("AllySupport", StringComparison.Ordinal));
@@ -210,7 +299,7 @@ public class RecommenderTests
     {
         var (state, target, lanes) = Scenario(Strong);
 
-        var items = Recommender().Recommend(state, target, lanes, ScoreWeights.Meta).Items;
+        var items = Recommender().Recommend(state, target, lanes).Items;
 
         Assert.DoesNotContain(items, item => item.ChampionId == Strong);
     }
@@ -220,7 +309,7 @@ public class RecommenderTests
     {
         var (state, target, lanes) = Scenario();
 
-        var items = Recommender().Recommend(state, target, lanes, ScoreWeights.Meta).Items;
+        var items = Recommender().Recommend(state, target, lanes).Items;
 
         Assert.DoesNotContain(items, item => item.ChampionId == EnemyMid);
         Assert.DoesNotContain(items, item => item.ChampionId == AllyTop);
@@ -232,7 +321,7 @@ public class RecommenderTests
         var (state, target, lanes) = Scenario();
 
         var items = Recommender()
-            .Recommend(state, target, lanes, ScoreWeights.Meta, selectable: new HashSet<int> { Average, Weak })
+            .Recommend(state, target, lanes, selectable: new HashSet<int> { Average, Weak })
             .Items;
 
         Assert.Equal([Average, Weak], items.Select(item => item.ChampionId).Order());
@@ -243,19 +332,99 @@ public class RecommenderTests
     {
         var (state, target, lanes) = Scenario();
 
-        var items = Recommender().Recommend(state, target, lanes, ScoreWeights.Meta, selectable: null).Items;
+        var items = Recommender().Recommend(state, target, lanes, selectable: null).Items;
 
         Assert.Contains(items, item => item.ChampionId == Strong);
         Assert.Contains(items, item => item.ChampionId == CounterPick);
     }
 
+    /// <summary>
+    /// A criterion with nothing to go on must say so instead of reporting a neutral zero. The
+    /// breakdown renders the two differently, and "even matchup" is a claim while "no data" is not.
+    /// </summary>
     [Fact]
-    public void ScoreEqualsTheSumOfItsBreakdown()
+    public void MissingData_IsDistinguishableFromNeutral()
     {
         var (state, target, lanes) = Scenario();
+        var items = Recommender().Recommend(state, target, lanes).Items;
 
-        foreach (var item in Recommender().Recommend(state, target, lanes, ScoreWeights.Meta).Items)
-            Assert.Equal(item.Breakdown.Sum(term => term.Contribution), item.Score, precision: 9);
+        ScoreTerm Term(int championId, ScoreTermKind kind)
+            => items.Single(item => item.ChampionId == championId).Breakdown.Single(term => term.Kind == kind);
+
+        // Only CounterPick has a recorded matchup against the enemy mid laner.
+        var known = Term(CounterPick, ScoreTermKind.LaneMatchup);
+        var unknown = Term(Strong, ScoreTermKind.LaneMatchup);
+
+        Assert.True(known.HasData);
+        Assert.False(unknown.HasData);
+        Assert.Null(unknown.LogOdds);
+
+        // Either way the score is unaffected: a missing criterion contributes nothing.
+        Assert.Equal(0, unknown.Points);
+
+        // Same for the duo record, which only Strong has.
+        Assert.True(Term(Strong, ScoreTermKind.Synergy).HasData);
+        Assert.False(Term(Weak, ScoreTermKind.Synergy).HasData);
+    }
+
+    /// <summary>Nothing to fit into yet, so the composition term must stay silent.</summary>
+    [Fact]
+    public void CompositionTerm_HasNoDataBeforeAnyAllyPicked()
+    {
+        var session = new SessionBuilder()
+            .LocalPlayer(2)
+            .Locked(7, EnemyMid)
+            .OnClock(2, "pick")
+            .Build();
+
+        var state = DraftState.From(session);
+        var target = new TurnTracker().Resolve(state)!;
+        var lanes = new LanePredictor(Meta()).Predict(state.Enemies);
+
+        var items = Recommender().Recommend(state, target, lanes).Items;
+
+        Assert.All(items, item =>
+            Assert.False(item.Breakdown.Single(term => term.Kind == ScoreTermKind.Composition).HasData));
+    }
+
+    /// <summary>
+    /// A chip is the first thing read during a draft, and there is no room on it for the caveats.
+    /// Every one must therefore carry the longer explanation behind it.
+    /// </summary>
+    [Fact]
+    public void EveryReasonChip_CarriesAnExplanation()
+    {
+        var (state, target, lanes) = Scenario();
+        var recommender = Recommender();
+
+        var sets = new[]
+        {
+            recommender.Recommend(state, target, lanes),
+            recommender.Recommend(state, target, lanes),
+            recommender.Recommend(state, target, lanes),
+            recommender.Recommend(state, target with { Action = TurnAction.Ban }, lanes),
+        };
+
+        var chips = sets.SelectMany(set => set.Items).SelectMany(item => item.Reasons).ToList();
+
+        Assert.NotEmpty(chips);
+        Assert.All(chips, chip =>
+            Assert.False(
+                string.IsNullOrWhiteSpace(chip.Hint),
+                $"Chip \"{chip.Text}\" hat keine Erklärung."));
+    }
+
+    /// <summary>Every criterion has to be introduceable on screen, or the line reads as jargon.</summary>
+    [Fact]
+    public void EveryTermKind_HasALabelAndAnExplanation()
+    {
+        foreach (var kind in Enum.GetValues<ScoreTermKind>())
+        {
+            var term = new ScoreTerm(kind, 0);
+
+            Assert.False(string.IsNullOrWhiteSpace(term.Label), $"{kind} braucht ein Label.");
+            Assert.False(string.IsNullOrWhiteSpace(term.Hint), $"{kind} braucht eine Erklärung.");
+        }
     }
 
     [Fact]
@@ -266,8 +435,8 @@ public class RecommenderTests
 
         var sets = new[]
         {
-            Recommender().Recommend(state, target, lanes, ScoreWeights.Meta),
-            Recommender().Recommend(state, banTarget, lanes, ScoreWeights.Meta),
+            Recommender().Recommend(state, target, lanes),
+            Recommender().Recommend(state, banTarget, lanes),
         };
 
         foreach (var item in sets.SelectMany(set => set.Items))
@@ -280,8 +449,8 @@ public class RecommenderTests
         var (state, target, lanes) = Scenario();
         var recommender = Recommender();
 
-        var first = recommender.Recommend(state, target, lanes, ScoreWeights.Meta).Items.Select(i => i.ChampionId);
-        var second = recommender.Recommend(state, target, lanes, ScoreWeights.Meta).Items.Select(i => i.ChampionId);
+        var first = recommender.Recommend(state, target, lanes).Items.Select(i => i.ChampionId);
+        var second = recommender.Recommend(state, target, lanes).Items.Select(i => i.ChampionId);
 
         Assert.Equal(first, second);
     }
@@ -291,7 +460,7 @@ public class RecommenderTests
     {
         var (state, target, lanes) = Scenario();
 
-        Assert.Equal(2, Recommender().Recommend(state, target, lanes, ScoreWeights.Meta, limit: 2).Items.Count);
+        Assert.Equal(2, Recommender().Recommend(state, target, lanes, limit: 2).Items.Count);
     }
 
     [Fact]
@@ -300,7 +469,7 @@ public class RecommenderTests
         var (state, target, lanes) = Scenario();
         var banTarget = target with { Action = TurnAction.Ban };
 
-        var set = Recommender().Recommend(state, banTarget, lanes, ScoreWeights.Meta, limit: 20);
+        var set = Recommender().Recommend(state, banTarget, lanes, limit: 20);
 
         Assert.Equal(TurnAction.Ban, set.Action);
         // A top laner is a legitimate ban even though the seat on the clock plays mid.
@@ -313,7 +482,7 @@ public class RecommenderTests
         var (state, target, lanes) = Scenario();
         var banTarget = target with { Action = TurnAction.Ban };
 
-        var set = Recommender().Recommend(state, banTarget, lanes, ScoreWeights.Meta, limit: 20);
+        var set = Recommender().Recommend(state, banTarget, lanes, limit: 20);
         var threat = set.Items.SingleOrDefault(item => item.ChampionId == Menace);
 
         Assert.NotNull(threat);
@@ -326,7 +495,7 @@ public class RecommenderTests
         var (state, target, lanes) = Scenario(Strong);
         var banTarget = target with { Action = TurnAction.Ban };
 
-        var items = Recommender().Recommend(state, banTarget, lanes, ScoreWeights.Meta, limit: 20).Items;
+        var items = Recommender().Recommend(state, banTarget, lanes, limit: 20).Items;
 
         Assert.DoesNotContain(items, item => item.ChampionId == Strong);
         Assert.DoesNotContain(items, item => item.ChampionId == EnemyMid);
@@ -346,7 +515,7 @@ public class RecommenderTests
         var target = new TurnTracker().Resolve(state)!;
         var lanes = new LanePredictor(Meta()).Predict(state.Enemies);
 
-        var set = Recommender().Recommend(state, target, lanes, ScoreWeights.Meta);
+        var set = Recommender().Recommend(state, target, lanes);
 
         Assert.Equal(4, set.CellId);
         Assert.Equal(Lane.Support, set.Lane);
@@ -366,7 +535,7 @@ public class RecommenderTests
             .Build());
 
         var target = new TurnTracker().Resolve(state)!;
-        var set = Recommender().Recommend(state, target, LanePredictionResult.Empty, ScoreWeights.Meta);
+        var set = Recommender().Recommend(state, target, LanePredictionResult.Empty);
 
         Assert.Equal(1, set.AllyComp.Count);
     }
@@ -377,11 +546,129 @@ public class RecommenderTests
         var target = new RecommendationTarget(
             new DraftSlot(2, 2, true, 0, 0, Lane.Mid), TurnAction.Pick, true);
 
-        var set = Recommender().Recommend(DraftState.Inactive, target, LanePredictionResult.Empty, ScoreWeights.Meta);
+        var set = Recommender().Recommend(DraftState.Inactive, target, LanePredictionResult.Empty);
 
         Assert.Empty(set.Items);
     }
 
     private static double Score(IReadOnlyList<Recommendation> items, int championId)
         => items.Single(item => item.ChampionId == championId).Score;
+
+    private static double? Term(IReadOnlyList<Recommendation> items, int championId, ScoreTermKind kind)
+        => items.Single(item => item.ChampionId == championId).Breakdown.Single(term => term.Kind == kind).LogOdds;
+
+    /// <summary>
+    /// The synergy term is a damped MEAN: the same duo win rate must contribute the same shift
+    /// whether one ally has locked or four. As a sum, the score drifted upward with the draft's
+    /// progress alone, making early- and late-draft scores incomparable.
+    /// </summary>
+    [Fact]
+    public void FourEqualDuos_ShiftTheScoreLikeOne()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Strong, "Strong").InLane(Strong, Lane.Mid, winRate: 0.52, play: 2000)
+            .Champion(201, "A1").Champion(202, "A2").Champion(203, "A3").Champion(204, "A4")
+            .Synergy(Strong, 201, winRate: 0.55, play: 2000)
+            .Synergy(Strong, 202, winRate: 0.55, play: 2000)
+            .Synergy(Strong, 203, winRate: 0.55, play: 2000)
+            .Synergy(Strong, 204, winRate: 0.55, play: 2000)
+            .Build();
+        var recommender = new Recommender(meta, TraitTable.Empty);
+
+        var one = DraftState.From(new SessionBuilder().LocalPlayer(2).Locked(0, 201).OnClock(2, "pick").Build());
+        var four = DraftState.From(new SessionBuilder().LocalPlayer(2)
+            .Locked(0, 201).Locked(1, 202).Locked(3, 203).Locked(4, 204).OnClock(2, "pick").Build());
+
+        var target = new TurnTracker().Resolve(one)!;
+        var withOne = Term(recommender.Recommend(one, target, LanePredictionResult.Empty, limit: 50).Items, Strong, ScoreTermKind.Synergy);
+        var withFour = Term(recommender.Recommend(four, new TurnTracker().Resolve(four)!, LanePredictionResult.Empty, limit: 50).Items, Strong, ScoreTermKind.Synergy);
+
+        Assert.NotNull(withOne);
+        Assert.Equal(withOne!.Value, withFour!.Value, precision: 10);
+    }
+
+    /// <summary>
+    /// The off-lane term promises to count LESS than the direct duel. With four enemies at the
+    /// same matchup rate, its weighted mean must stay at OffLaneShare of one duel — the old sum
+    /// reached 1.4 duels.
+    /// </summary>
+    [Fact]
+    public void OffLaneEnemies_StayBelowTheDirectDuelsWeight()
+    {
+        var (state, target, lanes) = Scenario();
+
+        var items = Recommender().Recommend(state, target, lanes, limit: 50).Items;
+        var offLane = Term(items, CounterPick, ScoreTermKind.EnemyTeam);
+
+        if (offLane is null)
+            return;
+
+        // The strongest single matchup in the fixture is 62 % over 3000 games; even if every
+        // off-lane enemy matched it, the mean caps the term at OffLaneShare of that one duel.
+        var duelCap = ScoreModel.OffLaneShare
+            * Math.Abs(ScoreModel.Logit(Shrinkage.Apply(0.62, 3000, Shrinkage.MatchupPrior)));
+
+        Assert.True(Math.Abs(offLane.Value) <= duelCap + 1e-9);
+    }
+
+    /// <summary>
+    /// Without an assigned lane (blind pick, customs) the seat's lane comes from the ALLY
+    /// prediction. The enemy prediction cannot contain the advised seat, so before the ally
+    /// prediction was passed in, blind pick always degenerated to "no lane".
+    /// </summary>
+    [Fact]
+    public void BlindPick_ResolvesTheLaneFromTheAllyPrediction()
+    {
+        var (state, target, enemyLanes) = Scenario();
+
+        var blindTarget = target with { Slot = target.Slot with { AssignedLane = Lane.Unknown } };
+        var allySlots = state.Allies
+            .Select(slot => slot.CellId == target.Slot.CellId
+                ? slot with { AssignedLane = Lane.Unknown, HoverChampionId = Strong }
+                : slot with { AssignedLane = Lane.Unknown })
+            .ToList();
+        var allyLanes = new LanePredictor(Meta()).Predict(allySlots);
+
+        var set = Recommender().Recommend(state, blindTarget, enemyLanes, allyLanes);
+
+        Assert.Equal(Lane.Mid, set.Lane);
+    }
+
+    [Fact]
+    public void ChampionsHoveredByOtherAllies_AreNotRecommended()
+    {
+        var session = new SessionBuilder()
+            .LocalPlayer(2)
+            .Locked(0, AllyTop)
+            .Hovering(4, Strong)
+            .Locked(7, EnemyMid)
+            .OnClock(2, "pick")
+            .Build();
+        var state = DraftState.From(session);
+        var target = new TurnTracker().Resolve(state)!;
+        var lanes = new LanePredictor(Meta()).Predict(state.Enemies);
+
+        var items = Recommender().Recommend(state, target, lanes, limit: 50).Items;
+
+        Assert.DoesNotContain(items, item => item.ChampionId == Strong);
+    }
+
+    [Fact]
+    public void TheTargetsOwnHover_StaysRecommendable()
+    {
+        var session = new SessionBuilder()
+            .LocalPlayer(2)
+            .Locked(0, AllyTop)
+            .Hovering(2, Strong)
+            .Locked(7, EnemyMid)
+            .OnClock(2, "pick")
+            .Build();
+        var state = DraftState.From(session);
+        var target = new TurnTracker().Resolve(state)!;
+        var lanes = new LanePredictor(Meta()).Predict(state.Enemies);
+
+        var items = Recommender().Recommend(state, target, lanes, limit: 50).Items;
+
+        Assert.Contains(items, item => item.ChampionId == Strong);
+    }
 }

@@ -10,7 +10,7 @@ internal static class EventsCommand
 {
     public static async Task<int> RunAsync(CancellationToken ct)
     {
-        var watcher = new LockfileWatcher();
+        using var watcher = new LockfileWatcher();
         await watcher.StartAsync(ct);
 
         if (watcher.Current is not { } credentials)
@@ -41,7 +41,6 @@ internal static class EventsCommand
         };
 
         await socket.RunAsync(ct);
-        watcher.Dispose();
         return 0;
     }
 }

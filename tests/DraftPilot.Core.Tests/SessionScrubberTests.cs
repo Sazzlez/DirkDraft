@@ -57,7 +57,7 @@ public class SessionScrubberTests
     [InlineData("summonerId")]
     public void SensitiveContent_IsRemoved(string needle)
     {
-        var scrubbed = SessionScrubber.Scrub(Payload);
+        Assert.True(SessionScrubber.TryScrub(Payload, out var scrubbed));
 
         Assert.DoesNotContain(needle, scrubbed, StringComparison.OrdinalIgnoreCase);
     }
@@ -72,7 +72,7 @@ public class SessionScrubberTests
     [InlineData("spell1Id")]
     public void EverythingTheToolReads_Survives(string needle)
     {
-        var scrubbed = SessionScrubber.Scrub(Payload);
+        Assert.True(SessionScrubber.TryScrub(Payload, out var scrubbed));
 
         Assert.Contains(needle, scrubbed, StringComparison.Ordinal);
     }
@@ -80,7 +80,7 @@ public class SessionScrubberTests
     [Fact]
     public void ScrubbedPayload_StillParsesIntoADraftState()
     {
-        var scrubbed = SessionScrubber.Scrub(Payload);
+        Assert.True(SessionScrubber.TryScrub(Payload, out var scrubbed));
         var session = System.Text.Json.JsonSerializer.Deserialize(
             scrubbed, DraftPilot.Core.Lcu.Models.LcuJson.Default.ChampSelectSession);
 

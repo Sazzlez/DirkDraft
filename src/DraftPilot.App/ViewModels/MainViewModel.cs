@@ -47,9 +47,23 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// <summary>Enemy champion ids whose live counter data was already fetched this draft.</summary>
     private readonly HashSet<int> _liveFetched = [];
 
+    /// <summary>
+    /// Matchups the build was already requested for this draft. Lane predictions can flip while
+    /// seats fill up, and without this a wobbling prediction would fetch the same guide repeatedly.
+    /// </summary>
+    private readonly HashSet<(int Champion, Lane Lane, int Opponent)> _buildFetched = [];
+
     private BuildPlan? _build;
     private bool _isFetchingDraftData;
     private bool _buildCardClosed;
+
+    /// <summary>
+    /// Set when a fetch failed, to stop a dead network from being retried on every client event.
+    /// </summary>
+    private DateTimeOffset _fetchCooldownUntil = DateTimeOffset.MinValue;
+
+    /// <summary>Something became fetchable while a fetch was already running.</summary>
+    private bool _fetchAgainWhenDone;
 
     /// <summary>The (champion, lane, opponent) the cache was last probed for, to probe only once.</summary>
     private (int Champion, Lane Lane, int Opponent) _buildProbe;
@@ -60,8 +74,40 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// <summary>My locked pick, its lane and its direct opponent — the build fetch's inputs.</summary>
     private (int Champion, Lane Lane, int Opponent)? _buildContext;
 
+    /// <summary>Cancels in-flight fetches when their draft ends; linked to the app lifetime.</summary>
+    private CancellationTokenSource? _draftScope;
+
+    /// <summary>
+    /// One shared OP.GG client for all draft fetches. A fresh HttpClient plus MCP handshake per
+    /// fetch — and a fetch runs after every revealed pick — cost two extra round trips each and
+    /// piled up half-closed sockets.
+    /// </summary>
+    private OpGgMcpClient? _opGg;
+
+    /// <summary>
+    /// Re-runs the fetch once after a failure's cooldown. Without it "versuche es weiter" was a
+    /// lie: no retry ever happened unless the client pushed another event, and finalization
+    /// produces none.
+    /// </summary>
+    private DispatcherTimer? _fetchRetry;
+
+    /// <summary>True while the fetch loop's own Refresh() runs, so it does not queue itself.</summary>
+    private bool _refreshingFromFetch;
+
+    /// <summary>A snapshot reload that arrived mid-draft; honoured once the draft ends.</summary>
+    private bool _reloadDeferred;
+
     /// <summary>Enemy composition from the last render, feeding the situational build hints.</summary>
     private CompProfile _enemyComp = CompProfile.Empty;
+
+    /// <summary>Localised item/rune/spell names; refreshed after a data update.</summary>
+    private AssetNames _names;
+
+    private bool _isGameRunning;
+    private bool _showGameView;
+    private bool _showIdleCard = true;
+    private bool _isImportingRunes;
+    private string _runeImportText = string.Empty;
 
     private readonly CancellationTokenSource _lifetime = new();
     private LiveSessionSource? _source;
@@ -86,14 +132,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private string _emptyHint = "Warte auf den League-Client.";
     private string _turnText = string.Empty;
     private string _listHeader = "Empfehlungen";
-    private string _allyCompText = string.Empty;
-    private string _enemyCompText = string.Empty;
     private string _snapshotText = string.Empty;
-    private string _presetName = "Meta";
     private string _updateStatus = string.Empty;
     private bool _isUpdating;
     private bool _isDraftActive;
-    private bool _isPinned;
     private bool _hasRecommendations;
     private bool _isMyTurn;
     private bool _isTimeCritical;
@@ -101,18 +143,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private string _snapshotDetail = string.Empty;
     private double _updateFraction;
     private string _draftFetchText = string.Empty;
-    private bool _showDraftFetchButton;
+    private bool _showDraftFetchStatus;
+    private bool _draftFetchFailed;
     private bool _hasBuild;
     private bool _showBuildSection;
     private bool _showBuildClose;
     private string _buildTitle = string.Empty;
     private string _buildSubtitle = string.Empty;
-    private string _buildRunesPrimary = string.Empty;
-    private string _buildRunesSecondary = string.Empty;
-    private string _buildStarter = string.Empty;
-    private string _buildSpells = string.Empty;
     private string _buildHint = string.Empty;
-    private bool _isBuildExpanded;
 
     /// <summary>Why the snapshot could not be used, if it could not. Shown in the footer.</summary>
     private string? _snapshotProblem;
@@ -123,8 +161,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private FileSystemWatcher? _snapshotWatcher;
     private DispatcherTimer? _snapshotRetry;
 
-    /// <summary>Collapses the watcher's event bursts — one save fires Created, Changed and Renamed.</summary>
-    private bool _reloadQueued;
+    /// <summary>Collapses the watcher's event bursts — one save fires Created, Changed and Renamed.
+    /// Volatile: set on the watcher's thread, cleared on the UI thread.</summary>
+    private volatile bool _reloadQueued;
 
     /// <param name="source">
     /// Overrides the live client connection. Used by the development harness to drive the panel
@@ -133,16 +172,19 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public MainViewModel(ISessionSource? source = null)
     {
         _settings = AppSettings.Load();
-        _presetName = _settings.Preset;
 
         _meta = LoadMeta();
         _predictor = new LanePredictor(_meta, _seatPriors);
         _recommender = new Recommender(_meta, _traits);
 
+        _names = AssetNames.Load(_settings.DataLanguage);
+
         // The live source is kept separately because only it can answer which champions the local
         // player owns; a replayed recording has no client to ask.
         _source = source is null ? new LiveSessionSource(_settings.LockfilePath) : null;
-        _tracker = new DraftTracker(source ?? _source!);
+        var sessionSource = source ?? _source!;
+        sessionSource.GameflowPhase += phase => DispatchFromClientThread(() => OnGameflowPhase(phase));
+        _tracker = new DraftTracker(sessionSource);
         _tracker.Changed += OnTrackerChanged;
 
         Allies.Resize(5, () => new SlotViewModel());
@@ -164,46 +206,63 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             }
         });
 
-        TogglePinCommand = new RelayCommand(_ =>
-        {
-            if (IsPinned)
-            {
-                _tracker.Turns.Unpin();
-            }
-            else if (_target is not null)
-            {
-                _tracker.Turns.Pin(_target.Slot.CellId);
-            }
-
-            IsPinned = _tracker.Turns.IsPinned;
-            _tracker.RefreshTarget();
-        });
-
-        SetPresetCommand = new RelayCommand(parameter =>
-        {
-            if (parameter is string name)
-            {
-                PresetName = name;
-                _settings.Preset = name;
-                _settings.Save();
-                Refresh();
-            }
-        });
-
         UpdateDataCommand = new RelayCommand(_ => _ = RunUpdateAsync(), _ => CanUpdate);
         CancelUpdateCommand = new RelayCommand(_ => _updateScope?.Cancel(), _ => IsUpdating);
-        FetchDraftDataCommand = new RelayCommand(_ => _ = FetchDraftDataAsync(), _ => CanFetchDraftData);
         CloseBuildCommand = new RelayCommand(_ =>
         {
             _buildCardClosed = true;
             UpdateBuildSection();
         });
 
+        ImportRunesCommand = new RelayCommand(_ => _ = ImportRunesAsync(), _ => CanImportRunes);
+
+        // CanImportRunes depends on Client, and Client changes on every reconnect — without this
+        // the button froze in whatever state the last session event left it.
+        if (_source is not null)
+            _source.ClientChanged += () => DispatchFromClientThread(() => ImportRunesCommand?.RaiseCanExecuteChanged());
+
         UpdateSnapshotText();
         WatchSnapshotFile();
 
         // A snapshot that is absent or broken at start-up may well be fine a moment later.
         SetSnapshotRetryRunning(_meta.IsEmpty);
+
+        // Housekeeping, off the UI thread: the data directory must not silt up over months. The
+        // patch travels as a parameter because the worker must not read _meta while the UI thread
+        // may be replacing it.
+        var maintenancePatch = _meta.IsEmpty || string.IsNullOrWhiteSpace(_meta.Patch) ? null : _meta.Patch;
+        _ = Task.Run(() => RunMaintenance(maintenancePatch));
+    }
+
+    /// <summary>
+    /// Prunes what accumulates on its own: build plans from old patches or older than two weeks,
+    /// leftover .tmp files, and the two append-forever logs. Icons stay — they never go stale and
+    /// deleting them would only mean downloading them again.
+    /// </summary>
+    private void RunMaintenance(string? currentPatch)
+    {
+        try
+        {
+            // Under the crash log's own lock: a crash being written mid-trim waits instead of
+            // colliding with the exclusive stream and being dropped.
+            CrashLog.WithLogLock(() => Maintenance.TrimLog(CrashLog.Path));
+            Maintenance.TrimLog(StartupReport.Path);
+
+            Maintenance.SweepTempFiles(
+                AppPaths.DataDirectory,
+                AppPaths.IconDirectory,
+                AppPaths.ItemIconDirectory,
+                AppPaths.RuneIconDirectory,
+                AppPaths.SpellIconDirectory);
+
+            if (currentPatch is not null)
+                _buildCache.CleanUp(currentPatch, TimeSpan.FromDays(14));
+        }
+        catch (Exception ex)
+        {
+            // Cleaning up must never be the thing that breaks; log it and move on.
+            CrashLog.Write("Aufräumen", ex);
+        }
     }
 
     public ObservableCollection<SlotViewModel> Allies { get; } = [];
@@ -216,22 +275,88 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public RelayCommand SelectSlotCommand { get; }
 
-    public RelayCommand TogglePinCommand { get; }
-
-    public RelayCommand SetPresetCommand { get; }
-
     public RelayCommand UpdateDataCommand { get; }
 
     public RelayCommand CancelUpdateCommand { get; }
 
-    public RelayCommand FetchDraftDataCommand { get; }
-
     public RelayCommand CloseBuildCommand { get; }
 
-    public IReadOnlyList<string> PresetNames { get; } = [.. ScoreWeights.Presets.Select(preset => preset.Name)];
+    public RelayCommand ImportRunesCommand { get; }
 
     /// <summary>Raised when champion select starts or ends, so the window can show or hide itself.</summary>
     public event Action<bool>? DraftActiveChanged;
+
+    /// <summary>Raised when a game starts or ends, so the window can surface the build view.</summary>
+    public event Action<bool>? GameActiveChanged;
+
+    /// <summary>The in-game build view's content: runes, purchase order, skill table.</summary>
+    public GameBuildViewModel GameBuild { get; } = new();
+
+    public bool IsGameRunning
+    {
+        get => _isGameRunning;
+        private set => Set(ref _isGameRunning, value);
+    }
+
+    /// <summary>The in-game build view, shown instead of the idle card while a game runs.</summary>
+    public bool ShowGameView
+    {
+        get => _showGameView;
+        private set => Set(ref _showGameView, value);
+    }
+
+    /// <summary>The compact status card: outside a draft AND outside a game with a build.</summary>
+    public bool ShowIdleCard
+    {
+        get => _showIdleCard;
+        private set => Set(ref _showIdleCard, value);
+    }
+
+    /// <summary>
+    /// Tracks the client's gameflow phase. The build view appears when the game actually starts,
+    /// not when champion select ends — loading screens count as "started".
+    /// </summary>
+    public void OnGameflowPhase(string phase)
+    {
+        // Reconnect counts as running: closing the build view in the exact moment somebody is
+        // clicking "Wieder verbinden" would be the least helpful time to do it.
+        var running = phase.Equals("GameStart", StringComparison.OrdinalIgnoreCase)
+            || phase.Equals("InProgress", StringComparison.OrdinalIgnoreCase)
+            || phase.Equals("Reconnect", StringComparison.OrdinalIgnoreCase);
+
+        if (running == IsGameRunning)
+            return;
+
+        IsGameRunning = running;
+        UpdateBuildSection();
+
+        if (running)
+        {
+            AnnounceGameActive();
+        }
+        else
+        {
+            _gameActiveAnnounced = false;
+            GameActiveChanged?.Invoke(false);
+        }
+    }
+
+    /// <summary>Set once <see cref="GameActiveChanged"/> announced the running game.</summary>
+    private bool _gameActiveAnnounced;
+
+    /// <summary>
+    /// Fires the auto-show event when a game runs AND a build exists. Called from the phase
+    /// change and again when a build lands — a slow fetch used to mean the phase event found no
+    /// build, never fired, and the window stayed in the tray for the whole game.
+    /// </summary>
+    private void AnnounceGameActive()
+    {
+        if (!IsGameRunning || !HasBuild || _gameActiveAnnounced)
+            return;
+
+        _gameActiveAnnounced = true;
+        GameActiveChanged?.Invoke(true);
+    }
 
     public string StatusText
     {
@@ -284,28 +409,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         private set => Set(ref _listHeader, value);
     }
 
-    public string AllyCompText
-    {
-        get => _allyCompText;
-        private set => Set(ref _allyCompText, value);
-    }
-
-    public string EnemyCompText
-    {
-        get => _enemyCompText;
-        private set => Set(ref _enemyCompText, value);
-    }
-
     public string SnapshotText
     {
         get => _snapshotText;
         private set => Set(ref _snapshotText, value);
-    }
-
-    public string PresetName
-    {
-        get => _presetName;
-        private set => Set(ref _presetName, value);
     }
 
     public string UpdateStatus
@@ -347,12 +454,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// of champion select.
     /// </summary>
     public bool CanUpdate => !IsUpdating && !IsDraftActive;
-
-    public bool IsPinned
-    {
-        get => _isPinned;
-        private set => Set(ref _isPinned, value);
-    }
 
     /// <summary>False while the empty-state hint should take the place of the list.</summary>
     public bool HasRecommendations
@@ -402,33 +503,36 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// </summary>
     public string BuildInfoText { get; } = DescribeBuild();
 
-    // ----- Draft live data (fetched only on the button) -------------------------------------
+    // ----- Draft live data (fetched automatically after every pick) -------------------------
 
     public bool IsFetchingDraftData
     {
         get => _isFetchingDraftData;
-        private set
-        {
-            if (Set(ref _isFetchingDraftData, value))
-                FetchDraftDataCommand.RaiseCanExecuteChanged();
-        }
+        private set => Set(ref _isFetchingDraftData, value);
     }
 
-    /// <summary>Label of the draft button, e.g. "OP.GG: 3 Gegner + Build laden".</summary>
+    /// <summary>
+    /// What the automatic draft fetch is doing, e.g. "lädt Daten zu Syndra…". Empty when there is
+    /// nothing to say, which is most of the time.
+    /// </summary>
     public string DraftFetchText
     {
         get => _draftFetchText;
         private set => Set(ref _draftFetchText, value);
     }
 
-    public bool ShowDraftFetchButton
+    public bool ShowDraftFetchStatus
     {
-        get => _showDraftFetchButton;
-        private set => Set(ref _showDraftFetchButton, value);
+        get => _showDraftFetchStatus;
+        private set => Set(ref _showDraftFetchStatus, value);
     }
 
-    public bool CanFetchDraftData
-        => !IsFetchingDraftData && !_meta.IsEmpty && _state.IsActive && PendingFetch().Total > 0;
+    /// <summary>True while the status line is reporting a failure rather than progress.</summary>
+    public bool DraftFetchFailed
+    {
+        get => _draftFetchFailed;
+        private set => Set(ref _draftFetchFailed, value);
+    }
 
     // ----- Build panel ----------------------------------------------------------------------
 
@@ -464,49 +568,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         private set => Set(ref _buildSubtitle, value);
     }
 
-    public string BuildRunesPrimary
-    {
-        get => _buildRunesPrimary;
-        private set => Set(ref _buildRunesPrimary, value);
-    }
-
-    public string BuildRunesSecondary
-    {
-        get => _buildRunesSecondary;
-        private set => Set(ref _buildRunesSecondary, value);
-    }
-
-    public string BuildStarter
-    {
-        get => _buildStarter;
-        private set => Set(ref _buildStarter, value);
-    }
-
-    public string BuildSpells
-    {
-        get => _buildSpells;
-        private set => Set(ref _buildSpells, value);
-    }
-
     /// <summary>Hint shown in the build block while nothing is loaded yet.</summary>
     public string BuildHint
     {
         get => _buildHint;
         private set => Set(ref _buildHint, value);
     }
-
-    /// <summary>
-    /// Collapsed by default during the draft — the recommendation list needs the space more.
-    /// Expands when a build arrives and on the post-draft card. Two-way: the chevron toggles it.
-    /// </summary>
-    public bool IsBuildExpanded
-    {
-        get => _isBuildExpanded;
-        set => Set(ref _isBuildExpanded, value);
-    }
-
-    /// <summary>Core item combinations, best sample first.</summary>
-    public ObservableCollection<string> BuildCoreLines { get; } = [];
 
     /// <summary>Situational pointers derived from the enemy composition, as toned chips.</summary>
     public ObservableCollection<Reason> BuildHints { get; } = [];
@@ -524,9 +591,18 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var lane = SlotViewModel.LaneAt(laneIndex);
 
         if (lane == Lane.Unknown)
+        {
             _manualLanes.Remove(slot.CellId);
+        }
         else
+        {
+            // One lane, one seat: leaving the same lane pinned on another seat would make the
+            // constraints contradictory and collapse every prediction.
+            foreach (var taken in _manualLanes.Where(pair => pair.Value == lane && pair.Key != slot.CellId).ToList())
+                _manualLanes.Remove(taken.Key);
+
             _manualLanes[slot.CellId] = lane;
+        }
 
         Refresh();
     }
@@ -660,32 +736,49 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     private async Task ReloadSnapshotAsync()
     {
-        // The file is written as a temporary and then renamed, so the first event can arrive before
-        // the rename lands. A short wait turns that race into a non-event.
-        await Task.Delay(400).ConfigureAwait(true);
-
-        if (!_dispatcher.CheckAccess())
+        // Fire-and-forget from a watcher thread and a timer: anything escaping here would vanish
+        // as an unobserved task exception and the panel would just silently stop updating.
+        try
         {
-            await _dispatcher.InvokeAsync(() => _ = ReloadSnapshotAsync());
-            return;
+            // The file is written as a temporary and then renamed, so the first event can arrive
+            // before the rename lands. A short wait turns that race into a non-event.
+            await Task.Delay(400).ConfigureAwait(true);
+
+            if (!_dispatcher.CheckAccess())
+            {
+                await _dispatcher.InvokeAsync(() => _ = ReloadSnapshotAsync());
+                return;
+            }
+
+            _reloadQueued = false;
+
+            // Mid-draft, replacing _meta would discard the live matchups this very draft fetched —
+            // while _liveFetched keeps claiming they are there, so they would never come back.
+            if (_state.IsActive)
+            {
+                _reloadDeferred = true;
+                return;
+            }
+
+            var meta = LoadMeta();
+            if (meta.IsEmpty && !_meta.IsEmpty)
+                return;
+
+            _meta = meta;
+            _predictor = new LanePredictor(_meta, _seatPriors);
+            _recommender = new Recommender(_meta, _traits);
+
+            // New portraits arrive with new data; a stale cache would keep showing blanks.
+            _icons.Clear();
+
+            SetSnapshotRetryRunning(_meta.IsEmpty);
+            UpdateSnapshotText();
+            Refresh();
         }
-
-        _reloadQueued = false;
-
-        var meta = LoadMeta();
-        if (meta.IsEmpty && !_meta.IsEmpty)
-            return;
-
-        _meta = meta;
-        _predictor = new LanePredictor(_meta, _seatPriors);
-        _recommender = new Recommender(_meta, _traits);
-
-        // New portraits arrive with new data; a stale cache would keep showing blanks.
-        _icons.Clear();
-
-        SetSnapshotRetryRunning(_meta.IsEmpty);
-        UpdateSnapshotText();
-        Refresh();
+        catch (Exception ex)
+        {
+            CrashLog.Write("Snapshot-Reload", ex);
+        }
     }
 
     private void OnTrackerChanged(DraftSnapshot snapshot)
@@ -693,7 +786,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // The client pushes from a background thread; everything below touches the UI.
         if (!_dispatcher.CheckAccess())
         {
-            _dispatcher.BeginInvoke(() => OnTrackerChanged(snapshot));
+            DispatchFromClientThread(() => OnTrackerChanged(snapshot));
             return;
         }
 
@@ -704,28 +797,54 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         StatusText = DescribeStatus(snapshot.Status);
         StatusTone = ToneOf(snapshot.Status);
 
+        // League gone while the in-game view was open: no gameflow event will ever arrive to
+        // close it, so the view (and the rune button's lock) stayed frozen until one did.
+        if (!snapshot.Status.ClientRunning && IsGameRunning)
+            OnGameflowPhase("None");
+
         if (!snapshot.State.IsActive)
         {
             _manualLanes.Clear();
             _selectable = null;
             _selectableFetched = false;
 
+            // In-flight fetches belong to the draft that just ended; let them stop instead of
+            // writing counters into the freshly cleared lookup.
+            ResetDraftScope();
+            _fetchRetry?.Stop();
+
             // The live counter overlay belonged to the draft that just ended; the build stays,
             // as the post-draft card, so the shopping order is still readable during the game.
             _meta.ClearLiveMatchups();
             _liveFetched.Clear();
+            _buildFetched.Clear();
             _pendingEnemyCount = 0;
             _buildContext = null;
-            ShowDraftFetchButton = false;
+            _fetchAgainWhenDone = false;
+            _fetchCooldownUntil = DateTimeOffset.MinValue;
+            DraftFetchText = string.Empty;
+            DraftFetchFailed = false;
+            ShowDraftFetchStatus = false;
 
             IsDraftActive = false;
             SetCountdownRunning(false);
             Clear();
             UpdateBuildSection();
+
+            // A snapshot reload that arrived mid-draft was parked to protect the live matchups.
+            if (_reloadDeferred)
+            {
+                _reloadDeferred = false;
+                _ = ReloadSnapshotAsync();
+            }
+
             return;
         }
 
-        if (!wasActive)
+        // The tracker's IsNewDraft also covers the client jumping straight from one draft into
+        // the next — our own wasActive bookkeeping never sees an inactive frame then, and the
+        // previous draft's manual lanes and build card leaked into the new one.
+        if (!wasActive || snapshot.IsNewDraft)
         {
             _manualLanes.Clear();
             _selectable = null;
@@ -734,11 +853,18 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // A fresh draft starts clean: no stale build card, no leftover overlay.
             _meta.ClearLiveMatchups();
             _liveFetched.Clear();
+            _buildFetched.Clear();
+            _fetchCooldownUntil = DateTimeOffset.MinValue;
+            RuneImportText = string.Empty;
             _build = null;
             HasBuild = false;
-            IsBuildExpanded = false;
             _buildCardClosed = false;
             _buildProbe = default;
+
+            // Cancel, not just dispose: on a draft→draft jump the previous fetch is still running
+            // and must stop before it applies the old draft's build to the new one.
+            ResetDraftScope();
+            _draftScope = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         }
 
         // Retried on every event until it succeeds; see FetchSelectableAsync.
@@ -746,7 +872,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _ = FetchSelectableAsync();
 
         IsDraftActive = true;
-        IsPinned = _tracker.Turns.IsPinned;
         SetCountdownRunning(true);
         Render();
     }
@@ -818,13 +943,19 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         RenderTeam(Allies, _state.Allies, allyPredictions, isAlly: true);
         RenderTeam(Enemies, _state.Enemies, enemyPredictions, isAlly: false);
 
-        RenderRecommendations(enemyPredictions);
+        RenderRecommendations(enemyPredictions, allyPredictions);
+
+        // Re-derived on every render, not only when a build lands: the enemy composition keeps
+        // growing after my own pick, and a hint frozen at "78 % physisch" from three revealed
+        // enemies is a wrong shopping advice once the last two turn out to be mages.
+        RenderBuildHints();
+
         UpdateDraftLiveState(enemyPredictions, allyPredictions);
     }
 
     /// <summary>
-    /// Recomputes what the draft button could fetch right now, probes the build cache once per
-    /// matchup (a cache hit shows the build with no network at all), and refreshes the panels.
+    /// Works out what data this draft is still missing, probes the build cache once per matchup (a
+    /// cache hit needs no network at all), and starts the fetch for whatever is left.
     /// </summary>
     private void UpdateDraftLiveState(LanePredictionResult enemyPredictions, LanePredictionResult allyPredictions)
     {
@@ -846,8 +977,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         TryLoadCachedBuild();
-        UpdateDraftFetchState();
         UpdateBuildSection();
+        TryFetchDraftData();
     }
 
     private bool BuildMatchesContext
@@ -856,28 +987,78 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             && _build.Lane == context.Lane
             && _build.OpponentId == context.Opponent;
 
+    /// <summary>
+    /// Queues work from a client thread onto the UI thread. BeginInvoke throws once the
+    /// dispatcher shuts down, and the LCU source can still fire during the two-second dispose
+    /// window — on a worker thread that exception would take the whole process down mid-exit.
+    /// </summary>
+    private void DispatchFromClientThread(Action action)
+    {
+        if (_dispatcher.HasShutdownStarted)
+            return;
+
+        try
+        {
+            _dispatcher.BeginInvoke(action);
+        }
+        catch (InvalidOperationException)
+        {
+            // Shutdown raced the check above; the work is moot anyway.
+        }
+    }
+
+    /// <summary>Ends the current draft's fetch scope: cancelled first, so in-flight work stops.</summary>
+    private void ResetDraftScope()
+    {
+        if (_draftScope is null)
+            return;
+
+        try
+        {
+            _draftScope.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already gone; nothing running on it either then.
+        }
+
+        _draftScope.Dispose();
+        _draftScope = null;
+    }
+
     private (int Enemies, bool Build, int Total) PendingFetch()
     {
-        var buildPending = _buildContext is not null && !BuildMatchesContext;
+        var buildPending = _buildContext is { } context
+            && !BuildMatchesContext
+            && !_buildFetched.Contains(context);
+
         return (_pendingEnemyCount, buildPending, _pendingEnemyCount + (buildPending ? 1 : 0));
     }
 
-    private void UpdateDraftFetchState()
+    /// <summary>
+    /// Starts the draft fetch if there is anything new to get. Called after every client event, so
+    /// each newly revealed pick pulls its own data in without anybody having to ask.
+    /// </summary>
+    private void TryFetchDraftData()
     {
-        var (enemies, build, total) = PendingFetch();
+        if (!_state.IsActive || _meta.IsEmpty || PendingFetch().Total == 0)
+            return;
 
-        ShowDraftFetchButton = IsFetchingDraftData || (_state.IsActive && total > 0 && !_meta.IsEmpty);
-        DraftFetchText = IsFetchingDraftData
-            ? "OP.GG: lade…"
-            : (enemies, build) switch
-            {
-                ( > 0, true) => $"OP.GG: {enemies} Gegner + Build laden",
-                ( > 0, false) => $"OP.GG: {enemies} Gegner laden",
-                (_, true) => "OP.GG: Build laden",
-                _ => string.Empty,
-            };
+        // One request at a time; whatever appeared meanwhile is picked up when this one finishes.
+        // The fetch loop's own Refresh() lands here too — that is progress being painted, not new
+        // work, and queueing it produced a pointless extra round after every fetch.
+        if (IsFetchingDraftData)
+        {
+            if (!_refreshingFromFetch)
+                _fetchAgainWhenDone = true;
 
-        FetchDraftDataCommand.RaiseCanExecuteChanged();
+            return;
+        }
+
+        if (DateTimeOffset.UtcNow < _fetchCooldownUntil)
+            return;
+
+        _ = FetchDraftDataAsync();
     }
 
     private void TryLoadCachedBuild()
@@ -896,23 +1077,31 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
 
     /// <summary>
-    /// Runs the draft button: fresh counters for every newly revealed enemy, and the matchup guide
-    /// for the locked pick. This is the only network access besides the big update, and like it,
-    /// it happens exclusively on a click.
+    /// Fetches what this draft is missing: fresh counters for every newly revealed enemy, and the
+    /// matchup guide for the locked pick.
+    /// <para>
+    /// Runs by itself after every pick, because the alternative — a button — meant the advice was
+    /// quietly worse until somebody remembered to press it. It stays cheap: at most one call per
+    /// enemy champion and one per matchup for the whole draft, everything is cached on disk, and a
+    /// failure backs off instead of hammering a dead connection.
+    /// </para>
     /// </summary>
     private async Task FetchDraftDataAsync()
     {
-        if (!CanFetchDraftData)
-            return;
-
         IsFetchingDraftData = true;
-        UpdateDraftFetchState();
+        _fetchAgainWhenDone = false;
+        DraftFetchFailed = false;
+
+        // Bound to the draft, not the app: a fetch must stop when its draft ends instead of
+        // writing that draft's counters into the freshly cleared lookup.
+        var token = _draftScope?.Token ?? _lifetime.Token;
 
         try
         {
             var resolver = new ChampionResolver(_meta.Champions);
-            using var client = new OpGgMcpClient();
-            var fetcher = new LiveDraftFetcher(client, _settings.GameMode);
+            _opGg ??= new OpGgMcpClient();
+            var fetcher = new LiveDraftFetcher(
+                _opGg, _settings.GameMode, message => CrashLog.Note("Draft-Abruf", message));
             var predictions = _predictor.Predict(_state.Enemies, _manualLanes);
 
             foreach (var slot in _state.Enemies.ToList())
@@ -921,8 +1110,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 if (id == 0 || _liveFetched.Contains(id) || _meta.Champion(id) is not { } enemy)
                     continue;
 
+                ReportFetch($"lädt Daten zu {enemy.Name}…");
+
                 var lane = predictions.ForCell(slot.CellId)?.Lane ?? Lane.Unknown;
-                var stats = await fetcher.FetchEnemyCountersAsync(enemy, lane, resolver, _lifetime.Token)
+                var stats = await fetcher.FetchEnemyCountersAsync(enemy, lane, resolver, token)
                     .ConfigureAwait(true);
 
                 // Marked as fetched even when empty: asking again would not produce more data.
@@ -930,51 +1121,113 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
                 if (stats.Count > 0)
                     _meta.ApplyLiveMatchups(stats);
+
+                // Show each enemy's data as it lands rather than after the last one.
+                _refreshingFromFetch = true;
+                try
+                {
+                    Refresh();
+                }
+                finally
+                {
+                    _refreshingFromFetch = false;
+                }
             }
 
             if (_buildContext is { } context && !BuildMatchesContext
+                && !_buildFetched.Contains(context)
                 && _meta.Champion(context.Champion) is { } me
                 && _meta.Champion(context.Opponent) is { } opponent)
             {
-                var plan = await fetcher.FetchBuildAsync(me, opponent, context.Lane, _meta.Patch, _lifetime.Token)
+                ReportFetch($"lädt Build für {me.Name}…");
+
+                var plan = await fetcher.FetchBuildAsync(me, opponent, context.Lane, _meta.Patch, token)
                     .ConfigureAwait(true);
+
+                // Marked AFTER the await, mirroring _liveFetched above: marked before it, one
+                // network hiccup meant no build and a locked rune button for the rest of the
+                // draft, because nothing would ever ask again.
+                _buildFetched.Add(context);
 
                 if (plan is not null && !plan.IsEmpty)
                 {
                     _buildCache.Save(plan);
                     ApplyBuild(plan);
-
-                    // The user asked for this build just now; show it opened.
-                    IsBuildExpanded = true;
                 }
             }
 
-            Refresh();
+            _fetchRetry?.Stop();
+
+            _refreshingFromFetch = true;
+            try
+            {
+                Refresh();
+            }
+            finally
+            {
+                _refreshingFromFetch = false;
+            }
         }
         catch (OperationCanceledException)
         {
-            // Shutting down.
+            // Shutting down, or the draft this fetch belonged to has ended.
         }
         catch (Exception ex)
         {
-            UpdateStatus = $"OP.GG-Abruf fehlgeschlagen: {ex.Message}";
+            // Back off: without this a broken connection would be retried on every client event,
+            // and champion select produces a lot of those.
+            _fetchCooldownUntil = DateTimeOffset.UtcNow.AddSeconds(30);
+            _fetchAgainWhenDone = false;
+            DraftFetchFailed = true;
+            DraftFetchText = "OP.GG nicht erreichbar — versuche es weiter";
+            ShowDraftFetchStatus = true;
             CrashLog.Write("Draft-Abruf", ex);
+
+            // The status line just promised to keep trying, so something actually has to: the
+            // last picks of a draft produce no further client events to piggyback on.
+            _fetchRetry ??= new DispatcherTimer(
+                TimeSpan.FromSeconds(31),
+                DispatcherPriority.Background,
+                (_, _) =>
+                {
+                    _fetchRetry!.Stop();
+                    TryFetchDraftData();
+                },
+                _dispatcher);
+
+            _fetchRetry.Stop();
+            _fetchRetry.Start();
+            return;
         }
         finally
         {
             IsFetchingDraftData = false;
-            UpdateDraftFetchState();
             UpdateBuildSection();
         }
+
+        DraftFetchText = string.Empty;
+        ShowDraftFetchStatus = false;
+
+        // A pick that landed while this ran gets its own round.
+        if (_fetchAgainWhenDone)
+            TryFetchDraftData();
+    }
+
+    private void ReportFetch(string text)
+    {
+        DraftFetchText = $"OP.GG: {text}";
+        ShowDraftFetchStatus = true;
     }
 
     private void ApplyBuild(BuildPlan plan)
     {
-        // Deliberately NOT auto-expanding here: a silent cache hit mid-draft must not shove the
-        // recommendation list aside. The explicit button click and the post-draft card do expand.
         _build = plan;
         _buildCardClosed = false;
         HasBuild = true;
+
+        // A result line from an earlier import would now sit next to DIFFERENT runes and read as
+        // if they had been transferred.
+        RuneImportText = string.Empty;
 
         BuildTitle = $"{plan.ChampionName} vs {plan.OpponentName} · {plan.Lane.Display()}";
 
@@ -983,35 +1236,59 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             ? $"Patch {plan.Patch}"
             : $"Runen: {runes.WinRate:P0} Winrate über {runes.Play} Spiele · Patch {plan.Patch}";
 
-        BuildRunesPrimary = runes is null
-            ? string.Empty
-            : $"{runes.PrimaryPath}:  {string.Join(" · ", runes.PrimaryRunes)}";
-
-        var shards = runes is null || runes.Shards.Count == 0
-            ? string.Empty
-            : $"    Shards: {string.Join(" / ", runes.Shards)}";
-
-        BuildRunesSecondary = runes is null
-            ? string.Empty
-            : $"{runes.SecondaryPath}:  {string.Join(" · ", runes.SecondaryRunes)}{shards}";
-
-        var starter = plan.Starters.Count > 0 ? string.Join(" + ", plan.Starters[0].Items) : "—";
-        var boots = plan.Boots.Count > 0 ? plan.Boots[0].Items.FirstOrDefault() ?? "—" : "—";
-        BuildStarter = $"Start: {starter}    Boots: {boots}";
-
-        var spells = plan.SummonerSpells.Count > 0 ? string.Join(" + ", plan.SummonerSpells[0].Items) : "—";
-        var skills = string.IsNullOrEmpty(plan.SkillPriority) ? string.Empty : $"    Skills: {plan.SkillPriority}";
-        BuildSpells = $"Spells: {spells}{skills}";
-
-        BuildCoreLines.Resize(plan.CoreItems.Count, () => string.Empty);
-        for (var i = 0; i < plan.CoreItems.Count; i++)
-        {
-            var core = plan.CoreItems[i];
-            BuildCoreLines[i] = $"{i + 1}.  {string.Join("  →  ", core.Items)}   ({core.WinRate:P0} · {core.Play} Spiele)";
-        }
-
-        RenderBuildHints();
+        // The tiles themselves — runes, purchase order, spells, skills — all live in GameBuild;
+        // the draft column and the in-game view render the same content at different sizes.
+        // (The situational hints are NOT rendered here: Render() re-derives them on every pass,
+        // so they follow the enemy composition instead of freezing at build time.)
+        GameBuild.Apply(plan, _names, _icons);
         UpdateBuildSection();
+        AnnounceGameActive();
+
+        // The plan's item icons are the one asset that cannot come with the big update — which
+        // items matter depends on the matchup. Fetched here, missing files only, ~10 small PNGs.
+        _ = FetchItemIconsAsync(plan);
+    }
+
+    /// <summary>Downloads missing item icons for the plan and refreshes the tiles once they land.</summary>
+    private async Task FetchItemIconsAsync(BuildPlan plan)
+    {
+        try
+        {
+            var ids = plan.Starters.Concat(plan.Boots).Concat(plan.CoreItems).Concat(plan.LateItems)
+                .SelectMany(set => set.ItemIds)
+                .ToList();
+
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            var downloader = new AssetDownloader(http);
+
+            var added = await downloader
+                .DownloadItemIconsAsync(ids, plan.Patch, _lifetime.Token)
+                .ConfigureAwait(true);
+
+            // Rune and spell icons normally arrive with the big update; fetched here too so a
+            // user who never ran one is not stuck with text chips forever.
+            IEnumerable<int> runeIds = plan.Runes is { } runes
+                ? runes.PrimaryRuneIds.Concat(runes.SecondaryRuneIds)
+                : [];
+            var spellIds = plan.SummonerSpells.SelectMany(set => set.ItemIds);
+
+            added += await downloader
+                .DownloadRuneAndSpellIconsAsync(runeIds, spellIds, plan.Patch, _lifetime.Token)
+                .ConfigureAwait(true);
+
+            // Still the same build on screen? Then swap the placeholder labels for the icons.
+            if (added > 0 && ReferenceEquals(_build, plan))
+                GameBuild.Apply(plan, _names, _icons);
+        }
+        catch (OperationCanceledException)
+        {
+            // Shutting down.
+        }
+        catch (Exception ex)
+        {
+            // Icons are decoration on top of a working text view; never let them take it down.
+            CrashLog.Write("Item-Icons", ex);
+        }
     }
 
     /// <summary>
@@ -1025,40 +1302,149 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         if (_enemyComp.Count >= 3)
         {
             if (_enemyComp.PhysicalShare >= 0.65)
-                hints.Add(Reason.Neutral($"Gegner {_enemyComp.PhysicalShare:P0} AD → Rüstung priorisieren"));
+            {
+                hints.Add(Reason.Neutral(
+                    $"Gegner macht {_enemyComp.PhysicalShare:P0} physischen Schaden → Rüstung zuerst",
+                    "Von dem Schaden, den das gegnerische Team austeilt, ist der größte Teil "
+                    + "physisch. Rüstung wirkt hier stärker als Magieresistenz."));
+            }
 
             if (_enemyComp.MagicShare >= 0.65)
-                hints.Add(Reason.Neutral($"Gegner {_enemyComp.MagicShare:P0} AP → Magieresistenz priorisieren"));
+            {
+                hints.Add(Reason.Neutral(
+                    $"Gegner macht {_enemyComp.MagicShare:P0} magischen Schaden → Magieresistenz zuerst",
+                    "Von dem Schaden, den das gegnerische Team austeilt, ist der größte Teil "
+                    + "magisch. Magieresistenz wirkt hier stärker als Rüstung."));
+            }
 
             if (_enemyComp.TotalCrowdControl >= 6)
-                hints.Add(Reason.Neutral("viel gegnerische CC → Zähigkeit einplanen"));
+            {
+                hints.Add(Reason.Neutral(
+                    "viele Betäubungen im Gegnerteam → Zähigkeit einplanen",
+                    "Das gegnerische Team hat auffällig viele Effekte, die dich bewegungsunfähig "
+                    + "machen. Zähigkeit (z. B. Merkurstiefel) verkürzt deren Dauer."));
+            }
         }
 
         BuildHints.Resize(hints.Count, () => Reason.Neutral(string.Empty));
         for (var i = 0; i < hints.Count; i++)
-            BuildHints[i] = hints[i];
+        {
+            // Reason is a record: skip identical values. An unconditional assignment raises
+            // Replace on every render pass and makes the ItemsControl rebuild its containers —
+            // visible as flickering chips.
+            if (!Equals(BuildHints[i], hints[i]))
+                BuildHints[i] = hints[i];
+        }
+    }
+
+    /// <summary>Progress or result of the rune import, next to its button.</summary>
+    public string RuneImportText
+    {
+        get => _runeImportText;
+        private set => Set(ref _runeImportText, value);
+    }
+
+    /// <summary>
+    /// Import works while the page can still change: during champion select and up to the load
+    /// screen. Once in game the client ignores page changes, so the button locks.
+    /// </summary>
+    public bool CanImportRunes
+        => !_isImportingRunes
+            && !IsGameRunning
+            // The importer's full precondition (4+2+3), not just the primaries — a weaker check
+            // left the button clickable only to produce an error message.
+            && _build?.Runes is { } runes
+            && runes.PrimaryRuneIds.Count >= 4
+            && runes.SecondaryRuneIds.Count >= 2
+            && runes.ShardIds.Count >= 3
+            && _source?.Client is not null;
+
+    /// <summary>
+    /// The tool's one write to the client: creates (or replaces) the DraftPilot rune page for the
+    /// current build and selects it. A foreign page is only ever deleted after the user confirmed
+    /// it by name.
+    /// </summary>
+    private async Task ImportRunesAsync()
+    {
+        if (!CanImportRunes || _build is not { Runes: { } runes } build)
+        {
+            // A stale button can still fire after the client reconnected or the build changed;
+            // saying nothing here reads as "the button is broken".
+            RuneImportText = "Gerade nicht möglich — Client verbunden und Build geladen?";
+            return;
+        }
+
+        _isImportingRunes = true;
+        ImportRunesCommand.RaiseCanExecuteChanged();
+        RuneImportText = "Übertrage…";
+
+        try
+        {
+            var result = await RuneImporter.ImportAsync(
+                _source!.Client!,
+                runes,
+                $"{build.ChampionName} vs {build.OpponentName}",
+                confirmReplace: name => _dispatcher.Invoke(() =>
+                {
+                    // Owned by the main window, or a Topmost panel covers the dialog and the
+                    // import hangs invisibly on this very callback.
+                    var owner = Application.Current?.MainWindow;
+                    var text = $"Alle Runenseiten sind belegt. Die Seite „{name}“ löschen und ersetzen?";
+                    const string caption = "DirkDraft — Runen übertragen";
+
+                    var choice = owner is { IsVisible: true }
+                        ? MessageBox.Show(owner, text, caption, MessageBoxButton.YesNo, MessageBoxImage.Question)
+                        : MessageBox.Show(text, caption, MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                    return choice == MessageBoxResult.Yes;
+                }),
+                _lifetime.Token).ConfigureAwait(true);
+
+            RuneImportText = result.Message;
+        }
+        catch (OperationCanceledException)
+        {
+            // Shutting down; don't leave "Übertrage…" standing.
+            RuneImportText = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            RuneImportText = $"Fehlgeschlagen: {ex.Message}";
+            CrashLog.Write("Runen-Import", ex);
+        }
+        finally
+        {
+            _isImportingRunes = false;
+            ImportRunesCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private void UpdateBuildSection()
     {
+        ImportRunesCommand?.RaiseCanExecuteChanged();
+
         if (_state.IsActive)
         {
+            ShowGameView = false;
+            ShowIdleCard = false;
             ShowBuildClose = false;
             ShowBuildSection = HasBuild || _buildContext is not null;
             BuildHint = HasBuild
                 ? string.Empty
-                : "Noch kein Build geladen — oben den OP.GG-Knopf klicken (ein gezielter Abruf).";
+                : "Build wird geladen, sobald dein Pick und dein Lane-Gegner feststehen.";
             return;
         }
+
+        // While the game runs, the full-width build view takes over from both the idle card and
+        // the compact post-draft card — it is the same content with room to breathe.
+        ShowGameView = IsGameRunning && HasBuild && !_buildCardClosed;
+        ShowIdleCard = !ShowGameView;
 
         // After the draft the build stays on screen as a card, so the shopping order is still
         // there when the user tabs out mid-game. Closed by hand or by the next draft.
         ShowBuildClose = true;
-        ShowBuildSection = HasBuild && !_buildCardClosed;
+        ShowBuildSection = HasBuild && !_buildCardClosed && !ShowGameView;
         BuildHint = string.Empty;
-
-        if (ShowBuildSection)
-            IsBuildExpanded = true;
     }
 
     private void RenderTeam(
@@ -1093,7 +1479,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             row.IsManualLane = _manualLanes.ContainsKey(slot.CellId);
             row.HasChampion = slot.EffectiveChampionId != 0;
 
-            row.IsOnClock = _state.Turn?.CellId == slot.CellId;
             row.IsTarget = _target?.Slot.CellId == slot.CellId;
 
             // Ally lanes come from the client, so a confidence figure there would be noise. And a
@@ -1125,7 +1510,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         return duplicate ? "schon gepickt" : null;
     }
 
-    private void RenderRecommendations(LanePredictionResult enemyPredictions)
+    private void RenderRecommendations(LanePredictionResult enemyPredictions, LanePredictionResult allyPredictions)
     {
         if (_target is null)
         {
@@ -1140,16 +1525,24 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var selectable = !_settings.ShowUnowned && _target.Slot.CellId == _state.LocalCellId ? _selectable : null;
 
         var set = _recommender.Recommend(
-            _state, _target, enemyPredictions, CurrentWeights(), selectable, _settings.RecommendationCount);
+            _state, _target, enemyPredictions, allyPredictions, selectable, _settings.RecommendationCount);
 
-        var who = _target.Slot.CellId == _state.LocalCellId
+        var allyIndex = _state.Allies.ToList().FindIndex(slot => slot.CellId == _target.Slot.CellId);
+        var who = _target.Slot.CellId == _state.LocalCellId || allyIndex < 0
             ? "dich"
-            : $"Mitspieler {_state.Allies.ToList().FindIndex(slot => slot.CellId == _target.Slot.CellId) + 1}";
+            : $"Mitspieler {allyIndex + 1}";
 
-        var mode = set.Action == TurnAction.Ban ? "Bans" : "Picks";
+        var isBan = set.Action == TurnAction.Ban;
+        var mode = isBan ? "Bans" : "Picks";
         var suffix = _target.IsFollowingTurn ? string.Empty : " (Ausblick)";
         var lanePart = set.Lane == Lane.Unknown ? string.Empty : $" · {set.Lane.Display()}";
-        ListHeader = $"{mode} für {who}{lanePart}{suffix}";
+
+        // When the top picks sit within a fraction of a point, the ranking is noise and the header
+        // says so — otherwise the list implies a precision the data does not have.
+        var tied = isBan ? 0 : CountLeadingTies(set.Items);
+        var tiePart = tied >= 2 ? $" — Top {tied} nahezu gleich" : string.Empty;
+
+        ListHeader = $"{mode} für {who}{lanePart}{suffix}{tiePart}";
 
         HasRecommendations = set.Items.Count > 0;
 
@@ -1163,27 +1556,34 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         Recommendations.Resize(set.Items.Count, () => new RecommendationViewModel());
         for (var i = 0; i < set.Items.Count; i++)
-            Recommendations[i].Apply(i + 1, set.Items[i], _icons.Get(set.Items[i].ChampionId));
+            Recommendations[i].Apply(i + 1, set.Items[i], _icons.Get(set.Items[i].ChampionId), isBan);
 
-        AllyCompText = DescribeComp(set.AllyComp);
-        EnemyCompText = DescribeComp(set.EnemyComp);
         _enemyComp = set.EnemyComp;
 
         var findings = set.AllyComp.Findings.Select(finding => finding.Text).ToList();
         Warnings.Resize(findings.Count, () => string.Empty);
         for (var i = 0; i < findings.Count; i++)
-            Warnings[i] = findings[i];
+        {
+            // Skip identical values: an unconditional assignment raises Replace on every render
+            // and rebuilds the chip containers for nothing.
+            if (!Equals(Warnings[i], findings[i]))
+                Warnings[i] = findings[i];
+        }
     }
 
-    private ScoreWeights CurrentWeights()
+    /// <summary>How many entries from the top sit within 0.3 win-rate points of first place.</summary>
+    private static int CountLeadingTies(IReadOnlyList<Recommendation> items)
     {
-        foreach (var (name, weights) in ScoreWeights.Presets)
-        {
-            if (string.Equals(name, PresetName, StringComparison.OrdinalIgnoreCase))
-                return weights;
-        }
+        if (items.Count < 2)
+            return 0;
 
-        return ScoreWeights.Meta;
+        var top = items[0].Score;
+        var tied = 1;
+
+        while (tied < items.Count && top - items[tied].Score < 0.003)
+            tied++;
+
+        return tied;
     }
 
     private void Clear()
@@ -1198,8 +1598,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         IsTimeCritical = false;
         TurnText = "Kein Champ Select";
         ListHeader = "Empfehlungen";
-        AllyCompText = string.Empty;
-        EnemyCompText = string.Empty;
 
         EmptyHint = _meta.IsEmpty
             ? "Noch keine Meta-Daten. Unten auf „Daten aktualisieren“ klicken — das dauert etwa vier Minuten und passiert nur auf deinen Klick."
@@ -1212,8 +1610,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             row.Champion = "—";
             row.Icon = null;
             row.LaneText = "?";
+            row.LaneIndex = 5;
             row.Confidence = string.Empty;
-            row.IsOnClock = false;
             row.IsTarget = false;
             row.IsLocked = false;
             row.HasHover = false;
@@ -1248,7 +1646,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         var index = _state.Allies.ToList().FindIndex(slot => slot.CellId == turn.CellId);
-        return $"Mitspieler {index + 1} {action}";
+        return index >= 0 ? $"Mitspieler {index + 1} {action}" : $"Mitspieler {action}";
     }
 
     private static string DescribePhase(DraftPhase phase) => phase switch
@@ -1277,20 +1675,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             return "Client nicht gestartet";
 
         return status.SocketConnected ? "verbunden" : status.Detail ?? "Verbindung unterbrochen";
-    }
-
-    private static string DescribeComp(CompProfile profile)
-    {
-        if (profile.Count == 0)
-            return "—";
-
-        var text = $"AD {profile.PhysicalShare:P0} / AP {profile.MagicShare:P0} · Frontline {profile.FrontlineCount} · CC {profile.TotalCrowdControl}";
-
-        // Say when part of the analysis could not run rather than implying a clean bill of health.
-        if (profile.TraitCoverage < 0.999)
-            text += $" · Traits {profile.TraitCoverage:P0}";
-
-        return text;
     }
 
     private void UpdateSnapshotText()
@@ -1368,7 +1752,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             using var builder = new SnapshotBuilder(client);
 
             var snapshot = await Task.Run(
-                () => builder.BuildAsync(new SnapshotBuildOptions { GameMode = _settings.GameMode }, progress, scope.Token),
+                () => builder.BuildAsync(
+                    new SnapshotBuildOptions { GameMode = _settings.GameMode, Language = _settings.DataLanguage },
+                    progress,
+                    scope.Token),
                 scope.Token).ConfigureAwait(true);
 
             // Written atomically; a failure above leaves the previous snapshot in place and in use.
@@ -1378,8 +1765,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _predictor = new LanePredictor(_meta, _seatPriors);
             _recommender = new Recommender(_meta, _traits);
 
-            // Newly downloaded portraits would otherwise stay invisible until the next start.
+            // Newly downloaded portraits and names would otherwise stay invisible until restart.
             _icons.Clear();
+            _names = AssetNames.Load(_settings.DataLanguage);
+
+            // The patch may just have changed; sweep the previous one's build plans right away.
+            var freshPatch = _meta.IsEmpty || string.IsNullOrWhiteSpace(_meta.Patch) ? null : _meta.Patch;
+            _ = Task.Run(() => RunMaintenance(freshPatch));
+
+            // The update just proved the snapshot loads; without this the 5-second retry poll ran
+            // forever whenever the file watcher could not be created.
+            SetSnapshotRetryRunning(false);
 
             UpdateSnapshotText();
             UpdateStatus = $"Aktualisiert: {snapshot.Champions.Count} Champions, {snapshot.Matchups.Count} Matchups";
@@ -1412,10 +1808,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         SetCountdownRunning(false);
         SetSnapshotRetryRunning(false);
+        _fetchRetry?.Stop();
         _snapshotWatcher?.Dispose();
         await _lifetime.CancelAsync().ConfigureAwait(false);
         _tracker.Changed -= OnTrackerChanged;
         await _tracker.DisposeAsync().ConfigureAwait(false);
+        _draftScope?.Dispose();
+        _opGg?.Dispose();
         _lifetime.Dispose();
     }
 }

@@ -71,35 +71,6 @@ public class TurnTrackerTests
     }
 
     [Fact]
-    public void Pin_SuppressesSwitching()
-    {
-        var tracker = new TurnTracker();
-        var first = DraftState.From(new SessionBuilder().OnClock(0, "pick").Build());
-        tracker.Resolve(first);
-        tracker.Pin(0);
-
-        var target = tracker.Resolve(DraftState.From(new SessionBuilder().OnClock(4, "pick").Build()));
-
-        Assert.NotNull(target);
-        Assert.Equal(0, target.Slot.CellId);
-        Assert.False(target.IsFollowingTurn);
-    }
-
-    [Fact]
-    public void Unpin_ResumesFollowingTheClock()
-    {
-        var tracker = new TurnTracker();
-        tracker.Pin(0);
-        tracker.Unpin();
-
-        var target = tracker.Resolve(DraftState.From(new SessionBuilder().OnClock(4, "pick").Build()));
-
-        Assert.NotNull(target);
-        Assert.Equal(4, target.Slot.CellId);
-        Assert.True(target.IsFollowingTurn);
-    }
-
-    [Fact]
     public void ManualSelection_HoldsWhileTheSameSeatIsOnTheClock()
     {
         var tracker = new TurnTracker();
@@ -144,17 +115,13 @@ public class TurnTrackerTests
     }
 
     [Fact]
-    public void Reset_ClearsPinAndManualSelection()
+    public void Reset_ClearsTheManualSelection()
     {
         var tracker = new TurnTracker();
         var state = DraftState.From(new SessionBuilder().OnClock(0, "pick").Build());
         tracker.SelectManually(2, state);
-        tracker.Pin(2);
 
         tracker.Reset();
-
-        Assert.False(tracker.IsPinned);
-        Assert.Null(tracker.PinnedCellId);
 
         var target = tracker.Resolve(state);
         Assert.NotNull(target);

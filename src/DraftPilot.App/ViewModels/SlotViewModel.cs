@@ -14,13 +14,12 @@ public sealed class SlotViewModel : ObservableObject
 
     private long _cellId = -1;
     private string _label = string.Empty;
-    private string _champion = "-";
+    private string _champion = "—";
     private string _laneText = "?";
     private int _laneIndex = 5;
     private string _confidence = string.Empty;
     private bool _isUncertain;
     private bool _isLocalPlayer;
-    private bool _isOnClock;
     private bool _isTarget;
     private bool _isLocked;
     private bool _hasHover;
@@ -88,12 +87,6 @@ public sealed class SlotViewModel : ObservableObject
     {
         get => _isLocalPlayer;
         set => Set(ref _isLocalPlayer, value);
-    }
-
-    public bool IsOnClock
-    {
-        get => _isOnClock;
-        set => Set(ref _isOnClock, value);
     }
 
     /// <summary>This is the seat the recommendation list is currently advising.</summary>

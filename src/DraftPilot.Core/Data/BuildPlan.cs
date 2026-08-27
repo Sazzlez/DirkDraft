@@ -6,18 +6,33 @@ using DraftPilot.Core.Draft;
 namespace DraftPilot.Core.Data;
 
 /// <summary>One rune page: keystone first in <see cref="PrimaryRunes"/>.</summary>
+/// <remarks>
+/// Carries both names (for display) and Riot's ids: the ids address the rune icons on disk and are
+/// what the client's rune-page endpoint expects, so nothing has to be reverse-translated later.
+/// </remarks>
 public sealed class RunePage
 {
     public string PrimaryPath { get; set; } = string.Empty;
 
+    /// <summary>Riot's style id of the primary path, e.g. 8000 for Precision.</summary>
+    public int PrimaryPathId { get; set; }
+
     public List<string> PrimaryRunes { get; set; } = [];
+
+    public List<int> PrimaryRuneIds { get; set; } = [];
 
     public string SecondaryPath { get; set; } = string.Empty;
 
+    public int SecondaryPathId { get; set; }
+
     public List<string> SecondaryRunes { get; set; } = [];
+
+    public List<int> SecondaryRuneIds { get; set; } = [];
 
     /// <summary>Stat shards, already translated to display names.</summary>
     public List<string> Shards { get; set; } = [];
+
+    public List<int> ShardIds { get; set; } = [];
 
     public double WinRate { get; set; }
 
@@ -28,6 +43,9 @@ public sealed class RunePage
 public sealed class ItemSet
 {
     public List<string> Items { get; set; } = [];
+
+    /// <summary>Riot's item (or spell) ids, parallel to <see cref="Items"/>.</summary>
+    public List<int> ItemIds { get; set; } = [];
 
     public double WinRate { get; set; }
 
@@ -42,6 +60,19 @@ public sealed class ItemSet
 /// </summary>
 public sealed class BuildPlan
 {
+    /// <summary>
+    /// Bump when the shape of this class changes in a way old cache files cannot satisfy. Loading
+    /// discards mismatches, so the next draft simply fetches fresh instead of showing half a plan.
+    /// </summary>
+    public const int CurrentSchemaVersion = 2;
+
+    /// <summary>
+    /// Defaults to 0, NOT to the current version: a default would also apply while deserialising
+    /// an old file that lacks the field, waving exactly the files through that the check exists
+    /// for. The parser stamps the current version on every freshly fetched plan.
+    /// </summary>
+    public int SchemaVersion { get; set; }
+
     public int ChampionId { get; set; }
 
     public string ChampionName { get; set; } = string.Empty;
@@ -65,10 +96,19 @@ public sealed class BuildPlan
     /// <summary>Three-item cores, best first.</summary>
     public List<ItemSet> CoreItems { get; set; } = [];
 
+    /// <summary>Common late-game buys, one item per entry, most played first.</summary>
+    public List<ItemSet> LateItems { get; set; } = [];
+
     public List<ItemSet> SummonerSpells { get; set; } = [];
 
     /// <summary>Dominant skill priority, e.g. <c>Q &gt; E &gt; W</c>.</summary>
     public string SkillPriority { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Which ability to level at each of the first 15 levels, from the most-played order of this
+    /// matchup. OP.GG reports only 15 entries; 16-18 are derived on display and marked as such.
+    /// </summary>
+    public List<string> SkillOrder { get; set; } = [];
 
     public bool IsEmpty => Runes is null && CoreItems.Count == 0 && Starters.Count == 0;
 }
@@ -115,7 +155,11 @@ public sealed class BuildCache(string? directory = null)
                 return null;
 
             using var stream = File.OpenRead(path);
-            return JsonSerializer.Deserialize(stream, BuildPlanJson.Default.BuildPlan);
+            var plan = JsonSerializer.Deserialize(stream, BuildPlanJson.Default.BuildPlan);
+
+            // A file written by an older build lacks fields this one renders; treat it as absent
+            // so the next draft fetches fresh instead of showing half a plan.
+            return plan?.SchemaVersion == BuildPlan.CurrentSchemaVersion ? plan : null;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
@@ -143,6 +187,84 @@ public sealed class BuildCache(string? directory = null)
         {
             // The plan is still on screen; only the shortcut for next time is lost.
         }
+    }
+
+    /// <summary>
+    /// Deletes plans that no longer serve anyone: other patches (the numbers changed) and entries
+    /// past <paramref name="maxAge"/> (the matchup will not repeat with current data). Leftover
+    /// <c>.tmp</c> files from interrupted writes go too. Returns how many files were removed —
+    /// the cache is a working set, not an archive.
+    /// </summary>
+    public int CleanUp(string currentPatch, TimeSpan maxAge)
+    {
+        // An empty patch would make the prefix "-", which matches NO file name — and the sweep
+        // below would then delete the entire cache as "foreign patches".
+        if (string.IsNullOrWhiteSpace(currentPatch) || !Directory.Exists(_directory))
+            return 0;
+
+        var prefix = Sanitize(currentPatch) + "-";
+        var cutoff = DateTime.UtcNow - maxAge;
+        var removed = 0;
+
+        foreach (var file in Directory.EnumerateFiles(_directory))
+        {
+            var name = Path.GetFileName(file);
+
+            // Same one-minute grace SweepTempFiles gives: a .tmp this young is a Save in
+            // progress, and deleting it under the writer made the plan silently never cache.
+            if (name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase))
+            {
+                if (DateTime.UtcNow - File.GetLastWriteTimeUtc(file) < TimeSpan.FromMinutes(1))
+                    continue;
+            }
+            else
+            {
+                var stale = !name.StartsWith(prefix, StringComparison.Ordinal)
+                    || AgeOf(file) < cutoff;
+
+                if (!stale)
+                    continue;
+            }
+
+            try
+            {
+                File.Delete(file);
+                removed++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Locked or protected; the next run tries again.
+            }
+        }
+
+        return removed;
+    }
+
+    /// <summary>
+    /// When the plan's data was fetched: the stamp inside the file when it is readable, the file
+    /// time otherwise. The stamp matters because a copied or restored file looks freshly written
+    /// while its content may be weeks old. A plan from another schema version reports itself as
+    /// ancient — Load refuses such files anyway, so keeping them until maxAge served nobody.
+    /// </summary>
+    private static DateTime AgeOf(string file)
+    {
+        try
+        {
+            using var stream = File.OpenRead(file);
+            var plan = JsonSerializer.Deserialize(stream, BuildPlanJson.Default.BuildPlan);
+
+            if (plan is not null && plan.SchemaVersion != BuildPlan.CurrentSchemaVersion)
+                return DateTime.MinValue;
+
+            if (plan is { FetchedAtUtc.Ticks: > 0 })
+                return plan.FetchedAtUtc.UtcDateTime;
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            // Unreadable: judge by the file time below.
+        }
+
+        return File.GetLastWriteTimeUtc(file);
     }
 
     private static string Sanitize(string patch)

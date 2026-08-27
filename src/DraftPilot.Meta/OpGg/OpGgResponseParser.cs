@@ -107,12 +107,24 @@ public static class OpGgResponseParser
                 _index++;
         }
 
+        /// <summary>Nesting level of the current ReadValue call, bounded below.</summary>
+        private int _depth;
+
+        /// <summary>
+        /// Network input decides the recursion depth here, and a stack overflow is not catchable —
+        /// it kills the process. Far above anything a real answer nests (~6 levels).
+        /// </summary>
+        private const int MaxDepth = 64;
+
         public OpGgNode ReadValue()
         {
             SkipWhitespace();
 
             if (AtEnd)
                 throw new OpGgParseException("Ausdruck endet unerwartet.");
+
+            if (_depth >= MaxDepth)
+                throw new OpGgParseException($"Antwort ist tiefer als {MaxDepth} Ebenen verschachtelt.");
 
             var current = _text[_index];
 
@@ -133,6 +145,9 @@ public static class OpGgResponseParser
 
         private OpGgNode ReadList()
         {
+            _depth++;
+            try
+            {
             Expect('[');
             var items = new List<OpGgNode>();
 
@@ -162,6 +177,11 @@ public static class OpGgResponseParser
                 }
 
                 throw new OpGgParseException($"Liste nicht geschlossen an Position {_index}.");
+            }
+            }
+            finally
+            {
+                _depth--;
             }
         }
 
@@ -195,6 +215,9 @@ public static class OpGgResponseParser
 
         private OpGgNode ReadConstructor(string typeName)
         {
+            _depth++;
+            try
+            {
             Expect('(');
 
             var arguments = new List<OpGgNode>();
@@ -241,6 +264,11 @@ public static class OpGgResponseParser
             }
 
             return OpGgNode.Object(typeName, mapped);
+            }
+            finally
+            {
+                _depth--;
+            }
         }
 
         private string ReadQuoted(char quote)

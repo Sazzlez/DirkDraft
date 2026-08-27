@@ -2,7 +2,8 @@ namespace DraftPilot.Core.Lcu;
 
 /// <summary>
 /// Champion select sessions straight from the running client: the lockfile tells us where it is,
-/// the event socket pushes every change, and a single HTTP read seeds the current state on connect.
+/// the event socket pushes every change, and an HTTP read seeds the current state whenever the
+/// socket (re)connects.
 /// </summary>
 public sealed class LiveSessionSource : ISessionSource
 {
@@ -36,10 +37,23 @@ public sealed class LiveSessionSource : ISessionSource
     private readonly LockfileWatcher _watcher;
     private readonly Action<string>? _diagnostic;
 
+    /// <summary>Serialises restart and teardown; without it two Connected events in quick
+    /// succession leaked a still-running socket that kept delivering every event twice.</summary>
+    private readonly SemaphoreSlim _clientGate = new(1, 1);
+    private int _generation;
+    private int _started;
+
     private CancellationTokenSource? _clientScope;
     private LcuClient? _client;
     private LcuEventSocket? _socket;
-    private bool _sessionOpen;
+
+    private volatile bool _sessionOpen;
+
+    // Once the socket has delivered a session or phase itself, the HTTP seed for that resource is
+    // stale by definition and gets discarded — the seed races the subscription, and a seed
+    // response landing AFTER a socket event used to roll the panel back to an older draft state.
+    private volatile bool _socketDeliveredSession;
+    private volatile bool _socketDeliveredPhase;
 
     /// <param name="diagnostic">
     /// Optional sink for connection notes, e.g. why a session was closed. The command-line tools
@@ -55,6 +69,11 @@ public sealed class LiveSessionSource : ISessionSource
 
     public event Action<ClientStatus>? StatusChanged;
 
+    public event Action<string>? GameflowPhase;
+
+    /// <summary>Raised whenever <see cref="Client"/> changes — connect, reconnect or teardown.</summary>
+    public event Action? ClientChanged;
+
     /// <summary>The HTTP client for the running instance, or null while the client is down.</summary>
     public LcuClient? Client => _client;
 
@@ -63,15 +82,36 @@ public sealed class LiveSessionSource : ISessionSource
         if (_watcher.LockfilePath is null)
         {
             StatusChanged?.Invoke(ClientStatus.NotFound);
-            await Task.Delay(Timeout.InfiniteTimeSpan, ct).ConfigureAwait(false);
+
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Normal shutdown; a caller awaiting RunAsync must not see a fault.
+            }
+
             return;
         }
+
+        // A second RunAsync would double-subscribe the watcher and from then on run two restarts
+        // per Connected event.
+        if (Interlocked.Exchange(ref _started, 1) == 1)
+            throw new InvalidOperationException("RunAsync läuft bereits.");
 
         _watcher.Connected += OnClientUp;
         _watcher.Disconnected += OnClientDown;
 
         StatusChanged?.Invoke(ClientStatus.Offline);
-        await _watcher.StartAsync(ct).ConfigureAwait(false);
+
+        if (!await _watcher.StartAsync(ct).ConfigureAwait(false))
+        {
+            // A lockfile path was resolved but its directory is gone (moved install, unmounted
+            // drive): nothing will ever be observed, and pretending to be merely offline would
+            // have the user waiting forever.
+            StatusChanged?.Invoke(ClientStatus.NotFound);
+        }
 
         try
         {
@@ -89,37 +129,116 @@ public sealed class LiveSessionSource : ISessionSource
 
     private void OnClientUp(LcuCredentials credentials)
     {
-        _ = RestartAsync(credentials);
+        _ = Observed(RestartAsync(credentials), "Neuverbindung");
     }
 
     private void OnClientDown()
     {
-        _ = TearDownClientAsync();
+        _ = Observed(TearDownClientAsync(), "Trennung");
         EndSession("Client nicht mehr erreichbar");
         StatusChanged?.Invoke(ClientStatus.Offline);
     }
 
-    private async Task RestartAsync(LcuCredentials credentials)
+    /// <summary>Fire-and-forget tasks still get their failures written somewhere. Without this a
+    /// broken connection attempt was simply invisible: the tool looked offline for no reason.</summary>
+    private async Task Observed(Task task, string what)
     {
-        await TearDownClientAsync().ConfigureAwait(false);
-
-        var scope = new CancellationTokenSource();
-        _clientScope = scope;
-        _client = new LcuClient(credentials);
-
-        var socket = new LcuEventSocket(credentials);
-        socket.EventReceived += OnLcuEvent;
-        socket.ConnectionChanged += OnSocketConnectionChanged;
-        _socket = socket;
-
-        // Fire and forget: the socket reconnects on its own until the scope is cancelled.
-        _ = socket.RunAsync(scope.Token);
-
-        // Seed the current state; the user may start the tool while already in champion select.
         try
         {
-            var raw = await _client.GetChampSelectSessionRawAsync(scope.Token).ConfigureAwait(false);
-            if (raw is not null)
+            await task.ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _diagnostic?.Invoke($"{what} fehlgeschlagen: {ex.Message}");
+        }
+    }
+
+    private async Task RestartAsync(LcuCredentials credentials)
+    {
+        var generation = Interlocked.Increment(ref _generation);
+
+        await _clientGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            // A newer restart is already queued behind us; building a connection it would
+            // immediately tear down again is pure churn.
+            if (generation != Volatile.Read(ref _generation))
+                return;
+
+            await TearDownCurrentAsync().ConfigureAwait(false);
+
+            var scope = new CancellationTokenSource();
+            var client = new LcuClient(credentials) { Diagnostic = _diagnostic };
+
+            var socket = new LcuEventSocket(credentials);
+            socket.EventReceived += OnLcuEvent;
+            socket.ConnectionChanged += OnSocketConnectionChanged;
+
+            _clientScope = scope;
+            _client = client;
+            _socket = socket;
+            ClientChanged?.Invoke();
+
+            // Fire and forget: the socket reconnects on its own until the scope is cancelled.
+            // The main seed happens in OnSocketConnectionChanged, AFTER the subscription is
+            // live — a seed taken before it raced the first events and could overwrite newer
+            // state. The extra seed below is the safety net for a socket that NEVER connects
+            // (firewall, subprotocol change): without it there would be no state at all. The
+            // _socketDelivered* flags keep it from overwriting anything newer.
+            _ = Observed(socket.RunAsync(scope.Token), "Event-Socket");
+            _ = Observed(SeedAsync(client, scope.Token), "Erst-Abgleich");
+        }
+        finally
+        {
+            _clientGate.Release();
+        }
+    }
+
+    private void OnSocketConnectionChanged(bool connected)
+    {
+        StatusChanged?.Invoke(new ClientStatus(
+            LeagueFound: true,
+            ClientRunning: true,
+            SocketConnected: connected,
+            Detail: connected ? null : "Verbindung zum Client unterbrochen"));
+
+        if (!connected)
+        {
+            // The next connect must seed afresh: whatever the socket delivered belongs to the
+            // link that just died.
+            _socketDeliveredSession = false;
+            _socketDeliveredPhase = false;
+            EndSession("Event-Socket getrennt");
+            return;
+        }
+
+        // Every (re)connect seeds the current state over HTTP. This is what repaints the panel
+        // after a socket drop during finalization, where no further session events would come.
+        if (_client is { } client && _clientScope is { } scope)
+            _ = Observed(SeedAsync(client, scope.Token), "Status-Abgleich");
+    }
+
+    private async Task SeedAsync(LcuClient client, CancellationToken ct)
+    {
+        try
+        {
+            // Phase first: started mid-game, the build view should come up right away — and a
+            // phase outside champion select makes reading the session pointless.
+            var phase = await client.GetGameflowPhaseAsync(ct).ConfigureAwait(false);
+
+            if (phase is { Length: > 0 } && !_socketDeliveredPhase)
+                HandlePhase(phase);
+
+            var outside = phase is { Length: > 0 }
+                && PhasesOutsideChampSelect.Contains(phase, StringComparer.OrdinalIgnoreCase);
+
+            if (outside)
+                return;
+
+            var raw = await client.GetChampSelectSessionRawAsync(ct).ConfigureAwait(false);
+
+            // Discarded when the socket has spoken in the meantime: its event is newer.
+            if (raw is not null && !_socketDeliveredSession && !ct.IsCancellationRequested)
             {
                 _sessionOpen = true;
                 SessionJson?.Invoke(raw);
@@ -131,23 +250,12 @@ public sealed class LiveSessionSource : ISessionSource
         }
     }
 
-    private void OnSocketConnectionChanged(bool connected)
-    {
-
-        StatusChanged?.Invoke(new ClientStatus(
-            LeagueFound: true,
-            ClientRunning: true,
-            SocketConnected: connected,
-            Detail: connected ? null : "Verbindung zum Client unterbrochen"));
-
-        if (!connected)
-            EndSession("Event-Socket getrennt");
-    }
-
     private void OnLcuEvent(LcuEvent lcuEvent)
     {
         if (lcuEvent.Uri.Equals(SessionUri, StringComparison.OrdinalIgnoreCase))
         {
+            _socketDeliveredSession = true;
+
             if (lcuEvent.EventType.Equals("Delete", StringComparison.OrdinalIgnoreCase) || lcuEvent.Data is null)
             {
                 EndSession("Session-Ressource gelöscht");
@@ -166,7 +274,19 @@ public sealed class LiveSessionSource : ISessionSource
         // moves first, so use it to close the panel promptly.
         var phase = lcuEvent.Data?.Trim('"');
 
-        if (phase is { Length: > 0 } && PhasesOutsideChampSelect.Contains(phase, StringComparer.OrdinalIgnoreCase))
+        if (phase is not { Length: > 0 })
+            return;
+
+        _socketDeliveredPhase = true;
+        HandlePhase(phase);
+    }
+
+    private void HandlePhase(string phase)
+    {
+        // Forwarded as-is: the in-game build view opens on GameStart/InProgress and closes after.
+        GameflowPhase?.Invoke(phase);
+
+        if (PhasesOutsideChampSelect.Contains(phase, StringComparer.OrdinalIgnoreCase))
             EndSession($"Gameflow-Phase {phase}");
     }
 
@@ -183,6 +303,20 @@ public sealed class LiveSessionSource : ISessionSource
 
     private async Task TearDownClientAsync()
     {
+        await _clientGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await TearDownCurrentAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _clientGate.Release();
+        }
+    }
+
+    /// <summary>Must be called with <see cref="_clientGate"/> held.</summary>
+    private async Task TearDownCurrentAsync()
+    {
         var scope = _clientScope;
         var socket = _socket;
         var client = _client;
@@ -190,7 +324,22 @@ public sealed class LiveSessionSource : ISessionSource
         _clientScope = null;
         _socket = null;
         _client = null;
+        _socketDeliveredSession = false;
+        _socketDeliveredPhase = false;
 
+        if (scope is null && socket is null && client is null)
+            return;
+
+        ClientChanged?.Invoke();
+
+        // Unsubscribe FIRST: the cancel below wakes the socket loop on a pool thread, and its
+        // dying breath (a drop notification, an EndSession) must not land in our handlers after
+        // a reconnect has already seeded fresh state.
+        if (socket is not null)
+        {
+            socket.EventReceived -= OnLcuEvent;
+            socket.ConnectionChanged -= OnSocketConnectionChanged;
+        }
 
         if (scope is not null)
         {
@@ -199,11 +348,7 @@ public sealed class LiveSessionSource : ISessionSource
         }
 
         if (socket is not null)
-        {
-            socket.EventReceived -= OnLcuEvent;
-            socket.ConnectionChanged -= OnSocketConnectionChanged;
             await socket.DisposeAsync().ConfigureAwait(false);
-        }
 
         client?.Dispose();
     }

@@ -145,12 +145,6 @@
         <Setter Property="FontSize" Value="14" />
     </Style>
 
-    <!-- One segment of the preset switch. Selection is driven by a DataTrigger in the window. -->
-    <Style x:Key="Segment" TargetType="Button" BasedOn="{StaticResource Ghost}">
-        <Setter Property="Padding" Value="0,7" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="FontSize" Value="13" />
-    </Style>
 
     <!-- A whole row that behaves like a button, for picking a team slot. -->
     <Style x:Key="RowButton" TargetType="Button">
@@ -262,7 +256,7 @@
                             </ToggleButton.Template>
                         </ToggleButton>
 
-                        <Popup x:Name="Popup"
+                        <Popup x:Name="PART_Popup"
                                Placement="Bottom"
                                VerticalOffset="4"
                                AllowsTransparency="True"
@@ -389,6 +383,5 @@
     </Style>
 
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
-    <app:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
 
 </ResourceDictionary>

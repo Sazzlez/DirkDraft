@@ -57,7 +57,7 @@ public static class StartupReport
         var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unbekannt";
 
         var text = new StringBuilder()
-            .AppendLine($"DraftPilot {version} — {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}")
+            .AppendLine($"DirkDraft {version} — {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}")
             .AppendLine($"Programmordner   {AppContext.BaseDirectory}")
             .AppendLine($"AppData-Sicht    {DescribeAppDataView()}")
             .AppendLine()

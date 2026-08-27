@@ -85,8 +85,13 @@ public sealed class MetaLookup
 
     public IReadOnlyList<ChampionEntry> Champions => _champions;
 
-    /// <summary>An empty lookup, so the app runs before the first data update.</summary>
-    public static MetaLookup Empty { get; } = new(new MetaSnapshot());
+    /// <summary>
+    /// An empty lookup, so the app runs before the first data update. Deliberately a fresh
+    /// instance per read: the type carries mutable live-matchup state, and a shared singleton
+    /// mutated by one caller would corrupt the fallback for all of them. (Live matchups can't
+    /// land on an empty lookup anyway — no champion resolves — but cheap beats subtle.)
+    /// </summary>
+    public static MetaLookup Empty => new(new MetaSnapshot());
 
     public bool IsEmpty => _champions.Length == 0;
 
@@ -108,16 +113,19 @@ public sealed class MetaLookup
     }
 
     /// <summary>
-    /// P(lane | champion), normalised so the five lanes sum to one. Falls back to a flat
-    /// distribution for champions the snapshot never saw, so the predictor stays well defined.
+    /// P(lane | champion), normalised so the five lanes sum to one. Champions the snapshot never
+    /// saw fall back to a flat distribution; a KNOWN champion without lane stats returns 0 for
+    /// every lane and survives only through the predictor's off-meta floor.
     /// </summary>
     public double RolePrior(int championId, Lane lane)
     {
         if (lane == Lane.Unknown || !_indexById.TryGetValue(championId, out var index))
             return 1.0 / Lanes.Count;
 
+        // Sanitizer, not decoration: one NaN role rate in a snapshot would ride through the
+        // predictor's normalisation and turn EVERY seat's prediction into Unknown.
         var prior = _rolePriors[((int)lane * _champions.Length) + index];
-        return prior > 0 ? prior : 0;
+        return double.IsFinite(prior) && prior > 0 ? prior : 0;
     }
 
     /// <summary>True when the snapshot knows which lanes this champion actually plays.</summary>
@@ -264,7 +272,13 @@ public sealed class MetaLookup
             if (!_indexById.TryGetValue(stat.ChampionId, out var a) || !_indexById.TryGetValue(stat.OpponentId, out var b))
                 continue;
 
-            map[MatchupKey(stat.Lane, a, b)] = new MatchupView(
+            // On duplicates the larger sample wins — same rule as the synergy and live-matchup
+            // builders. "Last wins" let a 12-game duplicate replace a 3000-game record.
+            var key = MatchupKey(stat.Lane, a, b);
+            if (map.TryGetValue(key, out var existing) && existing.Play >= stat.Play)
+                continue;
+
+            map[key] = new MatchupView(
                 WinRate: Shrinkage.Apply(stat.WinRate, stat.Play, Shrinkage.MatchupPrior),
                 Play: stat.Play,
                 Confidence: Shrinkage.Confidence(stat.Play, Shrinkage.MatchupPrior),

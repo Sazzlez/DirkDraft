@@ -23,12 +23,19 @@ public sealed class OpGgMcpClient : IDisposable
     private const string ProtocolVersion = "2025-06-18";
 
     private readonly HttpClient _http;
+    private readonly bool _ownsHttp;
     private readonly SemaphoreSlim _handshakeGate = new(1, 1);
+
+    // Not volatile: written under the handshake gate or via Interlocked; readers only ever use
+    // it as an advisory value that the server double-checks anyway.
     private string? _sessionId;
-    private int _nextId = 1;
+    private volatile bool _initialized;
+    private int _nextId;
+    private int _callCount;
 
     public OpGgMcpClient(HttpClient? http = null)
     {
+        _ownsHttp = http is null;
         _http = http ?? new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         _http.DefaultRequestHeaders.Accept.Clear();
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -37,7 +44,7 @@ public sealed class OpGgMcpClient : IDisposable
     }
 
     /// <summary>How many calls have been sent; surfaced in the update progress display.</summary>
-    public int CallCount { get; private set; }
+    public int CallCount => Volatile.Read(ref _callCount);
 
     /// <summary>Calls a tool and returns its parsed payload.</summary>
     public async Task<OpGgNode> CallToolAsync(string tool, JsonObject arguments, CancellationToken ct)
@@ -74,13 +81,13 @@ public sealed class OpGgMcpClient : IDisposable
 
     private async Task EnsureSessionAsync(CancellationToken ct)
     {
-        if (_sessionId is not null)
+        if (_initialized)
             return;
 
         await _handshakeGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (_sessionId is not null)
+            if (_initialized)
                 return;
 
             var initialize = new JsonObject
@@ -93,14 +100,21 @@ public sealed class OpGgMcpClient : IDisposable
             using var response = await PostAsync("initialize", initialize, isNotification: false, ct).ConfigureAwait(false);
             EnsureSuccess(response);
 
-            if (response.Headers.TryGetValues("Mcp-Session-Id", out var values))
-                _sessionId = values.FirstOrDefault();
-
             var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            ReadResult(body);
+            ReadResult(body, WasEventStream(response));
 
-            // The server expects the initialized notification before it accepts tool calls.
-            using var ack = await PostAsync("notifications/initialized", null, isNotification: true, ct).ConfigureAwait(false);
+            // Only a COMPLETE handshake counts. Setting the session id before ReadResult could
+            // throw left the client believing it was initialised while the server never got the
+            // initialized notification — after which every tools/call failed for good.
+            var sessionId = response.Headers.TryGetValues("Mcp-Session-Id", out var values)
+                ? values.FirstOrDefault()
+                : null;
+
+            using var ack = await PostAsyncWithSession("notifications/initialized", null, isNotification: true, sessionId, ct).ConfigureAwait(false);
+            EnsureSuccess(ack);
+
+            _sessionId = sessionId;
+            _initialized = true;
         }
         finally
         {
@@ -112,10 +126,14 @@ public sealed class OpGgMcpClient : IDisposable
     {
         // Retries cover the endpoint throttling a long update run, not application errors.
         var delay = TimeSpan.FromMilliseconds(400);
+        var sessionRetried = false;
 
         for (var attempt = 0; ; attempt++)
         {
-            using var response = await PostAsync(method, parameters, isNotification: false, ct).ConfigureAwait(false);
+            // Captured per attempt: with up to three calls in flight, the invalidation below must
+            // be able to tell "MY session died" from "somebody already replaced it".
+            var usedSession = _sessionId;
+            using var response = await PostAsyncWithSession(method, parameters, isNotification: false, usedSession, ct).ConfigureAwait(false);
 
             if (IsTransient(response.StatusCode) && attempt < 3)
             {
@@ -124,36 +142,68 @@ public sealed class OpGgMcpClient : IDisposable
                 continue;
             }
 
+            // A session can expire mid-run; the server answers 404/400 then. One fresh handshake
+            // rescues the remaining calls instead of failing all of them. Invalidate only when
+            // OUR session is still the current one — a parallel call's stale 404 arriving after
+            // the re-handshake must not tear down the freshly created session.
+            if (!sessionRetried
+                && _initialized
+                && response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.BadRequest)
+            {
+                sessionRetried = true;
+
+                if (usedSession is not null
+                    && Interlocked.CompareExchange(ref _sessionId, null, usedSession) == usedSession)
+                {
+                    _initialized = false;
+                }
+
+                await EnsureSessionAsync(ct).ConfigureAwait(false);
+                continue;
+            }
+
             EnsureSuccess(response);
 
             var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            return ReadResult(body);
+            return ReadResult(body, WasEventStream(response));
         }
     }
 
     private Task<HttpResponseMessage> PostAsync(string method, JsonObject? parameters, bool isNotification, CancellationToken ct)
+        => PostAsyncWithSession(method, parameters, isNotification, _sessionId, ct);
+
+    private async Task<HttpResponseMessage> PostAsyncWithSession(
+        string method, JsonObject? parameters, bool isNotification, string? sessionId, CancellationToken ct)
     {
         var envelope = new JsonObject { ["jsonrpc"] = "2.0", ["method"] = method };
 
         if (!isNotification)
-            envelope["id"] = _nextId++;
+        {
+            // Interlocked: the snapshot builder runs up to three calls in parallel, and duplicate
+            // JSON-RPC ids let a server pair answers with the wrong request.
+            envelope["id"] = Interlocked.Increment(ref _nextId);
+        }
 
         if (parameters is not null)
             envelope["params"] = parameters;
 
-        var request = new HttpRequestMessage(HttpMethod.Post, Endpoint)
+        using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint)
         {
             Content = new StringContent(envelope.ToJsonString(), Encoding.UTF8, "application/json"),
         };
 
-        if (_sessionId is not null)
-            request.Headers.TryAddWithoutValidation("Mcp-Session-Id", _sessionId);
+        if (sessionId is not null)
+            request.Headers.TryAddWithoutValidation("Mcp-Session-Id", sessionId);
 
         if (!isNotification)
-            CallCount++;
+            Interlocked.Increment(ref _callCount);
 
-        return _http.SendAsync(request, ct);
+        return await _http.SendAsync(request, ct).ConfigureAwait(false);
     }
+
+    /// <summary>SSE detection by the header, not by sniffing the body's first bytes.</summary>
+    private static bool WasEventStream(HttpResponseMessage response)
+        => string.Equals(response.Content.Headers.ContentType?.MediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsTransient(HttpStatusCode status)
         => status is HttpStatusCode.TooManyRequests
@@ -173,9 +223,9 @@ public sealed class OpGgMcpClient : IDisposable
     /// Reads the JSON-RPC result out of either a plain JSON body or a server-sent-event stream.
     /// The endpoint currently answers with JSON, but it advertises both.
     /// </summary>
-    private static JsonNode ReadResult(string body)
+    private static JsonNode ReadResult(string body, bool isEventStream)
     {
-        var json = LooksLikeEventStream(body) ? ExtractEventStreamPayload(body) : body;
+        var json = isEventStream || LooksLikeEventStream(body) ? ExtractEventStreamPayload(body) : body;
 
         var node = JsonNode.Parse(json)
             ?? throw new OpGgApiException("Antwort war kein JSON.");
@@ -229,7 +279,11 @@ public sealed class OpGgMcpClient : IDisposable
 
     public void Dispose()
     {
-        _http.Dispose();
+        // Only what we created: disposing an injected HttpClient would break its other users
+        // (the snapshot builder shares one with the asset downloaders).
+        if (_ownsHttp)
+            _http.Dispose();
+
         _handshakeGate.Dispose();
     }
 }

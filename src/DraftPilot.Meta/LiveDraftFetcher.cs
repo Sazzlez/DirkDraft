@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using DraftPilot.Core.Data;
@@ -28,6 +29,7 @@ public static class MatchupGuideParser
 
         var plan = new BuildPlan
         {
+            SchemaVersion = BuildPlan.CurrentSchemaVersion,
             ChampionId = championId,
             ChampionName = championName,
             OpponentId = opponentId,
@@ -44,8 +46,10 @@ public static class MatchupGuideParser
         plan.Starters = ItemSets(data, "starter_items", take: 2);
         plan.Boots = ItemSets(data, "boots", take: 2);
         plan.CoreItems = ItemSets(data, "core_items", take: 3);
+        plan.LateItems = ItemSets(data, "last_items", take: 3);
         plan.SummonerSpells = ItemSets(data, "summoner_spells", take: 2);
         plan.SkillPriority = SkillPriority(data);
+        plan.SkillOrder = SkillOrder(data);
 
         return plan;
     }
@@ -92,7 +96,13 @@ public static class MatchupGuideParser
             }
         }
 
-        if (bestBuild is not { } runes)
+        // No usable build inside the page? Fall back to the page element itself — some responses
+        // carry the rune ids at page level, and "no build breakdown" must not read as "no runes",
+        // which silently disabled the import button. But only when the page actually HAS ids:
+        // an empty-but-not-null page would make the plan look valid, get cached, and never be
+        // fetched again.
+        var runes = bestBuild ?? chosen;
+        if (bestBuild is null && Ints(chosen, "primary_rune_ids").Count() < 4)
             return null;
 
         var wins = IntOf(chosen, "win");
@@ -100,10 +110,15 @@ public static class MatchupGuideParser
         return new RunePage
         {
             PrimaryPath = TextOf(runes, "primary_page_name"),
+            PrimaryPathId = IntOf(runes, "primary_page_id"),
             PrimaryRunes = Names(runes, "primary_rune_names"),
+            PrimaryRuneIds = [.. Ints(runes, "primary_rune_ids")],
             SecondaryPath = TextOf(runes, "secondary_page_name"),
+            SecondaryPathId = IntOf(runes, "secondary_page_id"),
             SecondaryRunes = Names(runes, "secondary_rune_names"),
+            SecondaryRuneIds = [.. Ints(runes, "secondary_rune_ids")],
             Shards = [.. Ints(runes, "stat_mod_ids").Select(StatShards.NameOf)],
+            ShardIds = [.. Ints(runes, "stat_mod_ids")],
             Play = bestPlay,
             WinRate = bestPlay > 0 ? (double)wins / bestPlay : 0,
         };
@@ -125,10 +140,20 @@ public static class MatchupGuideParser
             result.Add(new ItemSet
             {
                 Items = Names(entry, "ids_names"),
+                ItemIds = [.. Ints(entry, "ids")],
                 Play = play,
                 WinRate = (double)IntOf(entry, "win") / play,
                 PickRate = NumberOf(entry, "pick_rate"),
             });
+        }
+
+        // Plausibility net: whether the endpoint quotes rates as 0..1 or 0..100 is not documented
+        // anywhere. Decided per LIST, not per entry — a per-entry division would rescale 47 → 0.47
+        // but leave a sibling 0.8 (0.8 %) as 80 %, mixing scales within the same list.
+        if (result.Count > 0 && result.Max(set => set.PickRate) > 1)
+        {
+            foreach (var set in result)
+                set.PickRate /= 100;
         }
 
         return [.. result.OrderByDescending(set => set.Play).Take(take)];
@@ -156,6 +181,32 @@ public static class MatchupGuideParser
         return best is { } chosen ? string.Join(" > ", Names(chosen, "ids")) : string.Empty;
     }
 
+    /// <summary>
+    /// The most played level-by-level skill order, 15 entries. Taken from <c>skills</c> rather
+    /// than the nested masteries builds because its top entry is the same list with the larger
+    /// aggregation.
+    /// </summary>
+    private static List<string> SkillOrder(JsonElement data)
+    {
+        if (!data.TryGetProperty("skills", out var skills) || skills.ValueKind != JsonValueKind.Array)
+            return [];
+
+        JsonElement? best = null;
+        var bestPlay = 0;
+
+        foreach (var entry in skills.EnumerateArray())
+        {
+            var play = IntOf(entry, "play");
+            if (play > bestPlay)
+            {
+                bestPlay = play;
+                best = entry;
+            }
+        }
+
+        return best is { } chosen ? Names(chosen, "order") : [];
+    }
+
     private static List<string> Names(JsonElement element, string property)
     {
         var names = new List<string>();
@@ -181,18 +232,41 @@ public static class MatchupGuideParser
 
         foreach (var item in array.EnumerateArray())
         {
-            if (item.ValueKind == JsonValueKind.Number && item.TryGetInt32(out var value))
+            if (AsInt(item) is { } value)
                 yield return value;
         }
     }
 
     private static int IntOf(JsonElement element, string property)
-        => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number
-            && value.TryGetInt32(out var result) ? result : 0;
+        => element.TryGetProperty(property, out var value) ? AsInt(value) ?? 0 : 0;
 
     private static double NumberOf(JsonElement element, string property)
-        => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number
-            ? value.GetDouble() : 0;
+    {
+        if (!element.TryGetProperty(property, out var value))
+            return 0;
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.Number => value.GetDouble(),
+            JsonValueKind.String when double.TryParse(
+                value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) => parsed,
+            _ => 0,
+        };
+    }
+
+    /// <summary>
+    /// Numbers, also when quoted — the LCU models tolerate <c>"play":"1234"</c> via
+    /// AllowReadingFromString, and this parser has to match. Rejecting the quoted form turned
+    /// every play count to 0, which discarded all item sets and produced an empty build that was
+    /// still marked "fetched". Invariant culture: never the German comma.
+    /// </summary>
+    private static int? AsInt(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Number when value.TryGetInt32(out var number) => number,
+        JsonValueKind.String when int.TryParse(
+            value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) => parsed,
+        _ => null,
+    };
 
     private static string TextOf(JsonElement element, string property)
         => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
@@ -201,11 +275,10 @@ public static class MatchupGuideParser
 
 /// <summary>
 /// On-demand fetches for the draft on screen: the matchup guide for the locked pick, and fresh
-/// counter lists for the enemies actually being faced. Only ever constructed from the explicit
-/// draft button — the data-sovereignty rule (network only on click) applies here exactly as it
-/// does to the big update.
+/// counter lists for the enemies actually being faced. Runs automatically as picks are revealed —
+/// at most one call per enemy champion and one per matchup for the whole draft, cached on disk.
 /// </summary>
-public sealed class LiveDraftFetcher(OpGgMcpClient client, string gameMode)
+public sealed class LiveDraftFetcher(OpGgMcpClient client, string gameMode, Action<string>? diagnostic = null)
 {
     /// <summary>Build, runes and spells for one concrete matchup, or null if OP.GG has nothing.</summary>
     public async Task<BuildPlan?> FetchBuildAsync(
@@ -237,8 +310,11 @@ public sealed class LiveDraftFetcher(OpGgMcpClient client, string gameMode)
                 {
                     // Wrong spelling or no data for this pairing; try the next combination.
                 }
-                catch (JsonException)
+                catch (JsonException ex)
                 {
+                    // The endpoint answered in a shape we do not understand. Silently returning
+                    // null made "kein Build" indistinguishable from a broken parser.
+                    diagnostic?.Invoke($"Guide-Antwort unlesbar für {myName} vs {opponentName}: {ex.Message}");
                     return null;
                 }
             }
@@ -274,6 +350,9 @@ public sealed class LiveDraftFetcher(OpGgMcpClient client, string gameMode)
                     "data.summary.positions[].counters[].champion_name",
                     "data.summary.positions[].counters[].play",
                     "data.summary.positions[].counters[].win",
+                    "data.weak_counters[].champion_name",
+                    "data.weak_counters[].play",
+                    "data.weak_counters[].my_win_rate",
                     "data.strong_counters[].champion_name",
                     "data.strong_counters[].play",
                     "data.strong_counters[].my_win_rate"),
@@ -326,20 +405,25 @@ public sealed class LiveDraftFetcher(OpGgMcpClient client, string gameMode)
             }
         }
 
-        foreach (var counter in data["strong_counters"].Items)
+        // Both top-level lists, exactly like the snapshot updater: only strong_counters taught the
+        // overlay where the enemy is STRONG — the half a counterpick cannot use.
+        foreach (var listName in new[] { "weak_counters", "strong_counters" })
         {
-            var play = counter["play"].AsInt();
-            if (play <= 0 || resolver.Resolve(counter["champion_name"].AsText()) is not { } counterId || counterId == enemyId)
-                continue;
-
-            stats.Add(new MatchupStat
+            foreach (var counter in data[listName].Items)
             {
-                ChampionId = enemyId,
-                OpponentId = counterId,
-                Lane = requested,
-                WinRate = counter["my_win_rate"].AsNumber(),
-                Play = play,
-            });
+                var play = counter["play"].AsInt();
+                if (play <= 0 || resolver.Resolve(counter["champion_name"].AsText()) is not { } counterId || counterId == enemyId)
+                    continue;
+
+                stats.Add(new MatchupStat
+                {
+                    ChampionId = enemyId,
+                    OpponentId = counterId,
+                    Lane = requested,
+                    WinRate = counter["my_win_rate"].AsNumber(),
+                    Play = play,
+                });
+            }
         }
 
         return stats;

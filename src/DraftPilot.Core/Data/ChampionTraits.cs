@@ -98,7 +98,7 @@ public sealed class TraitTable
 
             return new TraitTable(table);
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or JsonException or FormatException or InvalidOperationException or UnauthorizedAccessException)
         {
             return Empty;
         }
@@ -114,8 +114,12 @@ public sealed class TraitTable
     }
 
     private static int ReadInt(JsonElement element, string name)
-        => element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number
-            ? Math.Clamp(value.GetInt32(), 0, 3)
+        // TryGetInt32, not GetInt32: "2.5" in a hand-edited file must degrade to 0, not throw a
+        // FormatException out of the view-model's field initialiser and with it startup.
+        => element.TryGetProperty(name, out var value)
+            && value.ValueKind == JsonValueKind.Number
+            && value.TryGetInt32(out var raw)
+            ? Math.Clamp(raw, 0, 3)
             : 0;
 
     private static ScalingCurve ReadScaling(JsonElement element)

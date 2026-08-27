@@ -17,13 +17,21 @@ public enum ReasonTone
 /// One reason chip. Carries its tone explicitly because the code that writes the text is the only
 /// place that reliably knows the sign; parsing it back out of German prose would be guesswork.
 /// </summary>
-public sealed record Reason(string Text, ReasonTone Tone)
+/// <param name="Text">
+/// What fits on a chip. Written so it stands on its own: a chip that needs the tooltip to make any
+/// sense at all is a chip nobody can use mid-draft.
+/// </param>
+/// <param name="Hint">
+/// The full story behind the chip — where the number comes from, how solid it is, what the term
+/// means. Shown on hover, so the short text can stay short without becoming cryptic.
+/// </param>
+public sealed record Reason(string Text, ReasonTone Tone, string? Hint = null)
 {
-    public static Reason Pro(string text) => new(text, ReasonTone.Pro);
+    public static Reason Pro(string text, string? hint = null) => new(text, ReasonTone.Pro, hint);
 
-    public static Reason Contra(string text) => new(text, ReasonTone.Contra);
+    public static Reason Contra(string text, string? hint = null) => new(text, ReasonTone.Contra, hint);
 
-    public static Reason Neutral(string text) => new(text, ReasonTone.Neutral);
+    public static Reason Neutral(string text, string? hint = null) => new(text, ReasonTone.Neutral, hint);
 
     public override string ToString() => Text;
 }

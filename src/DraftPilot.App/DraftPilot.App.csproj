@@ -6,7 +6,8 @@
     <UseWPF>true</UseWPF>
     <!-- Only for the notification-area icon; WPF has no equivalent. -->
     <UseWindowsForms>true</UseWindowsForms>
-    <AssemblyName>DraftPilot</AssemblyName>
+    <!-- The product's outward name; internal namespaces keep the original working title. -->
+    <AssemblyName>DirkDraft</AssemblyName>
     <RootNamespace>DraftPilot.App</RootNamespace>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
 

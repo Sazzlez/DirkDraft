@@ -1,9 +1,10 @@
+using System.Globalization;
 using DraftPilot.Core.Draft;
 using DraftPilot.Core.Lcu;
 using DraftPilot.Tools;
 
-// Deliberately no command-line library: three verbs do not justify the dependency.
-if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
+// Deliberately no command-line library: a handful of verbs does not justify the dependency.
+if (args.Length == 0 || args[0].ToLowerInvariant() is "-h" or "--help" or "help")
 {
     PrintUsage();
     return 0;
@@ -13,63 +14,94 @@ using var lifetime = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
 {
     e.Cancel = true;
-    lifetime.Cancel();
+
+    try
+    {
+        lifetime.Cancel();
+    }
+    catch (ObjectDisposedException)
+    {
+        // A second Ctrl+C after the command already returned; nothing left to cancel.
+    }
 };
 
-switch (args[0].ToLowerInvariant())
+// One top-level net for every verb: an unwritable record target, a torn recording, a Ctrl+C in
+// the lockfile wait — none of them deserves a raw stack trace in the user's face.
+try
 {
-    case "watch":
-        return await RunWatchAsync(recordTo: null, lifetime.Token);
+    switch (args[0].ToLowerInvariant())
+    {
+        case "watch":
+            return await RunWatchAsync(recordTo: null, lifetime.Token);
 
-    case "record":
-        if (args.Length < 2)
-        {
-            Console.Error.WriteLine("record braucht einen Zieldateinamen.");
+        case "record":
+            if (args.Length < 2)
+            {
+                Console.Error.WriteLine("record braucht einen Zieldateinamen.");
+                return 2;
+            }
+
+            return await RunWatchAsync(recordTo: args[1], lifetime.Token);
+
+        case "replay":
+            if (args.Length < 2)
+            {
+                Console.Error.WriteLine("replay braucht eine Aufzeichnungsdatei.");
+                return 2;
+            }
+
+            return await RunReplayAsync(args[1], args.Length > 2 ? args[2] : "1", lifetime.Token);
+
+        case "update":
+            return await SnapshotCommand.RunAsync(lifetime.Token);
+
+        case "scrub":
+            if (args.Length < 2)
+            {
+                Console.Error.WriteLine("scrub braucht eine Aufzeichnungsdatei.");
+                return 2;
+            }
+
+            return ScrubCommand.Run(args[1], args.Length > 2 ? args[2] : null);
+
+        case "events":
+            return await EventsCommand.RunAsync(lifetime.Token);
+
+        case "probe":
+            return await ProbeCommand.RunAsync(lifetime.Token);
+
+        case "icons":
+            return await SnapshotCommand.DownloadIconsAsync(lifetime.Token);
+
+        case "inspect":
+            return SnapshotCommand.Inspect();
+
+        case "recommend":
+            return RecommendCommand.Run(args);
+
+        case "runes":
+            return await RunesCommand.RunAsync(lifetime.Token);
+
+        default:
+            Console.Error.WriteLine($"Unbekannter Befehl: {args[0]}");
+            PrintUsage();
             return 2;
-        }
-
-        return await RunWatchAsync(recordTo: args[1], lifetime.Token);
-
-    case "replay":
-        if (args.Length < 2)
-        {
-            Console.Error.WriteLine("replay braucht eine Aufzeichnungsdatei.");
-            return 2;
-        }
-
-        return await RunReplayAsync(args[1], args.Length > 2 ? args[2] : "1", lifetime.Token);
-
-    case "update":
-        return await SnapshotCommand.RunAsync(lifetime.Token);
-
-    case "scrub":
-        if (args.Length < 2)
-        {
-            Console.Error.WriteLine("scrub braucht eine Aufzeichnungsdatei.");
-            return 2;
-        }
-
-        return ScrubCommand.Run(args[1], args.Length > 2 ? args[2] : null);
-
-    case "events":
-        return await EventsCommand.RunAsync(lifetime.Token);
-
-    case "probe":
-        return await ProbeCommand.RunAsync(lifetime.Token);
-
-    case "icons":
-        return await SnapshotCommand.DownloadIconsAsync(lifetime.Token);
-
-    case "inspect":
-        return SnapshotCommand.Inspect();
-
-    case "recommend":
-        return RecommendCommand.Run(args);
-
-    default:
-        Console.Error.WriteLine($"Unbekannter Befehl: {args[0]}");
-        PrintUsage();
-        return 2;
+    }
+}
+catch (OperationCanceledException)
+{
+    Console.Error.WriteLine("Abgebrochen.");
+    return 130;
+}
+catch (Exception ex)
+{
+    // The message alone for users; the full trace on request — a bare NullReferenceException
+    // without frames is useless to whoever has to fix it.
+    Console.Error.WriteLine(
+        Environment.GetEnvironmentVariable("DIRKDRAFT_DEBUG") is { Length: > 0 }
+            ? $"Fehler: {ex}"
+            : $"Fehler: {ex.Message} (DIRKDRAFT_DEBUG=1 für Details)");
+    return 1;
 }
 
 static void PrintUsage()
@@ -92,6 +124,7 @@ static void PrintUsage()
           recommend <lane> [gegner] [team]
                                  Empfehlungen fuer einen erfundenen Draft rechnen,
                                  z. B. recommend mid Jax,Elise,Syndra Aatrox,LeeSin
+          runes                  Runenseiten des Accounts anzeigen (nur lesend)
         """);
 }
 
@@ -124,7 +157,12 @@ static async Task<int> RunWatchAsync(string? recordTo, CancellationToken ct)
     }
 
     if (recorder is not null)
+    {
         Console.WriteLine($"{recorder.FrameCount} Frames aufgezeichnet.");
+
+        if (recorder.UnscrubbedFrames > 0)
+            Console.WriteLine($"{recorder.UnscrubbedFrames} Frames waren nicht bereinigbar und wurden ausgelassen.");
+    }
 
     return 0;
 }
@@ -137,13 +175,30 @@ static async Task<int> RunReplayAsync(string path, string speedArgument, Cancell
         return 2;
     }
 
-    var speed = speedArgument.Equals("max", StringComparison.OrdinalIgnoreCase)
-        ? double.PositiveInfinity
-        : double.TryParse(speedArgument, out var parsed) && parsed > 0
-            ? parsed
-            : 1.0;
+    double speed;
+    if (speedArgument.Equals("max", StringComparison.OrdinalIgnoreCase))
+    {
+        speed = double.PositiveInfinity;
+    }
+    // Invariant plus comma tolerance. Plain TryParse read "1.5" through the German locale, where
+    // the dot is the GROUP separator — and played back at fifteenfold speed.
+    else if (double.TryParse(
+            speedArgument.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+        && parsed > 0)
+    {
+        speed = parsed;
+    }
+    else
+    {
+        Console.Error.WriteLine($"Ungültiges Tempo „{speedArgument}“ — Zahl größer 0 oder „max“.");
+        return 2;
+    }
 
     var source = new JsonlSessionSource(path, speed);
+
+    if (source.SkippedLines > 0)
+        Console.WriteLine($"{source.SkippedLines} unlesbare Zeilen übersprungen (Aufzeichnung abgebrochen?).");
+
     await using var tracker = new DraftTracker(source, debounceMs: 0);
     tracker.Changed += DraftStatePrinter.Print;
 

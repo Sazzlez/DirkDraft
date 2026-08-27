@@ -1,4 +1,4 @@
-# DraftPilot
+# DirkDraft
 
 Pick- und Ban-Assistent für League of Legends. Liest den Champ Select live mit, schätzt die Lanes
 des Gegners und schlägt Picks und Bans vor — für dich und für jeden Mitspieler, der am Zug ist.
@@ -18,12 +18,18 @@ dadurch bei etwa 0,7 MB statt der ~120 MB einer selbstenthaltenden Variante.
 ## Erster Schritt: Daten holen
 
 Beim ersten Start gibt es noch keine Meta-Daten. Ein Klick auf **Daten aktualisieren** holt
-Tierlist, Counter und Synergien und legt sie lokal ab. Das dauert etwa vier Minuten und ist der
-**einzige** Weg, auf dem das Tool ins Netz geht — es gibt keinen Auto-Update, keinen Update-Check
-beim Start und keinen Hintergrund-Timer.
+Tierlist, Counter und Synergien und legt sie lokal ab. Das dauert etwa vier Minuten. Es gibt keinen
+Auto-Update, keinen Update-Check beim Start und keinen Hintergrund-Timer.
 
 Der Knopf ist während eines laufenden Champ Select gesperrt, damit mitten im Draft kein Netzwerk-
 oder Speicher-Peak entsteht. Bricht ein Update ab, bleibt der vorherige Stand vollständig nutzbar.
+
+Der zweite und letzte Netzweg sind die **Draft-Daten**: Sobald im Champ Select ein Champion
+aufgedeckt wird, holt das Tool dessen aktuelle Counter-Zahlen, und nach deinem eigenen Pick den
+passenden Build. Das sind höchstens sechs kleine Abrufe pro Draft — einer je Gegner, einer für den
+Build —, jeder nur einmal, alles lokal gecacht. Ohne diese Abrufe wäre die Vorratsmatrix pro
+Champion und Lane nur etwa drei Counter tief, und genau die fünf Gegner, gegen die du wirklich
+spielst, wären meistens nicht darin. Außerhalb eines Champ Select passiert nichts.
 
 ## Wo Daten liegen
 
@@ -33,7 +39,16 @@ oder Speicher-Peak entsteht. Bricht ein Update ab, bleibt der vorherige Stand vo
 | `%LOCALAPPDATA%\DraftPilot\data\` | `snapshot.json` — vom Update-Knopf erzeugt |
 | `%APPDATA%\DraftPilot\` | `settings.json` |
 
+Die Datenordner (und die Projektnamen im Code) behalten den Arbeitstitel *DraftPilot* — eine
+Umbenennung dort würde nur eine Datenmigration erzwingen, ohne dass irgendwer sie je sieht.
+
 Nichts davon verlässt den Rechner. Keine Telemetrie, keine Datenbank, kein Cloud-Sync.
+
+Der Bestand pflegt sich selbst: „Daten aktualisieren" **überschreibt** Snapshot und Namen atomar,
+und beim Start räumt das Tool im Hintergrund auf — Build-Pläne fremder Patches oder älter als zwei
+Wochen, verwaiste `.tmp`-Dateien und zu groß gewordene Logs (gekappt auf die neuesten Einträge).
+Nur die Icon-Ordner bleiben unangetastet: Icons veralten nicht, und sie zu löschen hieße nur, sie
+wieder herunterzuladen.
 
 ## Bedienung
 
@@ -42,10 +57,23 @@ Nichts davon verlässt den Rechner. Keine Telemetrie, keine Datenbank, kein Clou
   die übrigen Slots werden sofort neu zugeordnet.
 - **Dein Team**: klickbar. Die Empfehlungsliste folgt normalerweise dem Spieler am Zug; ein Klick
   schaltet auf einen anderen Slot, das Pin-Symbol oben hält sie dort fest.
-- **Empfehlungen**: Score, Begründungs-Chips, und über den Pfeil rechts die vollständige
-  Aufschlüsselung jedes Terms. Pick oder Ban richtet sich nach der laufenden Action.
-- **Presets**: *Meta* gewichtet die Tierlist, *Counter* das Lane-Matchup, *Teamcomp* Synergien und
-  Comp-Bedarf.
+- **Empfehlungen**: Der Score ist eine **geschätzte Siegquote** — Lane-Stärke, Matchups, Synergien
+  und Team-Bedarf werden als Log-Odds-Verschiebungen addiert und zurück in Prozent übersetzt
+  (`ScoreModel.cs` dokumentiert jede Konstante). 50 % ist ausgeglichen; Unterschiede unter einem
+  halben Punkt sind Rauschen, und liegen die Spitzenkandidaten gleichauf, sagt die Kopfzeile das.
+  Jeder Chip erklärt sich beim Überfahren mit der Maus; der Pfeil rechts klappt die Aufschlüsselung
+  auf — pro Kriterium ein Urteil in Worten, ein Balken und der Beitrag in Prozentpunkten. Kriterien
+  ohne Datengrundlage stehen dort als *keine Daten*, nicht als Null. Bans rechnen dieselbe Einheit
+  aus Gegnersicht: Stärke mal Wahrscheinlichkeit, dass der Champion überhaupt genommen wird.
+- **Dein Build**: nach deinem Pick Runen, Shards, Startitems, Schuhe und Kern-Items für genau dieses
+  Matchup, plus Hinweise zur gegnerischen Aufstellung. **Runen übertragen** legt die Seite als
+  „DirkRunen · …" im Client an und wählt sie aus — der einzige Schreibzugriff des Tools, nur auf
+  Klick, und gelöscht wird nur die eigene Seite (eine fremde erst nach Nachfrage mit Namen).
+- **Im Spiel**: sobald das Spiel startet, zeigt das Fenster den Build groß — Item-Bilder in
+  Kaufreihenfolge (Start → Schuhe → Kern → Spät), Beschwörerzauber und die Skill-Tabelle für
+  Stufe 1–18. Die Stufen 16–18 liefert die Quelle nicht; sie sind abgeleitet und blasser
+  dargestellt. Das Fenster ist „immer oben", also im randlosen Fenstermodus über dem Spiel sichtbar;
+  im exklusiven Vollbild versteckt Windows fremde Fenster prinzipbedingt.
 
 ## Kommandozeile
 
@@ -107,8 +135,10 @@ vergrößerte Prüfansicht. Die kleinen Ebenen haben absichtlich dickere Balken:
 
 ## Was das Tool bewusst nicht tut
 
-- **Keine Schreibzugriffe auf den Client.** Kein Auto-Hover, kein Auto-Ban, kein Auto-Accept. Du
-  klickst selbst.
+- **Kein Auto-Hover, kein Auto-Ban, kein Auto-Accept.** Du klickst selbst. Der einzige
+  Schreibzugriff auf den Client ist der Runen-Import, und der passiert ausschließlich auf deinen
+  Klick. Er nutzt dieselbe inoffizielle Client-Schnittstelle wie Blitz, Porofessor oder U.GG —
+  Riot kann sie jederzeit ändern, dann scheitert der Import sichtbar statt still.
 - **Keine Namen fremder Spieler.** Riots Richtlinie verlangt das im Champ Select, und das Tool
   braucht sie ohnehin nicht — es zeigt `Mitspieler 3` und `Gegner 2`.
 - **Keine Cooldown- oder Ult-Timer.** Ebenfalls Richtlinie.
@@ -124,12 +154,17 @@ Das solltest du wissen, bevor du den Empfehlungen zu viel zutraust:
 
 - **Tierlist und Lane-Verteilung sind solide.** Die Rollen-Anteile, aus denen die Lane-Vorhersage
   rechnet, sind Verhältnisse großer Zahlen und entsprechend belastbar.
-- **Counter-Daten sind dünn.** Die Quelle liefert pro Champion und Lane nur die auffälligsten drei
-  Gegner, insgesamt etwa 600 Kanten für 147 von 173 Champions — keine vollständige Matrix. Wo keine
-  Daten vorliegen, wirkt das Preset *Counter* schlicht nicht, und die Tierlist dominiert.
+- **Die Vorrats-Counter-Matrix ist dünn.** Die Quelle liefert pro Champion und Lane nur die
+  auffälligsten drei Gegner — keine vollständige Matrix. Genau dafür gibt es die automatischen
+  Draft-Abrufe: für die fünf real aufgedeckten Gegner kommen dichte, aktuelle Zahlen nach. Wo
+  trotzdem nichts vorliegt, sagt die Aufschlüsselung „keine Daten" statt zu raten.
 - **Kleine Stichproben werden gedämpft.** Ein Duo mit 78 % Winrate über 32 Spiele ist Rauschen. Jede
   Rate läuft durch eine Bayes-Glättung, bevor daraus ein Score wird. Deshalb sehen die angezeigten
   Winrates flacher aus als auf einer Statistikseite — sie sind dafür belastbarer.
+- **Vier Konstanten des Scores sind Schätzungen.** Wie stark Gegner außerhalb der eigenen Lane,
+  die OP.GG-Stufe, Synergien und der Team-Bedarf zählen, steht begründet, aber unkalibriert in
+  `ScoreModel.cs`. Kalibrieren ließe sich das erst an echten Ranked-Aufzeichnungen
+  (`Tools -- record`) — offene Aufgabe. Die Winrate-Anteile selbst sind gemessen, nicht geschätzt.
 - **Die kuratierten Traits deckt nicht alle Champions ab.** Engage, Peel, CC und Scaling stehen für
   166 der 173 Champions in `data\champion_traits.json`. Für die übrigen — meist ganz neue — feuern
   die davon abhängigen Comp-Regeln nicht, statt zu raten. Die Anzeige nennt die Trait-Abdeckung,
