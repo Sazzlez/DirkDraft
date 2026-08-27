@@ -44,7 +44,7 @@ public static class MatchupGuideParser
 
         plan.Runes = BestRunePage(data);
         plan.Starters = ItemSets(data, "starter_items", take: 2);
-        plan.Boots = ItemSets(data, "boots", take: 2);
+        plan.Boots = ItemSets(data, "boots", take: 4);
         plan.CoreItems = ItemSets(data, "core_items", take: 3);
         plan.LateItems = ItemSets(data, "last_items", take: 3);
         plan.SummonerSpells = ItemSets(data, "summoner_spells", take: 2);

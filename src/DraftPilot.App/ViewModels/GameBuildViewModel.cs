@@ -161,7 +161,12 @@ public sealed class GameBuildViewModel : ObservableObject
     }
 
     /// <summary>Fills the view from a plan, translating names and resolving icons where present.</summary>
-    public void Apply(BuildPlan plan, AssetNames names, IconCache icons)
+    /// <param name="bootsPreference">
+    /// What the enemy composition asks of the boots slot. When the fetched alternatives contain
+    /// the matching boot, THAT set is shown (highlighted, with the reason in its tooltip) instead
+    /// of the most-played one — the one build slot that adapts to the situation hints.
+    /// </param>
+    public void Apply(BuildPlan plan, AssetNames names, IconCache icons, BootsPreference bootsPreference = BootsPreference.None)
     {
         Title = $"{plan.ChampionName} vs {plan.OpponentName} · {plan.Lane.Display()}";
 
@@ -180,7 +185,7 @@ public sealed class GameBuildViewModel : ObservableObject
         FillRunes(SecondaryRunes, runes?.SecondaryRuneIds ?? [], runes?.SecondaryRunes ?? [], names, icons, keystoneFirst: false);
 
         FillItems(StartItems, plan.Starters.FirstOrDefault(), names, icons);
-        FillItems(BootItems, plan.Boots.FirstOrDefault(), names, icons);
+        FillBoots(plan, names, icons, bootsPreference);
         FillItems(CoreItems, plan.CoreItems.FirstOrDefault(), names, icons);
         FillSingles(LateItems, plan.LateItems, names, icons);
 
@@ -241,6 +246,33 @@ public sealed class GameBuildViewModel : ObservableObject
             target[i].Label = name;
             target[i].Hint = name.Length > 0 ? name : null;
             target[i].IsHighlighted = keystoneFirst && i == 0;
+        }
+    }
+
+    /// <summary>
+    /// The boots slot: the situational set when the data offers it, the most-played one
+    /// otherwise. A situational pick is highlighted and its tooltip says WHY it was preferred,
+    /// with the sample behind it — an unexplained swap would just look like a wrong number.
+    /// </summary>
+    private void FillBoots(BuildPlan plan, AssetNames names, IconCache icons, BootsPreference preference)
+    {
+        var situational = SituationalBuild.PickBoots(plan.Boots, preference);
+        FillItems(BootItems, situational ?? plan.Boots.FirstOrDefault(), names, icons);
+
+        if (situational is null)
+            return;
+
+        var reason = preference switch
+        {
+            BootsPreference.Tenacity => "wegen der vielen Betäubungen im Gegnerteam vorgezogen",
+            BootsPreference.MagicResist => "wegen des überwiegend magischen Gegner-Schadens vorgezogen",
+            _ => "wegen des überwiegend physischen Gegner-Schadens vorgezogen",
+        };
+
+        foreach (var chip in BootItems)
+        {
+            chip.IsHighlighted = true;
+            chip.Hint = $"{chip.Label} — {reason} · {situational.WinRate:P0} aus {situational.Play} Spielen.";
         }
     }
 

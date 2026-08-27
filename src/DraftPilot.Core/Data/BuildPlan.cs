@@ -64,7 +64,9 @@ public sealed class BuildPlan
     /// Bump when the shape of this class changes in a way old cache files cannot satisfy. Loading
     /// discards mismatches, so the next draft simply fetches fresh instead of showing half a plan.
     /// </summary>
-    public const int CurrentSchemaVersion = 2;
+    // 3: boots now carry four alternatives so the situational choice (Mercs vs Steelcaps) has
+    // data to pick from; older cached plans hold only two and are refetched.
+    public const int CurrentSchemaVersion = 3;
 
     /// <summary>
     /// Defaults to 0, NOT to the current version: a default would also apply while deserialising

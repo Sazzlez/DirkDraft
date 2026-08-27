@@ -137,7 +137,9 @@ public sealed class OpGgMcpClient : IDisposable
 
             if (IsTransient(response.StatusCode) && attempt < 3)
             {
-                await Task.Delay(delay, ct).ConfigureAwait(false);
+                // The server's own Retry-After wins over the blind backoff — with six calls in
+                // parallel, respecting the throttle is what keeps the higher concurrency safe.
+                await Task.Delay(RetryAfterOrDefault(response, delay), ct).ConfigureAwait(false);
                 delay *= 2;
                 continue;
             }
@@ -204,6 +206,20 @@ public sealed class OpGgMcpClient : IDisposable
     /// <summary>SSE detection by the header, not by sniffing the body's first bytes.</summary>
     private static bool WasEventStream(HttpResponseMessage response)
         => string.Equals(response.Content.Headers.ContentType?.MediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The server's requested wait when it sent one (capped at 30 s), else the fallback.</summary>
+    private static TimeSpan RetryAfterOrDefault(HttpResponseMessage response, TimeSpan fallback)
+    {
+        var retryAfter = response.Headers.RetryAfter;
+
+        var wait = retryAfter?.Delta
+            ?? (retryAfter?.Date is { } date ? date - DateTimeOffset.UtcNow : null);
+
+        if (wait is not { TotalSeconds: > 0 } positive)
+            return fallback;
+
+        return positive > TimeSpan.FromSeconds(30) ? TimeSpan.FromSeconds(30) : positive;
+    }
 
     private static bool IsTransient(HttpStatusCode status)
         => status is HttpStatusCode.TooManyRequests

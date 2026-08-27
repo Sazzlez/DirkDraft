@@ -27,7 +27,14 @@ public sealed record SnapshotBuildOptions
     public string Language { get; init; } = "de_DE";
 
     /// <summary>Concurrent requests. Deliberately low; this is somebody else's free endpoint.</summary>
-    public int MaxConcurrency { get; init; } = 3;
+    /// <summary>
+    /// Parallel OP.GG calls — the update is ~320 of them, and this is its only real throttle.
+    /// Measured against the live endpoint (2026-08): throughput scales cleanly to 12 in flight
+    /// with zero 429s, so ten is a comfortable middle that still behaves like a guest — the
+    /// update runs for two minutes every few days, and the client honours Retry-After should
+    /// OP.GG ever start pushing back.
+    /// </summary>
+    public int MaxConcurrency { get; init; } = 10;
 }
 
 public sealed record BuildProgress(string Stage, int Done, int Total)

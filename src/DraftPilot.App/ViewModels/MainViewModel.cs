@@ -324,8 +324,23 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             || phase.Equals("InProgress", StringComparison.OrdinalIgnoreCase)
             || phase.Equals("Reconnect", StringComparison.OrdinalIgnoreCase);
 
+        // Every DISTINCT running phase re-announces. GameStart is only the loading screen;
+        // exclusive fullscreen grabs the display (and minimises other windows) at InProgress,
+        // which can trail by minutes — the anti-minimise grace window has to re-anchor there,
+        // and the once-per-game latch alone left it anchored on the loading screen.
+        if (running && !phase.Equals(_lastGamePhase, StringComparison.OrdinalIgnoreCase))
+        {
+            _lastGamePhase = phase;
+            _gameActiveAnnounced = false;
+        }
+
         if (running == IsGameRunning)
+        {
+            if (running)
+                AnnounceGameActive();
+
             return;
+        }
 
         IsGameRunning = running;
         UpdateBuildSection();
@@ -336,13 +351,27 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
         else
         {
+            _lastGamePhase = string.Empty;
             _gameActiveAnnounced = false;
             GameActiveChanged?.Invoke(false);
         }
     }
 
+    /// <summary>The last running gameflow phase, to detect GameStart → InProgress transitions.</summary>
+    private string _lastGamePhase = string.Empty;
+
     /// <summary>Set once <see cref="GameActiveChanged"/> announced the running game.</summary>
     private bool _gameActiveAnnounced;
+
+    /// <summary>The boots preference the build tiles were last rendered with.</summary>
+    private BootsPreference _appliedBootsPreference;
+
+    /// <summary>Renders the build tiles with the current situational boots preference.</summary>
+    private void ApplyGameBuild(BuildPlan plan)
+    {
+        _appliedBootsPreference = SituationalBuild.PreferredBoots(_enemyComp);
+        GameBuild.Apply(plan, _names, _icons, _appliedBootsPreference);
+    }
 
     /// <summary>
     /// Fires the auto-show event when a game runs AND a build exists. Called from the phase
@@ -1240,7 +1269,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // the draft column and the in-game view render the same content at different sizes.
         // (The situational hints are NOT rendered here: Render() re-derives them on every pass,
         // so they follow the enemy composition instead of freezing at build time.)
-        GameBuild.Apply(plan, _names, _icons);
+        ApplyGameBuild(plan);
         UpdateBuildSection();
         AnnounceGameActive();
 
@@ -1278,7 +1307,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
             // Still the same build on screen? Then swap the placeholder labels for the icons.
             if (added > 0 && ReferenceEquals(_build, plan))
-                GameBuild.Apply(plan, _names, _icons);
+                ApplyGameBuild(plan);
         }
         catch (OperationCanceledException)
         {
@@ -1299,32 +1328,52 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         var hints = new List<Reason>();
 
+        // The boots slot ADAPTS to these hints (the one slot that does): when the fetched
+        // alternatives contain the matching boot, the build shows it and the chip says so —
+        // otherwise the chip stays plain advice. Applied lazily below so a late enemy reveal
+        // (composition shifting after my pick) updates the shown boots too.
+        var preference = SituationalBuild.PreferredBoots(_enemyComp);
+        var adjusted = _build is { } plan && SituationalBuild.PickBoots(plan.Boots, preference) is not null;
+
         if (_enemyComp.Count >= 3)
         {
             if (_enemyComp.PhysicalShare >= 0.65)
             {
+                var acted = adjusted && preference == BootsPreference.Armor;
                 hints.Add(Reason.Neutral(
-                    $"Gegner macht {_enemyComp.PhysicalShare:P0} physischen Schaden → Rüstung zuerst",
+                    $"Gegner macht {_enemyComp.PhysicalShare:P0} physischen Schaden → "
+                        + (acted ? "Stahlkappen im Build vorgezogen" : "Rüstung zuerst"),
                     "Von dem Schaden, den das gegnerische Team austeilt, ist der größte Teil "
-                    + "physisch. Rüstung wirkt hier stärker als Magieresistenz."));
+                    + "physisch. Rüstung wirkt hier stärker als Magieresistenz."
+                    + (acted ? " Die Schuhwahl im Build ist entsprechend angepasst." : string.Empty)));
             }
 
             if (_enemyComp.MagicShare >= 0.65)
             {
+                var acted = adjusted && preference == BootsPreference.MagicResist;
                 hints.Add(Reason.Neutral(
-                    $"Gegner macht {_enemyComp.MagicShare:P0} magischen Schaden → Magieresistenz zuerst",
+                    $"Gegner macht {_enemyComp.MagicShare:P0} magischen Schaden → "
+                        + (acted ? "Merkurstiefel im Build vorgezogen" : "Magieresistenz zuerst"),
                     "Von dem Schaden, den das gegnerische Team austeilt, ist der größte Teil "
-                    + "magisch. Magieresistenz wirkt hier stärker als Rüstung."));
+                    + "magisch. Magieresistenz wirkt hier stärker als Rüstung."
+                    + (acted ? " Die Schuhwahl im Build ist entsprechend angepasst." : string.Empty)));
             }
 
             if (_enemyComp.TotalCrowdControl >= 6)
             {
+                var acted = adjusted && preference == BootsPreference.Tenacity;
                 hints.Add(Reason.Neutral(
-                    "viele Betäubungen im Gegnerteam → Zähigkeit einplanen",
+                    "viele Betäubungen im Gegnerteam → "
+                        + (acted ? "Merkurstiefel im Build vorgezogen" : "Zähigkeit einplanen"),
                     "Das gegnerische Team hat auffällig viele Effekte, die dich bewegungsunfähig "
-                    + "machen. Zähigkeit (z. B. Merkurstiefel) verkürzt deren Dauer."));
+                    + "machen. Zähigkeit (z. B. Merkurstiefel) verkürzt deren Dauer."
+                    + (acted ? " Die Schuhwahl im Build ist entsprechend angepasst." : string.Empty)));
             }
         }
+
+        // A revealed enemy can shift the preference after the build already landed.
+        if (_build is { } current && preference != _appliedBootsPreference)
+            ApplyGameBuild(current);
 
         BuildHints.Resize(hints.Count, () => Reason.Neutral(string.Empty));
         for (var i = 0; i < hints.Count; i++)
@@ -1732,6 +1781,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         UpdateStatus = "Starte…";
         UpdateFraction = 0;
 
+        // Shown with the result: makes the update's speed visible, and a future regression obvious.
+        var updateClock = System.Diagnostics.Stopwatch.StartNew();
+
         using var scope = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _updateScope = scope;
 
@@ -1778,7 +1830,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             SetSnapshotRetryRunning(false);
 
             UpdateSnapshotText();
-            UpdateStatus = $"Aktualisiert: {snapshot.Champions.Count} Champions, {snapshot.Matchups.Count} Matchups";
+            UpdateStatus = $"Aktualisiert in {updateClock.Elapsed:m\\:ss}: "
+                + $"{snapshot.Champions.Count} Champions, {snapshot.Matchups.Count} Matchups";
             Refresh();
         }
         catch (OperationCanceledException)

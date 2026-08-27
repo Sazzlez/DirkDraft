@@ -163,17 +163,19 @@ public partial class App : Application
                 _window.WindowState = WindowState.Normal;
         });
 
-        // The game taking the screen can MINIMISE other windows a moment after launch — ours
-        // included, second monitor or not. Around the game start that is never the user's doing,
-        // so the window puts itself back (without Activate: the game keeps the focus). The time
-        // window keeps this from fighting the user's own minimise later on.
+        // The game taking the screen can MINIMISE other windows — ours included, second monitor
+        // or not. GameActiveChanged re-anchors the tick on every phase change (GameStart AND
+        // InProgress — the fullscreen grab happens at the latter), and around those moments a
+        // minimise is never the user's doing, so the window puts itself back (without Activate:
+        // the game keeps the focus). The time window keeps this from fighting the user's own
+        // minimise later in the game.
         _window.StateChanged += (_, _) =>
         {
             if (_window is not { WindowState: WindowState.Minimized }
                 || _model is not { IsGameRunning: true }
                 || !_model.Settings.AutoShowOnGameStart
                 || _gameStartedAtTick == 0
-                || Environment.TickCount64 - _gameStartedAtTick > 30_000)
+                || Environment.TickCount64 - _gameStartedAtTick > 60_000)
             {
                 return;
             }
