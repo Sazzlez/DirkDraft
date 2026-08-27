@@ -873,25 +873,48 @@
                             keep trailing labels and chips from being squeezed to zero when the
                             text fallback fills the narrow column.
                         -->
+                        <!--
+                            Spells live in the FIRST row on purpose: start items and boots are
+                            always plain icons, so there is guaranteed room. Hanging them off the
+                            "Spät" row put them at the card's bottom edge, where late items in
+                            their text fallback (Ornn upgrades never get icons) wrapped the row
+                            and pushed the spells half out of the window.
+                        -->
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Start" Style="{StaticResource Small}" FontSize="10"
                                        Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                        Margin="0,6,7,3" MinWidth="34" />
-                            <ItemsControl Grid.Column="1" ItemsSource="{Binding GameBuild.StartItems}"
-                                          ItemTemplate="{StaticResource IconChipSmall}"
-                                          ItemsPanel="{StaticResource ChipRow}" />
-                            <TextBlock Grid.Column="2" Text="Schuhe" Style="{StaticResource Small}" FontSize="10"
-                                       Foreground="{StaticResource Faint}" VerticalAlignment="Top"
-                                       Margin="10,6,7,3" />
-                            <ItemsControl Grid.Column="3" ItemsSource="{Binding GameBuild.BootItems}"
-                                          ItemTemplate="{StaticResource IconChipSmall}"
-                                          ItemsPanel="{StaticResource ChipRow}" />
+                            <!--
+                                One flowing wrap row: each group keeps its natural size and drops
+                                to the next line when the column is tight. Fixed trailing columns
+                                starved whichever group came first once text-fallback chips
+                                widened the others.
+                            -->
+                            <WrapPanel Grid.Column="1">
+                                <ItemsControl ItemsSource="{Binding GameBuild.StartItems}"
+                                              ItemTemplate="{StaticResource IconChipSmall}"
+                                              ItemsPanel="{StaticResource ChipRow}" />
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Schuhe" Style="{StaticResource Small}" FontSize="10"
+                                               Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                               Margin="10,6,7,3" />
+                                    <ItemsControl ItemsSource="{Binding GameBuild.BootItems}"
+                                                  ItemTemplate="{StaticResource IconChipSmall}"
+                                                  ItemsPanel="{StaticResource ChipRow}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Spells" Style="{StaticResource Small}" FontSize="10"
+                                               Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                               Margin="10,6,7,3" />
+                                    <ItemsControl ItemsSource="{Binding GameBuild.Spells}"
+                                                  ItemTemplate="{StaticResource IconChipSmall}"
+                                                  ItemsPanel="{StaticResource ChipRow}" />
+                                </StackPanel>
+                            </WrapPanel>
                         </Grid>
                         <Grid Margin="0,3,0,0">
                             <Grid.ColumnDefinitions>
@@ -914,20 +937,12 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Spät" Style="{StaticResource Small}" FontSize="10"
                                        Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                        Margin="0,6,7,3" MinWidth="34"
                                        ToolTip="Häufige Käufe für die letzten Slots — Optionen, keine feste Reihenfolge." />
                             <ItemsControl Grid.Column="1" ItemsSource="{Binding GameBuild.LateItems}"
-                                          ItemTemplate="{StaticResource IconChipSmall}"
-                                          ItemsPanel="{StaticResource ChipRow}" />
-                            <TextBlock Grid.Column="2" Text="Spells" Style="{StaticResource Small}" FontSize="10"
-                                       Foreground="{StaticResource Faint}" VerticalAlignment="Top"
-                                       Margin="10,6,7,3" />
-                            <ItemsControl Grid.Column="3" ItemsSource="{Binding GameBuild.Spells}"
                                           ItemTemplate="{StaticResource IconChipSmall}"
                                           ItemsPanel="{StaticResource ChipRow}" />
                         </Grid>

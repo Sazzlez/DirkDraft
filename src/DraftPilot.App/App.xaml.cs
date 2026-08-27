@@ -15,6 +15,9 @@ public partial class App : Application
     private Mutex? _instanceMutex;
     private EventWaitHandle? _showSignal;
     private string? _phase;
+
+    /// <summary>When the running game was announced (0 = never); anchors the anti-minimise grace window.</summary>
+    private long _gameStartedAtTick;
     private CancellationTokenSource? _signalListener;
     private Thread? _signalThread;
     private MainViewModel? _model;
@@ -151,12 +154,38 @@ public partial class App : Application
             if (!isRunning || !_model.Settings.AutoShowOnGameStart || _window is null)
                 return;
 
+            _gameStartedAtTick = Environment.TickCount64;
+
             if (!_window.IsVisible)
                 _window.Show();
 
             if (_window.WindowState == WindowState.Minimized)
                 _window.WindowState = WindowState.Normal;
         });
+
+        // The game taking the screen can MINIMISE other windows a moment after launch — ours
+        // included, second monitor or not. Around the game start that is never the user's doing,
+        // so the window puts itself back (without Activate: the game keeps the focus). The time
+        // window keeps this from fighting the user's own minimise later on.
+        _window.StateChanged += (_, _) =>
+        {
+            if (_window is not { WindowState: WindowState.Minimized }
+                || _model is not { IsGameRunning: true }
+                || !_model.Settings.AutoShowOnGameStart
+                || _gameStartedAtTick == 0
+                || Environment.TickCount64 - _gameStartedAtTick > 30_000)
+            {
+                return;
+            }
+
+            _ = Dispatcher.InvokeAsync(
+                () =>
+                {
+                    if (_window is { WindowState: WindowState.Minimized })
+                        _window.WindowState = WindowState.Normal;
+                },
+                System.Windows.Threading.DispatcherPriority.Background);
+        };
         _model.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(MainViewModel.StatusText))

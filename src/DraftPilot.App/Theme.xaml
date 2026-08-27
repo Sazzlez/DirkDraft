@@ -369,12 +369,24 @@
         <Setter Property="BorderBrush" Value="{StaticResource Line}" />
         <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
         <Setter Property="FontSize" Value="12" />
+        <!--
+            Every tooltip in the app is a string, and several are whole paragraphs. Without this
+            template a long text was CUT at the border's MaxWidth — the default presenter renders
+            strings with a non-wrapping TextBlock.
+        -->
+        <Setter Property="ContentTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToolTip">
                     <Border Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="1" CornerRadius="6" Padding="9,6" MaxWidth="300">
+                            BorderThickness="1" CornerRadius="6" Padding="9,6" MaxWidth="340">
                         <ContentPresenter TextElement.Foreground="{StaticResource Text}" />
                     </Border>
                 </ControlTemplate>
