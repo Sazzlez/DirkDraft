@@ -71,7 +71,8 @@ public class SnapshotStoreTests : IDisposable
         var path = PathFor("good.json");
         var store = new SnapshotStore(path);
 
-        var snapshot = new MetaSnapshot { Patch = "16.17.1" };
+        var stamp = new DateTimeOffset(2026, 8, 26, 11, 23, 37, TimeSpan.FromHours(9));
+        var snapshot = new MetaSnapshot { Patch = "16.17.1", DataPatch = "16.17", DataAsOfUtc = stamp };
         snapshot.Champions.Add(new ChampionEntry { Id = 266, Key = "Aatrox", Name = "Aatrox" });
         store.Save(snapshot);
 
@@ -79,7 +80,32 @@ public class SnapshotStoreTests : IDisposable
 
         Assert.True(result.IsOk);
         Assert.Equal("16.17.1", result.Snapshot!.Patch);
+        Assert.Equal("16.17", result.Snapshot.DataPatch);
+        Assert.Equal(stamp, result.Snapshot.DataAsOfUtc);
         Assert.Equal("Aatrox", result.Snapshot.Champions[0].Name);
+    }
+
+    /// <summary>
+    /// The data stamp arrived without a version bump on purpose: pressing the update button should
+    /// be worth it, never required. A file written before the stamp existed has to keep working.
+    /// </summary>
+    [Fact]
+    public void ASnapshotWrittenBeforeTheDataStampExisted_StillLoads()
+    {
+        var path = PathFor("older.json");
+        File.WriteAllText(
+            path,
+            $$"""
+            {"version":{{MetaSnapshot.CurrentVersion}},"patch":"16.17.1",
+             "champions":[{"id":266,"key":"Aatrox","name":"Aatrox"}]}
+            """);
+
+        var result = new SnapshotStore(path).LoadWithStatus();
+
+        Assert.True(result.IsOk);
+        Assert.Equal("16.17.1", result.Snapshot!.Patch);
+        Assert.Equal(string.Empty, result.Snapshot.DataPatch);
+        Assert.Null(result.Snapshot.DataAsOfUtc);
     }
 
     [Fact]

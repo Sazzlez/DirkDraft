@@ -1,0 +1,11 @@
+class LolGetChampionAnalysis: data,_field_diagnostics
+class Data: summary,trends
+class Summary: positions
+class Position: name,stats
+class Stats: play,win_rate,pick_rate,role_rate,ban_rate,tier_data
+class TierData: tier
+class Trends: win
+class Win: version,created_at
+class FieldDiagnostics: unmatched_fields,hint
+
+LolGetChampionAnalysis(Data(Summary([Position("TOP",Stats(394825,0.52,0.09,0.91,0.07,TierData(1)))]),Trends(Win("16.17","2026-08-26T11:23:37+09:00"))),FieldDiagnostics(["data.summary.positions[].stats.win"],"These field names did not match the response and were skipped. Check the names against this tool's field list. Array fields need \"[]\" before the dot (e.g. \"strong_counters[].win\", not \"strong_counters.win\"); nesting uses \".\", and names are case-sensitive. To get the full response instead, send an empty array."))

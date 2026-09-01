@@ -7,7 +7,15 @@ using System.Text.Json.Nodes;
 namespace DraftPilot.Meta.OpGg;
 
 /// <summary>The endpoint answered, but with an error.</summary>
-public sealed class OpGgApiException(string message) : Exception(message);
+public sealed class OpGgApiException(string message) : Exception(message)
+{
+    /// <summary>
+    /// The HTTP status, when the transport itself failed. Null means the response arrived and was
+    /// rejected on content — an unknown champion name, no data for this combination. The difference
+    /// decides whether a caller may quietly try the next spelling or has to report an outage.
+    /// </summary>
+    public HttpStatusCode? Status { get; init; }
+}
 
 /// <summary>
 /// Talks to OP.GG's public MCP endpoint over plain JSON-RPC. No MCP SDK: the exchange is an
@@ -232,7 +240,12 @@ public sealed class OpGgMcpClient : IDisposable
     private static void EnsureSuccess(HttpResponseMessage response)
     {
         if (!response.IsSuccessStatusCode)
-            throw new OpGgApiException($"OP.GG antwortete mit HTTP {(int)response.StatusCode} {response.ReasonPhrase}.");
+        {
+            throw new OpGgApiException($"OP.GG antwortete mit HTTP {(int)response.StatusCode} {response.ReasonPhrase}.")
+            {
+                Status = response.StatusCode,
+            };
+        }
     }
 
     /// <summary>

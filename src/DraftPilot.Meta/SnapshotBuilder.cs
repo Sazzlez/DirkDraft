@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -58,9 +59,18 @@ public sealed class SnapshotBuilder : IDisposable
     private static readonly string[] AnalysisFields =
     [
         "data.damage_type",
+        // The patch OP.GG aggregated these numbers over, which is not the client patch we stamp on
+        // the file — after a patch day the two disagree, and only this one says whether the numbers
+        // still describe the game being played.
+        "data.trends.win.version",
+        "data.trends.win.created_at",
         "data.summary.positions[].name",
+        "data.summary.positions[].stats.play",
         "data.summary.positions[].stats.win_rate",
+        "data.summary.positions[].stats.pick_rate",
+        "data.summary.positions[].stats.ban_rate",
         "data.summary.positions[].stats.role_rate",
+        "data.summary.positions[].stats.tier_data.tier",
         "data.summary.positions[].counters[].champion_name",
         "data.summary.positions[].counters[].play",
         "data.summary.positions[].counters[].win",
@@ -88,11 +98,31 @@ public sealed class SnapshotBuilder : IDisposable
         "data.synergies.mid[].synergy_tier_data.tier",
     ];
 
+    private static readonly string[] DuoSynergyFields =
+    [
+        "data.synergies[].synergy_champion_name",
+        "data.synergies[].play",
+        "data.synergies[].win_rate",
+        "data.synergies[].synergy_tier_data.tier",
+    ];
+
     private static readonly string[] LaneMetaFields = BuildLaneMetaFields();
 
     private readonly OpGgMcpClient _client;
     private readonly HttpClient _staticData;
     private readonly bool _ownsStaticData;
+
+    /// <summary>
+    /// How often each requested field was asked for, and how often OP.GG rejected it. A renamed
+    /// field otherwise disappears silently and its numbers simply read as zero.
+    /// <para>
+    /// Both halves are needed, because a rejection is normal: the analysis response leaves out the
+    /// synergy branch for the champion's OWN lane, so every support champion reports
+    /// <c>data.synergies.support[]…</c> as unmatched. Only a field rejected by EVERY response that
+    /// asked for it is actually gone — anything else would cry wolf on every single update.
+    /// </para>
+    /// </summary>
+    private readonly Dictionary<string, (int Requested, int Unmatched)> _fieldReports = new(StringComparer.Ordinal);
 
     public SnapshotBuilder(OpGgMcpClient client, HttpClient? staticData = null)
     {
@@ -112,6 +142,8 @@ public sealed class SnapshotBuilder : IDisposable
             Tier = options.CounterTier,
             BuiltAtUtc = DateTimeOffset.UtcNow,
         };
+
+        _fieldReports.Clear();
 
         progress?.Report(new BuildProgress("Patch", 0, 0));
         snapshot.Patch = await ReadPatchAsync(snapshot.Warnings, ct).ConfigureAwait(false);
@@ -150,7 +182,7 @@ public sealed class SnapshotBuilder : IDisposable
         }
 
         Deduplicate(snapshot);
-        AddCoverageWarnings(snapshot);
+        AddCoverageWarnings(snapshot, MissingFields());
 
         progress?.Report(new BuildProgress("Fertig", 1, 1));
         return snapshot;
@@ -297,8 +329,10 @@ public sealed class SnapshotBuilder : IDisposable
             ["desired_output_fields"] = OpGgMcpClient.Fields(LaneMetaFields),
         };
 
-        var positions = (await _client.CallToolAsync("lol_list_lane_meta_champions", arguments, ct).ConfigureAwait(false))
-            ["data"]["positions"];
+        var response = await _client.CallToolAsync("lol_list_lane_meta_champions", arguments, ct).ConfigureAwait(false);
+        RecordFieldDiagnostics(response, LaneMetaFields);
+
+        var positions = response["data"]["positions"];
 
         var unresolved = new SortedSet<string>(StringComparer.Ordinal);
 
@@ -316,22 +350,46 @@ public sealed class SnapshotBuilder : IDisposable
                     continue;
                 }
 
-                snapshot.LaneStats.Add(new LaneStat
-                {
-                    ChampionId = championId,
-                    Lane = lane,
-                    WinRate = entry["win_rate"].AsNumber(),
-                    PickRate = entry["pick_rate"].AsNumber(),
-                    BanRate = entry["ban_rate"].AsNumber(),
-                    RoleRate = entry["role_rate"].AsNumber(),
-                    Tier = entry["tier"].AsInt(),
-                    Play = entry["play"].AsInt(),
-                });
+                snapshot.LaneStats.Add(ReadLaneStat(entry, championId, lane));
             }
         }
 
         if (unresolved.Count > 0)
             snapshot.Warnings.Add($"Tierlist: {unresolved.Count} Namen nicht zugeordnet ({string.Join(", ", unresolved.Take(5))}).");
+    }
+
+    /// <summary>
+    /// One tier list row. Public and static so it can be tested against a recorded response — the
+    /// win rate it produces is the single number every recommendation rests on.
+    /// <para>
+    /// The rate is computed from the win counter rather than read from <c>win_rate</c>, which OP.GG
+    /// rounds to two decimals. On samples of tens of thousands of games that rounding is worth
+    /// roughly half a percentage point — ten times more than shrinkage moves the same number, and
+    /// enough to make genuinely different champions indistinguishable: Sett (50,43 %) and Darius
+    /// (49,83 %) both arrive as 0,50.
+    /// </para>
+    /// </summary>
+    public static LaneStat ReadLaneStat(OpGgNode entry, int championId, Lane lane)
+    {
+        var play = entry["play"].AsInt();
+
+        return new LaneStat
+        {
+            ChampionId = championId,
+            Lane = lane,
+            // HasValue, not just a division: a missing field reads as 0 through AsInt, so a renamed
+            // field would quietly turn every champion into a 0 % champion — worse than the rounding
+            // this replaces. The fallback keeps the rounded rate, and 0.5 means "unknown" here.
+            WinRate = play > 0 && entry["win"].HasValue
+                ? (double)entry["win"].AsInt() / play
+                : entry["win_rate"].AsNumber(0.5),
+            PickRate = entry["pick_rate"].AsNumber(),
+            BanRate = entry["ban_rate"].AsNumber(),
+            RoleRate = entry["role_rate"].AsNumber(),
+            Tier = entry["tier"].AsInt(),
+            Play = play,
+            FromTierList = true,
+        };
     }
 
     /// <summary>
@@ -364,6 +422,11 @@ public sealed class SnapshotBuilder : IDisposable
         var done = 0;
         var failures = new List<string>();
 
+        // Every champion reports the same aggregate, so this is a vote rather than a lookup: one
+        // odd answer among 173 should not decide what the footer claims.
+        var versions = new Dictionary<string, int>(StringComparer.Ordinal);
+        DateTimeOffset? newest = null;
+
         var gate = new SemaphoreSlim(options.MaxConcurrency);
         var sync = new Lock();
 
@@ -380,9 +443,21 @@ public sealed class SnapshotBuilder : IDisposable
                 lock (sync)
                 {
                     if (node is null)
+                    {
                         failures.Add(champion.Name);
+                    }
                     else
+                    {
                         Absorb(snapshot, resolver, champion, requested, node);
+                        RecordFieldDiagnostics(node, AnalysisFields);
+
+                        var (version, asOf) = ReadDataStamp(node);
+                        if (version is not null)
+                            versions[version] = versions.GetValueOrDefault(version) + 1;
+
+                        if (asOf is { } stamp && (newest is null || stamp > newest))
+                            newest = stamp;
+                    }
 
                     progress?.Report(new BuildProgress("Counter", ++done, champions.Count));
                 }
@@ -393,9 +468,94 @@ public sealed class SnapshotBuilder : IDisposable
             }
         })).ConfigureAwait(false);
 
+        if (versions.Count > 0)
+        {
+            snapshot.DataPatch = versions
+                .OrderByDescending(pair => pair.Value)
+                .ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                .First().Key;
+
+            snapshot.DataAsOfUtc = newest;
+
+            if (versions.Count > 1)
+            {
+                var listed = string.Join(", ", versions.Keys.OrderBy(key => key, StringComparer.Ordinal));
+                snapshot.Warnings.Add($"OP.GG-Zahlen stammen aus mehreren Patches ({listed}) — angezeigt wird der häufigste.");
+            }
+        }
+
         if (failures.Count > 0)
             snapshot.Warnings.Add($"Analyse: {failures.Count} Champions ohne Daten ({string.Join(", ", failures.Take(5))}).");
     }
+
+    /// <summary>
+    /// The patch and timestamp OP.GG reports for its own aggregate. Both may be absent; the caller
+    /// treats that as "this response says nothing" rather than as a zero.
+    /// </summary>
+    public static (string? Version, DateTimeOffset? AsOf) ReadDataStamp(OpGgNode node)
+    {
+        var trend = node["data"]["trends"]["win"];
+
+        // A trend is a series by name. The endpoint currently answers with a single value, but if it
+        // ever returns the series, the newest entry is the one that describes today's numbers.
+        if (trend.Items.Count > 0)
+            trend = trend.Items[^1];
+
+        var version = trend["version"].AsText() is { Length: > 0 } text ? text : null;
+
+        var asOf = DateTimeOffset.TryParse(
+            trend["created_at"].AsText(),
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out var parsed)
+            ? parsed
+            : (DateTimeOffset?)null;
+
+        return (version, asOf);
+    }
+
+    /// <summary>
+    /// Reads the field names this one response could not match. OP.GG injects the list itself, which
+    /// makes it the only warning we get before a renamed field turns into a column of zeroes.
+    /// </summary>
+    public static void CollectUnmatchedFields(OpGgNode root, SortedSet<string> sink)
+    {
+        foreach (var field in root["_field_diagnostics"]["unmatched_fields"].Items)
+        {
+            if (field.AsText() is { Length: > 0 } name)
+                sink.Add(name);
+        }
+    }
+
+    /// <summary>
+    /// Books one response against the field list it was asked for, so the build can tell a field
+    /// that is genuinely gone from one that is merely absent for this particular champion.
+    /// </summary>
+    private void RecordFieldDiagnostics(OpGgNode root, IReadOnlyList<string> requested)
+    {
+        var unmatched = new SortedSet<string>(StringComparer.Ordinal);
+        CollectUnmatchedFields(root, unmatched);
+
+        foreach (var field in requested)
+        {
+            var seen = _fieldReports.GetValueOrDefault(field);
+            _fieldReports[field] = (seen.Requested + 1, seen.Unmatched + (unmatched.Contains(field) ? 1 : 0));
+        }
+    }
+
+    private List<string> MissingFields() => MissingFields(_fieldReports);
+
+    /// <summary>
+    /// Fields that no response accepted. A field rejected by SOME responses and not others is simply
+    /// absent for those champions — the analysis call omits the synergy branch for the champion's own
+    /// lane, so roughly a third of all champions reject one of them. Reporting those would put a
+    /// scary line under every single update, and a warning that is always wrong gets ignored.
+    /// </summary>
+    public static List<string> MissingFields(IReadOnlyDictionary<string, (int Requested, int Unmatched)> reports)
+        => [.. reports
+            .Where(entry => entry.Value.Requested > 0 && entry.Value.Unmatched == entry.Value.Requested)
+            .Select(entry => entry.Key)
+            .Order(StringComparer.Ordinal)];
 
     /// <summary>
     /// Calls the analysis endpoint, retrying once under the champion's display name. OP.GG accepts
@@ -511,24 +671,47 @@ public sealed class SnapshotBuilder : IDisposable
     /// </summary>
     private static void AddLaneFallback(MetaSnapshot snapshot, int championId, Lane lane, OpGgNode stats)
     {
-        var roleRate = stats["role_rate"].AsNumber(-1);
-        if (roleRate < 0)
+        if (ReadFallbackLaneStat(stats, championId, lane) is not { } fallback)
             return;
 
+        // The tier list wins whenever it covers this lane. Its sample counts a different population
+        // than the analysis call (which runs with tier="all"), so the two numbers are not comparable
+        // and the larger one is not the better one.
         var alreadyKnown = snapshot.LaneStats.Any(stat => stat.ChampionId == championId && stat.Lane == lane);
         if (alreadyKnown)
             return;
 
-        snapshot.LaneStats.Add(new LaneStat
+        snapshot.LaneStats.Add(fallback);
+    }
+
+    /// <summary>
+    /// One lane row built from the analysis call instead of the tier list. Returns
+    /// <see langword="null"/> when the response says nothing about this lane.
+    /// <para>
+    /// Unlike the tier list this endpoint reports no win counter, so these few rows keep the rate
+    /// rounded to two decimals. What it does report — and what used to be thrown away here — is the
+    /// sample size and the tier: without them shrinkage pinned every one of these rows to exactly
+    /// 50 %, which is not what "off-meta lane" means.
+    /// </para>
+    /// </summary>
+    public static LaneStat? ReadFallbackLaneStat(OpGgNode stats, int championId, Lane lane)
+    {
+        var roleRate = stats["role_rate"].AsNumber(-1);
+        if (roleRate < 0)
+            return null;
+
+        return new LaneStat
         {
             ChampionId = championId,
             Lane = lane,
             WinRate = stats["win_rate"].AsNumber(0.5),
+            PickRate = stats["pick_rate"].AsNumber(),
+            BanRate = stats["ban_rate"].AsNumber(),
             RoleRate = roleRate,
-            // No sample size is reported here, so leave it at zero: shrinkage then treats the win
-            // rate as unknown rather than as fact.
-            Play = 0,
-        });
+            // 0 is LaneStat's documented "unrated"; TierNudge skips it. Not -1, that is SynergyStat.
+            Tier = stats["tier_data"]["tier"].AsInt(),
+            Play = stats["play"].AsInt(),
+        };
     }
 
     private static void AddMatchup(
@@ -605,7 +788,10 @@ public sealed class SnapshotBuilder : IDisposable
                 lock (sync)
                 {
                     if (node is not null)
+                    {
                         AbsorbDuos(snapshot, resolver, pair.Champion.Id, pair.Lane, pair.PartnerLane, node);
+                        RecordFieldDiagnostics(node, DuoSynergyFields);
+                    }
 
                     progress?.Report(new BuildProgress("Duos", ++done, pairs.Count));
                 }
@@ -626,11 +812,7 @@ public sealed class SnapshotBuilder : IDisposable
                 ["champion"] = name,
                 ["my_position"] = own.ToOpGg(),
                 ["synergy_position"] = partner.ToOpGg(),
-                ["desired_output_fields"] = OpGgMcpClient.Fields(
-                    "data.synergies[].synergy_champion_name",
-                    "data.synergies[].play",
-                    "data.synergies[].win_rate",
-                    "data.synergies[].synergy_tier_data.tier"),
+                ["desired_output_fields"] = OpGgMcpClient.Fields(DuoSynergyFields),
             };
 
             try
@@ -696,16 +878,20 @@ public sealed class SnapshotBuilder : IDisposable
             .Select(group => group.MaxBy(stat => stat.Play)!)
             .OrderBy(stat => stat.ChampionId)];
 
+        // Tier list first, sample size only as a tie-break: an analysis row carries the all-tier
+        // aggregate and can outnumber a tier list row for the same lane by thirty to one without
+        // being the better answer. AddLaneFallback already prevents the collision; this keeps the
+        // rule where it is visible instead of resting on a check 200 lines away.
         snapshot.LaneStats = [.. snapshot.LaneStats
             .GroupBy(stat => (stat.ChampionId, stat.Lane))
-            .Select(group => group.MaxBy(stat => stat.Play)!)
+            .Select(group => group.OrderByDescending(stat => stat.FromTierList).ThenByDescending(stat => stat.Play).First())
             .OrderBy(stat => stat.Lane).ThenByDescending(stat => stat.RoleRate)];
     }
 
     /// <summary>
     /// States plainly how thin the data is. Silent gaps would read as "we checked and it is fine".
     /// </summary>
-    private static void AddCoverageWarnings(MetaSnapshot snapshot)
+    private static void AddCoverageWarnings(MetaSnapshot snapshot, IReadOnlyList<string> missingFields)
     {
         var withMatchups = snapshot.Matchups.Select(stat => stat.ChampionId).Distinct().Count();
         var total = snapshot.Champions.Count;
@@ -721,6 +907,25 @@ public sealed class SnapshotBuilder : IDisposable
         snapshot.Warnings.Add(
             $"Synergien: {snapshot.Synergies.Count} Paare. Tierlist stammt aus OP.GGs Standard-Bracket, " +
             $"Matchups aus dem Bracket '{snapshot.Tier}'.");
+
+        // The one failure neither the parser nor OP.GG's own diagnostics report: if a class stops
+        // being declared in the header, every field falls back to a positional name, every lookup
+        // misses and the numbers arrive as zero. A count is the cheapest way to notice.
+        var withoutPlay = snapshot.LaneStats.Count(stat => stat.Play <= 0);
+        if (withoutPlay * 10 >= snapshot.LaneStats.Count && withoutPlay > 0)
+        {
+            snapshot.Warnings.Add(
+                $"Tierlist: {withoutPlay} von {snapshot.LaneStats.Count} Lane-Zeilen ohne Spielzahl — " +
+                "vermutlich haben sich die OP.GG-Feldnamen geändert.");
+        }
+
+        if (missingFields.Count > 0)
+        {
+            var listed = string.Join(", ", missingFields.Take(5));
+            snapshot.Warnings.Add(
+                $"OP.GG liefert {missingFields.Count} angefragte Felder in keiner einzigen Antwort mehr: " +
+                $"{listed}. Diese Zahlen fehlen im Snapshot.");
+        }
     }
 
     private static DamageType ParseDamage(string? value) => value?.ToUpperInvariant() switch
@@ -733,7 +938,8 @@ public sealed class SnapshotBuilder : IDisposable
 
     private static string[] BuildLaneMetaFields()
     {
-        string[] metrics = ["champion", "play", "win_rate", "pick_rate", "role_rate", "ban_rate", "tier"];
+        // "win" is the exact counter behind the rounded win_rate; see ReadLaneStat for why it matters.
+        string[] metrics = ["champion", "play", "win", "win_rate", "pick_rate", "role_rate", "ban_rate", "tier"];
         var fields = new List<string>(Lanes.Count * metrics.Length);
 
         foreach (var lane in Lanes.All)

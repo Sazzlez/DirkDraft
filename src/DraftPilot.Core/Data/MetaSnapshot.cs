@@ -67,6 +67,15 @@ public sealed class LaneStat
 
     /// <summary>Sample size. Small values are why every rate gets shrunk before use.</summary>
     public int Play { get; set; }
+
+    /// <summary>
+    /// True when the row comes from the tier list rather than from a champion analysis. Not stored:
+    /// it only decides which of two rows for the same lane survives deduplication, and the two
+    /// sources count different populations, so the larger sample is not automatically the better
+    /// row.
+    /// </summary>
+    [JsonIgnore]
+    public bool FromTierList { get; set; }
 }
 
 /// <summary>
@@ -118,6 +127,20 @@ public sealed class MetaSnapshot
 
     /// <summary>Data Dragon version at build time, e.g. <c>16.17.1</c>.</summary>
     public string Patch { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The patch OP.GG aggregated the numbers over, e.g. <c>16.17</c>. Empty in files written before
+    /// this was recorded, which is why nothing may depend on it being set.
+    /// <para>
+    /// Deliberately separate from <see cref="Patch"/>: that one is the client version at the moment
+    /// the button was pressed and doubles as a cache key for build plans and icon paths. The two
+    /// disagree on patch day, and only this one answers "do these numbers still describe the game".
+    /// </para>
+    /// </summary>
+    public string DataPatch { get; set; } = string.Empty;
+
+    /// <summary>When OP.GG last recomputed the numbers, as opposed to when we fetched them.</summary>
+    public DateTimeOffset? DataAsOfUtc { get; set; }
 
     public DateTimeOffset BuiltAtUtc { get; set; }
 

@@ -17,11 +17,15 @@
 
 .PARAMETER OutputDirectory
     Where to place the build. Defaults to build\DraftPilot next to this script.
+
+.PARAMETER SkipTests
+    Publish without running the test suite first. Emergency exit only.
 #>
 [CmdletBinding()]
 param(
     [switch]$NoShortcut,
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+    [switch]$SkipTests
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,6 +35,15 @@ if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'build\DirkDraft
 
 $project = Join-Path $root 'src\DraftPilot.App\DraftPilot.App.csproj'
 if (-not (Test-Path -LiteralPath $project)) { throw "Projekt nicht gefunden: $project" }
+
+# The gate runs BEFORE the running instance is killed: a red test should cost nothing, least of all
+# the instance the user has open. Against the solution, not the test project, so the app compiles
+# too. $ErrorActionPreference does not react to a native exit code, hence the explicit check.
+if (-not $SkipTests) {
+    Write-Host 'Teste vor dem Bauen'
+    & dotnet test (Join-Path $root 'DraftPilot.sln') -m:1 --nologo --verbosity quiet
+    if ($LASTEXITCODE -ne 0) { throw "dotnet test ist fehlgeschlagen (Exitcode $LASTEXITCODE) - es wurde nichts gebaut." }
+}
 
 # A running instance holds its DLLs open, which makes the copy step fail halfway.
 # DraftPilot is the pre-rename process name; kill it too so an old instance cannot linger.

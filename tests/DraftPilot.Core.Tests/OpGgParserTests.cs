@@ -1,3 +1,4 @@
+using DraftPilot.Meta;
 using DraftPilot.Meta.OpGg;
 using Xunit;
 
@@ -46,8 +47,13 @@ public class OpGgParserTests
         }
     }
 
+    /// <summary>
+    /// The field set the shipped build asks for, pinned against an older capture. The win rate in
+    /// here is the rounded one; since the win counter was added, scoring no longer uses it — see
+    /// <see cref="LaneMeta_ReadsTheWinCountBesideTheRoundedRate"/>.
+    /// </summary>
     [Fact]
-    public void LaneMeta_ReadsTheStatsWeScoreOn()
+    public void LaneMeta_StillExposesTheRoundedRateWeUsedToScoreOn()
     {
         var top = OpGgResponseParser.Parse(Load("lane-meta-all.txt"))["data"]["positions"]["top"].Items;
         var malphite = top.First(entry => entry["champion"].AsText() == "Malphite");
@@ -56,6 +62,63 @@ public class OpGgParserTests
         Assert.Equal(0.57, malphite["win_rate"].AsNumber(), precision: 3);
         Assert.Equal(0.78, malphite["role_rate"].AsNumber(), precision: 3);
         Assert.Equal(1, malphite["tier"].AsInt());
+    }
+
+    [Fact]
+    public void LaneMeta_ReadsTheWinCountBesideTheRoundedRate()
+    {
+        var top = OpGgResponseParser.Parse(Load("lane-meta-win.txt"))["data"]["positions"]["top"].Items;
+        var sett = top.First(entry => entry["champion"].AsText() == "Sett");
+
+        Assert.Equal(61702, sett["play"].AsInt());
+        Assert.Equal(31118, sett["win"].AsInt());
+
+        // The whole point of asking for the counter: the reported rate cannot tell these apart.
+        var darius = top.First(entry => entry["champion"].AsText() == "Darius");
+        Assert.Equal(sett["win_rate"].AsNumber(), darius["win_rate"].AsNumber(), precision: 6);
+    }
+
+    [Fact]
+    public void AResponseWithFieldDiagnostics_NamesTheFieldsThatDidNotMatch()
+    {
+        var root = OpGgResponseParser.Parse(Load("lane-meta-win.txt"));
+        var unmatched = root["_field_diagnostics"]["unmatched_fields"].Items;
+
+        Assert.Equal("data.positions.top[].gibtsnicht", Assert.Single(unmatched).AsText());
+    }
+
+    [Fact]
+    public void ChampionAnalysis_PositionStatsCarrySampleSizeAndTier()
+    {
+        var positions = OpGgResponseParser.Parse(Load("analysis-fields.txt"))["data"]["summary"]["positions"].Items;
+        var stats = Assert.Single(positions)["stats"];
+
+        Assert.Equal(394825, stats["play"].AsInt());
+        Assert.Equal(1, stats["tier_data"]["tier"].AsInt());
+        Assert.Equal(0.09, stats["pick_rate"].AsNumber(), precision: 3);
+        Assert.Equal(0.07, stats["ban_rate"].AsNumber(), precision: 3);
+    }
+
+    [Fact]
+    public void ChampionAnalysis_ReportsTheDataVersionItWasBuiltFrom()
+    {
+        var (version, asOf) = SnapshotBuilder.ReadDataStamp(OpGgResponseParser.Parse(Load("analysis-fields.txt")));
+
+        Assert.Equal("16.17", version);
+        Assert.Equal(new DateTimeOffset(2026, 8, 26, 11, 23, 37, TimeSpan.FromHours(9)), asOf);
+    }
+
+    /// <summary>
+    /// The counter is the one field the analysis endpoint refuses, which is why the fallback lane
+    /// rows keep a rounded rate. Pinned so a future capture that suddenly carries it gets noticed.
+    /// </summary>
+    [Fact]
+    public void ChampionAnalysis_DoesNotOfferAWinCountForALanesOverallStats()
+    {
+        var root = OpGgResponseParser.Parse(Load("analysis-fields.txt"));
+        var unmatched = root["_field_diagnostics"]["unmatched_fields"].Items.Select(field => field.AsText());
+
+        Assert.Contains("data.summary.positions[].stats.win", unmatched);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows.Media;
+using DraftPilot.App;
 using DraftPilot.Core.Draft;
 
 namespace DraftPilot.App.ViewModels;
@@ -156,9 +157,7 @@ public sealed class RecommendationViewModel : ObservableObject
             TotalLabel = "Geschätzte Siegquote";
         }
 
-        Reasons.Resize(recommendation.Reasons.Count, () => Reason.Neutral(string.Empty));
-        for (var i = 0; i < recommendation.Reasons.Count; i++)
-            Reasons[i] = recommendation.Reasons[i];
+        Reasons.ReplaceAll(recommendation.Reasons);
 
         Breakdown.Resize(recommendation.Breakdown.Count, () => new TermViewModel());
         for (var i = 0; i < recommendation.Breakdown.Count; i++)

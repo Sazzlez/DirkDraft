@@ -79,6 +79,12 @@ public sealed class MetaLookup
 
     public string Patch => _snapshot.Patch;
 
+    /// <summary>The patch OP.GG's numbers describe; empty for snapshots written before it existed.</summary>
+    public string DataPatch => _snapshot.DataPatch;
+
+    /// <summary>When OP.GG last recomputed, as opposed to when the button was pressed.</summary>
+    public DateTimeOffset? DataAsOfUtc => _snapshot.DataAsOfUtc;
+
     public DateTimeOffset BuiltAtUtc => _snapshot.BuiltAtUtc;
 
     public IReadOnlyList<string> Warnings => _snapshot.Warnings;

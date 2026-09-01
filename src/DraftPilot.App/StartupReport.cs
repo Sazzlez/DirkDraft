@@ -78,10 +78,19 @@ public static class StartupReport
         if (snapshot is not null)
         {
             text.AppendLine($"Patch            {snapshot.Patch}")
+                .AppendLine($"OP.GG-Patch      {(snapshot.DataPatch.Length > 0 ? snapshot.DataPatch : "unbekannt (älterer Snapshot)")}")
+                .AppendLine($"Zahlenstand      {snapshot.DataAsOfUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "unbekannt (älterer Snapshot)"}")
                 .AppendLine($"Champions        {snapshot.Champions.Count}")
                 .AppendLine($"Lane-Einträge    {snapshot.LaneStats.Count}")
                 .AppendLine($"Matchups         {snapshot.Matchups.Count}")
                 .AppendLine($"Synergien        {snapshot.Synergies.Count}");
+
+            if (snapshot.Warnings.Count > 0)
+            {
+                text.AppendLine().AppendLine("--- Hinweise zum Datenbestand ---");
+                foreach (var warning in snapshot.Warnings)
+                    text.AppendLine($"  {warning}");
+            }
         }
 
         text.AppendLine($"Icon-Ordner      {AppPaths.IconDirectory}")

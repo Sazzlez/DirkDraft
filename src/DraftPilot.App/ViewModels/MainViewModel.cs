@@ -55,8 +55,36 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     private readonly BuildCache _buildCache = new();
 
-    /// <summary>Enemy champion ids whose live counter data was already fetched this draft.</summary>
-    private readonly HashSet<int> _liveFetched = [];
+    /// <summary>
+    /// Enemy counters already fetched this draft, keyed by the arguments the call was actually made
+    /// with. Keying by champion alone looked right and was not: live matchups are stored per lane, so
+    /// a champion fetched under a guessed lane that later turns out different keeps its edges filed
+    /// where nothing ever looks them up, and the champion counts as done for the rest of the draft.
+    /// </summary>
+    private readonly HashSet<(int Champion, Lane Lane)> _liveFetched = [];
+
+    /// <summary>
+    /// Counter calls made this draft. A prediction that keeps flipping would otherwise buy a new
+    /// request on every flip; twelve is well above what an honest draft needs.
+    /// </summary>
+    private int _liveCallsThisDraft;
+
+    private const int MaxLiveCallsPerDraft = 12;
+
+    /// <summary>Consecutive rounds that ended with at least one failed call; drives the backoff.</summary>
+    private int _fetchFailures;
+
+    /// <summary>The matchup whose build could not be fetched, so the card can say so.</summary>
+    private (int Champion, Lane Lane, int Opponent)? _buildFailedFor;
+
+    /// <summary>How often the build failed for that same matchup, so it cannot retry forever.</summary>
+    private int _buildFailCount;
+
+    /// <summary>
+    /// The enemy lane prediction the current render worked with. The fetch must select and count
+    /// enemies from the same prediction it was counted with, or the pending count never reaches zero.
+    /// </summary>
+    private LanePredictionResult? _enemyPredictions;
 
     /// <summary>
     /// Matchups the build was already requested for this draft. Lane predictions can flip while
@@ -822,6 +850,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _meta.ClearLiveMatchups();
             _liveFetched.Clear();
             _buildFetched.Clear();
+            _liveCallsThisDraft = 0;
+            _fetchFailures = 0;
+            _buildFailedFor = null;
+            _buildFailCount = 0;
+            _enemyPredictions = null;
             _pendingEnemyCount = 0;
             _buildContext = null;
             _fetchAgainWhenDone = false;
@@ -857,6 +890,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _meta.ClearLiveMatchups();
             _liveFetched.Clear();
             _buildFetched.Clear();
+            _liveCallsThisDraft = 0;
+            _fetchFailures = 0;
+            _buildFailedFor = null;
+            _buildFailCount = 0;
             _fetchCooldownUntil = DateTimeOffset.MinValue;
             RuneImportText = string.Empty;
             _build = null;
@@ -956,8 +993,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// </summary>
     private void UpdateDraftLiveState(LanePredictionResult enemyPredictions, LanePredictionResult allyPredictions)
     {
-        _pendingEnemyCount = _state.Enemies.Count(slot =>
-            slot.EffectiveChampionId != 0 && !_liveFetched.Contains(slot.EffectiveChampionId));
+        _enemyPredictions = enemyPredictions;
+        _pendingEnemyCount = PendingEnemies().Count;
 
         _buildContext = null;
 
@@ -1033,6 +1070,48 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
 
     /// <summary>
+    /// The enemies still worth a counter call, keyed exactly as the call will be made. Counting and
+    /// selecting run through this same method: two copies of the predicate drifted apart the moment
+    /// the lane became part of the key, and a pending count that never reaches zero turns every
+    /// client event into an empty round.
+    /// </summary>
+    private List<(int Champion, Lane Lane, string Name)> PendingEnemies()
+    {
+        var pending = new List<(int Champion, Lane Lane, string Name)>();
+
+        if (_enemyPredictions is not { } predictions || _liveCallsThisDraft >= MaxLiveCallsPerDraft)
+            return pending;
+
+        var seen = new HashSet<(int, Lane)>();
+
+        foreach (var slot in _state.Enemies)
+        {
+            var id = slot.EffectiveChampionId;
+            if (id == 0 || _meta.Champion(id) is not { } enemy)
+                continue;
+
+            var prediction = predictions.ForCell(slot.CellId);
+            var lane = LiveDraftFetcher.RequestedLane(prediction?.Lane ?? Lane.Unknown);
+            var key = (id, lane);
+
+            // Two seats can hover the same champion; that is still one call.
+            if (_liveFetched.Contains(key) || !seen.Add(key))
+                continue;
+
+            // The first call for a champion always goes out, however unsure the lane — some data
+            // beats none. A SECOND lane for the same champion only once the prediction has settled:
+            // an uncertain lane wobbles while seats fill up, and each wobble would cost a request.
+            var alreadyHaveOne = _liveFetched.Any(entry => entry.Champion == id);
+            if (alreadyHaveOne && prediction is not { IsUncertain: false })
+                continue;
+
+            pending.Add((id, lane, enemy.Name));
+        }
+
+        return pending;
+    }
+
+    /// <summary>
     /// Starts the draft fetch if there is anything new to get. Called after every client event, so
     /// each newly revealed pick pulls its own data in without anybody having to ask.
     /// </summary>
@@ -1074,13 +1153,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
 
     /// <summary>
-    /// Fetches what this draft is missing: fresh counters for every newly revealed enemy, and the
-    /// matchup guide for the locked pick.
+    /// Fetches what this draft is missing: the matchup guide for the locked pick first, then fresh
+    /// counters for every newly revealed enemy, three at a time.
     /// <para>
     /// Runs by itself after every pick, because the alternative — a button — meant the advice was
-    /// quietly worse until somebody remembered to press it. It stays cheap: at most one call per
-    /// enemy champion and one per matchup for the whole draft, everything is cached on disk, and a
-    /// failure backs off instead of hammering a dead connection.
+    /// quietly worse until somebody remembered to press it. It stays cheap: one call per enemy and
+    /// lane, one per matchup, a hard ceiling of <see cref="MaxLiveCallsPerDraft"/> for the whole
+    /// draft, everything cached on disk, and a failure that costs only its own call.
     /// </para>
     /// </summary>
     private async Task FetchDraftDataAsync()
@@ -1093,67 +1172,75 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // writing that draft's counters into the freshly cleared lookup.
         var token = _draftScope?.Token ?? _lifetime.Token;
 
+        var attempted = 0;
+        var failed = 0;
+
         try
         {
             var resolver = new ChampionResolver(_meta.Champions);
             _opGg ??= new OpGgMcpClient();
             var fetcher = new LiveDraftFetcher(
                 _opGg, _settings.GameMode, message => CrashLog.Note("Draft-Abruf", message));
-            var predictions = _predictor.Predict(_state.Enemies, _manualLanes);
 
-            foreach (var slot in _state.Enemies.ToList())
-            {
-                var id = slot.EffectiveChampionId;
-                if (id == 0 || _liveFetched.Contains(id) || _meta.Champion(id) is not { } enemy)
-                    continue;
-
-                ReportFetch($"lädt Daten zu {enemy.Name}…");
-
-                var lane = predictions.ForCell(slot.CellId)?.Lane ?? Lane.Unknown;
-                var stats = await fetcher.FetchEnemyCountersAsync(enemy, lane, resolver, token)
-                    .ConfigureAwait(true);
-
-                // Marked as fetched even when empty: asking again would not produce more data.
-                _liveFetched.Add(id);
-
-                if (stats.Count > 0)
-                    _meta.ApplyLiveMatchups(stats);
-
-                // Show each enemy's data as it lands rather than after the last one.
-                _refreshingFromFetch = true;
-                try
-                {
-                    Refresh();
-                }
-                finally
-                {
-                    _refreshingFromFetch = false;
-                }
-            }
-
+            // The build goes first. It is the only result of this whole round the user can act on —
+            // the rune button hangs off it — and behind up to five serial enemy calls it regularly
+            // arrived after the draft had already ended. Nothing the enemy calls fetch can change
+            // which build is wanted: _buildContext comes from lane predictions and the locked pick,
+            // and the predictor does not read matchups.
             if (_buildContext is { } context && !BuildMatchesContext
                 && !_buildFetched.Contains(context)
                 && _meta.Champion(context.Champion) is { } me
                 && _meta.Champion(context.Opponent) is { } opponent)
             {
+                attempted++;
                 ReportFetch($"lädt Build für {me.Name}…");
 
-                var plan = await fetcher.FetchBuildAsync(me, opponent, context.Lane, _meta.Patch, token)
-                    .ConfigureAwait(true);
-
-                // Marked AFTER the await, mirroring _liveFetched above: marked before it, one
-                // network hiccup meant no build and a locked rune button for the rest of the
-                // draft, because nothing would ever ask again.
-                _buildFetched.Add(context);
-
-                if (plan is not null && !plan.IsEmpty)
-                {
-                    _buildCache.Save(plan);
-                    ApplyBuild(plan);
-                }
+                if (!await FetchTheBuildAsync(fetcher, context, me, opponent, token).ConfigureAwait(true))
+                    failed++;
             }
 
-            _fetchRetry?.Stop();
+            if (token.IsCancellationRequested)
+                return;
+
+            var pending = PendingEnemies();
+            if (pending.Count > 0)
+            {
+                attempted += pending.Count;
+                ReportFetch(pending.Count == 1
+                    ? $"lädt Daten zu {pending[0].Name}…"
+                    : $"lädt Daten zu {pending.Count} Gegnern…");
+
+                // Three at a time. The update run drives the same endpoint at ten without ever
+                // seeing a 429, and a pick phase does not have thirty seconds to spend serially.
+                using var gate = new SemaphoreSlim(3);
+                var remaining = pending.Count;
+
+                var results = await Task.WhenAll(pending.Select(async entry =>
+                {
+                    await gate.WaitAsync(token).ConfigureAwait(true);
+                    try
+                    {
+                        // ConfigureAwait(true) throughout is what makes this safe without a lock:
+                        // every continuation returns to the dispatcher, so the shared sets, the
+                        // lookup and the UI are still only ever touched from one thread.
+                        var ok = await FetchOneEnemyAsync(fetcher, entry, resolver, token).ConfigureAwait(true);
+
+                        if (!token.IsCancellationRequested && --remaining > 0)
+                            ReportFetch($"lädt Daten zu {remaining} weiteren Gegnern…");
+
+                        return ok;
+                    }
+                    finally
+                    {
+                        gate.Release();
+                    }
+                })).ConfigureAwait(true);
+
+                failed += results.Count(ok => !ok);
+            }
+
+            if (token.IsCancellationRequested)
+                return;
 
             _refreshingFromFetch = true;
             try
@@ -1168,33 +1255,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         catch (OperationCanceledException)
         {
             // Shutting down, or the draft this fetch belonged to has ended.
+            return;
         }
         catch (Exception ex)
         {
-            // Back off: without this a broken connection would be retried on every client event,
-            // and champion select produces a lot of those.
-            _fetchCooldownUntil = DateTimeOffset.UtcNow.AddSeconds(30);
-            _fetchAgainWhenDone = false;
-            DraftFetchFailed = true;
-            DraftFetchText = "OP.GG nicht erreichbar — versuche es weiter";
-            ShowDraftFetchStatus = true;
+            // Anything that got past the per-call handlers is a real defect, not a bad connection.
             CrashLog.Write("Draft-Abruf", ex);
-
-            // The status line just promised to keep trying, so something actually has to: the
-            // last picks of a draft produce no further client events to piggyback on.
-            _fetchRetry ??= new DispatcherTimer(
-                TimeSpan.FromSeconds(31),
-                DispatcherPriority.Background,
-                (_, _) =>
-                {
-                    _fetchRetry!.Stop();
-                    TryFetchDraftData();
-                },
-                _dispatcher);
-
-            _fetchRetry.Stop();
-            _fetchRetry.Start();
-            return;
+            failed = Math.Max(failed, 1);
+            attempted = Math.Max(attempted, 1);
         }
         finally
         {
@@ -1202,12 +1270,170 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             UpdateBuildSection();
         }
 
+        if (failed > 0)
+        {
+            ScheduleFetchRetry(failed, attempted);
+            return;
+        }
+
+        _fetchFailures = 0;
+        _fetchRetry?.Stop();
+        DraftFetchFailed = false;
         DraftFetchText = string.Empty;
         ShowDraftFetchStatus = false;
 
         // A pick that landed while this ran gets its own round.
         if (_fetchAgainWhenDone)
             TryFetchDraftData();
+    }
+
+    /// <summary>
+    /// One enemy's counters. Returns <see langword="false"/> when the call failed in a way the round
+    /// can survive; the enemy simply stays on the pending list for the next attempt.
+    /// </summary>
+    private async Task<bool> FetchOneEnemyAsync(
+        LiveDraftFetcher fetcher,
+        (int Champion, Lane Lane, string Name) entry,
+        ChampionResolver resolver,
+        CancellationToken token)
+    {
+        if (_meta.Champion(entry.Champion) is not { } enemy)
+            return true;
+
+        try
+        {
+            _liveCallsThisDraft++;
+            var stats = await fetcher.FetchEnemyCountersAsync(enemy, entry.Lane, resolver, token)
+                .ConfigureAwait(true);
+
+            // The draft may have ended while this was in flight: the sets and the lookup have been
+            // cleared by now, and writing into them would leave the NEXT draft with stale edges.
+            if (token.IsCancellationRequested)
+                return true;
+
+            // Marked as fetched even when empty: asking again would not produce more data.
+            _liveFetched.Add((entry.Champion, entry.Lane));
+
+            if (stats.Count > 0)
+                _meta.ApplyLiveMatchups(stats);
+
+            // Show each enemy's data as it lands rather than after the last one.
+            _refreshingFromFetch = true;
+            try
+            {
+                Refresh();
+            }
+            finally
+            {
+                _refreshingFromFetch = false;
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (IsRecoverable(ex, token))
+        {
+            CrashLog.Note("Draft-Abruf", $"{entry.Name}: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>The matchup guide for the locked pick, with the same per-call error handling.</summary>
+    private async Task<bool> FetchTheBuildAsync(
+        LiveDraftFetcher fetcher,
+        (int Champion, Lane Lane, int Opponent) context,
+        ChampionEntry me,
+        ChampionEntry opponent,
+        CancellationToken token)
+    {
+        try
+        {
+            var plan = await fetcher.FetchBuildAsync(me, opponent, context.Lane, _meta.Patch, token)
+                .ConfigureAwait(true);
+
+            if (token.IsCancellationRequested)
+                return true;
+
+            // Marked AFTER the await, mirroring _liveFetched: marked before it, one network hiccup
+            // meant no build and a locked rune button for the rest of the draft, because nothing
+            // would ever ask again.
+            _buildFetched.Add(context);
+            _buildFailedFor = null;
+            _buildFailCount = 0;
+
+            if (plan is not null && !plan.IsEmpty)
+            {
+                _buildCache.Save(plan);
+                ApplyBuild(plan);
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (IsRecoverable(ex, token))
+        {
+            CrashLog.Note("Draft-Abruf", $"Build {me.Name} vs {opponent.Name}: {ex.Message}");
+
+            // Three attempts, then stop asking: a matchup OP.GG cannot answer would otherwise keep
+            // the retry timer alive for the whole draft.
+            _buildFailCount = _buildFailedFor == context ? _buildFailCount + 1 : 1;
+            _buildFailedFor = context;
+
+            if (_buildFailCount >= 3)
+                _buildFetched.Add(context);
+
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Whether a failed call should cost only its own item. A cancelled token means the draft ended
+    /// and the whole round is void; the same exception type WITHOUT a cancelled token is the HTTP
+    /// timeout, which used to be swallowed as if the draft had ended.
+    /// </summary>
+    private static bool IsRecoverable(Exception ex, CancellationToken token) => ex switch
+    {
+        OperationCanceledException => !token.IsCancellationRequested,
+        OpGgApiException or OpGgParseException => true,
+        System.Text.Json.JsonException or HttpRequestException or IOException => true,
+        _ => false,
+    };
+
+    /// <summary>
+    /// Backs off after a failed round: 3, 6, 12, 24, then 30 seconds. The old flat 30 s cost a
+    /// quarter of the whole draft for one hiccup, and it applied to every pending call at once.
+    /// </summary>
+    private void ScheduleFetchRetry(int failed, int attempted)
+    {
+        _fetchFailures++;
+
+        var seconds = Math.Min(30, 3 * (1 << Math.Min(_fetchFailures - 1, 4)));
+        var backoff = TimeSpan.FromSeconds(seconds);
+
+        _fetchCooldownUntil = DateTimeOffset.UtcNow + backoff;
+        DraftFetchFailed = true;
+        DraftFetchText = failed >= attempted
+            ? "OP.GG nicht erreichbar — versuche es weiter"
+            : $"OP.GG: {failed} von {attempted} Abrufen fehlgeschlagen — versuche es weiter";
+        ShowDraftFetchStatus = true;
+
+        // The status line just promised to keep trying, so something actually has to: the last picks
+        // of a draft produce no further client events to piggyback on.
+        _fetchRetry ??= new DispatcherTimer(
+            backoff,
+            DispatcherPriority.Background,
+            (_, _) =>
+            {
+                _fetchRetry!.Stop();
+                TryFetchDraftData();
+            },
+            _dispatcher);
+
+        _fetchRetry.Stop();
+
+        // Assigned every time, not just on creation: the timer is built with ??= , so the interval
+        // of the very first failure would otherwise be the interval forever.
+        // One second past the cooldown, or the tick bounces off the cooldown check and does nothing.
+        _fetchRetry.Interval = backoff + TimeSpan.FromSeconds(1);
+        _fetchRetry.Start();
     }
 
     private void ReportFetch(string text)
@@ -1389,15 +1615,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         if (_build is { } current && preference != _appliedBootsPreference)
             ApplyGameBuild(current);
 
-        BuildHints.Resize(hints.Count, () => Reason.Neutral(string.Empty));
-        for (var i = 0; i < hints.Count; i++)
-        {
-            // Reason is a record: skip identical values. An unconditional assignment raises
-            // Replace on every render pass and makes the ItemsControl rebuild its containers —
-            // visible as flickering chips.
-            if (!Equals(BuildHints[i], hints[i]))
-                BuildHints[i] = hints[i];
-        }
+        BuildHints.ReplaceAll(hints);
     }
 
     /// <summary>Progress or result of the rune import, next to its button.</summary>
@@ -1492,9 +1710,19 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             ShowIdleCard = false;
             ShowBuildClose = false;
             ShowBuildSection = HasBuild || _buildContext is not null;
-            BuildHint = HasBuild
-                ? string.Empty
-                : "Build wird geladen, sobald dein Pick und dein Lane-Gegner feststehen.";
+
+            // The old text claimed to be waiting for the pick and the lane opponent — in the only
+            // situation where the card is visible at all, since the line above needs _buildContext,
+            // which needs both. Say what is actually going on instead.
+            BuildHint = (HasBuild, _buildContext) switch
+            {
+                (true, _) => string.Empty,
+                (false, { } ctx) when _buildFailedFor == ctx => "Build konnte nicht geladen werden — versuche es weiter.",
+                (false, { } ctx) when _buildFetched.Contains(ctx) => "OP.GG hat zu diesem Duell keinen Build.",
+                (false, { } ctx) => $"Build für {_meta.ChampionName(ctx.Champion)} gegen {_meta.ChampionName(ctx.Opponent)} wird geladen…",
+                _ => string.Empty,
+            };
+
             return;
         }
 
@@ -1621,15 +1849,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         _enemyComp = set.EnemyComp;
 
-        var findings = set.AllyComp.Findings.Select(finding => finding.Text).ToList();
-        Warnings.Resize(findings.Count, () => string.Empty);
-        for (var i = 0; i < findings.Count; i++)
-        {
-            // Skip identical values: an unconditional assignment raises Replace on every render
-            // and rebuilds the chip containers for nothing.
-            if (!Equals(Warnings[i], findings[i]))
-                Warnings[i] = findings[i];
-        }
+        Warnings.ReplaceAll([.. set.AllyComp.Findings.Select(finding => finding.Text)]);
     }
 
     /// <summary>How many entries from the top sit within 0.3 win-rate points of first place.</summary>
@@ -1755,16 +1975,53 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             return;
         }
 
+        // Three clocks that must not be mixed up: the file time says when the button was pressed,
+        // Patch is the client version at that moment, and DataPatch is the patch OP.GG's numbers
+        // actually describe. Only the last one answers "do these numbers still fit the game", so it
+        // gets the headline whenever the snapshot carries it.
         var age = _store.Age();
         var ageText = age is null
             ? string.Empty
             : age.Value.TotalDays >= 1
-                ? $" · {(int)age.Value.TotalDays} Tage alt"
-                : $" · {(int)age.Value.TotalHours} h alt";
+                ? $" · vor {(int)age.Value.TotalDays} Tagen geholt"
+                : $" · vor {(int)age.Value.TotalHours} h geholt";
+
+        // No scolding below a week: a two-day-old snapshot in the same patch is perfectly current.
+        var nudge = age is { TotalDays: >= 7 } ? " · ein Update lohnt sich" : string.Empty;
+
+        var patchText = _meta.DataPatch.Length > 0
+            ? $"OP.GG-Patch {_meta.DataPatch}"
+            : $"Patch {_meta.Patch}";
 
         HasMeta = true;
-        SnapshotText = $"Daten: Patch {_meta.Patch}{ageText}";
-        SnapshotDetail = DataSummary;
+        SnapshotText = $"Daten: {patchText}{ageText}{nudge}";
+        SnapshotDetail = DescribeDataProvenance();
+    }
+
+    /// <summary>
+    /// The long form behind the footer: which numbers, from when, and whether OP.GG was still on the
+    /// previous patch when they were fetched.
+    /// </summary>
+    private string DescribeDataProvenance()
+    {
+        var lines = new List<string>(5);
+
+        if (_meta.DataAsOfUtc is { } asOf)
+            lines.Add($"Zahlenstand laut OP.GG: {asOf.ToLocalTime():dd.MM.yyyy HH:mm}");
+
+        if (_meta.Patch.Length > 0)
+            lines.Add($"Client-Patch beim Abruf: {_meta.Patch}");
+
+        if (_meta.DataPatch.Length > 0 && !_meta.Patch.StartsWith(_meta.DataPatch, StringComparison.Ordinal))
+            lines.Add("OP.GG lag beim Abruf einen Patch zurück.");
+
+        // Snapshot warnings had no reader in the app at all — the update wrote them and only the
+        // console tool ever showed them.
+        lines.AddRange(_meta.Warnings);
+
+        lines.Add(DataSummary);
+
+        return string.Join("\n", lines);
     }
 
     /// <summary>Version plus the executable's write time — the only reliable "which build is this".</summary>

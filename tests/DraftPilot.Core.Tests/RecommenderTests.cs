@@ -455,6 +455,35 @@ public class RecommenderTests
         Assert.Equal(first, second);
     }
 
+    /// <summary>
+    /// The chip lists only write positions that changed, which relies on the reasons coming back
+    /// value-equal between two renders. A culture-dependent format or a timestamp in a chip would
+    /// make that guard never fire, and the flickering would be back without a red test.
+    /// </summary>
+    [Fact]
+    public void IdenticalInput_ProducesValueEqualReasonChips()
+    {
+        var (state, target, lanes) = Scenario();
+        var recommender = Recommender();
+
+        var first = recommender.Recommend(state, target, lanes).Items;
+        var second = recommender.Recommend(state, target, lanes).Items;
+
+        Assert.Equal(first.Count, second.Count);
+        for (var i = 0; i < first.Count; i++)
+            Assert.Equal(first[i].Reasons, second[i].Reasons);
+    }
+
+    [Fact]
+    public void TwoReasonsWithTheSameTextToneAndHint_AreEqual()
+    {
+        // Turning Reason into a class would silently drop all three chip guards back to reference
+        // equality, and nothing else in the suite would notice.
+        Assert.Equal(Reason.Neutral("gleich"), Reason.Neutral("gleich"));
+        Assert.NotEqual(Reason.Neutral("gleich"), Reason.Pro("gleich"));
+        Assert.NotEqual(Reason.Neutral("gleich"), Reason.Neutral("gleich", hint: "anders"));
+    }
+
     [Fact]
     public void LimitIsRespected()
     {

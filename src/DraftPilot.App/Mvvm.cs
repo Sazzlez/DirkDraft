@@ -54,4 +54,28 @@ public static class ObservableCollectionExtensions
         while (target.Count < size)
             target.Add(create());
     }
+
+    /// <summary>
+    /// Replaces the contents, but only writes the positions that actually differ.
+    /// <para>
+    /// An unconditional assignment raises Replace on every render pass and makes the ItemsControl
+    /// rebuild its containers — visible as flickering chips, and it drops a tooltip the moment the
+    /// user hovers one. Requires value equality on <typeparamref name="T"/>; the chip types are
+    /// records for exactly that reason.
+    /// </para>
+    /// </summary>
+    public static void ReplaceAll<T>(this ObservableCollection<T> target, IReadOnlyList<T> values)
+    {
+        while (target.Count > values.Count)
+            target.RemoveAt(target.Count - 1);
+
+        for (var i = 0; i < target.Count; i++)
+        {
+            if (!Equals(target[i], values[i]))
+                target[i] = values[i];
+        }
+
+        for (var i = target.Count; i < values.Count; i++)
+            target.Add(values[i]);
+    }
 }

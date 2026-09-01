@@ -306,9 +306,11 @@ public sealed class LiveDraftFetcher(OpGgMcpClient client, string gameMode, Acti
 
                     return MatchupGuideParser.Parse(text, me.Id, me.Name, opponent.Id, opponent.Name, lane, patch);
                 }
-                catch (OpGgApiException)
+                catch (OpGgApiException ex) when (ex.Status is null)
                 {
-                    // Wrong spelling or no data for this pairing; try the next combination.
+                    // Wrong spelling or no data for this pairing; try the next combination. An HTTP
+                    // status means the endpoint itself is unwell — that one goes up, or an outage
+                    // looks exactly like "this champion has no build".
                 }
                 catch (JsonException ex)
                 {
@@ -328,13 +330,20 @@ public sealed class LiveDraftFetcher(OpGgMcpClient client, string gameMode, Acti
     /// stocked snapshot carries the same shape of data but only ~3 entries per champion; asking
     /// again for the enemies actually on the board is what makes the counter advice dense.
     /// </summary>
+    /// <summary>
+    /// The lane a counter call is actually made for. Public because the caller has to remember what
+    /// it already fetched, and remembering the predicted lane instead of the requested one means the
+    /// two disagree exactly when the prediction was unclear.
+    /// </summary>
+    public static Lane RequestedLane(Lane likelyLane) => likelyLane == Lane.Unknown ? Lane.Mid : likelyLane;
+
     public async Task<IReadOnlyList<MatchupStat>> FetchEnemyCountersAsync(
         ChampionEntry enemy,
         Lane likelyLane,
         ChampionResolver resolver,
         CancellationToken ct)
     {
-        var requested = likelyLane == Lane.Unknown ? Lane.Mid : likelyLane;
+        var requested = RequestedLane(likelyLane);
 
         foreach (var name in ChampionResolver.ApiNames(enemy))
         {
@@ -363,12 +372,15 @@ public sealed class LiveDraftFetcher(OpGgMcpClient client, string gameMode, Acti
                 var node = await client.CallToolAsync("lol_get_champion_analysis", arguments, ct).ConfigureAwait(false);
                 return ParseCounters(node, enemy.Id, requested, resolver);
             }
-            catch (OpGgApiException)
+            catch (OpGgApiException ex) when (ex.Status is null)
             {
-                // Try the next spelling.
+                // Try the next spelling. A response carrying an HTTP status is an outage, not a
+                // misspelling, and has to reach the caller so the status line can say so.
             }
-            catch (OpGgParseException)
+            catch (OpGgParseException ex)
             {
+                // Unreadable is not unreachable: no counters, but nothing to retry either.
+                diagnostic?.Invoke($"Counter-Antwort unlesbar für {name}: {ex.Message}");
                 return [];
             }
         }
