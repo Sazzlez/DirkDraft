@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Net.Http;
 using System.Windows;
@@ -11,6 +12,17 @@ using DraftPilot.Meta;
 using DraftPilot.Meta.OpGg;
 
 namespace DraftPilot.App.ViewModels;
+
+/// <summary>Colours the own team's draft win rate: green ahead, red behind, plain when even.</summary>
+public enum BalanceTone
+{
+    /// <summary>Within a point of even — inside the noise, so it stays neutral.</summary>
+    Even,
+
+    Ahead,
+
+    Behind,
+}
 
 /// <summary>Drives the colour of the connection dot in the title bar.</summary>
 public enum ConnectionTone
@@ -128,6 +140,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private ConnectionTone _statusTone = ConnectionTone.Off;
     private string _emptyHint = "Warte auf den League-Client.";
     private string _turnText = string.Empty;
+    private string _allyWinRateText = "—";
+    private string _enemyWinRateText = "—";
+    private BalanceTone _balanceTone;
+    private string _balanceHint = string.Empty;
     private string _listHeader = "Empfehlungen";
     private string _snapshotText = string.Empty;
     private string _updateStatus = string.Empty;
@@ -390,6 +406,34 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         get => _phaseText;
         private set => Set(ref _phaseText, value);
+    }
+
+    /// <summary>Estimated win rate of the own team, over its column.</summary>
+    public string AllyWinRateText
+    {
+        get => _allyWinRateText;
+        private set => Set(ref _allyWinRateText, value);
+    }
+
+    /// <summary>The counterpart over the enemy column; the two always add up to 100 %.</summary>
+    public string EnemyWinRateText
+    {
+        get => _enemyWinRateText;
+        private set => Set(ref _enemyWinRateText, value);
+    }
+
+    /// <summary>Colours the own number: green ahead, red behind, plain inside the noise.</summary>
+    public BalanceTone BalanceTone
+    {
+        get => _balanceTone;
+        private set => Set(ref _balanceTone, value);
+    }
+
+    /// <summary>What the two numbers mean and what they leave out; shown on hover.</summary>
+    public string BalanceHint
+    {
+        get => _balanceHint;
+        private set => Set(ref _balanceHint, value);
     }
 
     public ConnectionTone StatusTone
@@ -894,6 +938,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         RenderTeam(Allies, _state.Allies, allyPredictions, isAlly: true);
         RenderTeam(Enemies, _state.Enemies, enemyPredictions, isAlly: false);
+        RenderBalance(allyPredictions, enemyPredictions);
 
         RenderRecommendations(enemyPredictions, allyPredictions);
 
@@ -1247,6 +1292,50 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// Situational pointers from the enemy composition. They order the alternatives the data
     /// already offers — they never invent an item the statistics did not surface.
     /// </summary>
+    /// <summary>
+    /// The two numbers over the team columns. Deliberately a dash until champions are actually
+    /// revealed: a confident "50,0 %" before anyone has picked would be a claim about nothing.
+    /// </summary>
+    private void RenderBalance(LanePredictionResult allyPredictions, LanePredictionResult enemyPredictions)
+    {
+        var balance = DraftBalance.Estimate(_meta, _state, allyPredictions, enemyPredictions);
+
+        if (!balance.HasData)
+        {
+            AllyWinRateText = "—";
+            EnemyWinRateText = "—";
+            BalanceTone = BalanceTone.Even;
+            BalanceHint = "Sobald Champions aufgedeckt sind, steht hier die geschätzte Siegquote "
+                + "des Drafts.";
+            return;
+        }
+
+        AllyWinRateText = balance.AllyWinRate.ToString("P1", CultureInfo.CurrentCulture);
+        EnemyWinRateText = balance.EnemyWinRate.ToString("P1", CultureInfo.CurrentCulture);
+
+        // A point either way is inside the noise of the underlying samples; only beyond that does
+        // the colour claim anything.
+        BalanceTone = balance.AllyWinRate switch
+        {
+            >= 0.51 => BalanceTone.Ahead,
+            <= 0.49 => BalanceTone.Behind,
+            _ => BalanceTone.Even,
+        };
+
+        var duels = balance.ContestedLanes switch
+        {
+            0 => "noch kein direktes Lane-Duell in den Daten",
+            1 => "1 direktes Lane-Duell",
+            _ => $"{balance.ContestedLanes} direkte Lane-Duelle",
+        };
+
+        BalanceHint = $"Geschätzte Siegquote dieses Drafts aus {balance.RatedChampions} aufgedeckten "
+            + $"Champions und {duels}: gerechnet werden die Lane-Siegquoten beider Teams und die "
+            + "Matchups dort, wo sich zwei Picks direkt gegenüberstehen.\n\n"
+            + "50 % ist ausgeglichen, Unterschiede unter einem Punkt sind Rauschen. Noch verdeckte "
+            + "Picks zählen nicht mit — die Zahl bewegt sich also mit jedem weiteren Pick.";
+    }
+
     private void RenderBuildHints()
     {
         var hints = new List<Reason>();
@@ -1566,6 +1655,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         PhaseText = string.Empty;
         IsMyTurn = false;
         TurnText = "Kein Champ Select";
+        AllyWinRateText = "—";
+        EnemyWinRateText = "—";
+        BalanceTone = BalanceTone.Even;
+        BalanceHint = string.Empty;
         ListHeader = "Empfehlungen";
 
         EmptyHint = _meta.IsEmpty

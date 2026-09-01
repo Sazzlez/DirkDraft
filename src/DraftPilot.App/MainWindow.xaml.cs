@@ -46,7 +46,7 @@ public partial class MainWindow : Window
 
     /// <summary>Stores the window position so the panel comes back where the user put it.</summary>
     /// <remarks>
-    /// Position only: the size is fixed at 860 × 900 for every view. The window used to shrink to
+    /// Position only: the size is fixed at 1120 × 900 for every view. The window used to shrink to
     /// its content outside a draft and grow back when one started — which read as the tool
     /// "minimising itself" whenever the game began. Now nothing about the window ever moves or
     /// resizes unless the user drags it.
