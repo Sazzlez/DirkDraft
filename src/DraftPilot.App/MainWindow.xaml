@@ -203,62 +203,44 @@
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
+                <!--
+                    The status IS the headline. There used to be a countdown here plus a phase
+                    bar; both are gone on purpose. The client only reports the remaining seconds
+                    when it pushes an update, so any clock built on them drifts against the one
+                    in the client — and two clocks disagreeing by a second or two is worse than
+                    one. The client's timer is always on screen anyway; this card answers the
+                    question the client answers badly: who is on the clock right now.
+                -->
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="{Binding TurnText}" Style="{StaticResource Title}" />
-                        <TextBlock Text="{Binding PhaseText}" Style="{StaticResource Small}"
-                                   Foreground="{StaticResource Faint}" Margin="0,1,0,0" />
-                    </StackPanel>
-
-                    <TextBlock Grid.Column="1" Text="{Binding SecondsText}" VerticalAlignment="Center"
-                               FontSize="27" FontWeight="Light"
-                               FontFamily="{StaticResource NumFont}" Margin="10,0,0,0">
+                    <!-- Big enough to read from the corner of the eye; accent-coloured on your
+                         own turn, which together with the card's accent border is the one moment
+                         this panel is allowed to shout. -->
+                    <TextBlock Text="{Binding TurnText}" VerticalAlignment="Center"
+                               FontFamily="{StaticResource UiFont}" FontSize="23" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Setter Property="Foreground" Value="{StaticResource Text}" />
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsTimeCritical}" Value="True">
-                                        <Setter Property="Foreground" Value="{StaticResource Bad}" />
-                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                    <DataTrigger Binding="{Binding IsMyTurn}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource Accent}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
 
-                    <!--
-                        Phase timer, scaled rather than width-bound: a ScaleTransform takes the
-                        fraction directly, so no converter is needed to turn it into pixels. Hidden
-                        outside a draft, where it would read as a stalled bar.
-                    -->
-                    <Border Grid.Row="1" Grid.ColumnSpan="2" Height="3" CornerRadius="2" Margin="0,9,0,0"
-                            Background="{StaticResource SurfaceHi}" ClipToBounds="True"
-                            Visibility="{Binding IsDraftActive, Converter={StaticResource BoolToVisibility}}">
-                        <Border CornerRadius="2"
-                                HorizontalAlignment="Stretch" RenderTransformOrigin="0,0.5">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Background" Value="{StaticResource Accent}" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsTimeCritical}" Value="True">
-                                            <Setter Property="Background" Value="{StaticResource Bad}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                            <Border.RenderTransform>
-                                <ScaleTransform ScaleX="{Binding PhaseFraction}" ScaleY="1" />
-                            </Border.RenderTransform>
-                        </Border>
+                    <!-- Where in the draft we are, as quiet context beside the headline rather
+                         than a second line under it: it must not compete for the first glance. -->
+                    <Border Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0"
+                            Background="{StaticResource SurfaceHi}" CornerRadius="10" Padding="10,4">
+                        <TextBlock Text="{Binding PhaseText}" Style="{StaticResource Caption}"
+                                   Margin="0" Foreground="{StaticResource Muted}" />
                     </Border>
                 </Grid>
             </Border>

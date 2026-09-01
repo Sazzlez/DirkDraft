@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using System.IO;
 using System.Net.Http;
 using System.Windows;
@@ -126,8 +125,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     private string _statusText = "Starte…";
     private string _phaseText = string.Empty;
-    private string _secondsText = string.Empty;
-    private double _phaseFraction;
     private ConnectionTone _statusTone = ConnectionTone.Off;
     private string _emptyHint = "Warte auf den League-Client.";
     private string _turnText = string.Empty;
@@ -138,7 +135,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _isDraftActive;
     private bool _hasRecommendations;
     private bool _isMyTurn;
-    private bool _isTimeCritical;
     private bool _hasMeta;
     private string _snapshotDetail = string.Empty;
     private double _updateFraction;
@@ -155,9 +151,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// <summary>Why the snapshot could not be used, if it could not. Shown in the footer.</summary>
     private string? _snapshotProblem;
 
-    /// <summary>The phase deadline, captured from the last client update and counted down locally.</summary>
-    private PhaseClock _clock = PhaseClock.Stopped;
-    private DispatcherTimer? _countdown;
     private FileSystemWatcher? _snapshotWatcher;
     private DispatcherTimer? _snapshotRetry;
 
@@ -399,20 +392,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         private set => Set(ref _phaseText, value);
     }
 
-    /// <summary>Seconds left, on its own so it can be shown as a large figure.</summary>
-    public string SecondsText
-    {
-        get => _secondsText;
-        private set => Set(ref _secondsText, value);
-    }
-
-    /// <summary>Share of the phase still to run, 0 to 1, for the timer bar.</summary>
-    public double PhaseFraction
-    {
-        get => _phaseFraction;
-        private set => Set(ref _phaseFraction, value);
-    }
-
     public ConnectionTone StatusTone
     {
         get => _statusTone;
@@ -496,13 +475,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         get => _isMyTurn;
         private set => Set(ref _isMyTurn, value);
-    }
-
-    /// <summary>Ten seconds or less on the clock; number and bar switch to the warning colour.</summary>
-    public bool IsTimeCritical
-    {
-        get => _isTimeCritical;
-        private set => Set(ref _isTimeCritical, value);
     }
 
     /// <summary>Whether usable meta data is loaded; drives the tick in the idle checklist.</summary>
@@ -634,47 +606,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         Refresh();
-    }
-
-    /// <summary>
-    /// Recomputes the visible clock from the captured deadline. Called on every client update and by
-    /// the local tick in between.
-    /// </summary>
-    private void UpdateCountdown()
-    {
-        if (!_clock.IsRunning)
-        {
-            SecondsText = string.Empty;
-            PhaseFraction = 0;
-            IsTimeCritical = false;
-            return;
-        }
-
-        var (seconds, fraction) = _clock.At(DateTimeOffset.UtcNow);
-        SecondsText = seconds.ToString(CultureInfo.CurrentCulture);
-        PhaseFraction = fraction;
-        IsTimeCritical = seconds is > 0 and <= 10;
-    }
-
-    /// <summary>
-    /// Runs the local clock only while a draft is on screen, so an idle tool still costs no ticks.
-    /// </summary>
-    private void SetCountdownRunning(bool running)
-    {
-        if (running)
-        {
-            _countdown ??= new DispatcherTimer(
-                TimeSpan.FromMilliseconds(500),
-                DispatcherPriority.Normal,
-                (_, _) => UpdateCountdown(),
-                _dispatcher);
-
-            _countdown.Start();
-            return;
-        }
-
-        _countdown?.Stop();
-        _clock = PhaseClock.Stopped;
     }
 
     private MetaLookup LoadMeta()
@@ -856,7 +787,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             ShowDraftFetchStatus = false;
 
             IsDraftActive = false;
-            SetCountdownRunning(false);
             Clear();
             UpdateBuildSection();
 
@@ -901,7 +831,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _ = FetchSelectableAsync();
 
         IsDraftActive = true;
-        SetCountdownRunning(true);
         Render();
     }
 
@@ -959,12 +888,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var allyPredictions = _predictor.Predict(_state.Allies, _manualLanes);
 
         PhaseText = DescribePhase(_state.Phase);
-
-        // The client pushes only when something changes, and a ticking clock is not a change to it —
-        // the remaining seconds simply ride along on the next update. Left alone the display would
-        // freeze between events, so the deadline is captured here and counted down locally.
-        _clock = PhaseClock.FromState(_state, DateTimeOffset.UtcNow);
-        UpdateCountdown();
 
         TurnText = DescribeTurn();
         IsMyTurn = _state.Turn is { IsLocalPlayer: true };
@@ -1641,10 +1564,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Warnings.Clear();
         HasRecommendations = false;
         PhaseText = string.Empty;
-        SecondsText = string.Empty;
-        PhaseFraction = 0;
         IsMyTurn = false;
-        IsTimeCritical = false;
         TurnText = "Kein Champ Select";
         ListHeader = "Empfehlungen";
 
@@ -1679,14 +1599,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             {
                 DraftPhase.Planning => "Planungsphase",
                 DraftPhase.Finalization => "Warten auf Spielstart…",
-                _ => "niemand am Zug",
+                _ => "Niemand am Zug",
             };
         }
 
         var action = turn.Action == TurnAction.Ban ? "bannt" : "pickt";
 
+        // Second person needs its own conjugation — "Du pickt" was wrong all along and only
+        // became obvious once the status grew into the card's headline.
         if (turn.IsLocalPlayer)
-            return $"Du {action}";
+            return turn.Action == TurnAction.Ban ? "Du bannst" : "Du pickst";
 
         if (!turn.IsAlly)
         {
@@ -1859,7 +1781,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        SetCountdownRunning(false);
         SetSnapshotRetryRunning(false);
         _fetchRetry?.Stop();
         _snapshotWatcher?.Dispose();

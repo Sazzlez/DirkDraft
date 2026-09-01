@@ -107,26 +107,16 @@ public sealed class ChampSelectBans
     public int NumBans { get; set; }
 }
 
+/// <summary>
+/// Only the phase name is read. The payload also carries the remaining and total milliseconds,
+/// deliberately ignored: the client pushes them only when something else changes, so a display fed
+/// from them either freezes or has to be extrapolated locally — and a second clock that disagrees
+/// with the client's by a second or two is worse than no second clock.
+/// </summary>
 public sealed class ChampSelectTimer
 {
     /// <summary><c>PLANNING</c>, <c>BAN_PICK</c>, <c>FINALIZATION</c>, …</summary>
     public string? Phase { get; set; }
-
-    public long AdjustedTimeLeftInPhase { get; set; }
-
-    public long TotalTimeInPhase { get; set; }
-
-    /// <summary>
-    /// The client's own clock when it built this snapshot, in Unix milliseconds.
-    /// <para>
-    /// Needed to correct the countdown: <see cref="AdjustedTimeLeftInPhase"/> was already stale by
-    /// the time the payload arrived — transport, debounce and parsing all elapse first. Treating it
-    /// as current makes the displayed clock run ahead of the one in the client.
-    /// </para>
-    /// </summary>
-    public long InternalNowInEpochMs { get; set; }
-
-    public bool IsInfinite { get; set; }
 }
 
 [JsonSourceGenerationOptions(

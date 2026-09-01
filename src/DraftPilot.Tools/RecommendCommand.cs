@@ -80,7 +80,7 @@ internal static class RecommendCommand
         var session = new ChampSelectSession
         {
             LocalPlayerCellId = (int)lane,
-            Timer = new ChampSelectTimer { Phase = "BAN_PICK", AdjustedTimeLeftInPhase = 25_000 },
+            Timer = new ChampSelectTimer { Phase = "BAN_PICK" },
         };
 
         var allyQueue = new Queue<int>(allies);

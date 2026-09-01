@@ -79,16 +79,10 @@ public sealed class DraftState
 
     public DraftPhase Phase { get; private init; } = DraftPhase.None;
 
-    public int SecondsLeft { get; private init; }
-
-    /// <summary>Length of the current phase in seconds; 0 when the client reports none.</summary>
-    public int TotalSeconds { get; private init; }
-
-    /// <summary>
-    /// How stale <see cref="SecondsLeft"/> already was when the payload arrived, in milliseconds.
-    /// Zero when the client did not report its own clock.
-    /// </summary>
-    public long AgeAtArrivalMs { get; private init; }
+    // No phase countdown here on purpose. The client reports the remaining seconds only when it
+    // pushes an update, so any local clock built on them drifts against the one in the client —
+    // and two clocks disagreeing by a second or two is worse than one clock. The client's own
+    // timer is authoritative and always on screen; this panel shows the status instead.
 
     public ActiveTurn? Turn { get; private init; }
 
@@ -130,9 +124,6 @@ public sealed class DraftState
             AllyBans = allyBans,
             EnemyBans = enemyBans,
             Phase = ParsePhase(session.Timer.Phase),
-            SecondsLeft = (int)Math.Max(0, session.Timer.AdjustedTimeLeftInPhase / 1000),
-            TotalSeconds = (int)Math.Max(0, session.Timer.TotalTimeInPhase / 1000),
-            AgeAtArrivalMs = AgeOf(session.Timer),
             Turn = FindActiveTurn(session),
             Unavailable = unavailable,
         };
@@ -223,20 +214,6 @@ public sealed class DraftState
         }
 
         return best;
-    }
-
-    /// <summary>
-    /// How long ago the client built this snapshot. Clamped to a sane window: a client clock that
-    /// disagrees with ours by minutes is a wrong clock, not a stale payload, and correcting by it
-    /// would be worse than not correcting at all.
-    /// </summary>
-    private static long AgeOf(ChampSelectTimer timer)
-    {
-        if (timer.InternalNowInEpochMs <= 0)
-            return 0;
-
-        var age = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - timer.InternalNowInEpochMs;
-        return age is >= 0 and <= 10_000 ? age : 0;
     }
 
     private static TurnAction ParseAction(string? type) => type?.ToLowerInvariant() switch

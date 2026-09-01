@@ -13,7 +13,7 @@ internal sealed class SessionBuilder
     private readonly ChampSelectSession _session = new()
     {
         LocalPlayerCellId = 2,
-        Timer = new ChampSelectTimer { Phase = "BAN_PICK", AdjustedTimeLeftInPhase = 25_000 },
+        Timer = new ChampSelectTimer { Phase = "BAN_PICK" },
     };
 
     private readonly List<ChampSelectAction> _actions = [];
@@ -33,10 +33,9 @@ internal sealed class SessionBuilder
         return this;
     }
 
-    public SessionBuilder Phase(string phase, int secondsLeft = 25)
+    public SessionBuilder Phase(string phase)
     {
         _session.Timer.Phase = phase;
-        _session.Timer.AdjustedTimeLeftInPhase = secondsLeft * 1000;
         return this;
     }
 

@@ -20,7 +20,7 @@ internal static class DraftStatePrinter
         }
 
         var text = new StringBuilder();
-        text.AppendLine($"[{Timestamp()}] {state.Phase}  {state.SecondsLeft}s  ({Describe(status)})");
+        text.AppendLine($"[{Timestamp()}] {state.Phase}  ({Describe(status)})");
         text.AppendLine($"  Am Zug: {DescribeTurn(state)}");
         text.AppendLine($"  Ziel:   {DescribeTarget(target)}");
         text.AppendLine($"  Bans    wir: {Join(state.AllyBans)}   sie: {Join(state.EnemyBans)}");
