@@ -133,7 +133,10 @@ public sealed class RecommendationViewModel : ObservableObject
         }
         else
         {
-            Score = recommendation.Score.ToString("P1", culture);
+            // "WR" spelled out on the figure itself: the panel shows a second kind of percentage
+            // right next to it — how likely an enemy plays that lane — and the two were easy to
+            // mix up when both were bare numbers.
+            Score = $"{recommendation.Score.ToString("P1", culture)} WR";
             Tone = recommendation.Score switch
             {
                 > 0.53 => ScoreTone.Strong,

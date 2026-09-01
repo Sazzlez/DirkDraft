@@ -173,7 +173,7 @@ public sealed class GameBuildViewModel : ObservableObject
         var runes = plan.Runes;
         Subtitle = runes is null
             ? $"Patch {plan.Patch}"
-            : $"Runen: {runes.WinRate:P0} Winrate über {runes.Play} Spiele · Patch {plan.Patch}";
+            : $"Runen: {runes.WinRate:P0} WR über {runes.Play} Spiele · Patch {plan.Patch}";
 
         PrimaryPath = runes?.PrimaryPath ?? string.Empty;
         SecondaryPath = runes?.SecondaryPath ?? string.Empty;
@@ -190,7 +190,7 @@ public sealed class GameBuildViewModel : ObservableObject
         FillSingles(LateItems, plan.LateItems, names, icons);
 
         var core = plan.CoreItems.FirstOrDefault();
-        CoreStats = core is null ? string.Empty : $"{core.WinRate:P0} · {core.Play} Spiele";
+        CoreStats = core is null ? string.Empty : $"{core.WinRate:P0} WR · {core.Play} Spiele";
 
         // Update in place like every other row — Resize(0) first tore all containers down and
         // rebuilt them, which made the spell chips visibly flicker on the second Apply (the one
@@ -272,7 +272,7 @@ public sealed class GameBuildViewModel : ObservableObject
         foreach (var chip in BootItems)
         {
             chip.IsHighlighted = true;
-            chip.Hint = $"{chip.Label} — {reason} · {situational.WinRate:P0} aus {situational.Play} Spielen.";
+            chip.Hint = $"{chip.Label} — {reason} · {situational.WinRate:P0} WR aus {situational.Play} Spielen.";
         }
     }
 
@@ -339,7 +339,7 @@ public sealed class GameBuildViewModel : ObservableObject
 
             target[i].Icon = icons.GetItem(entry.Id);
             target[i].Label = name;
-            target[i].Hint = $"{name} — {entry.WinRate:P0} Siegquote aus {entry.Play} Spielen mit diesem Kauf.";
+            target[i].Hint = $"{name} — {entry.WinRate:P0} WR aus {entry.Play} Spielen mit diesem Kauf.";
             target[i].IsHighlighted = false;
         }
     }

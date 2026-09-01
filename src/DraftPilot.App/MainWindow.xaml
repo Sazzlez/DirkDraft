@@ -620,7 +620,6 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="32" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
                             <Border Style="{StaticResource IconTile}" Width="26" Height="26">
@@ -632,23 +631,7 @@
                                        Style="{StaticResource ChampionName}" Margin="4,0,8,0"
                                        TextTrimming="CharacterEllipsis" />
 
-                            <TextBlock Grid.Column="2" Text="{Binding Confidence}"
-                                       HorizontalAlignment="Right" VerticalAlignment="Center"
-                                       FontFamily="{StaticResource NumFont}" FontSize="12">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="{StaticResource Muted}" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsUncertain}" Value="True">
-                                                <Setter Property="Foreground" Value="{StaticResource Warn}" />
-                                                <Setter Property="ToolTip" Value="Unsichere Vorhersage — bitte selbst prüfen" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-
-                            <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                            <StackPanel Grid.Row="1" Grid.Column="1"
                                         Orientation="Horizontal" Margin="4,2,0,0">
                                 <TextBlock Text="{Binding Label}" Style="{StaticResource Small}"
                                            Foreground="{StaticResource Faint}" FontSize="11"
@@ -674,6 +657,15 @@
                                     <ComboBox.Style>
                                         <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
                                             <Style.Triggers>
+                                                <!-- The prediction's confidence used to stand next to
+                                                     the champion as a percentage, which read like a
+                                                     win rate. The figure is gone; what mattered about
+                                                     it — "this lane is a guess" — now colours the lane
+                                                     itself. Manual wins: a lane you set is not a guess. -->
+                                                <DataTrigger Binding="{Binding IsUncertain}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource Warn}" />
+                                                    <Setter Property="ToolTip" Value="Unsichere Lane-Vorhersage — bitte selbst prüfen und notfalls hier umstellen." />
+                                                </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsManualLane}" Value="True">
                                                     <Setter Property="Foreground" Value="{StaticResource Accent}" />
                                                 </DataTrigger>

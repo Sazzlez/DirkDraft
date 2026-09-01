@@ -339,7 +339,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         else if (stat.WinRateDelta > 0.015)
         {
             reasons.Add(Reason.Pro(
-                $"{stat.WinRate:P1} Siegquote auf {lane.Display()}",
+                $"{stat.WinRate:P1} WR auf {lane.Display()}",
                 $"Aus {stat.Play:N0} Spielen im aktuellen Patch. 50 % wäre Durchschnitt."));
         }
 
@@ -436,7 +436,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             // it would be read out loud.
             var uncertain = bestProbability < 0.6;
             reasons.Add(new Reason(
-                $"{best.WinRate:P0} gegen {opponent}{(uncertain ? " (falls Lane-Gegner)" : string.Empty)}",
+                $"{best.WinRate:P0} WR gegen {opponent}{(uncertain ? " (falls Lane-Gegner)" : string.Empty)}",
                 best.WinRateDelta > 0 ? ReasonTone.Pro : ReasonTone.Contra,
                 DescribeMatchup(best, opponent, lane, bestProbability)));
         }
@@ -527,7 +527,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         if (favourable >= 2)
         {
             reasons.Add(Reason.Pro(
-                $"über 50 % gegen {favourable} von {counted} weiteren Gegnern",
+                $"über 50 % WR gegen {favourable} von {counted} weiteren Gegnern",
                 "Gegner außerhalb der eigenen Lane: gegen so viele von ihnen hat dieser Champion "
                 + "eine Siegquote über 50 %. Zählt weniger als das direkte Lane-Duell."));
         }
@@ -621,7 +621,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         {
             var strength = stat.Tier is >= 1 and <= 5
                 ? ScoreModel.TierName(stat.Tier)
-                : $"{stat.WinRate:P1} Siegquote";
+                : $"{stat.WinRate:P1} WR";
 
             reasons.Add(Reason.Pro(
                 $"{strength} auf {lane.Display()}",

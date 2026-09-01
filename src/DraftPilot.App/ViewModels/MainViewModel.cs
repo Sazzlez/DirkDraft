@@ -1310,8 +1310,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             return;
         }
 
-        AllyWinRateText = balance.AllyWinRate.ToString("P1", CultureInfo.CurrentCulture);
-        EnemyWinRateText = balance.EnemyWinRate.ToString("P1", CultureInfo.CurrentCulture);
+        // Marked as a win rate, like every other win rate in the window: the team columns also
+        // carry the lane-confidence percentages, and unlabelled the two read the same.
+        AllyWinRateText = $"{balance.AllyWinRate.ToString("P1", CultureInfo.CurrentCulture)} WR";
+        EnemyWinRateText = $"{balance.EnemyWinRate.ToString("P1", CultureInfo.CurrentCulture)} WR";
 
         // A point either way is inside the noise of the underlying samples; only beyond that does
         // the colour claim anything.
@@ -1542,15 +1544,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
             row.IsTarget = _target?.Slot.CellId == slot.CellId;
 
-            // Ally lanes come from the client, so a confidence figure there would be noise. And a
-            // figure for a seat that has revealed nothing is guesswork dressed up as a measurement.
-            var showConfidence = !isAlly
+            // Only for an enemy seat that has revealed a champion and whose lane the client did
+            // not hand us: everywhere else "uncertain" would be either noise or guesswork dressed
+            // up as a reading.
+            row.IsUncertain = !isAlly
                 && slot.AssignedLane == Lane.Unknown
                 && slot.EffectiveChampionId != 0
-                && prediction is not null;
-
-            row.Confidence = showConfidence ? $"{prediction!.Confidence:P0}" : string.Empty;
-            row.IsUncertain = showConfidence && prediction!.IsUncertain;
+                && prediction is { IsUncertain: true };
 
             row.Warning = isAlly ? HoverWarning(slot) : null;
         }
@@ -1673,7 +1673,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             row.Icon = null;
             row.LaneText = "?";
             row.LaneIndex = 5;
-            row.Confidence = string.Empty;
             row.IsTarget = false;
             row.IsLocked = false;
             row.HasHover = false;

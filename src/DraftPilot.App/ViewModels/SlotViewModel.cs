@@ -17,7 +17,6 @@ public sealed class SlotViewModel : ObservableObject
     private string _champion = "—";
     private string _laneText = "?";
     private int _laneIndex = 5;
-    private string _confidence = string.Empty;
     private bool _isUncertain;
     private bool _isLocalPlayer;
     private bool _isTarget;
@@ -67,13 +66,6 @@ public sealed class SlotViewModel : ObservableObject
     {
         get => _laneIndex;
         set => Set(ref _laneIndex, value);
-    }
-
-    /// <summary>Empty for allies, whose lane the client tells us outright.</summary>
-    public string Confidence
-    {
-        get => _confidence;
-        set => Set(ref _confidence, value);
     }
 
     /// <summary>Prediction is shaky; the UI marks it so the user knows to look for themselves.</summary>
