@@ -17,7 +17,7 @@
     <TieredPGO>true</TieredPGO>
 
     <!-- The version the update check compares against GitHub Releases. release.ps1 bumps it. -->
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
 
     <!-- Velopack must run before WPF: Program.Main hosts it, the generated Main is bypassed. -->
     <StartupObject>DraftPilot.App.Program</StartupObject>
