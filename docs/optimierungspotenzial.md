@@ -12,7 +12,7 @@ die Quick Wins Gleichheits-Wächter, Test-Tor, vergessene Datenfelder, echter Da
 Feld-Diagnose. Gemessene Wirkung von Maßnahme 1: von 12 auf 274 verschiedene Lane-Winraten, Zeilen
 auf exakt 0,50 von 68 auf 2, Zeilen ohne Spielzahl von 9 auf 0.
 
-**Offen:** Maßnahme 3 (Duell-Term zentrieren), 6 (Mittelspalte nach dem eigenen Lock) und die
+**Offen:** Maßnahme 6 (Mittelspalte nach dem eigenen Lock) und die
 restlichen Quick Wins (`queueId` lesen, Ban-Gate und Ban-Stärke aus derselben Lane, Jungle-Duos
 streichen, doppeltes Laden beim Start).
 
@@ -24,6 +24,35 @@ meistgespielten Champion der eigenen Lane, sichtbar als solcher gekennzeichnet. 
 gar kein Gegner aufgedeckt ist — ein Draft, der sie zeigt, ist die paar Sekunden Wartezeit wert.
 Das Scoring bleibt unangetastet: einen Gegner in die Bewertung zu erfinden würde jeden Kandidaten
 unterschiedlich verzerren.
+
+### Was Maßnahme 3 ergeben hat
+
+Die Maßnahme bestand aus zwei Behauptungen, und die Messung (`Tools -- matchupfit`,
+5-fache Kreuzvalidierung über 1386 Kanten) hat sie in verschiedene Richtungen aufgelöst.
+
+**„Eine fehlende Kante zählt als ausgeglichen" — falsch.** Fehlt die Kante, ist der Duell-Term
+`null` und addiert 0; die Schätzung liegt dann beim Lane-Term, also bei der allgemeinen Stärke.
+Der Rückfall war schon immer richtig. Zusätzlich gemessen: das Kantenmittel eines Champions sagt
+eine zurückgehaltene Kante **schlechter** vorher als pauschale 50 %, und zwar monoton schlechter,
+je mehr man ihm traut (Prior 30: −0,00 %, Prior 10: −0,02 %, Prior 3: −0,06 %, Prior 1: −0,11 %).
+Das ist die Signatur von reinem Rauschen. Die Lane-Winrate der Tierlist gewinnt mit +0,05 %, was
+bei 1386 Kanten nichts bedeutet.
+
+**„Doppelzählung" — richtig und umgesetzt.** Regression des Duell-Terms auf den Lane-Term:
+Steigung 1,228 pro Logit-Einheit, Korrelation 0,298 (erklärte Varianz 8,9 %). Der Score addierte
+die allgemeine Stärke also mit Faktor 1 + 1,228 ≈ 2,2. Für einen Champion 1 Sigma über dem Mittel
+sind das **1,78 Punkte** zu viel — dieselbe Größenordnung wie die Abstände, nach denen sortiert
+wird. Der Duell-Term ist jetzt auf die Lane-Winrate desselben Champions zentriert: Ein bekanntes
+Duell **ersetzt** die allgemeine Rate für die umkämpfte Lane, statt auf ihr aufzusatteln.
+
+Gemessene Wirkung an einem Top-Draft gegen Jax: Kandidaten mit Duell-Daten verlieren die
+Doppelzählung (Singed 65,2 → 63,4, Garen 62,7 → 61,6, Illaoi 61,0 → 60,0), Kandidaten ohne
+bleiben unverändert (Malphite 57,5, Gangplank 57,1). Die Reihenfolge blieb hier gleich; weg ist
+die systematische Benachteiligung von Champions, für die OP.GG keine Kante liefert.
+
+Zwei Zahlen der Analyse waren dabei nicht reproduzierbar und sind korrigiert: der Kanten-Mittelwert
+ist 0,4873 (nach Spielen gewichtet 0,4954), nicht 0,469; und die Korrelation ist 0,298, nicht 0,469
+bzw. 0,683. Die Selektions-Sorge („weak_counters überwiegen") trägt damit kaum.
 
 ### Was Maßnahme 4 ergeben hat
 

@@ -473,6 +473,107 @@ public class RecommenderTests
         for (var i = 0; i < first.Count; i++)
             Assert.Equal(first[i].Reasons, second[i].Reasons);
     }
+    /// <summary>
+    /// The duel term is a difference, not an absolute rate: a champion that does against this
+    /// opponent exactly what it does on the lane in general has learnt nothing from the matchup, so
+    /// the term is zero. Adding the absolute rate instead counted the champion's general strength a
+    /// second time — measured on the real snapshot, the duel rate tracks the lane rate with a slope
+    /// of 1.23, worth 1.8 points of over-credit for a champion one standard deviation above the
+    /// middle.
+    /// </summary>
+    [Fact]
+    public void ADuelThatMatchesTheChampionsUsualRate_AddsNothing()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Strong, "Strong", DamageType.Magic, ["Mage"], 550, 3)
+            .Champion(EnemyMid, "EnemyMid", DamageType.Magic, ["Mage"], 550, 3)
+            .InLane(Strong, Lane.Mid, winRate: 0.56, play: 40_000)
+            .InLane(EnemyMid, Lane.Mid, winRate: 0.50, play: 40_000)
+            // Exactly the champion's own lane rate: no news about this particular opponent.
+            .Matchup(Strong, EnemyMid, Lane.Mid, winRate: 0.56, play: 40_000)
+            .Build();
+
+        // Not exactly zero: the lane rate is shrunk with prior 300 and the matchup with 150, so the
+        // two differ in the fourth decimal even for identical raw rates. 0.0009 log-odds is 0.02
+        // points of win rate — a rounding residual, not a term.
+        Assert.Equal(0, DuelTerm(meta), precision: 2);
+    }
+
+    [Fact]
+    public void ADuelAboveTheChampionsUsualRate_StillCounts()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Strong, "Strong", DamageType.Magic, ["Mage"], 550, 3)
+            .Champion(EnemyMid, "EnemyMid", DamageType.Magic, ["Mage"], 550, 3)
+            .InLane(Strong, Lane.Mid, winRate: 0.50, play: 40_000)
+            .InLane(EnemyMid, Lane.Mid, winRate: 0.50, play: 40_000)
+            .Matchup(Strong, EnemyMid, Lane.Mid, winRate: 0.56, play: 40_000)
+            .Build();
+
+        Assert.True(DuelTerm(meta) > 0.2, "Ein echter Vorteil gegen den Gegner muss zählen.");
+    }
+
+    /// <summary>
+    /// Two champions equally good against this opponent end up within a rounding error of each
+    /// other, however different their general reputation — the duel measurement replaces the
+    /// general one instead of stacking on it. Before centring, the stronger one kept its full
+    /// reputation gap on top of an identical duel rate.
+    /// <para>
+    /// Not exactly equal, and correctly so: the opponent is only about 96 % likely to be on this
+    /// lane, and for the remaining 4 % the general rate still carries the estimate. What is left is
+    /// that fraction of the gap, not the whole of it.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TwoChampionsEquallyGoodAgainstTheOpponent_ScoreTheSameOnThatLane()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Strong, "Strong", DamageType.Magic, ["Mage"], 550, 3)
+            .Champion(Average, "Average", DamageType.Magic, ["Mage"], 550, 3)
+            .Champion(EnemyMid, "EnemyMid", DamageType.Magic, ["Mage"], 550, 3)
+            .InLane(Strong, Lane.Mid, winRate: 0.56, play: 40_000)
+            .InLane(Average, Lane.Mid, winRate: 0.50, play: 40_000)
+            .InLane(EnemyMid, Lane.Mid, winRate: 0.50, play: 40_000)
+            .Matchup(Strong, EnemyMid, Lane.Mid, winRate: 0.58, play: 40_000)
+            .Matchup(Average, EnemyMid, Lane.Mid, winRate: 0.58, play: 40_000)
+            .Build();
+
+        var state = DraftState.From(new SessionBuilder()
+            .LocalPlayer(2)
+            .Locked(7, EnemyMid)
+            .OnClock(2, "pick")
+            .Build());
+
+        var target = new TurnTracker().Resolve(state)!;
+        var lanes = new LanePredictor(meta).Predict(state.Enemies);
+        var items = new Recommender(meta, TraitTable.Empty).Recommend(state, target, lanes).Items;
+
+        var gap = Math.Abs(ScoreModel.Logit(Score(items, Strong)) - ScoreModel.Logit(Score(items, Average)));
+        var reputationGap = Math.Abs(ScoreModel.Logit(0.55955) - ScoreModel.Logit(0.5));
+
+        Assert.True(
+            gap < reputationGap / 10,
+            $"Der Reputationsvorsprung darf nicht durchschlagen: {gap:N4} gegen {reputationGap:N4} Logit.");
+    }
+
+    /// <summary>The LaneMatchup term of the one candidate that has matchup data, in log-odds.</summary>
+    private static double DuelTerm(MetaLookup meta)
+    {
+        var state = DraftState.From(new SessionBuilder()
+            .LocalPlayer(2)
+            .Locked(7, EnemyMid)
+            .OnClock(2, "pick")
+            .Build());
+
+        var target = new TurnTracker().Resolve(state)!;
+        var lanes = new LanePredictor(meta).Predict(state.Enemies);
+
+        return new Recommender(meta, TraitTable.Empty).Recommend(state, target, lanes).Items
+            .Single(item => item.ChampionId == Strong)
+            .Breakdown.Single(term => term.Kind == ScoreTermKind.LaneMatchup)
+            .LogOdds ?? 0;
+    }
+
 
     /// <summary>
     /// The score carries the sampling error of the numbers it was built from, so the panel can say

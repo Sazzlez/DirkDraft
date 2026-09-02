@@ -82,6 +82,9 @@ try
         case "noise":
             return NoiseCommand.Run(args);
 
+        case "matchupfit":
+            return MatchupFitCommand.Run(args);
+
         case "runes":
             return await RunesCommand.RunAsync(lifetime.Token);
 
@@ -130,6 +133,8 @@ static void PrintUsage()
           noise <lane> [gegner] [team] [ziehungen]
                                  Denselben Draft wiederholt aus den Stichproben ziehen und
                                  pruefen, ob die Reihenfolge ueberhaupt etwas bedeutet
+          matchupfit [folds]     Kanten zurueckhalten und pruefen, welche Grundannahme ein
+                                 unbekanntes Matchup am besten vorhersagt
           runes                  Runenseiten des Accounts anzeigen (nur lesend)
         """);
 }

@@ -67,7 +67,9 @@ public sealed record ScoreTerm(ScoreTermKind Kind, double? LogOdds)
         ScoreTermKind.LaneStrength =>
             "Wie gut der Champion auf dieser Lane allgemein läuft — Siegquote und OP.GG-Tier (S bis D).",
         ScoreTermKind.LaneMatchup =>
-            "Siegquote direkt gegen den Champion, den wir auf deiner Lane erwarten.",
+            "Wie viel besser oder schlechter dieser Champion gegen den erwarteten Lane-Gegner "
+            + "abschneidet als auf dieser Lane üblich. Die allgemeine Stärke steckt schon in der "
+            + "Zeile darüber — sonst würde sie zweimal zählen.",
         ScoreTermKind.EnemyTeam =>
             "Siegquote gegen die übrigen aufgedeckten Gegner; zählt gedämpft, weil sie nicht auf deiner Lane stehen.",
         ScoreTermKind.Synergy =>
@@ -417,6 +419,15 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         if (lane == Lane.Unknown)
             return null;
 
+        // Centred on what this champion does on the lane in general, because that is already in the
+        // lane term two lines up. Measured on the stored edges: the duel rate tracks the lane rate
+        // with a slope of 1.23, so adding both counted a champion's general strength about 2.2
+        // times over — worth 1.8 points for a champion one standard deviation above the middle,
+        // which is the same order as the gaps this list is sorted by. With the baseline subtracted,
+        // a known duel REPLACES the general rate for the contested lane instead of piling on top of
+        // it, and an unknown one still leaves the general rate standing.
+        var baseline = _meta.LaneStat(championId, lane) is { } own ? ScoreModel.Logit(own.WinRate) : 0;
+
         var total = 0.0;
         var variance = 0.0;
         var counted = 0;
@@ -437,12 +448,17 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
                 continue;
 
             counted++;
+
+            // Only the matchup's own error, although the term also subtracts the lane rate whose
+            // error the lane term already booked. The two partially cancel, so the reported bar is
+            // slightly WIDER than the truth — visible in Tools -- noise as 1,10 analytic against
+            // 0,95 resampled. Erring toward "less certain than stated" is the right direction.
             variance += probability * probability
                 * ScoreError.LogitVariance(matchup.WinRate, matchup.Play, Shrinkage.MatchupPrior);
 
             // No extra confidence factor: the win rate is already shrunk by its sample size, and
             // multiplying a second damping on top made thin data vanish entirely.
-            total += probability * ScoreModel.Logit(matchup.WinRate);
+            total += probability * (ScoreModel.Logit(matchup.WinRate) - baseline);
 
             if (probability > bestProbability)
             {
