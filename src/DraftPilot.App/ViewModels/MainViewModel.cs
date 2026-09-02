@@ -159,6 +159,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private string _runeImportText = string.Empty;
 
     private readonly CancellationTokenSource _lifetime = new();
+
+    private readonly AppUpdater _updater = new();
+    private string _updateNotice = string.Empty;
+    private bool _hasUpdate;
+    private bool _isInstallingUpdate;
     private LiveSessionSource? _source;
     private DraftTracker _tracker;
 
@@ -279,6 +284,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         });
 
         ImportRunesCommand = new RelayCommand(_ => _ = ImportRunesAsync(), _ => CanImportRunes);
+        InstallUpdateCommand = new RelayCommand(_ => _ = InstallUpdateAsync(), _ => HasUpdate && !IsInstallingUpdate);
 
         // CanImportRunes depends on Client, and Client changes on every reconnect — without this
         // the button froze in whatever state the last session event left it.
@@ -346,6 +352,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public RelayCommand CloseBuildCommand { get; }
 
     public RelayCommand ImportRunesCommand { get; }
+
+    public RelayCommand InstallUpdateCommand { get; }
 
     /// <summary>Raised when champion select starts or ends, so the window can show or hide itself.</summary>
     public event Action<bool>? DraftActiveChanged;
@@ -777,7 +785,74 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// <summary>What was found on disk at start-up; shown as the tooltip of the snapshot line.</summary>
     public string DataSummary => StartupReport.Summary;
 
-    public Task StartAsync() => _tracker.RunAsync(_lifetime.Token);
+    /// <summary>What the start-up check found, e.g. <c>Version 1.1.0 ist da</c>; empty when current.</summary>
+    public string UpdateNotice
+    {
+        get => _updateNotice;
+        private set => Set(ref _updateNotice, value);
+    }
+
+    /// <summary>A newer release exists and can be installed with one click.</summary>
+    public bool HasUpdate
+    {
+        get => _hasUpdate;
+        private set
+        {
+            if (Set(ref _hasUpdate, value))
+                InstallUpdateCommand?.RaiseCanExecuteChanged();
+        }
+    }
+
+    public bool IsInstallingUpdate
+    {
+        get => _isInstallingUpdate;
+        private set
+        {
+            if (Set(ref _isInstallingUpdate, value))
+                InstallUpdateCommand?.RaiseCanExecuteChanged();
+        }
+    }
+
+    /// <summary>
+    /// One question to GitHub per start: is there a newer release? Only the answer is acted on —
+    /// nothing is downloaded until the user clicks. A copy that was not installed through the
+    /// installer skips this entirely (see <see cref="AppUpdater.CanUpdate"/>).
+    /// </summary>
+    private async Task CheckForUpdateAsync()
+    {
+        var newer = await _updater.CheckAsync(_lifetime.Token).ConfigureAwait(true);
+        if (newer is null)
+            return;
+
+        UpdateNotice = $"Version {newer} ist da";
+        HasUpdate = true;
+    }
+
+    /// <summary>Downloads and restarts into the new version. On success this method never returns.</summary>
+    private async Task InstallUpdateAsync()
+    {
+        if (!HasUpdate || IsInstallingUpdate)
+            return;
+
+        IsInstallingUpdate = true;
+        UpdateNotice = "Lädt die neue Version …";
+
+        var failure = await _updater.InstallAsync(
+            percent => _dispatcher.Invoke(() => UpdateNotice = $"Lädt die neue Version … {percent} %"),
+            _lifetime.Token).ConfigureAwait(true);
+
+        // Only reached when the update did not go through; success has already restarted the app.
+        IsInstallingUpdate = false;
+        UpdateNotice = failure ?? "Aktualisierung fehlgeschlagen.";
+    }
+
+    public Task StartAsync()
+    {
+        // Fire-and-forget on purpose: the tracker must not wait for GitHub, and the check
+        // reports through the view model whenever it comes back.
+        _ = CheckForUpdateAsync();
+        return _tracker.RunAsync(_lifetime.Token);
+    }
 
     /// <summary>Applies a manual lane override from the dropdown and recalculates.</summary>
     public void SetManualLane(SlotViewModel slot, int laneIndex)

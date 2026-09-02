@@ -345,6 +345,14 @@
 
                     <TextBlock Text="{Binding StatusText}" Style="{StaticResource Small}"
                                Foreground="{StaticResource Faint}" Margin="0,3,0,0" VerticalAlignment="Center" />
+
+                    <!-- Update pill: the start-up check found a newer release. Reachable from every
+                         screen, never more than one line, and nothing happens without the click. -->
+                    <Button Style="{StaticResource Ghost}" Margin="14,0,0,0" Padding="9,1" Height="22"
+                            FontSize="11" Command="{Binding InstallUpdateCommand}"
+                            Content="{Binding UpdateNotice}"
+                            ToolTip="Lädt die neue Version von GitHub und startet das Tool neu. Ohne diesen Klick passiert nichts."
+                            Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibility}}" />
                 </StackPanel>
 
                 <!-- A hairline of the brand gradient, sitting in the title bar's empty bottom edge.
@@ -525,6 +533,24 @@
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
+                        </Grid>
+
+                        <!-- The third answer an idle window can owe: a newer version exists. -->
+                        <Grid Margin="0,8,0,0"
+                              Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibility}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="18" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Ellipse Width="8" Height="8" Fill="{StaticResource Accent}"
+                                     VerticalAlignment="Center" HorizontalAlignment="Left" />
+                            <TextBlock Grid.Column="1" Text="{Binding UpdateNotice}"
+                                       Style="{StaticResource Small}" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Style="{StaticResource Ghost}" Content="Jetzt aktualisieren"
+                                    Margin="12,0,0,0" Padding="10,2" FontSize="12"
+                                    Command="{Binding InstallUpdateCommand}"
+                                    ToolTip="Lädt die neue Version von GitHub und startet das Tool neu. Ohne diesen Klick passiert nichts." />
                         </Grid>
 
                         <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,11,0,8" />

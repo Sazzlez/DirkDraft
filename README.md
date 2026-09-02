@@ -15,6 +15,34 @@ Tool. Es bleibt im Infobereich; Rechtsklick auf das Symbol: *Öffnen · Daten ak
 Voraussetzung ist das .NET 9 Desktop Runtime, das hier schon installiert ist. Der Build bleibt
 dadurch bei etwa 0,7 MB statt der ~120 MB einer selbstenthaltenden Variante.
 
+## Weitergeben und aktualisieren
+
+Freunde bekommen das Tool als Installer, nicht als Ordner: `DirkDraft-win-Setup.exe` von der
+Releases-Seite (https://github.com/OWNER/DirkDraft/releases). Ein Doppelklick installiert es ins
+eigene Benutzerprofil, legt eine Verknüpfung an und startet es — die .NET-Runtime ist eingebaut, es
+muss vorher nichts installiert werden. Windows warnt beim ersten Start, weil der Installer nicht
+signiert ist („Weitere Informationen" → „Trotzdem ausführen"); ein Signaturzertifikat kostet Geld
+und lohnt für einen Freundeskreis nicht.
+
+Neue Versionen holen sich installierte Kopien selbst: Beim Start fragt das Tool einmal bei GitHub
+nach, ob eine neuere Version vorliegt. Gibt es eine, steht im Fenster „Version 1.1.0 ist da" mit dem
+Knopf „Jetzt aktualisieren" — erst der Klick lädt und installiert, nichts passiert im Hintergrund.
+Eine Kopie aus `build\DirkDraft\` oder aus dem Entwicklungs-Build prüft nicht; sie kann sich nicht
+an Ort und Stelle ersetzen.
+
+Eine neue Version veröffentlichen:
+
+```powershell
+.\release.ps1 -Version 1.1.0
+```
+
+Trägt die Version ins Projekt, lässt die Tests laufen, baut mit eingebauter Runtime, packt den
+Installer samt Delta-Paketen (`vpk`) und lädt alles als GitHub-Release hoch. Voraussetzungen
+einmalig: `dotnet tool install -g vpk`, `winget install GitHub.cli --scope user` und ein
+`gh auth login`. Der Token kommt aus dieser Anmeldung und wird nirgends gespeichert. `-NoUpload`
+baut nur den Installer nach `build\Releases\`, wenn du ihn einmal von Hand weitergeben willst. Die
+Versionsnummer muss steigen, sonst sehen installierte Kopien nichts Neues.
+
 ## Erster Schritt: Daten holen
 
 Beim ersten Start gibt es noch keine Meta-Daten. Ein Klick auf **Daten aktualisieren** holt
