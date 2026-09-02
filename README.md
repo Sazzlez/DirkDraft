@@ -27,6 +27,8 @@ und lohnt für einen Freundeskreis nicht.
 Neue Versionen holen sich installierte Kopien selbst: Beim Start fragt das Tool einmal bei GitHub
 nach, ob eine neuere Version vorliegt. Gibt es eine, steht im Fenster „Version 1.1.0 ist da" mit dem
 Knopf „Jetzt aktualisieren" — erst der Klick lädt und installiert, nichts passiert im Hintergrund.
+Ist die Kopie aktuell, sagt die Versionszeile im Startbildschirm das auch („auf dem neuesten
+Stand"). Was sich je Version geändert hat, steht in `CHANGELOG.md`.
 Eine Kopie aus `build\DirkDraft\` oder aus dem Entwicklungs-Build prüft nicht; sie kann sich nicht
 an Ort und Stelle ersetzen.
 

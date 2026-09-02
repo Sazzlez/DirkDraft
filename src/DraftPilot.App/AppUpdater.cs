@@ -37,24 +37,26 @@ public sealed class AppUpdater
     public string? InstalledVersion => _manager.CurrentVersion?.ToString();
 
     /// <summary>
-    /// Asks the feed once. Returns the newer version's number, or <see langword="null"/> when this
-    /// copy is current or cannot be updated at all. Network and parse failures come back as null too:
-    /// an update check that fails is not news the user needs at start-up.
+    /// Asks the feed once and says what it found. Network and parse failures come back as
+    /// <see cref="UpdateCheck.Failed"/> rather than an exception: an update check that fails is not
+    /// news the user needs at start-up, but the window must not claim "up to date" either.
     /// </summary>
-    public async Task<string?> CheckAsync(CancellationToken ct)
+    public async Task<UpdateCheckResult> CheckAsync(CancellationToken ct)
     {
         if (!CanUpdate)
-            return null;
+            return new(UpdateCheck.NotInstalled, null);
 
         try
         {
             _pending = await _manager.CheckForUpdatesAsync().WaitAsync(ct).ConfigureAwait(false);
-            return _pending?.TargetFullRelease.Version.ToString();
+            return _pending is null
+                ? new(UpdateCheck.Current, null)
+                : new(UpdateCheck.Newer, _pending.TargetFullRelease.Version.ToString());
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             CrashLog.Note("Update-Prüfung", ex.Message);
-            return null;
+            return new(UpdateCheck.Failed, null);
         }
     }
 
@@ -84,3 +86,22 @@ public sealed class AppUpdater
         }
     }
 }
+
+/// <summary>What one start-up check against the feed found.</summary>
+public enum UpdateCheck
+{
+    /// <summary>Not an installed copy; nothing could be updated in place.</summary>
+    NotInstalled,
+
+    /// <summary>The feed was reached and this version is its newest.</summary>
+    Current,
+
+    /// <summary>A newer release exists; <see cref="UpdateCheckResult.NewerVersion"/> names it.</summary>
+    Newer,
+
+    /// <summary>The feed could not be reached or read; nothing is known.</summary>
+    Failed,
+}
+
+/// <summary>Outcome of <see cref="AppUpdater.CheckAsync"/>.</summary>
+public readonly record struct UpdateCheckResult(UpdateCheck Outcome, string? NewerVersion);

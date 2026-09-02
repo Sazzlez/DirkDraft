@@ -699,11 +699,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         private set => Set(ref _updateFraction, value);
     }
 
+    private string _buildInfoText = DescribeBuild();
+
     /// <summary>
     /// Which build is on screen. Exists because an old instance is indistinguishable from a new one
-    /// without it, and that ambiguity has already cost a debugging round.
+    /// without it, and that ambiguity has already cost a debugging round. After a successful update
+    /// check the line also says whether this is the newest release.
     /// </summary>
-    public string BuildInfoText { get; } = DescribeBuild();
+    public string BuildInfoText { get => _buildInfoText; private set => Set(ref _buildInfoText, value); }
 
     // ----- Draft live data (fetched automatically after every pick) -------------------------
 
@@ -816,16 +819,25 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// <summary>
     /// One question to GitHub per start: is there a newer release? Only the answer is acted on —
     /// nothing is downloaded until the user clicks. A copy that was not installed through the
-    /// installer skips this entirely (see <see cref="AppUpdater.CanUpdate"/>).
+    /// installer skips this entirely (see <see cref="AppUpdater.CanUpdate"/>). When the check comes
+    /// back with "nothing newer", the version line says so: otherwise nobody could tell a current
+    /// installation from one whose check never ran.
     /// </summary>
     private async Task CheckForUpdateAsync()
     {
-        var newer = await _updater.CheckAsync(_lifetime.Token).ConfigureAwait(true);
-        if (newer is null)
-            return;
-
-        UpdateNotice = $"Version {newer} ist da";
-        HasUpdate = true;
+        var check = await _updater.CheckAsync(_lifetime.Token).ConfigureAwait(true);
+        switch (check.Outcome)
+        {
+            case UpdateCheck.Newer:
+                UpdateNotice = $"Version {check.NewerVersion} ist da";
+                HasUpdate = true;
+                break;
+            case UpdateCheck.Current:
+                BuildInfoText = $"{BuildInfoText} · auf dem neuesten Stand";
+                break;
+            // NotInstalled and Failed say nothing: a copy from the build folder cannot update, and a
+            // failed check is not news anyone needs at start-up.
+        }
     }
 
     /// <summary>Downloads and restarts into the new version. On success this method never returns.</summary>
