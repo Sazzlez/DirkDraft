@@ -320,8 +320,14 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- The mark from the app icon, vector-drawn so it stays crisp at this size. -->
+                    <Image Source="{StaticResource AppMarkSmall}" Width="20" Height="20"
+                           Margin="0,0,9,0" VerticalAlignment="Center" />
+
+                    <TextBlock Text="DirkDraft" Style="{StaticResource Title}" VerticalAlignment="Center" />
+
                     <!-- Connection state as a coloured dot; the text beside it stays secondary. -->
-                    <Ellipse Width="8" Height="8" Margin="0,1,9,0" VerticalAlignment="Center">
+                    <Ellipse Width="8" Height="8" Margin="12,1,7,0" VerticalAlignment="Center">
                         <Ellipse.Style>
                             <Style TargetType="Ellipse">
                                 <Setter Property="Fill" Value="{StaticResource Faint}" />
@@ -337,10 +343,14 @@
                         </Ellipse.Style>
                     </Ellipse>
 
-                    <TextBlock Text="DirkDraft" Style="{StaticResource Title}" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding StatusText}" Style="{StaticResource Small}"
-                               Foreground="{StaticResource Faint}" Margin="9,3,0,0" VerticalAlignment="Center" />
+                               Foreground="{StaticResource Faint}" Margin="0,3,0,0" VerticalAlignment="Center" />
                 </StackPanel>
+
+                <!-- A hairline of the brand gradient, sitting in the title bar's empty bottom edge.
+                     Deliberately faint: an accent, not a banner. -->
+                <Border Grid.ColumnSpan="2" Height="2" VerticalAlignment="Bottom"
+                        Background="{StaticResource BrandLine}" CornerRadius="1" Margin="0,0,0,1" />
 
                 <Button Grid.Column="1" Style="{StaticResource IconButton}" Margin="2,0,0,0"
                         Click="Hide_Click" ToolTip="In den Infobereich minimieren">
@@ -357,9 +367,10 @@
                     <Style TargetType="Border">
                         <Setter Property="BorderBrush" Value="{StaticResource LineSoft}" />
                         <Style.Triggers>
-                            <!-- Your own turn is the one moment the panel must not be overlooked. -->
+                            <!-- Your own turn is the one moment the panel must not be overlooked.
+                                 The brand gradient, nowhere else on a border, marks exactly this. -->
                             <DataTrigger Binding="{Binding IsMyTurn}" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource Brand}" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -407,85 +418,93 @@
             </Border>
 
             <!--
-                ===================== Idle card =====================
-                Replaces the turn card while no draft runs: a checklist that answers the three
-                questions an idle window raises — is the client connected, are there data, and what
-                happens next. The build line settles "which version is this" at a glance.
+                ===================== Idle hero =====================
+                Between drafts the window used to be a small card in one corner and 90 % black. The
+                hero centres the mark, the name and the two answers an idle window owes its user —
+                is the client connected, are there data — in the space that is empty anyway. It
+                yields to any build card (ShowIdleHero), because a kept-open shopping order beats a
+                logo. RowSpan reaches into the content row, whose columns are all collapsed here.
             -->
-            <!-- Capped: at the window's new width a full-width card would be a 830 px band
-                 holding four short lines. -->
-            <Border Grid.Row="1" Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
-                    BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,3,0,0"
-                    MaxWidth="520" HorizontalAlignment="Left"
-                    Visibility="{Binding ShowIdleCard, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="18" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Ellipse Width="8" Height="8" VerticalAlignment="Center" HorizontalAlignment="Left">
-                            <Ellipse.Style>
-                                <Style TargetType="Ellipse">
-                                    <Setter Property="Fill" Value="{StaticResource Faint}" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding StatusTone}" Value="Ok">
-                                            <Setter Property="Fill" Value="{StaticResource Good}" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding StatusTone}" Value="Warn">
-                                            <Setter Property="Fill" Value="{StaticResource Warn}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Ellipse.Style>
-                        </Ellipse>
-                        <TextBlock Grid.Column="1" Style="{StaticResource Small}" VerticalAlignment="Center">
-                            <Run Text="League-Client: " Foreground="{StaticResource Muted}" /><Run Text="{Binding StatusText, Mode=OneWay}" />
-                        </TextBlock>
-                    </Grid>
+            <StackPanel Grid.Row="1" Grid.RowSpan="2" VerticalAlignment="Center" HorizontalAlignment="Center"
+                        Margin="0,0,0,34"
+                        Visibility="{Binding ShowIdleHero, Converter={StaticResource BoolToVisibility}}">
 
-                    <Grid Margin="0,7,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="18" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Ellipse Width="8" Height="8" VerticalAlignment="Center" HorizontalAlignment="Left">
-                            <Ellipse.Style>
-                                <Style TargetType="Ellipse">
-                                    <Setter Property="Fill" Value="{StaticResource Warn}" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasMeta}" Value="True">
-                                            <Setter Property="Fill" Value="{StaticResource Good}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Ellipse.Style>
-                        </Ellipse>
-                        <TextBlock Grid.Column="1" Text="{Binding SnapshotText}"
-                                   VerticalAlignment="Center" ToolTip="{Binding SnapshotDetail}">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasMeta}" Value="False">
-                                            <Setter Property="Foreground" Value="{StaticResource Warn}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Grid>
+                <Image Source="{StaticResource AppMark}" Width="88" Height="88" HorizontalAlignment="Center" />
 
-                    <TextBlock Text="Sobald ein Champ Select beginnt, füllt sich das Fenster automatisch."
-                               Style="{StaticResource Small}" Foreground="{StaticResource Faint}"
-                               TextWrapping="Wrap" Margin="18,9,0,0" />
+                <TextBlock Text="DirkDraft" FontSize="26" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" Margin="0,16,0,0" />
 
-                    <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,10,0,7" />
+                <TextBlock Text="Wartet auf das nächste Champ Select — das Fenster füllt sich dann von selbst."
+                           Style="{StaticResource Small}" Foreground="{StaticResource Muted}"
+                           HorizontalAlignment="Center" Margin="0,7,0,0" />
 
-                    <TextBlock Text="{Binding BuildInfoText}" FontSize="10"
-                               Foreground="{StaticResource Faint}" Margin="18,0,0,0" />
-                </StackPanel>
-            </Border>
+                <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
+                        BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="0,28,0,0"
+                        MinWidth="460">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="18" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Ellipse Width="8" Height="8" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Setter Property="Fill" Value="{StaticResource Faint}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding StatusTone}" Value="Ok">
+                                                <Setter Property="Fill" Value="{StaticResource Good}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusTone}" Value="Warn">
+                                                <Setter Property="Fill" Value="{StaticResource Warn}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <TextBlock Grid.Column="1" Style="{StaticResource Small}" VerticalAlignment="Center">
+                                <Run Text="League-Client: " Foreground="{StaticResource Muted}" /><Run Text="{Binding StatusText, Mode=OneWay}" />
+                            </TextBlock>
+                        </Grid>
 
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="18" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Ellipse Width="8" Height="8" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Setter Property="Fill" Value="{StaticResource Warn}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasMeta}" Value="True">
+                                                <Setter Property="Fill" Value="{StaticResource Good}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <TextBlock Grid.Column="1" Text="{Binding SnapshotText}"
+                                       VerticalAlignment="Center" ToolTip="{Binding SnapshotDetail}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasMeta}" Value="False">
+                                                <Setter Property="Foreground" Value="{StaticResource Warn}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+
+                        <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,11,0,8" />
+
+                        <TextBlock Text="{Binding BuildInfoText}" FontSize="10"
+                                   Foreground="{StaticResource Faint}" Margin="18,0,0,0" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
             <!--
                 ===================== In-game build view =====================
                 Shown while the game runs: the drafted matchup's runes, purchase order with item

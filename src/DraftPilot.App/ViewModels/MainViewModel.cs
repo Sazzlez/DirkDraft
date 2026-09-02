@@ -190,6 +190,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _hasRecommendations;
     private bool _showMatchupPanel;
     private bool _showNarrowBuildCard;
+    private bool _showIdleHero;
     private bool _showEmptyHint;
     private bool _hasMatchupFigure;
     private string _matchupHeadline = string.Empty;
@@ -590,6 +591,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         get => _showNarrowBuildCard;
         private set => Set(ref _showNarrowBuildCard, value);
+    }
+
+    /// <summary>
+    /// The centred brand-and-status hero that fills the otherwise empty window between drafts. It
+    /// yields to any build card: the two would overlap, and a shopping order the user kept open
+    /// beats a logo.
+    /// </summary>
+    public bool ShowIdleHero
+    {
+        get => _showIdleHero;
+        private set => Set(ref _showIdleHero, value);
     }
 
     /// <summary>The empty-list hint. Suppressed while the matchup panel has the column.</summary>
@@ -1945,6 +1957,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             ShowBuildClose = false;
             ShowBuildSection = HasBuild || _buildContext is not null;
             ShowNarrowBuildCard = ShowBuildSection && !ShowMatchupPanel;
+            ShowIdleHero = false;
 
             // The old text claimed to be waiting for the pick and the lane opponent — in the only
             // situation where the card is visible at all, since the line above needs _buildContext,
@@ -1971,6 +1984,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         ShowBuildClose = true;
         ShowBuildSection = HasBuild && !_buildCardClosed && !ShowGameView;
         ShowNarrowBuildCard = ShowBuildSection;
+        ShowIdleHero = ShowIdleCard && !ShowBuildSection;
         BuildHint = string.Empty;
     }
 

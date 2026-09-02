@@ -26,6 +26,80 @@
     <SolidColorBrush x:Key="Bad" Color="#EC5F5F" />
     <SolidColorBrush x:Key="BadSoft" Color="#3B1D1F" />
 
+    <!--
+        The brand: the gradient and the coffee-cup mark from the app icon (tools/make-app-icon.ps1
+        holds the same geometry — change it there and here together). Drawn as vectors so the mark
+        is crisp at 20 px in the title bar and at 88 px on the idle screen alike.
+
+        The gradient is used sparingly on purpose: the mark itself, a hairline under the title bar,
+        and the border of the turn card while it is the user's turn. As a fill on large surfaces it
+        would fight the champion portraits, which are the only colourful thing this panel should
+        have.
+    -->
+    <LinearGradientBrush x:Key="Brand" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#3B82F6" Offset="0" />
+        <GradientStop Color="#22C55E" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="BrandLine" StartPoint="0,0" EndPoint="1,0" Opacity="0.55">
+        <GradientStop Color="#3B82F6" Offset="0" />
+        <GradientStop Color="#22C55E" Offset="1" />
+    </LinearGradientBrush>
+
+    <PathGeometry x:Key="AppMarkCup" Figures="M 305,413 H 607 A 16,16 0 0 1 623,429 V 636 A 92,92 0 0 1 531,728 H 381 A 92,92 0 0 1 289,636 V 429 A 16,16 0 0 1 305,413 Z" />
+    <PathGeometry x:Key="AppMarkHandle" Figures="M 623,440 A 95,95 0 1 1 623,612" />
+    <PathGeometry x:Key="AppMarkSteam" Figures="M 362,260 V 305 M 460,260 V 305 M 560,260 V 305" />
+
+    <DrawingImage x:Key="AppMark">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="{StaticResource Brand}">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="0,0,1024,1024" RadiusX="200" RadiusY="200" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="White" Thickness="34" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <GeometryGroup>
+                            <StaticResource ResourceKey="AppMarkCup" />
+                            <StaticResource ResourceKey="AppMarkHandle" />
+                            <StaticResource ResourceKey="AppMarkSteam" />
+                        </GeometryGroup>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- The title-bar size. Same optical-sizing trick as the .ico: at 20 px the 34-unit stroke is
+         two thirds of a pixel, so the small variant carries a heavier line. -->
+    <DrawingImage x:Key="AppMarkSmall">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="{StaticResource Brand}">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="0,0,1024,1024" RadiusX="220" RadiusY="220" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="White" Thickness="76" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <GeometryGroup>
+                            <StaticResource ResourceKey="AppMarkCup" />
+                            <StaticResource ResourceKey="AppMarkHandle" />
+                            <StaticResource ResourceKey="AppMarkSteam" />
+                        </GeometryGroup>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
     <!-- Typography. Everything moved up a few points; the old 10-12 px was unreadable at a glance. -->
     <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="NumFont">Consolas, Cascadia Mono</FontFamily>
