@@ -9,6 +9,19 @@ Kopien melden sie beim nächsten Start.
   genau diese Kacheln als Text stehen, bis irgendein anderes Ereignis das Panel neu zeichnete;
   Icons aus früheren Drafts waren immer da. Betrifft auch Runen- und Beschwörerzauber-Icons bei
   jemandem, der noch kein großes Daten-Update gelaufen hat.
+- Die Build-Karte erscheint nicht mehr ohne Build. Ein Klick auf einen Mitspieler zeigte sie
+  auch dann, wenn man selbst noch nicht gepickt hatte — mit leerem Inhalt und der Kopfzeile des
+  vorherigen Drafts („DEIN BUILD · Darius · Top").
+- Klickt man einen Mitspieler an, ist der Text auch für ihn geschrieben: „Matchup von
+  Mitspieler 2" statt „Dein Matchup", und das Duell läuft für ihn, nicht für dich.
+- Die Ban-Liste nennt keine Lane mehr in der Kopfzeile. Sie stand auf der eigenen Lane, während
+  die Vorschläge nach den Lanes ausgewählt werden, die der Gegner noch füllen kann — „Bans für
+  dich · Top" über einer Liste aus Supports.
+- Solange kein gegnerischer Pick aufgedeckt ist (Blind Pick), zeigen die Team-Spalten einen
+  Strich statt zweimal „50,0 % WR". Die Zahl entsteht aus dem Unterschied beider Teams; ohne
+  Gegner war sie ein Ergebnis, das nichts gemessen hat.
+- Fehlt die Duell-Statistik, heißt es jetzt „Für dieses Duell hat OP.GG keine Statistik" statt
+  „OP.GG kennt dieses Duell nicht" — direkt darunter stand ein Build für genau dieses Duell.
 
 ## 1.0.1 — 2026-09-02
 

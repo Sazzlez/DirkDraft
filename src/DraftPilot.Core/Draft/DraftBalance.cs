@@ -15,12 +15,21 @@ namespace DraftPilot.Core.Draft;
 /// <param name="AllyWinRate">Estimated win rate of the own team, 0..1.</param>
 /// <param name="RatedChampions">Revealed champions that contributed a lane win rate.</param>
 /// <param name="ContestedLanes">Lanes where both sides revealed a champion and a matchup existed.</param>
-public readonly record struct DraftBalance(double AllyWinRate, int RatedChampions, int ContestedLanes)
+/// <param name="IsComparable">
+/// Whether both sides revealed something to compare. Only a difference between the two sides says
+/// anything; with one side entirely hidden the estimate collapses to exactly 50 % by construction,
+/// and that number would look like a measured verdict instead of the absence of one.
+/// </param>
+public readonly record struct DraftBalance(
+    double AllyWinRate,
+    int RatedChampions,
+    int ContestedLanes,
+    bool IsComparable = true)
 {
     /// <summary>Nothing to judge yet — shown as a dash rather than as a confident 50 %.</summary>
-    public static DraftBalance Unknown => new(0.5, 0, 0);
+    public static DraftBalance Unknown => new(0.5, 0, 0, false);
 
-    public bool HasData => RatedChampions > 0;
+    public bool HasData => RatedChampions > 0 && IsComparable;
 
     public double EnemyWinRate => 1 - AllyWinRate;
 
@@ -68,7 +77,12 @@ public readonly record struct DraftBalance(double AllyWinRate, int RatedChampion
 
         var duelEdge = contested > 0 ? duelSum / contested : 0;
 
-        return new DraftBalance(ScoreModel.Sigmoid(strengthEdge + duelEdge), rated, contested);
+        // Blind pick reveals our own team and nothing of theirs: both edges stay zero, the sigmoid
+        // returns exactly 0.5, and the window would print "50,0 % WR" on both columns as if the
+        // draft had been weighed. Say so instead.
+        var comparable = allyCount > 0 && enemyCount > 0;
+
+        return new DraftBalance(ScoreModel.Sigmoid(strengthEdge + duelEdge), rated, contested, comparable);
     }
 
     /// <summary>Sum of the lane-win-rate log-odds of one side's revealed champions, and how many.</summary>

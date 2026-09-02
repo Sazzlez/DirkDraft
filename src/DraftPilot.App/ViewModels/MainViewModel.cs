@@ -1108,6 +1108,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             RuneImportText = string.Empty;
             _build = null;
             HasBuild = false;
+
+            // The heading is set only when a build arrives, so without this it still named the
+            // previous draft's matchup — visible as "DEIN BUILD · Darius · Top" in a draft where
+            // nothing had been picked yet, and as the wrong matchup while the new build loads.
+            BuildTitle = string.Empty;
+            BuildSubtitle = string.Empty;
             _buildCardClosed = false;
             _buildProbe = default;
 
@@ -1775,8 +1781,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             AllyWinRateText = "—";
             EnemyWinRateText = "—";
             BalanceTone = BalanceTone.Even;
-            BalanceHint = "Sobald Champions aufgedeckt sind, steht hier die geschätzte Siegquote "
-                + "des Drafts.";
+
+            // Two different reasons for a dash, and telling them apart matters: in blind pick our
+            // own team is fully revealed, so "sobald Champions aufgedeckt sind" would read as if
+            // the tool had missed them.
+            BalanceHint = balance.RatedChampions > 0
+                ? "Solange kein gegnerischer Pick aufgedeckt ist, gibt es nichts zu vergleichen — "
+                    + "die Siegquote eines Drafts ergibt sich aus dem Unterschied beider Teams."
+                : "Sobald Champions aufgedeckt sind, steht hier die geschätzte Siegquote des Drafts.";
             return;
         }
 
@@ -1818,6 +1830,24 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// nothing anyone could act on. A team-mate on the clock keeps the list: advising them is real.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// The advised seat when it is not our own: "Mitspieler N", numbered the way the team column
+    /// shows them. <see langword="null"/> for our own seat.
+    /// <para>
+    /// Every text that addresses the user directly hangs off this distinction. A click on a
+    /// team-mate moves the advice to their seat, and their duel must not be worded as ours — the
+    /// panel used to greet a team-mate's lane with "Dein Matchup" and "deiner Lane".
+    /// </para>
+    /// </summary>
+    private string? TargetTeammate()
+    {
+        if (_target is null || _target.Slot.CellId == _state.LocalCellId)
+            return null;
+
+        var index = _state.Allies.ToList().FindIndex(slot => slot.CellId == _target.Slot.CellId);
+        return index < 0 ? null : $"Mitspieler {index + 1}";
+    }
+
     private void RenderMatchupPanel()
     {
         var show = _target?.IsSettled == true;
@@ -1832,6 +1862,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // Not _buildContext: that one additionally requires an opponent, and the panel has
         // something to say without one.
         var mine = _target!.Slot;
+        var teammate = TargetTeammate();
         var lane = mine.AssignedLane != Lane.Unknown
             ? mine.AssignedLane
             : _allyPredictions?.ForCell(mine.CellId)?.Lane ?? Lane.Unknown;
@@ -1851,7 +1882,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             MatchupFigure = string.Empty;
             HasMatchupFigure = false;
             MatchupTone = ScoreTone.Weak;
-            MatchupNote = "Der Gegner auf deiner Lane ist noch nicht aufgedeckt.";
+            MatchupNote = teammate is null
+                ? "Der Gegner auf deiner Lane ist noch nicht aufgedeckt."
+                : "Der Gegner auf dieser Lane ist noch nicht aufgedeckt.";
             return;
         }
 
@@ -1864,8 +1897,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             MatchupFigure = string.Empty;
             HasMatchupFigure = false;
             MatchupTone = ScoreTone.Weak;
-            MatchupNote = $"OP.GG kennt dieses Duell nicht — von den möglichen Paarungen auf "
-                + $"{(lanePart.Length > 0 ? lanePart : "einer Lane")} ist nur etwa ein Fünftel erfasst.";
+            // "kennt dieses Duell nicht" stood directly above a build card for that same pairing
+            // and read as a contradiction. Only the duel STATISTIC is missing; the build comes
+            // from a different OP.GG endpoint and is unaffected — said only when one is on screen.
+            MatchupNote = $"Für dieses Duell hat OP.GG keine Statistik — von den möglichen "
+                + $"Paarungen auf {(lanePart.Length > 0 ? lanePart : "einer Lane")} ist nur etwa "
+                + "ein Fünftel erfasst."
+                + (HasBuild ? " Der Build unten stammt aus einem eigenen Abruf." : string.Empty);
             return;
         }
 
@@ -1886,11 +1924,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var sample = duel.Play > 0 ? $" · {duel.Play.ToString("N0", culture)} Spiele" : string.Empty;
         MatchupSubline = $"{lanePart}{sample}";
 
-        MatchupNote = duel.WinRateDelta switch
+        MatchupNote = (duel.WinRateDelta, teammate) switch
         {
-            > 0.02 => "Das Duell läuft für dich. 50 % wäre ausgeglichen.",
-            > -0.02 => "Ein ausgeglichenes Duell — es entscheidet sich im Spiel, nicht im Draft.",
-            _ => "Das Duell läuft gegen dich. Vorsichtig spielen und auf Hilfe des Junglers setzen.",
+            ( > 0.02, null) => "Das Duell läuft für dich. 50 % wäre ausgeglichen.",
+            ( > 0.02, _) => $"Das Duell läuft für {teammate}. 50 % wäre ausgeglichen.",
+            ( > -0.02, _) => "Ein ausgeglichenes Duell — es entscheidet sich im Spiel, nicht im Draft.",
+            (_, null) => "Das Duell läuft gegen dich. Vorsichtig spielen und auf Hilfe des Junglers setzen.",
+            _ => $"Das Duell läuft gegen {teammate} — dort ist Hilfe des Junglers am meisten wert.",
         };
     }
 
@@ -2162,10 +2202,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var set = _recommender.Recommend(
             _state, _target, enemyPredictions, allyPredictions, selectable, _settings.RecommendationCount);
 
-        var allyIndex = _state.Allies.ToList().FindIndex(slot => slot.CellId == _target.Slot.CellId);
-        var who = _target.Slot.CellId == _state.LocalCellId || allyIndex < 0
-            ? "dich"
-            : $"Mitspieler {allyIndex + 1}";
+        var teammate = TargetTeammate();
+        var who = teammate ?? "dich";
 
         var isBan = set.Action == TurnAction.Ban;
         var mode = isBan ? "Bans" : "Picks";
@@ -2175,11 +2213,15 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // list nobody can act on.
         if (_target.IsSettled)
         {
-            ListHeader = set.Lane == Lane.Unknown ? "Dein Matchup" : $"Dein Matchup · {set.Lane.Display()}";
+            var whose = teammate is null ? "Dein Matchup" : $"Matchup von {teammate}";
+            ListHeader = set.Lane == Lane.Unknown ? whose : $"{whose} · {set.Lane.Display()}";
             HasRecommendations = false;
             return;
         }
-        var lanePart = set.Lane == Lane.Unknown ? string.Empty : $" · {set.Lane.Display()}";
+        // Not for bans: the lane in the set is our own seat's, while the candidates are picked by
+        // the lanes the ENEMY can still fill. "Bans für dich · Top" over a list of supports named
+        // a lane the list has nothing to do with.
+        var lanePart = isBan || set.Lane == Lane.Unknown ? string.Empty : $" · {set.Lane.Display()}";
 
         // When the top picks sit inside the sampling error of the numbers behind them, their order
         // is noise and the header says so. The bar is the measured error, not a fixed fraction of a

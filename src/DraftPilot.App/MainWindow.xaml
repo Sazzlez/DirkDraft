@@ -1250,8 +1250,15 @@
                                 </StackPanel>
                             </Border>
 
+                            <!--
+                                Only when there is a build, or a matchup one is being fetched for.
+                                Without the condition this card appeared under every matchup panel -
+                                including one for a team-mate while we had not picked at all, where
+                                it showed an empty body under a heading left over from the last draft.
+                            -->
                             <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
-                                    BorderThickness="1" CornerRadius="10" Padding="14,11" Margin="0,11,0,0">
+                                    BorderThickness="1" CornerRadius="10" Padding="14,11" Margin="0,11,0,0"
+                                    Visibility="{Binding ShowBuildSection, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel>
                                     <Grid>
                                         <Grid.ColumnDefinitions>

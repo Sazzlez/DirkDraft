@@ -64,6 +64,34 @@ public class DraftBalanceTests
         Assert.False(balance.HasData);
     }
 
+    /// <summary>
+    /// Blind pick: our own team is revealed, theirs is not. Both edges are zero by construction, so
+    /// the estimate lands on exactly 50 % — and printing that would claim the draft had been weighed
+    /// when in truth there was nothing to weigh it against.
+    /// </summary>
+    [Fact]
+    public void WithTheEnemyTeamHidden_ThereIsNothingToCompare()
+    {
+        var meta = Meta(allyTopWinRate: 0.56);
+        var session = new SessionBuilder()
+            .LocalPlayer(0)
+            .Locked(0, AllyTop)
+            .Locked(2, AllyMid)
+            .Build();
+
+        var state = DraftState.From(session);
+        var predictor = new LanePredictor(meta);
+        var allies = predictor.Predict(state.Allies);
+
+        var balance = DraftBalance.Estimate(meta, state, allies, predictor.Predict(state.Enemies));
+
+        Assert.False(balance.HasData);
+        Assert.False(balance.IsComparable);
+
+        // The champions were still read — the window uses that to explain WHICH dash it is showing.
+        Assert.Equal(2, balance.RatedChampions);
+    }
+
     [Fact]
     public void EquallyStrongTeams_AreEven()
     {
