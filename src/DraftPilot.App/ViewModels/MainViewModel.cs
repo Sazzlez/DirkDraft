@@ -74,6 +74,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// <summary>Consecutive rounds that ended with at least one failed call; drives the backoff.</summary>
     private int _fetchFailures;
 
+    /// <summary>
+    /// The build on screen was fetched against a stand-in opponent, because the queue never reveals
+    /// the real one. Everything the card says about it has to carry that caveat.
+    /// </summary>
+    private bool _buildIsStandIn;
+
     /// <summary>The matchup whose build could not be fetched, so the card can say so.</summary>
     private (int Champion, Lane Lane, int Opponent)? _buildFailedFor;
 
@@ -407,7 +413,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private void ApplyGameBuild(BuildPlan plan)
     {
         _appliedBootsPreference = SituationalBuild.PreferredBoots(_enemyComp);
-        GameBuild.Apply(plan, _names, _icons, _appliedBootsPreference);
+        GameBuild.Apply(plan, _names, _icons, _appliedBootsPreference, _buildIsStandIn);
     }
 
     /// <summary>
@@ -998,6 +1004,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         _buildContext = null;
 
+        _buildIsStandIn = false;
+
         if (_state.LocalSlot is { IsLocked: true } mine && mine.LockedChampionId != 0)
         {
             var myLane = mine.AssignedLane != Lane.Unknown
@@ -1005,6 +1013,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 : allyPredictions.ForCell(mine.CellId)?.Lane ?? Lane.Unknown;
 
             var opponent = myLane == Lane.Unknown ? 0 : enemyPredictions.ChampionOnLane(myLane);
+
+            // Blind pick never reveals the enemy team, and OP.GG has no build that works without an
+            // opponent — so without a stand-in these queues get no build and no rune import for the
+            // whole game. Only when NOTHING is revealed; a draft that will show the real opponent in
+            // a few seconds is worth waiting for.
+            if (opponent == 0 && myLane != Lane.Unknown && StandInOpponent.EnemiesAreHidden(_state))
+            {
+                opponent = StandInOpponent.For(_meta, myLane, _state.Unavailable, mine.LockedChampionId);
+                _buildIsStandIn = opponent != 0;
+            }
 
             if (myLane != Lane.Unknown && opponent != 0)
                 _buildContext = (mine.LockedChampionId, myLane, opponent);
@@ -1452,7 +1470,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // if they had been transferred.
         RuneImportText = string.Empty;
 
-        BuildTitle = $"{plan.ChampionName} vs {plan.OpponentName} · {plan.Lane.Display()}";
+        // No opponent in the title for a stand-in: the 280 px column truncates it and the caveat is
+        // exactly the half that gets cut off. It becomes a chip below instead, where it wraps.
+        BuildTitle = _buildIsStandIn
+            ? $"{plan.ChampionName} · {plan.Lane.Display()}"
+            : $"{plan.ChampionName} vs {plan.OpponentName} · {plan.Lane.Display()}";
 
         var runes = plan.Runes;
         BuildSubtitle = runes is null
@@ -1461,9 +1483,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         // The tiles themselves — runes, purchase order, spells, skills — all live in GameBuild;
         // the draft column and the in-game view render the same content at different sizes.
-        // (The situational hints are NOT rendered here: Render() re-derives them on every pass,
-        // so they follow the enemy composition instead of freezing at build time.)
         ApplyGameBuild(plan);
+
+        // The hints are re-derived on every render pass so they follow the enemy composition, but
+        // two of them read _build itself — the stand-in caveat and the "boots adjusted" wording.
+        // A cached build lands in the MIDDLE of a render, after the hints for that pass were
+        // already built, and if nothing else triggers another pass those two never appear at all.
+        RenderBuildHints();
         UpdateBuildSection();
         AnnounceGameActive();
 
@@ -1574,6 +1600,18 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // (composition shifting after my pick) updates the shown boots too.
         var preference = SituationalBuild.PreferredBoots(_enemyComp);
         var adjusted = _build is { } plan && SituationalBuild.PickBoots(plan.Boots, preference) is not null;
+
+        // Named first, because everything below it is advice about an opponent we do not have.
+        if (_buildIsStandIn && _build is { } standIn)
+        {
+            hints.Add(Reason.Neutral(
+                $"Gegner unbekannt — Build gegen {standIn.OpponentName}",
+                $"Diese Warteschlange deckt die gegnerischen Picks nie auf, und OP.GG liefert keinen "
+                + $"Build ohne Gegner. Gezeigt wird deshalb das Matchup gegen {standIn.OpponentName} — "
+                + $"den am häufigsten gespielten Champion auf {standIn.Lane.Display()}. Runen, Spells und "
+                + "Skill-Reihenfolge hängen kaum am Gegenspieler und passen so; die Kern-Items sind "
+                + "nur eine Richtung."));
+        }
 
         if (_enemyComp.Count >= 3)
         {

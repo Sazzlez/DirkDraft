@@ -166,14 +166,27 @@ public sealed class GameBuildViewModel : ObservableObject
     /// the matching boot, THAT set is shown (highlighted, with the reason in its tooltip) instead
     /// of the most-played one — the one build slot that adapts to the situation hints.
     /// </param>
-    public void Apply(BuildPlan plan, AssetNames names, IconCache icons, BootsPreference bootsPreference = BootsPreference.None)
+    /// <param name="isStandIn">
+    /// The opponent in <paramref name="plan"/> is a stand-in, because the queue never revealed the
+    /// real one. Naming it as such matters: the runes and the skill order carry over, the item core
+    /// is the part that was chosen against somebody else.
+    /// </param>
+    public void Apply(
+        BuildPlan plan,
+        AssetNames names,
+        IconCache icons,
+        BootsPreference bootsPreference = BootsPreference.None,
+        bool isStandIn = false)
     {
-        Title = $"{plan.ChampionName} vs {plan.OpponentName} · {plan.Lane.Display()}";
+        Title = isStandIn
+            ? $"{plan.ChampionName} · {plan.Lane.Display()} — gegen den üblichen Gegner ({plan.OpponentName})"
+            : $"{plan.ChampionName} vs {plan.OpponentName} · {plan.Lane.Display()}";
 
         var runes = plan.Runes;
+        var caveat = isStandIn ? " · Gegner unbekannt, Items nur als Richtung" : string.Empty;
         Subtitle = runes is null
-            ? $"Patch {plan.Patch}"
-            : $"Runen: {runes.WinRate:P0} WR über {runes.Play} Spiele · Patch {plan.Patch}";
+            ? $"Patch {plan.Patch}{caveat}"
+            : $"Runen: {runes.WinRate:P0} WR über {runes.Play} Spiele · Patch {plan.Patch}{caveat}";
 
         PrimaryPath = runes?.PrimaryPath ?? string.Empty;
         SecondaryPath = runes?.SecondaryPath ?? string.Empty;

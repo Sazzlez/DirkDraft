@@ -16,6 +16,15 @@ auf exakt 0,50 von 68 auf 2, Zeilen ohne Spielzahl von 9 auf 0.
 restlichen Quick Wins (`queueId` lesen, Ban-Gate und Ban-Stärke aus derselben Lane, Jungle-Duos
 streichen, doppeltes Laden beim Start).
 
+**Zusätzlich, nicht aus dieser Analyse:** Blind-Pick-Rückfall. Der Live-Test zeigte, dass
+Warteschlangen ohne Gegner-Reveal strukturell *keinen* Build und *keine* Runen bekommen — die
+Bedingung dafür verlangt einen aufgedeckten Lane-Gegner, und OP.GG hat nachweislich keinen Build
+ohne Gegner (29 Werkzeuge, keins davon generisch). Gelöst über einen benannten Ersatzgegner: den
+meistgespielten Champion der eigenen Lane, sichtbar als solcher gekennzeichnet. Greift nur, wenn
+gar kein Gegner aufgedeckt ist — ein Draft, der sie zeigt, ist die paar Sekunden Wartezeit wert.
+Das Scoring bleibt unangetastet: einen Gegner in die Bewertung zu erfinden würde jeden Kandidaten
+unterschiedlich verzerren.
+
 ### Was Maßnahme 4 ergeben hat
 
 Der Score trägt jetzt seinen eigenen Standardfehler, aus den Stichprobengrößen hinter seinen
@@ -162,7 +171,8 @@ der 280-px-Spalte stecken. Sinnvoller: eigene Matchup-Karte plus Build groß.
 
 ## Offene Fragen (blinde Flecken der Analyse)
 
-- **Anzeige-Präzision**: Die UI schreibt `P1` („53,9 %") auf Daten mit 1-pp-Auflösung. Ganze
+- ~~**Anzeige-Präzision**~~ — erledigt mit Maßnahme 4: die Nachkommastelle folgt jetzt dem
+  gemessenen Fehlerbalken, einmal für die ganze Spalte entschieden. Ursprünglicher Befund: Die UI schreibt `P1` („53,9 %") auf Daten mit 1-pp-Auflösung. Ganze
   Prozent oder eine Spanne wäre sofort ehrlicher, ohne jede Modelländerung.
 - **Nutzt der Nutzer die Liste überhaupt?** Ob aus den Top 3 gepickt wurde, ist ohne jeden neuen
   Zugriff feststellbar (eigener Lock steht in der Session, Empfehlung liegt im Speicher). Die
