@@ -31,9 +31,9 @@
         holds the same geometry — change it there and here together). Drawn as vectors so the mark
         is crisp at 20 px in the title bar and at 88 px on the idle screen alike.
 
-        The gradient is used sparingly on purpose: the mark itself and a hairline under the title
-        bar. A gradient border on the turn card sat right under that hairline and read as two of the
-        same thing stacked, so the card keeps its plain accent. As a fill on large surfaces it
+        The gradient is used sparingly on purpose: the mark itself, a hairline under the title bar,
+        and the border of the turn card while it is the user's turn - where it rotates, which is
+        what separates it from the static line above. As a fill on large surfaces it
         would fight the champion portraits, which are the only colourful thing this panel should
         have.
     -->

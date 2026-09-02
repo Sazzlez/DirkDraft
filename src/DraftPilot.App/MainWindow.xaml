@@ -367,9 +367,39 @@
                     <Style TargetType="Border">
                         <Setter Property="BorderBrush" Value="{StaticResource LineSoft}" />
                         <Style.Triggers>
-                            <!-- Your own turn is the one moment the panel must not be overlooked. -->
+                            <!--
+                                Your own turn is the one moment the panel must not be overlooked. The
+                                brand gradient runs around the frame and turns while the turn lasts:
+                                motion in a static panel draws the eye without adding a single pixel
+                                of size. Stopped on exit, so nothing animates while nobody is on the
+                                clock. 30 fps and one full turn per six seconds keep it calm and
+                                cheap under software rendering.
+                            -->
                             <DataTrigger Binding="{Binding IsMyTurn}" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+                                <Setter Property="BorderBrush">
+                                    <Setter.Value>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <LinearGradientBrush.RelativeTransform>
+                                                <RotateTransform CenterX="0.5" CenterY="0.5" Angle="0" />
+                                            </LinearGradientBrush.RelativeTransform>
+                                            <GradientStop Color="#3B82F6" Offset="0" />
+                                            <GradientStop Color="#22C55E" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                                <DataTrigger.EnterActions>
+                                    <BeginStoryboard x:Name="SpinBrand">
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="(Border.BorderBrush).(LinearGradientBrush.RelativeTransform).(RotateTransform.Angle)"
+                                                             From="0" To="360" Duration="0:0:6"
+                                                             RepeatBehavior="Forever"
+                                                             Timeline.DesiredFrameRate="30" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </DataTrigger.EnterActions>
+                                <DataTrigger.ExitActions>
+                                    <StopStoryboard BeginStoryboardName="SpinBrand" />
+                                </DataTrigger.ExitActions>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
