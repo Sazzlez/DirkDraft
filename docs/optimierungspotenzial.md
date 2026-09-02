@@ -7,14 +7,16 @@ Handlungsrelevante verdichtet.
 ## Stand der Umsetzung (2026-09-01)
 
 **Umgesetzt:** Maßnahme 1 (exakte Winrates), 2 (Build zuerst, Gegner parallel), 4 (Bootstrap und
-Gleichrangigkeits-Schwelle), 5 (Ausfälle sichtbar, Fehler pro Aufruf, Live-Kanten nach Lane) sowie
+Gleichrangigkeits-Schwelle), 5 (Ausfälle sichtbar, Fehler pro Aufruf, Live-Kanten nach Lane),
+6 (Matchup-Karte statt toter Pick-Liste) sowie
 die Quick Wins Gleichheits-Wächter, Test-Tor, vergessene Datenfelder, echter Datenstand und
 Feld-Diagnose. Gemessene Wirkung von Maßnahme 1: von 12 auf 274 verschiedene Lane-Winraten, Zeilen
 auf exakt 0,50 von 68 auf 2, Zeilen ohne Spielzahl von 9 auf 0.
 
-**Offen:** Maßnahme 6 (Mittelspalte nach dem eigenen Lock) und die
-restlichen Quick Wins (`queueId` lesen, Ban-Gate und Ban-Stärke aus derselben Lane, Jungle-Duos
-streichen, doppeltes Laden beim Start).
+**Offen:** nur noch die restlichen Quick Wins (`queueId` lesen, Ban-Gate und Ban-Stärke aus
+derselben Lane, Jungle-Duos streichen, doppeltes Laden beim Start). Alle sechs priorisierten
+Maßnahmen sind entschieden — vier umgesetzt, eine (3) zur Hälfte, weil die Messung die andere
+Hälfte widerlegt hat.
 
 **Zusätzlich, nicht aus dieser Analyse:** Blind-Pick-Rückfall. Der Live-Test zeigte, dass
 Warteschlangen ohne Gegner-Reveal strukturell *keinen* Build und *keine* Runen bekommen — die
@@ -24,6 +26,23 @@ meistgespielten Champion der eigenen Lane, sichtbar als solcher gekennzeichnet. 
 gar kein Gegner aufgedeckt ist — ein Draft, der sie zeigt, ist die paar Sekunden Wartezeit wert.
 Das Scoring bleibt unangetastet: einen Gegner in die Bewertung zu erfinden würde jeden Kandidaten
 unterschiedlich verzerren.
+
+### Was Maßnahme 6 ergeben hat
+
+Die Regel steht jetzt als `RecommendationTarget.IsSettled` in Core und ist damit geprüft: Der
+beratene Sitz hat gesperrt UND niemand im eigenen Team ist am Zug. Genau dann ist eine Pick-Liste
+Beratung zu einer gefallenen Entscheidung. Ein Mitspieler am Zug ist ausdrücklich nicht dieser
+Fall — den zu beraten ist echte Beratung, auch wenn der eigene Pick längst steht.
+
+In dieser Phase zeigt die breiteste Spalte die Matchup-Karte (beide Portraits, das Duell mit
+Siegquote und Stichprobe, oder ehrlich „OP.GG kennt dieses Duell nicht") und darunter den Build
+in voller Breite. Die schmale Build-Karte links verschwindet dabei, sonst stünde derselbe Build
+zweimal auf dem Schirm.
+
+Das Build-Markup ist dafür **nicht** ein zweites Mal geschrieben, sondern einmal als Vorlage
+(`BuildBody`) definiert und an beiden Stellen eingesetzt. Die Chip-Reihen brechen um, nutzen die
+zusätzliche Breite also von selbst: Start, Schuhe und Spells stehen dort auf einer Zeile statt
+gestapelt.
 
 ### Was Maßnahme 3 ergeben hat
 

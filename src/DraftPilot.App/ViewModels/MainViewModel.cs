@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Net.Http;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Threading;
 using DraftPilot.Core.Config;
 using DraftPilot.Core.Data;
@@ -91,6 +92,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// enemies from the same prediction it was counted with, or the pending count never reaches zero.
     /// </summary>
     private LanePredictionResult? _enemyPredictions;
+
+    /// <summary>The ally prediction of the current render, for the matchup panel's own lane.</summary>
+    private LanePredictionResult? _allyPredictions;
 
     /// <summary>
     /// Matchups the build was already requested for this draft. Lane predictions can flip while
@@ -184,6 +188,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _isUpdating;
     private bool _isDraftActive;
     private bool _hasRecommendations;
+    private bool _showMatchupPanel;
+    private bool _showNarrowBuildCard;
+    private bool _showEmptyHint;
+    private bool _hasMatchupFigure;
+    private string _matchupHeadline = string.Empty;
+    private string _matchupSubline = string.Empty;
+    private string _matchupFigure = string.Empty;
+    private string _matchupNote = string.Empty;
+    private ScoreTone _matchupTone;
+    private ImageSource? _matchupOwnIcon;
+    private ImageSource? _matchupOpponentIcon;
     private bool _isMyTurn;
     private bool _hasMeta;
     private string _snapshotDetail = string.Empty;
@@ -546,6 +561,89 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         get => _hasRecommendations;
         private set => Set(ref _hasRecommendations, value);
+    }
+
+    /// <summary>
+    /// The widest column shows the matchup instead of a pick list. Reached once the advised seat has
+    /// locked and nobody on our team is on the clock — in that state a list of alternatives is
+    /// advice about a decision already made, and it occupied the one column with room to breathe
+    /// while the build sat in the 280 px column next to it.
+    /// </summary>
+    public bool ShowMatchupPanel
+    {
+        get => _showMatchupPanel;
+        private set => Set(ref _showMatchupPanel, value);
+    }
+
+    /// <summary>
+    /// The narrow build card in the left column. Hidden while the matchup panel shows the same
+    /// build in the wide column — two copies on one screen are noise. Expressed as one property
+    /// rather than a style trigger, because the local Visibility attribute on that Border would
+    /// win against any trigger.
+    /// </summary>
+    public bool ShowNarrowBuildCard
+    {
+        get => _showNarrowBuildCard;
+        private set => Set(ref _showNarrowBuildCard, value);
+    }
+
+    /// <summary>The empty-list hint. Suppressed while the matchup panel has the column.</summary>
+    public bool ShowEmptyHint
+    {
+        get => _showEmptyHint;
+        private set => Set(ref _showEmptyHint, value);
+    }
+
+    /// <summary>Both champions of the duel, e.g. <c>Darius vs Jax</c>.</summary>
+    public string MatchupHeadline
+    {
+        get => _matchupHeadline;
+        private set => Set(ref _matchupHeadline, value);
+    }
+
+    /// <summary>Where the number comes from: lane, sample size, patch.</summary>
+    public string MatchupSubline
+    {
+        get => _matchupSubline;
+        private set => Set(ref _matchupSubline, value);
+    }
+
+    /// <summary>The duel win rate as a figure, or empty when the duel is unknown.</summary>
+    public string MatchupFigure
+    {
+        get => _matchupFigure;
+        private set => Set(ref _matchupFigure, value);
+    }
+
+    public ScoreTone MatchupTone
+    {
+        get => _matchupTone;
+        private set => Set(ref _matchupTone, value);
+    }
+
+    /// <summary>Said in words when there is no number: no opponent yet, or no data for the pairing.</summary>
+    public string MatchupNote
+    {
+        get => _matchupNote;
+        private set => Set(ref _matchupNote, value);
+    }
+
+    public bool HasMatchupFigure
+    {
+        get => _hasMatchupFigure;
+        private set => Set(ref _hasMatchupFigure, value);
+    }
+
+    public ImageSource? MatchupOwnIcon
+    {
+        get => _matchupOwnIcon;
+        private set => Set(ref _matchupOwnIcon, value);
+    }
+
+    public ImageSource? MatchupOpponentIcon
+    {
+        get => _matchupOpponentIcon;
+        private set => Set(ref _matchupOpponentIcon, value);
     }
 
     /// <summary>The local player is on the clock; the turn card lights up for it.</summary>
@@ -1000,6 +1098,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private void UpdateDraftLiveState(LanePredictionResult enemyPredictions, LanePredictionResult allyPredictions)
     {
         _enemyPredictions = enemyPredictions;
+        _allyPredictions = allyPredictions;
         _pendingEnemyCount = PendingEnemies().Count;
 
         _buildContext = null;
@@ -1030,6 +1129,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         TryLoadCachedBuild();
         UpdateBuildSection();
+
+        // After _buildContext, because the panel answers the same question the build does.
+        RenderMatchupPanel();
+
         TryFetchDraftData();
     }
 
@@ -1590,6 +1693,92 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             + "Picks zählen nicht mit — die Zahl bewegt sich also mit jedem weiteren Pick.";
     }
 
+    /// <summary>
+    /// Decides whether the widest column shows a pick list or the matchup, and fills the latter.
+    /// <para>
+    /// The list is meaningless exactly when the advised seat has already locked AND nobody on our
+    /// team is on the clock: it then offers alternatives to a decision that is made. That is the
+    /// last minute of every draft — finalisation, and the stretches where the enemy is picking —
+    /// and it is the only phase where the 280 px column held the build while the wide one held
+    /// nothing anyone could act on. A team-mate on the clock keeps the list: advising them is real.
+    /// </para>
+    /// </summary>
+    private void RenderMatchupPanel()
+    {
+        var show = _target?.IsSettled == true;
+
+        ShowMatchupPanel = show;
+        ShowEmptyHint = !show && !HasRecommendations;
+        ShowNarrowBuildCard = ShowBuildSection && !show;
+
+        if (!show)
+            return;
+
+        // Not _buildContext: that one additionally requires an opponent, and the panel has
+        // something to say without one.
+        var mine = _target!.Slot;
+        var lane = mine.AssignedLane != Lane.Unknown
+            ? mine.AssignedLane
+            : _allyPredictions?.ForCell(mine.CellId)?.Lane ?? Lane.Unknown;
+
+        var opponent = lane == Lane.Unknown ? 0 : _enemyPredictions?.ChampionOnLane(lane) ?? 0;
+        var ownName = _meta.ChampionName(mine.LockedChampionId);
+
+        MatchupOwnIcon = _icons.Get(mine.LockedChampionId);
+        MatchupOpponentIcon = opponent == 0 ? null : _icons.Get(opponent);
+
+        var lanePart = lane == Lane.Unknown ? string.Empty : lane.Display();
+
+        if (opponent == 0)
+        {
+            MatchupHeadline = ownName;
+            MatchupSubline = lanePart;
+            MatchupFigure = string.Empty;
+            HasMatchupFigure = false;
+            MatchupTone = ScoreTone.Weak;
+            MatchupNote = "Der Gegner auf deiner Lane ist noch nicht aufgedeckt.";
+            return;
+        }
+
+        var opponentName = _meta.ChampionName(opponent);
+        MatchupHeadline = $"{ownName} vs {opponentName}";
+
+        if (_meta.Matchup(mine.LockedChampionId, opponent, lane) is not { } duel)
+        {
+            MatchupSubline = lanePart;
+            MatchupFigure = string.Empty;
+            HasMatchupFigure = false;
+            MatchupTone = ScoreTone.Weak;
+            MatchupNote = $"OP.GG kennt dieses Duell nicht — von den möglichen Paarungen auf "
+                + $"{(lanePart.Length > 0 ? lanePart : "einer Lane")} ist nur etwa ein Fünftel erfasst.";
+            return;
+        }
+
+        var culture = CultureInfo.CurrentCulture;
+
+        // The absolute rate, not the centred term: "wie steht mein Duell" is answered by the rate
+        // as it would be read out loud, and the breakdown next door carries the shift.
+        MatchupFigure = $"{duel.WinRate.ToString($"P{ScoreError.Decimals(ScoreError.LogitVariance(duel.WinRate, duel.Play, Shrinkage.MatchupPrior))}", culture)} WR";
+        HasMatchupFigure = true;
+
+        MatchupTone = duel.WinRateDelta switch
+        {
+            > 0.02 => ScoreTone.Strong,
+            > -0.02 => ScoreTone.Fair,
+            _ => ScoreTone.Weak,
+        };
+
+        var sample = duel.Play > 0 ? $" · {duel.Play.ToString("N0", culture)} Spiele" : string.Empty;
+        MatchupSubline = $"{lanePart}{sample}";
+
+        MatchupNote = duel.WinRateDelta switch
+        {
+            > 0.02 => "Das Duell läuft für dich. 50 % wäre ausgeglichen.",
+            > -0.02 => "Ein ausgeglichenes Duell — es entscheidet sich im Spiel, nicht im Draft.",
+            _ => "Das Duell läuft gegen dich. Vorsichtig spielen und auf Hilfe des Junglers setzen.",
+        };
+    }
+
     private void RenderBuildHints()
     {
         var hints = new List<Reason>();
@@ -1748,6 +1937,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             ShowIdleCard = false;
             ShowBuildClose = false;
             ShowBuildSection = HasBuild || _buildContext is not null;
+            ShowNarrowBuildCard = ShowBuildSection && !ShowMatchupPanel;
 
             // The old text claimed to be waiting for the pick and the lane opponent — in the only
             // situation where the card is visible at all, since the line above needs _buildContext,
@@ -1773,6 +1963,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // there when the user tabs out mid-game. Closed by hand or by the next draft.
         ShowBuildClose = true;
         ShowBuildSection = HasBuild && !_buildCardClosed && !ShowGameView;
+        ShowNarrowBuildCard = ShowBuildSection;
         BuildHint = string.Empty;
     }
 
@@ -1862,6 +2053,15 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var isBan = set.Action == TurnAction.Ban;
         var mode = isBan ? "Bans" : "Picks";
         var suffix = _target.IsFollowingTurn ? string.Empty : " (Ausblick)";
+
+        // The matchup panel takes the column in this phase, so the header names that instead of a
+        // list nobody can act on.
+        if (_target.IsSettled)
+        {
+            ListHeader = set.Lane == Lane.Unknown ? "Dein Matchup" : $"Dein Matchup · {set.Lane.Display()}";
+            HasRecommendations = false;
+            return;
+        }
         var lanePart = set.Lane == Lane.Unknown ? string.Empty : $" · {set.Lane.Display()}";
 
         // When the top picks sit inside the sampling error of the numbers behind them, their order
@@ -1895,12 +2095,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Warnings.ReplaceAll([.. set.AllyComp.Findings.Select(finding => finding.Text)]);
     }
 
-    /// <summary>How many entries from the top sit within 0.3 win-rate points of first place.</summary>
     private void Clear()
     {
         Recommendations.Clear();
         Warnings.Clear();
         HasRecommendations = false;
+        ShowMatchupPanel = false;
+        ShowEmptyHint = false;
         PhaseText = string.Empty;
         IsMyTurn = false;
         TurnText = "Kein Champ Select";

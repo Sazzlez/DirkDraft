@@ -7,7 +7,20 @@ namespace DraftPilot.Core.Draft;
 /// True when this seat is the one actually on the clock, false when we are showing an outlook
 /// (manually selected, or nobody on our team is picking right now).
 /// </param>
-public sealed record RecommendationTarget(DraftSlot Slot, TurnAction Action, bool IsFollowingTurn);
+public sealed record RecommendationTarget(DraftSlot Slot, TurnAction Action, bool IsFollowingTurn)
+{
+    /// <summary>
+    /// The advised seat has locked and nobody on our team is on the clock, so a list of picks for
+    /// it is advice about a settled decision. True for the last stretch of every draft — the
+    /// finalisation, and the turns where the enemy is picking — and the signal for the panel to
+    /// show the matchup that will actually be played instead.
+    /// <para>
+    /// A team-mate on the clock is deliberately NOT this: advising them is real advice, even though
+    /// our own pick is long since made.
+    /// </para>
+    /// </summary>
+    public bool IsSettled => !IsFollowingTurn && Slot.IsLocked;
+}
 
 /// <summary>
 /// Decides which ally seat the recommendation list should advise.
