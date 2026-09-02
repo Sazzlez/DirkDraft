@@ -3,6 +3,13 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
+## Noch nicht veröffentlicht
+
+- Item-Icons, die für das aktuelle Matchup neu geladen werden, erscheinen sofort. Vorher blieben
+  genau diese Kacheln als Text stehen, bis irgendein anderes Ereignis das Panel neu zeichnete;
+  Icons aus früheren Drafts waren immer da. Betrifft auch Runen- und Beschwörerzauber-Icons bei
+  jemandem, der noch kein großes Daten-Update gelaufen hat.
+
 ## 1.0.1 — 2026-09-02
 
 - Der Startbildschirm meldet nach der Update-Prüfung, dass die installierte Version die neueste ist
