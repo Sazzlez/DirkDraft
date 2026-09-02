@@ -13,10 +13,40 @@ die Quick Wins Gleichheits-Wächter, Test-Tor, vergessene Datenfelder, echter Da
 Feld-Diagnose. Gemessene Wirkung von Maßnahme 1: von 12 auf 274 verschiedene Lane-Winraten, Zeilen
 auf exakt 0,50 von 68 auf 2, Zeilen ohne Spielzahl von 9 auf 0.
 
-**Offen:** nur noch die restlichen Quick Wins (`queueId` lesen, Ban-Gate und Ban-Stärke aus
-derselben Lane, Jungle-Duos streichen, doppeltes Laden beim Start). Alle sechs priorisierten
-Maßnahmen sind entschieden — vier umgesetzt, eine (3) zur Hälfte, weil die Messung die andere
-Hälfte widerlegt hat.
+**Offen:** nichts mehr aus dieser Liste. Alle sechs priorisierten Maßnahmen und alle Quick Wins
+sind entschieden — umgesetzt, oder nach Messung verworfen. Verworfen wurden: die zweite Hälfte von
+Maßnahme 3 (fehlende Kante als Kantenmittel) und das Streichen der Jungle-Duos, beide weil die
+Messung gegen sie ausfiel.
+
+### Was die letzten vier Quick Wins ergeben haben
+
+**`queueId` lesen — umgesetzt.** `QueueKinds` benennt die Warteschlange und beantwortet die eine
+Frage, die zählt: ob überhaupt auf Lanes gespielt wird. In ARAM, Arena und Wechselmodi steht die
+Warnung jetzt als erster Chip über den Comp-Befunden. Unbekannte Ids gelten bewusst als
+Lane-Modus: eine falsche Warnung in Ranked kostet mehr als eine fehlende in einem Rotationsmodus.
+Nebenbei aufgefallen: den Warnungs-Chips fehlte das `TextWrapping`, das die Build-Hinweise haben —
+jede lange Warnung war am Spaltenrand abgeschnitten.
+
+**Ban-Lane vereinheitlicht — umgesetzt, und stärker als geplant.** Stärke und Popularität lesen
+jetzt dieselbe Zeile. Die Lane wird nach `RoleRate` gewählt, nicht nach dem Gate: das Gate
+sättigt bei 1,0 auf 36 von 276 Zeilen, also genau bei den Champions, die einen Bann wert sind, und
+kann dort zwei Lanes gar nicht unterscheiden. Dazu fließen die gesperrten Gegner ein — eine Lane,
+die der Gegner belegt hat, wird mit der Zuversicht der Lane-Vorhersage abgewertet (nicht
+ausgeschlossen, die Vorhersage kann falsch sein). Wirkung in der zweiten Bannrunde mit Top,
+Jungle und Mid belegt: die Liste zeigt nur noch Bot- und Support-Champions, also genau die zwei
+Plätze, die der Gegner noch füllen kann. Vorher standen dort Jungle-Champions, die er nicht mehr
+spielen konnte.
+
+**Doppeltes Laden beim Start — umgesetzt.** `StartupReport` gibt Snapshot und Traits an das
+ViewModel weiter, statt beides ein zweites Mal zu parsen. Gemessen und dauerhaft im Startbericht
+ausgewiesen: **104 ms** (die Datei schätzte ~180).
+
+**Jungle-Duos streichen — verworfen.** Die Begründung („Lane-Information, die nie gelesen wird")
+trägt nicht. Gemessen: die Ausweitung liefert 1048 Synergie-Zeilen, davon **960 Paare, die es
+sonst nirgends gibt** — ein Drittel der gesamten Tabelle, Median 288 Spiele. Es sind
+Jungler-mit-Laner-Paare, und der Jungler ist in jedem Draft ein Mitspieler; diese Zeilen werden
+laufend gelesen. Ein Drittel der Synergiedaten für 33 Sekunden an einem Knopf, der alle paar Tage
+gedrückt wird, ist ein schlechter Tausch.
 
 **Zusätzlich, nicht aus dieser Analyse:** Blind-Pick-Rückfall. Der Live-Test zeigte, dass
 Warteschlangen ohne Gegner-Reveal strukturell *keinen* Build und *keine* Runen bekommen — die

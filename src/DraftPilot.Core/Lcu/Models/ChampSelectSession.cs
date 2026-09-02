@@ -19,6 +19,14 @@ public sealed class ChampSelectSession
 
     public long LocalPlayerCellId { get; set; } = -1;
 
+    /// <summary>
+    /// Riot's queue id, present in the first frame of every session. Zero in a custom lobby and in
+    /// anything this field is missing from.
+    /// </summary>
+    public int QueueId { get; set; }
+
+    public bool IsCustomGame { get; set; }
+
     public List<ChampSelectPlayer> MyTeam
     {
         get => _myTeam;

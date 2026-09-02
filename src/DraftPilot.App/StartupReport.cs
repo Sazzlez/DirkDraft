@@ -23,6 +23,22 @@ public static class StartupReport
     /// <summary>A one-line summary suitable for a tooltip.</summary>
     public static string Summary { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// What the report already read from disk, offered to whoever starts next. The snapshot is 441 KB
+    /// of JSON and the trait table another file; parsing both twice before the first frame is work
+    /// nobody asked for, and it happens on the UI thread. Cleared on handover — a later reload goes
+    /// through the normal path, because by then the file may have changed.
+    /// </summary>
+    private static (SnapshotLoadResult Load, TraitTable Traits)? _preloaded;
+
+    /// <summary>Takes the preload, or <see langword="null"/> when there is none left to take.</summary>
+    public static (SnapshotLoadResult Load, TraitTable Traits)? TakePreloaded()
+    {
+        var value = _preloaded;
+        _preloaded = null;
+        return value;
+    }
+
     public static void Write()
     {
         try
@@ -48,10 +64,16 @@ public static class StartupReport
 
     private static (string Summary, string Detail) Build()
     {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
         var store = new SnapshotStore();
         var load = store.LoadWithStatus();
         var snapshot = load.Snapshot;
         var traits = TraitTable.Load();
+
+        // Handed to the view model instead of letting it parse the same two files again.
+        _preloaded = (load, traits);
+        var loadMs = clock.ElapsedMilliseconds;
 
         var iconCount = CountIcons();
         var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unbekannt";
@@ -73,7 +95,8 @@ public static class StartupReport
             .AppendLine("--- Erzeugte Daten ---")
             .AppendLine($"snapshot.json    {store.Path}")
             .AppendLine($"                 {(store.Exists ? $"{new FileInfo(store.Path).Length / 1024} KB" : "FEHLT")}")
-            .AppendLine($"geladen          {(load.IsOk ? "ja" : $"NEIN — {load.Detail}")}");
+            .AppendLine($"geladen          {(load.IsOk ? "ja" : $"NEIN — {load.Detail}")}")
+            .AppendLine($"Ladezeit         {loadMs} ms (Snapshot und Traits, wird an das Fenster weitergegeben)");
 
         if (snapshot is not null)
         {

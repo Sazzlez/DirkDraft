@@ -744,6 +744,106 @@ public class RecommenderTests
         Assert.Empty(set.Items);
     }
 
+    /// <summary>
+    /// Strength and popularity have to describe the same lane. They used to be chosen
+    /// independently, which let a ban read "stark auf Bot" while its value came from a third
+    /// lane's pick rate.
+    /// </summary>
+    [Fact]
+    public void BanStrengthAndPopularity_ComeFromTheSameLane()
+    {
+        // Mostly played mid and merely respectable there; a rare but monstrous top pick.
+        var meta = new MetaBuilder()
+            .Champion(Menace, "Menace", DamageType.Physical, ["Fighter"], 175, 5)
+            .Champion(EnemyMid, "EnemyMid", DamageType.Magic, ["Mage"], 550, 3)
+            .InLane(Menace, Lane.Mid, roleRate: 0.85, winRate: 0.50, play: 20_000, tier: 3, pickRate: 0.10)
+            .InLane(Menace, Lane.Top, roleRate: 0.10, winRate: 0.58, play: 2_000, tier: 1, pickRate: 0.01)
+            .InLane(EnemyMid, Lane.Mid, roleRate: 0.9, winRate: 0.50, play: 20_000)
+            .Build();
+
+        var item = BanItem(meta, Menace);
+
+        // The mid row is the one the enemy would use, so no "stark auf Top" chip may appear.
+        Assert.DoesNotContain(item.Reasons, reason => reason.Text.Contains("Top", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// A champion whose only lane the enemy has already locked is nearly worthless to ban: they
+    /// have no seat left for them. What survives is our own doubt about the lane read.
+    /// </summary>
+    [Fact]
+    public void AChampionWhoseLaneTheEnemyFilled_IsWorthLessThanOneOnAnOpenLane()
+    {
+        var meta = BanMeta();
+
+        var withoutInfo = BanScore(meta, JungleOnly, enemies: []);
+        var afterTheirJunglerLocked = BanScore(meta, JungleOnly, enemies: [EnemyJungler]);
+
+        Assert.True(withoutInfo > 0, "Ohne Information muss der Bann etwas wert sein.");
+        Assert.True(
+            afterTheirJunglerLocked < withoutInfo / 3,
+            $"Mit gesperrtem Gegner-Jungler muss der Wert einbrechen ({afterTheirJunglerLocked} gegen {withoutInfo}).");
+    }
+
+    [Fact]
+    public void AChampionOnAnOpenLane_KeepsItsBanValue()
+    {
+        var meta = BanMeta();
+
+        var withoutInfo = BanScore(meta, SupportOnly, enemies: []);
+        var afterTheirJunglerLocked = BanScore(meta, SupportOnly, enemies: [EnemyJungler]);
+
+        Assert.Equal(withoutInfo, afterTheirJunglerLocked, precision: 6);
+    }
+
+    /// <summary>
+    /// The first ban round has nothing locked, so nothing may be discounted — the whole point of
+    /// reading the enemy lanes is that it only starts mattering once they commit.
+    /// </summary>
+    [Fact]
+    public void WithNothingLocked_TheBanListIsUnrestricted()
+    {
+        var meta = BanMeta();
+
+        var jungle = BanScore(meta, JungleOnly, enemies: []);
+        var support = BanScore(meta, SupportOnly, enemies: []);
+
+        Assert.True(jungle > 0);
+        Assert.True(support > 0);
+    }
+
+    private const int JungleOnly = 401, SupportOnly = 402, EnemyJungler = 403;
+
+    private static MetaLookup BanMeta() => new MetaBuilder()
+        .Champion(JungleOnly, "JungleOnly", DamageType.Physical, ["Fighter"], 175, 5)
+        .Champion(SupportOnly, "SupportOnly", DamageType.Magic, ["Tank"], 125, 6)
+        .Champion(EnemyJungler, "EnemyJungler", DamageType.Physical, ["Fighter"], 175, 5)
+        .InLane(JungleOnly, Lane.Jungle, roleRate: 0.98, winRate: 0.54, play: 20_000, tier: 1, pickRate: 0.10)
+        .InLane(SupportOnly, Lane.Support, roleRate: 0.98, winRate: 0.54, play: 20_000, tier: 1, pickRate: 0.10)
+        .InLane(EnemyJungler, Lane.Jungle, roleRate: 0.98, winRate: 0.50, play: 20_000)
+        .Build();
+
+    /// <summary>The ban score of one candidate, with the given enemies locked in.</summary>
+    private static double BanScore(MetaLookup meta, int candidate, int[] enemies)
+        => BanItem(meta, candidate, enemies).Score;
+
+    private static Recommendation BanItem(MetaLookup meta, int candidate, int[]? enemies = null)
+    {
+        var builder = new SessionBuilder().LocalPlayer(2).OnClock(2, "ban");
+
+        var cell = 5;
+        foreach (var enemy in enemies ?? [])
+            builder.Locked(cell++, enemy);
+
+        var state = DraftState.From(builder.Build());
+        var target = new TurnTracker().Resolve(state)!;
+        var lanes = new LanePredictor(meta).Predict(state.Enemies);
+
+        return new Recommender(meta, TraitTable.Empty)
+            .Recommend(state, target, lanes, limit: 50).Items
+            .Single(item => item.ChampionId == candidate);
+    }
+
     private static double Score(IReadOnlyList<Recommendation> items, int championId)
         => items.Single(item => item.ChampionId == championId).Score;
 

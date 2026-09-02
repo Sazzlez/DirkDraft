@@ -89,6 +89,12 @@ public sealed class DraftState
     /// <summary>Every champion that is off the table: banned by either side or already locked.</summary>
     public IReadOnlySet<int> Unavailable { get; private init; } = new HashSet<int>();
 
+    /// <summary>
+    /// Which queue this draft belongs to. Every number in the snapshot is a per-lane statistic, so
+    /// this is what decides whether the advice describes the game being played at all.
+    /// </summary>
+    public QueueKind Queue { get; private init; } = QueueKind.Unknown;
+
     public DraftSlot? LocalSlot => Allies.FirstOrDefault(slot => slot.CellId == LocalCellId);
 
     public DraftSlot? FindSlot(long cellId)
@@ -119,6 +125,7 @@ public sealed class DraftState
         {
             IsActive = true,
             LocalCellId = session.LocalPlayerCellId,
+            Queue = QueueKinds.FromId(session.QueueId, session.IsCustomGame),
             Allies = allies,
             Enemies = enemies,
             AllyBans = allyBans,

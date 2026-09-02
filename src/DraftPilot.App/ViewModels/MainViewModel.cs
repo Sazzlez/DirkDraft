@@ -47,7 +47,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly Dispatcher _dispatcher = Application.Current.Dispatcher;
     private readonly AppSettings _settings;
     private readonly SnapshotStore _store = new();
-    private readonly TraitTable _traits = TraitTable.Load();
+    private readonly TraitTable _traits;
     private readonly SeatPriors _seatPriors = SeatPriors.Load();
     private readonly IconCache _icons = new();
 
@@ -231,7 +231,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         _settings = AppSettings.Load();
 
-        _meta = LoadMeta();
+        // The start-up report already read both files a moment ago; taking them over saves parsing
+        // 441 KB of JSON twice on the UI thread before the first frame is drawn.
+        var preloaded = StartupReport.TakePreloaded();
+
+        _traits = preloaded?.Traits ?? TraitTable.Load();
+        _meta = preloaded is { } ready ? UseSnapshot(ready.Load) : LoadMeta();
         _predictor = new LanePredictor(_meta, _seatPriors);
         _recommender = new Recommender(_meta, _traits);
 
@@ -784,9 +789,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Refresh();
     }
 
-    private MetaLookup LoadMeta()
+    private MetaLookup LoadMeta() => UseSnapshot(_store.LoadWithStatus());
+
+    /// <summary>Adopts a load result, whether we read it ourselves or inherited it.</summary>
+    private MetaLookup UseSnapshot(SnapshotLoadResult result)
     {
-        var result = _store.LoadWithStatus();
         _snapshotProblem = result.IsOk ? null : result.Detail;
 
         return result.Snapshot is null ? MetaLookup.Empty : new MetaLookup(result.Snapshot);
@@ -2092,7 +2099,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         _enemyComp = set.EnemyComp;
 
-        Warnings.ReplaceAll([.. set.AllyComp.Findings.Select(finding => finding.Text)]);
+        // The queue caveat goes first: everything after it is lane advice, and in a mode without
+        // lanes that is the one thing the reader has to know before reading the rest.
+        var findings = new List<string>();
+
+        if (_state.Queue.LaneCaveat() is { Length: > 0 } caveat)
+            findings.Add(caveat);
+
+        findings.AddRange(set.AllyComp.Findings.Select(finding => finding.Text));
+
+        Warnings.ReplaceAll(findings);
     }
 
     private void Clear()

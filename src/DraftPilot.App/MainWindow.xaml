@@ -991,7 +991,10 @@
                     <DataTemplate>
                         <Border Background="{StaticResource WarnSoft}" CornerRadius="10"
                                 Padding="10,3" Margin="0,0,6,5">
-                            <TextBlock Text="{Binding}" FontSize="12" Foreground="{StaticResource Warn}" />
+                            <!-- Wrapping like the build hints: the comp findings are one-liners, but the
+                                 queue caveat is a sentence and was cut off at the column edge. -->
+                            <TextBlock Text="{Binding}" FontSize="12" TextWrapping="Wrap"
+                                       Foreground="{StaticResource Warn}" />
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

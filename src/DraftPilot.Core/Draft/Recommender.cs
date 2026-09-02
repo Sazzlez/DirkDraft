@@ -184,7 +184,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         var enemyComp = _comp.Analyze(enemyChampions);
 
         var items = target.Action == TurnAction.Ban
-            ? ScoreBans(state, lane, allyChampions, hoveredByOthers, limit)
+            ? ScoreBans(state, lane, allyChampions, hoveredByOthers, enemyLanes, limit)
             : ScorePicks(state, lane, allyChampions, hoveredByOthers, enemyLanes, allyComp, selectable, limit);
 
         return new RecommendationSet(target.Slot.CellId, lane, target.Action, items, allyComp, enemyComp);
@@ -271,9 +271,11 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         Lane lane,
         List<int> allyChampions,
         IReadOnlySet<int> hoveredByOthers,
+        LanePredictionResult enemyLanes,
         int limit)
     {
         var results = new List<Recommendation>();
+        var takenByEnemy = EnemyLanesTaken(state, enemyLanes);
 
         foreach (var candidate in Candidates(Lane.Unknown))
         {
@@ -286,12 +288,17 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             // not mean the same thing. The budget is collected and dropped.
             var banBudget = new ErrorBudget();
 
+            // One lane for both strength and popularity, so the two cannot describe different
+            // champions. BanLaneThreat stays on the advised seat's lane on purpose - that double
+            // counting is what BanLaneFocus is for.
+            var banLane = BanLane(candidate, takenByEnemy);
+
             var terms = new List<ScoreTerm>(4)
             {
-                new(ScoreTermKind.BanStrength, BestLaneLogOdds(candidate, lane, reasons, banBudget)),
+                new(ScoreTermKind.BanStrength, BanStrengthLogOdds(banLane, lane, reasons)),
                 new(ScoreTermKind.BanLaneThreat, LaneThreatLogOdds(candidate, lane, reasons)),
                 new(ScoreTermKind.BanTeamThreat, ThreatToAlliesLogOdds(candidate, allyChampions, reasons)),
-                new(ScoreTermKind.BanPopularity, PopularityGate(candidate, reasons)),
+                new(ScoreTermKind.BanPopularity, BanPopularity(banLane, reasons)),
             };
 
             var threat = terms.Where(term => !term.IsGate).Sum(term => term.LogOdds ?? 0);
@@ -368,6 +375,135 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
 
     private static double TierNudge(int tier)
         => tier is >= 1 and <= 5 ? ScoreModel.TierNudge * (3 - tier) : 0;
+    /// <summary>
+    /// How strong the candidate is on the lane the enemy would play them. Names that lane in a chip
+    /// only when it differs from the advised seat's own — otherwise the threat term below says the
+    /// same thing about the same lane.
+    /// </summary>
+    private double? BanStrengthLogOdds((Lane Lane, LaneView Stat, double Gate)? banLane, Lane seatLane, ICollection<Reason> reasons)
+    {
+        if (banLane is not { } best)
+            return null;
+
+        var logOdds = ScoreModel.Logit(best.Stat.WinRate) + TierNudge(best.Stat.Tier);
+
+        // 0.08 log-odds ≈ +2 percentage points: strong enough to be worth a chip.
+        if (best.Lane != seatLane && logOdds > 0.08)
+        {
+            reasons.Add(Reason.Pro(
+                $"stark auf {best.Lane.Display()}",
+                $"{best.Lane.Display()} ist die Lane, auf der dieser Champion gerade am "
+                + $"gefährlichsten ist und auf der ihn der Gegner am ehesten spielt: "
+                + $"{best.Stat.WinRate:P1} Siegquote aus {best.Stat.Play:N0} Spielen."));
+        }
+
+        return logOdds;
+    }
+
+    /// <summary>
+    /// How likely the enemy takes the champion at all, read from the same lane the strength was.
+    /// A terrifying champion nobody plays is a wasted ban.
+    /// </summary>
+    private static double? BanPopularity((Lane Lane, LaneView Stat, double Gate)? banLane, ICollection<Reason> reasons)
+    {
+        if (banLane is not { } best)
+            return null;
+
+        if (best.Gate > 0.6)
+        {
+            reasons.Add(best.Stat.BanRate > best.Stat.PickRate
+                ? Reason.Neutral(
+                    $"in {best.Stat.BanRate:P0} der Spiele gebannt",
+                    "So oft bannen andere diesen Champion. Ein hoher Wert heißt: viele halten ihn "
+                    + "für gefährlich — aber vielleicht bannt ihn ohnehin jemand anders.")
+                : Reason.Neutral(
+                    $"in {best.Stat.PickRate:P0} der Spiele gepickt",
+                    "So oft wird dieser Champion gespielt. Je häufiger, desto wahrscheinlicher "
+                    + "nimmt ihn der Gegner, wenn du ihn nicht bannst."));
+        }
+
+        return best.Gate;
+    }
+
+
+    /// <summary>
+    /// The one lane a ban candidate is judged on: where the enemy would most plausibly play them,
+    /// given what their draft already shows.
+    /// <para>
+    /// The three ban terms used to pick their own lane independently — strength from the champion's
+    /// best lane, popularity from whichever lane had the highest pick and ban rate, threat from the
+    /// advised seat's lane. That let a mid ban justify itself with "stark auf Bot" while its value
+    /// came from a third lane's popularity. Strength and popularity now read the same row.
+    /// </para>
+    /// <para>
+    /// Selected by role rate rather than by the gate: the gate saturates at 1 for 36 of 276 rows —
+    /// every champion popular enough to be worth banning — and then cannot tell two lanes apart at
+    /// all. Role rate is the share of this champion's games played on that lane, which is exactly
+    /// the question being asked (Viktor: Mid 70 %, Bot 27 %).
+    /// </para>
+    /// <para>
+    /// A lane an enemy has already locked is discounted by how sure we are of that read, not
+    /// excluded outright. They cannot field a second champion there, so by the second ban round a
+    /// jungle-only champion is nearly worthless to ban when their jungler is in — but our lane
+    /// prediction can be wrong, and its own confidence is the honest size of that doubt. No new
+    /// constant: both factors are measured.
+    /// </para>
+    /// </summary>
+    private (Lane Lane, LaneView Stat, double Gate)? BanLane(int championId, IReadOnlyDictionary<Lane, double> takenByEnemy)
+    {
+        (Lane Lane, LaneView Stat, double Gate)? best = null;
+        var bestPlausibility = -1.0;
+
+        foreach (var lane in Lanes.All)
+        {
+            if (_meta.LaneStat(championId, lane) is not { } stat)
+                continue;
+
+            // How much room the enemy still has for this champion here: everything when the lane is
+            // open, only our doubt about the read when it is taken.
+            var room = takenByEnemy.TryGetValue(lane, out var confidence) ? 1 - confidence : 1;
+
+            var plausibility = Math.Max(0, stat.RoleRate) * room;
+            if (plausibility <= bestPlausibility)
+                continue;
+
+            // Pick rate answers "how often is this champion played here", ban rate "how often do
+            // others fear them here"; both say how likely the enemy reaches for them at all.
+            var gate = Math.Clamp((stat.PickRate * 8) + (stat.BanRate * 4), 0, 1) * room;
+
+            bestPlausibility = plausibility;
+            best = (lane, stat, gate);
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Which lanes the enemy has already filled, and how sure we are of each read. Only locked
+    /// champions count — a hover can still change — and the confidence travels with the lane so the
+    /// caller can discount rather than exclude.
+    /// </summary>
+    private static Dictionary<Lane, double> EnemyLanesTaken(DraftState state, LanePredictionResult enemyLanes)
+    {
+        var taken = new Dictionary<Lane, double>();
+
+        foreach (var slot in state.Enemies)
+        {
+            if (!slot.IsLocked)
+                continue;
+
+            if (enemyLanes.ForCell(slot.CellId) is not { Lane: not Lane.Unknown } prediction)
+                continue;
+
+            var confidence = Math.Clamp(prediction.Confidence, 0, 1);
+
+            // Two locked enemies read onto the same lane means one read is wrong; keep the surer.
+            if (!taken.TryGetValue(prediction.Lane, out var known) || confidence > known)
+                taken[prediction.Lane] = confidence;
+        }
+
+        return taken;
+    }
 
     /// <summary>
     /// Strength on whichever lane suits the champion best; used for bans and unknown lanes. The
@@ -735,45 +871,5 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         // Mean, not sum, for the same reason as the synergy term: otherwise the ban value climbed
         // with every locked ally instead of with the threat itself.
         return ScoreModel.BanAllyShare * (total / counted);
-    }
-
-    /// <summary>
-    /// For bans: 0..1, whether the enemy is likely to take the champion at all. Pick and ban rate
-    /// are shares of all games, so a few percent is already a lot.
-    /// </summary>
-    private double? PopularityGate(int championId, ICollection<Reason> reasons)
-    {
-        double? best = null;
-        var bestPickRate = 0.0;
-        var bestBanRate = 0.0;
-
-        foreach (var lane in Lanes.All)
-        {
-            if (_meta.LaneStat(championId, lane) is not { } stat)
-                continue;
-
-            var gate = Math.Clamp((stat.PickRate * 8) + (stat.BanRate * 4), 0, 1);
-            if (best is not null && gate <= best)
-                continue;
-
-            best = gate;
-            bestPickRate = stat.PickRate;
-            bestBanRate = stat.BanRate;
-        }
-
-        if (best > 0.6)
-        {
-            reasons.Add(bestBanRate > bestPickRate
-                ? Reason.Neutral(
-                    $"in {bestBanRate:P0} der Spiele gebannt",
-                    "So oft bannen andere diesen Champion. Ein hoher Wert heißt: viele halten ihn "
-                    + "für gefährlich — aber vielleicht bannt ihn ohnehin jemand anders.")
-                : Reason.Neutral(
-                    $"in {bestPickRate:P0} der Spiele gepickt",
-                    "So oft wird dieser Champion gespielt. Je häufiger, desto wahrscheinlicher "
-                    + "nimmt ihn der Gegner, wenn du ihn nicht bannst."));
-        }
-
-        return best;
     }
 }
