@@ -74,7 +74,7 @@ internal static class RecommendCommand
     /// Builds a session where the local player sits on the requested lane and is on the clock.
     /// Allies fill the other lanes in order; enemies occupy seats in the order given.
     /// </summary>
-    private static DraftState BuildState(Lane lane, List<int> allies, List<int> enemies)
+    internal static DraftState BuildState(Lane lane, List<int> allies, List<int> enemies)
     {
         string[] positions = ["top", "jungle", "middle", "bottom", "utility"];
         var session = new ChampSelectSession
@@ -117,7 +117,7 @@ internal static class RecommendCommand
         return DraftState.From(session);
     }
 
-    private static List<int> Resolve(MetaLookup meta, string list, out List<string> unknown)
+    internal static List<int> Resolve(MetaLookup meta, string list, out List<string> unknown)
     {
         unknown = [];
         var result = new List<int>();
@@ -137,7 +137,7 @@ internal static class RecommendCommand
         return result;
     }
 
-    private static string Names(MetaLookup meta, List<int> ids)
+    internal static string Names(MetaLookup meta, List<int> ids)
         => ids.Count == 0 ? "-" : string.Join(", ", ids.Select(meta.ChampionName));
 
     private static void PrintPredictions(MetaLookup meta, LanePredictionResult predictions)

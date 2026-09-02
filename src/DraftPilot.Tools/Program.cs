@@ -79,6 +79,9 @@ try
         case "recommend":
             return RecommendCommand.Run(args);
 
+        case "noise":
+            return NoiseCommand.Run(args);
+
         case "runes":
             return await RunesCommand.RunAsync(lifetime.Token);
 
@@ -124,6 +127,9 @@ static void PrintUsage()
           recommend <lane> [gegner] [team]
                                  Empfehlungen fuer einen erfundenen Draft rechnen,
                                  z. B. recommend mid Jax,Elise,Syndra Aatrox,LeeSin
+          noise <lane> [gegner] [team] [ziehungen]
+                                 Denselben Draft wiederholt aus den Stichproben ziehen und
+                                 pruefen, ob die Reihenfolge ueberhaupt etwas bedeutet
           runes                  Runenseiten des Accounts anzeigen (nur lesend)
         """);
 }

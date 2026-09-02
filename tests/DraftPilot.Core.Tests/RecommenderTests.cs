@@ -474,6 +474,69 @@ public class RecommenderTests
             Assert.Equal(first[i].Reasons, second[i].Reasons);
     }
 
+    /// <summary>
+    /// The score carries the sampling error of the numbers it was built from, so the panel can say
+    /// when its own ordering is meaningless. The same duo win rate measured over 40 games has to
+    /// come out visibly less certain than over 40.000 — that difference is the whole mechanism.
+    /// </summary>
+    [Fact]
+    public void AThinSynergy_MakesTheScoreLessCertainThanAThickOne()
+    {
+        static double Uncertainty(int synergyPlay)
+        {
+            var meta = new MetaBuilder()
+                .Champion(Strong, "Strong", DamageType.Magic, ["Mage"], 550, 3)
+                .Champion(AllySupport, "AllySupport", DamageType.Magic, ["Tank"], 125, 6)
+                .InLane(Strong, Lane.Mid, winRate: 0.52, play: 40_000)
+                .InLane(AllySupport, Lane.Support, winRate: 0.51, play: 40_000)
+                .Synergy(Strong, AllySupport, winRate: 0.58, play: synergyPlay)
+                .Build();
+
+            var state = DraftState.From(new SessionBuilder()
+                .LocalPlayer(2)
+                .Locked(4, AllySupport)
+                .OnClock(2, "pick")
+                .Build());
+
+            var target = new TurnTracker().Resolve(state)!;
+            var lanes = new LanePredictor(meta).Predict(state.Enemies);
+
+            return new Recommender(meta, TraitTable.Empty).Recommend(state, target, lanes).Items
+                .Single(item => item.ChampionId == Strong)
+                .Uncertainty;
+        }
+
+        var thin = Uncertainty(40);
+        var thick = Uncertainty(40_000);
+
+        Assert.True(thin > 0, "Der Fehlerbalken darf nicht null sein.");
+        Assert.True(
+            thin > thick * 3,
+            $"40 Spiele müssen unsicherer sein als 40.000 ({thin} gegen {thick}).");
+    }
+
+    /// <summary>
+    /// A candidate with no sampled evidence at all must report no error rather than a small one —
+    /// the panel turns that into "Datenlage zu dünn" instead of a confident-looking verdict.
+    /// </summary>
+    [Fact]
+    public void WithoutAnySampledTerm_TheScoreReportsNoError()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Strong, "Strong", DamageType.Magic, ["Mage"], 550, 3)
+            .InLane(Strong, Lane.Mid, winRate: 0.5, play: 0)
+            .Build();
+
+        var state = DraftState.From(new SessionBuilder().LocalPlayer(2).OnClock(2, "pick").Build());
+        var target = new TurnTracker().Resolve(state)!;
+
+        var item = new Recommender(meta, TraitTable.Empty)
+            .Recommend(state, target, LanePredictionResult.Empty).Items
+            .Single(entry => entry.ChampionId == Strong);
+
+        Assert.Equal(0, item.Uncertainty);
+    }
+
     [Fact]
     public void TwoReasonsWithTheSameTextToneAndHint_AreEqual()
     {

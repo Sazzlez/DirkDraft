@@ -6,15 +6,32 @@ Handlungsrelevante verdichtet.
 
 ## Stand der Umsetzung (2026-09-01)
 
-**Umgesetzt:** Maßnahme 1 (exakte Winrates), 2 (Build zuerst, Gegner parallel), 5 (Ausfälle
-sichtbar, Fehler pro Aufruf, Live-Kanten nach Lane) sowie die Quick Wins Gleichheits-Wächter,
-Test-Tor, vergessene Datenfelder, echter Datenstand und Feld-Diagnose. Gemessene Wirkung: von
-12 auf 274 verschiedene Lane-Winraten, Zeilen auf exakt 0,50 von 68 auf 2, Zeilen ohne Spielzahl
-von 9 auf 0.
+**Umgesetzt:** Maßnahme 1 (exakte Winrates), 2 (Build zuerst, Gegner parallel), 4 (Bootstrap und
+Gleichrangigkeits-Schwelle), 5 (Ausfälle sichtbar, Fehler pro Aufruf, Live-Kanten nach Lane) sowie
+die Quick Wins Gleichheits-Wächter, Test-Tor, vergessene Datenfelder, echter Datenstand und
+Feld-Diagnose. Gemessene Wirkung von Maßnahme 1: von 12 auf 274 verschiedene Lane-Winraten, Zeilen
+auf exakt 0,50 von 68 auf 2, Zeilen ohne Spielzahl von 9 auf 0.
 
-**Offen:** Maßnahme 3 (Duell-Term zentrieren), 4 (Bootstrap + Gleichrangigkeits-Schwelle),
-6 (Mittelspalte nach dem eigenen Lock) und die restlichen Quick Wins (`queueId` lesen,
-Ban-Gate und Ban-Stärke aus derselben Lane, Jungle-Duos streichen, doppeltes Laden beim Start).
+**Offen:** Maßnahme 3 (Duell-Term zentrieren), 6 (Mittelspalte nach dem eigenen Lock) und die
+restlichen Quick Wins (`queueId` lesen, Ban-Gate und Ban-Stärke aus derselben Lane, Jungle-Duos
+streichen, doppeltes Laden beim Start).
+
+### Was Maßnahme 4 ergeben hat
+
+Der Score trägt jetzt seinen eigenen Standardfehler, aus den Stichprobengrößen hinter seinen
+Termen. `Tools -- noise` zieht denselben Draft wiederholt aus den Stichproben und prüft die
+Formel gegen echtes Resampling — am Support-Draft des Nutzers stimmten beide auf zwei Stellen
+überein (Rell 1,51 analytisch gegen 1,48 gezogen, über alle acht Kandidaten).
+
+Das gemessene Ergebnis dieses Drafts: **Platz 1 bleibt nur in 48 % der Ziehungen derselbe
+Champion** (Leona 34 %, Alistar 14 %, Blitzcrank 4 %). Die neue Regel markiert genau diese vier
+als gleichrangig. Die frühere Schwelle von 0,003 markierte nichts. Der Fehler stammt fast
+vollständig aus einer einzigen Synergie über 111 Spiele.
+
+Damit sind zwei Falschaussagen der Oberfläche weg: „starke Wahl" ab festen 53 % (jetzt in
+Standardfehlern gemessen) und die Nachkommastelle, die eine Genauigkeit behauptete, die keine
+111-Spiele-Statistik hergibt. Die Rauschzahlen der Analyse selbst (1 SE median 0,68 pp,
+Rundungs-sd 0,29 pp) sind überholt: sie wurden am gerundeten Snapshot vor Maßnahme 1 gemessen.
 
 Nachträglich beim ersten echten Lauf gelernt und bereits berücksichtigt: OP.GG lässt den
 Synergie-Zweig für die **eigene Lane** eines Champions weg. Eine Feld-Warnung darf deshalb nur

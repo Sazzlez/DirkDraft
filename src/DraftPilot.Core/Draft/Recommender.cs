@@ -91,12 +91,18 @@ public sealed record ScoreTerm(ScoreTermKind Kind, double? LogOdds)
 /// For picks: the estimated win rate of the line-up with this champion, 0..1. For bans: the
 /// expected win-rate points the ban denies the enemy (popularity × edge), roughly 0..8.
 /// </param>
+/// <param name="Uncertainty">
+/// Standard error of <paramref name="Score"/> in log-odds, from the sample sizes behind the terms.
+/// Zero for bans, which are not on a win-rate scale. This is what decides whether two entries may
+/// honestly be shown in an order at all — see <see cref="ScoreError"/>.
+/// </param>
 public sealed record Recommendation(
     int ChampionId,
     string Name,
     double Score,
     IReadOnlyList<Reason> Reasons,
-    IReadOnlyList<ScoreTerm> Breakdown);
+    IReadOnlyList<ScoreTerm> Breakdown,
+    double Uncertainty = 0);
 
 /// <summary>The full answer for one seat.</summary>
 public sealed record RecommendationSet(
@@ -218,21 +224,24 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
 
             var reasons = new List<Reason>();
 
+            // One budget per candidate: the terms add up, so their sampling errors add up too.
+            var budget = new ErrorBudget();
+
             // Without a lane — custom games, blind pick — the lane-bound base is null for everyone
             // and the list degenerates into an alphabet. Strength on the champion's own best lane
             // is the honest substitute.
             var baseTerm = lane == Lane.Unknown
-                ? BestLaneLogOdds(candidate, lane, reasons)
-                : LaneLogOdds(candidate, lane, reasons);
+                ? BestLaneLogOdds(candidate, lane, reasons, budget)
+                : LaneLogOdds(candidate, lane, reasons, budget);
 
             var compFit = _comp.Fit(candidate, allyComp, reasons);
 
             var terms = new List<ScoreTerm>(5)
             {
                 new(ScoreTermKind.LaneStrength, baseTerm),
-                new(ScoreTermKind.LaneMatchup, LaneMatchupLogOdds(candidate, lane, enemyLanes, reasons)),
-                new(ScoreTermKind.EnemyTeam, OffLaneMatchupLogOdds(candidate, lane, enemyLanes, reasons)),
-                new(ScoreTermKind.Synergy, SynergyLogOdds(candidate, allyChampions, reasons)),
+                new(ScoreTermKind.LaneMatchup, LaneMatchupLogOdds(candidate, lane, enemyLanes, reasons, budget)),
+                new(ScoreTermKind.EnemyTeam, OffLaneMatchupLogOdds(candidate, lane, enemyLanes, reasons, budget)),
+                new(ScoreTermKind.Synergy, SynergyLogOdds(candidate, allyChampions, reasons, budget)),
                 new(ScoreTermKind.Composition, compFit is null ? null : ScoreModel.CompScale * compFit),
             };
 
@@ -243,7 +252,8 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
                 _meta.ChampionName(candidate),
                 ScoreModel.Sigmoid(total),
                 Dedupe(reasons),
-                terms));
+                terms,
+                budget.StandardError));
         }
 
         return Top(results, limit);
@@ -269,9 +279,14 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
                 continue;
 
             var reasons = new List<Reason>();
+
+            // Bans are scored in denied points, not on a win-rate scale, so their error bar would
+            // not mean the same thing. The budget is collected and dropped.
+            var banBudget = new ErrorBudget();
+
             var terms = new List<ScoreTerm>(4)
             {
-                new(ScoreTermKind.BanStrength, BestLaneLogOdds(candidate, lane, reasons)),
+                new(ScoreTermKind.BanStrength, BestLaneLogOdds(candidate, lane, reasons, banBudget)),
                 new(ScoreTermKind.BanLaneThreat, LaneThreatLogOdds(candidate, lane, reasons)),
                 new(ScoreTermKind.BanTeamThreat, ThreatToAlliesLogOdds(candidate, allyChampions, reasons)),
                 new(ScoreTermKind.BanPopularity, PopularityGate(candidate, reasons)),
@@ -322,12 +337,15 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
     /// The base term: how the champion does on this lane regardless of opponents. The shrunk win
     /// rate carries the strength; the OP.GG tier adds the small extra its pick/ban blend knows.
     /// </summary>
-    private double? LaneLogOdds(int championId, Lane lane, ICollection<Reason> reasons)
+    private double? LaneLogOdds(int championId, Lane lane, ICollection<Reason> reasons, ErrorBudget budget)
     {
         if (_meta.LaneStat(championId, lane) is not { } stat)
             return null;
 
         var logOdds = ScoreModel.Logit(stat.WinRate) + TierNudge(stat.Tier);
+
+        // The tier nudge is a label, not a measurement, so only the win rate carries error.
+        budget.Add(ScoreError.LogitVariance(stat.WinRate, stat.Play, Shrinkage.LanePrior));
 
         if (stat.Tier is 1 or 2)
         {
@@ -353,10 +371,11 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
     /// Strength on whichever lane suits the champion best; used for bans and unknown lanes. The
     /// chip names that lane only when it differs from the seat's own.
     /// </summary>
-    private double? BestLaneLogOdds(int championId, Lane seatLane, ICollection<Reason> reasons)
+    private double? BestLaneLogOdds(int championId, Lane seatLane, ICollection<Reason> reasons, ErrorBudget budget)
     {
         double? best = null;
         var bestLane = Lane.Unknown;
+        LaneView bestStat = default;
 
         foreach (var lane in Lanes.All)
         {
@@ -370,7 +389,11 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
 
             best = logOdds;
             bestLane = lane;
+            bestStat = stat;
         }
+
+        if (best is not null)
+            budget.Add(ScoreError.LogitVariance(bestStat.WinRate, bestStat.Play, Shrinkage.LanePrior));
 
         // 0.08 log-odds ≈ +2 percentage points: strong enough to be worth a chip.
         if (bestLane != Lane.Unknown && bestLane != seatLane && best > 0.08)
@@ -389,12 +412,13 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
     /// 50/50 flex pick counts half on each of its plausible lanes, instead of fully on the single
     /// most likely one — which used to make the advice flip-flop on flex champions.
     /// </summary>
-    private double? LaneMatchupLogOdds(int championId, Lane lane, LanePredictionResult enemyLanes, ICollection<Reason> reasons)
+    private double? LaneMatchupLogOdds(int championId, Lane lane, LanePredictionResult enemyLanes, ICollection<Reason> reasons, ErrorBudget budget)
     {
         if (lane == Lane.Unknown)
             return null;
 
         var total = 0.0;
+        var variance = 0.0;
         var counted = 0;
         var bestProbability = 0.0;
         MatchupView? bestMatchup = null;
@@ -413,6 +437,8 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
                 continue;
 
             counted++;
+            variance += probability * probability
+                * ScoreError.LogitVariance(matchup.WinRate, matchup.Play, Shrinkage.MatchupPrior);
 
             // No extra confidence factor: the win rate is already shrunk by its sample size, and
             // multiplying a second damping on top made thin data vanish entirely.
@@ -441,7 +467,11 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
                 DescribeMatchup(best, opponent, lane, bestProbability)));
         }
 
-        return counted == 0 ? null : total;
+        if (counted == 0)
+            return null;
+
+        budget.Add(variance);
+        return total;
     }
 
     /// <summary>
@@ -491,10 +521,12 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         int championId,
         Lane lane,
         LanePredictionResult enemyLanes,
-        ICollection<Reason> reasons)
+        ICollection<Reason> reasons,
+        ErrorBudget budget)
     {
         var total = 0.0;
         var weightSum = 0.0;
+        var variance = 0.0;
         var counted = 0;
         var favourable = 0;
 
@@ -514,6 +546,8 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             counted++;
             weightSum += offLane;
             total += offLane * ScoreModel.Logit(view.Value.WinRate);
+            variance += offLane * offLane
+                * ScoreError.LogitVariance(view.Value.WinRate, view.Value.Play, Shrinkage.MatchupPrior);
 
             if (view.Value.WinRateDelta > 0.01)
                 favourable++;
@@ -523,6 +557,10 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             return null;
 
         var meanLogOdds = ScoreModel.OffLaneShare * (total / weightSum);
+
+        // The term is a weighted mean, so its error shrinks with the same divisor the mean uses.
+        var scale = ScoreModel.OffLaneShare / weightSum;
+        budget.Add(scale * scale * variance);
 
         if (favourable >= 2)
         {
@@ -563,9 +601,10 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
     /// thresholds ("starke Wahl" at 53 %). OP.GG's smoothed synergy tier adds the same small
     /// nudge the lane tier does.
     /// </summary>
-    private double? SynergyLogOdds(int championId, List<int> allyChampions, ICollection<Reason> reasons)
+    private double? SynergyLogOdds(int championId, List<int> allyChampions, ICollection<Reason> reasons, ErrorBudget budget)
     {
         var total = 0.0;
+        var variance = 0.0;
         var counted = 0;
         string? bestPartner = null;
         var bestLogOdds = 0.0;
@@ -581,6 +620,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             var logOdds = ScoreModel.Logit(synergy.WinRate) + tierNudge;
 
             total += logOdds;
+            variance += ScoreError.LogitVariance(synergy.WinRate, synergy.Play, Shrinkage.SynergyPrior);
             counted++;
 
             if (logOdds > bestLogOdds)
@@ -601,6 +641,11 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
                 $"Zusammen mit {bestPartner} im selben Team liegt die Siegquote bei "
                 + $"{bestView.WinRate:P1} aus {bestView.Play:N0} Spielen. 50 % wäre Durchschnitt."));
         }
+
+        // Thin duo samples are where the score is least certain; the damping applies to the
+        // error exactly as it applies to the value.
+        var scale = ScoreModel.SynergyDamping / counted;
+        budget.Add(scale * scale * variance);
 
         return ScoreModel.SynergyDamping * (total / counted);
     }

@@ -1826,9 +1826,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var suffix = _target.IsFollowingTurn ? string.Empty : " (Ausblick)";
         var lanePart = set.Lane == Lane.Unknown ? string.Empty : $" · {set.Lane.Display()}";
 
-        // When the top picks sit within a fraction of a point, the ranking is noise and the header
-        // says so — otherwise the list implies a precision the data does not have.
-        var tied = isBan ? 0 : CountLeadingTies(set.Items);
+        // When the top picks sit inside the sampling error of the numbers behind them, their order
+        // is noise and the header says so. The bar is the measured error, not a fixed fraction of a
+        // point: a thin duo statistic makes four champions equivalent, while 40.000-game lane data
+        // separates them at a tenth of that distance.
+        var tied = isBan ? 0 : ScoreError.CountLeadingTies(set.Items);
         var tiePart = tied >= 2 ? $" — Top {tied} nahezu gleich" : string.Empty;
 
         ListHeader = $"{mode} für {who}{lanePart}{suffix}{tiePart}";
@@ -1843,9 +1845,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 : "Keine Kandidaten verfügbar — alles auf dieser Lane ist gebannt oder vergeben.";
         }
 
+        // One precision for the whole column, decided by the list, not by each row.
+        var precision = isBan ? 1 : ScoreError.Decimals(set.Items);
+
         Recommendations.Resize(set.Items.Count, () => new RecommendationViewModel());
         for (var i = 0; i < set.Items.Count; i++)
-            Recommendations[i].Apply(i + 1, set.Items[i], _icons.Get(set.Items[i].ChampionId), isBan);
+            Recommendations[i].Apply(i + 1, set.Items[i], _icons.Get(set.Items[i].ChampionId), isBan, precision);
 
         _enemyComp = set.EnemyComp;
 
@@ -1853,20 +1858,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
 
     /// <summary>How many entries from the top sit within 0.3 win-rate points of first place.</summary>
-    private static int CountLeadingTies(IReadOnlyList<Recommendation> items)
-    {
-        if (items.Count < 2)
-            return 0;
-
-        var top = items[0].Score;
-        var tied = 1;
-
-        while (tied < items.Count && top - items[tied].Score < 0.003)
-            tied++;
-
-        return tied;
-    }
-
     private void Clear()
     {
         Recommendations.Clear();
