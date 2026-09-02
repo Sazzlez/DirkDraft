@@ -18,7 +18,7 @@ dadurch bei etwa 0,7 MB statt der ~120 MB einer selbstenthaltenden Variante.
 ## Weitergeben und aktualisieren
 
 Freunde bekommen das Tool als Installer, nicht als Ordner: `DirkDraft-win-Setup.exe` von der
-Releases-Seite (https://github.com/OWNER/DirkDraft/releases). Ein Doppelklick installiert es ins
+Releases-Seite (https://github.com/Sazzlez/DirkDraft/releases). Ein Doppelklick installiert es ins
 eigene Benutzerprofil, legt eine Verknüpfung an und startet es — die .NET-Runtime ist eingebaut, es
 muss vorher nichts installiert werden. Windows warnt beim ersten Start, weil der Installer nicht
 signiert ist („Weitere Informationen" → „Trotzdem ausführen"); ein Signaturzertifikat kostet Geld

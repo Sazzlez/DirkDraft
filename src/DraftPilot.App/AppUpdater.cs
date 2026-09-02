@@ -24,7 +24,7 @@ public sealed class AppUpdater
     /// Where releases live. GitHub Releases is the free, ordinary choice for a public repository;
     /// unauthenticated reads allow sixty requests per hour per IP, and the tool makes one per start.
     /// </summary>
-    public const string Feed = "https://github.com/OWNER/DirkDraft";
+    public const string Feed = "https://github.com/Sazzlez/DirkDraft";
 
     private readonly UpdateManager _manager = new(new GithubSource(Feed, null, false));
 

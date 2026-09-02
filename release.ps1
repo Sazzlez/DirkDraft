@@ -37,7 +37,7 @@ param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
     [string]$Version,
 
-    [string]$Repo = 'https://github.com/OWNER/DirkDraft',
+    [string]$Repo = 'https://github.com/Sazzlez/DirkDraft',
 
     [string]$Notes,
 
