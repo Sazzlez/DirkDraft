@@ -3,7 +3,7 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
-## Noch nicht veröffentlicht
+## 1.0.2 — 2026-09-02
 
 - Item-Icons, die für das aktuelle Matchup neu geladen werden, erscheinen sofort. Vorher blieben
   genau diese Kacheln als Text stehen, bis irgendein anderes Ereignis das Panel neu zeichnete;
