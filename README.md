@@ -157,15 +157,17 @@ dotnet run --project src\DraftPilot.App -- --demo aufzeichnung.jsonl --frames 5 
 Neben `ui.png` entsteht `ui-dropdown.png`: ein Popup lebt in einem eigenen Fenster und taucht in
 einer Aufnahme des Hauptfensters nicht auf, muss also getrennt erfasst werden.
 
-Das App-Icon ist generiert, nicht gezeichnet — damit es reproduzierbar bleibt:
+Das App-Icon ist generiert, nicht gezeichnet — damit die nächste Änderung eine Bearbeitung ist,
+keine Neuzeichnung:
 
 ```powershell
-.\tools\make-icon.ps1 -PreviewPath icon-preview.png
+.\tools\make-app-icon.ps1 -PreviewDir icon-preview
 ```
 
-Schreibt `src\DraftPilot.App\Assets\app.ico` mit acht Ebenen von 16 bis 256 px und optional eine
-vergrößerte Prüfansicht. Die kleinen Ebenen haben absichtlich dickere Balken: Proportionen, die bei
-256 px stimmen, werden bei 16 px zu drei grauen Flecken.
+Schreibt `src\DraftPilot.App\Assets\app.ico` (Kaffeetasse auf Blau-Grün-Verlauf, acht Ebenen von
+16 bis 256 px) und optional eine PNG-Vorschau je Größe. Jede Größe wird frisch aus der Vektorform
+gezeichnet statt aus einer großen Bitmap herunterskaliert: Eine Haarlinie wird beim Skalieren
+matschig, und 16 px ist die Größe, in der ein Icon tatsächlich angeschaut wird.
 
 ## Was das Tool bewusst nicht tut
 
