@@ -792,27 +792,27 @@
                             column allowed; in a 250-px side column it left the champion name about
                             twenty pixels and trimmed nearly every one of them away.
                         -->
-                        <Grid Margin="0,0,0,5">
+                        <Grid Margin="0,0,0,12">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="32" />
+                                <ColumnDefinition Width="40" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
-                            <Border Style="{StaticResource IconTile}" Width="26" Height="26">
+                            <Border Style="{StaticResource IconTile}" Width="32" Height="32">
                                 <Image Source="{Binding Icon}" Stretch="UniformToFill"
                                        RenderOptions.BitmapScalingMode="HighQuality" />
                             </Border>
 
                             <TextBlock Grid.Column="1" Text="{Binding Champion}"
-                                       Style="{StaticResource ChampionName}" Margin="4,0,8,0"
+                                       Style="{StaticResource ChampionName}" Margin="8,0,8,0"
                                        TextTrimming="CharacterEllipsis" />
 
                             <StackPanel Grid.Row="1" Grid.Column="1"
-                                        Orientation="Horizontal" Margin="4,2,0,0">
+                                        Orientation="Horizontal" Margin="8,4,0,0">
                                 <TextBlock Text="{Binding Label}" Style="{StaticResource Small}"
                                            Foreground="{StaticResource Faint}" FontSize="11"
                                            VerticalAlignment="Center" Margin="0,0,7,0" />
@@ -906,10 +906,10 @@
             <ItemsControl ItemsSource="{Binding Allies}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:SlotViewModel}">
-                        <Button Style="{StaticResource RowButton}"
+                        <Button Style="{StaticResource RowButton}" Margin="0,0,0,6"
                                 Command="{Binding DataContext.SelectSlotCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                 CommandParameter="{Binding}">
-                            <Border CornerRadius="8">
+                            <Border CornerRadius="8" Padding="4,6">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="Background" Value="Transparent" />
@@ -923,14 +923,14 @@
 
                                 <!-- Two lines, mirroring the enemy column: the champion reads on
                                      the first, the seat label and its state on the second. -->
-                                <Grid Margin="0,0,0,3">
+                                <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="3" />
-                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="40" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
@@ -949,13 +949,13 @@
                                         </Border.Style>
                                     </Border>
 
-                                    <Border Grid.Column="1" Style="{StaticResource IconTile}" Width="26" Height="26">
+                                    <Border Grid.Column="1" Style="{StaticResource IconTile}" Width="32" Height="32">
                                         <Image Source="{Binding Icon}" Stretch="UniformToFill"
                                                RenderOptions.BitmapScalingMode="HighQuality" />
                                     </Border>
 
                                     <TextBlock Grid.Column="2" Text="{Binding Champion}"
-                                               Style="{StaticResource ChampionName}" Margin="4,0,8,0"
+                                               Style="{StaticResource ChampionName}" Margin="8,0,8,0"
                                                TextTrimming="CharacterEllipsis" />
 
                                     <TextBlock Grid.Column="3" Text="{Binding LaneText}" Style="{StaticResource Small}"
@@ -963,7 +963,7 @@
                                                Margin="0,0,8,0" />
 
                                     <StackPanel Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2"
-                                                Orientation="Horizontal" Margin="4,1,0,0">
+                                                Orientation="Horizontal" Margin="8,3,0,0">
                                         <!-- Which seat this is. Your own row says so in accent and
                                              bold — the accent BAR on the left means something else
                                              (the seat the list is advising), and the two can differ. -->
