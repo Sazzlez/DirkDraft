@@ -1734,9 +1734,18 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 .DownloadRuneAndSpellIconsAsync(runeIds, spellIds, plan.Patch, _lifetime.Token)
                 .ConfigureAwait(true);
 
-            // Still the same build on screen? Then swap the placeholder labels for the icons.
-            if (added > 0 && ReferenceEquals(_build, plan))
-                ApplyGameBuild(plan);
+            if (added > 0)
+            {
+                // The files just landed, but the tiles that asked for them a moment ago are
+                // remembered as misses — and that memory outlives these downloads. Without
+                // dropping it the re-render below reads the stale "not there" and the icons stay
+                // blank until an unrelated event happens to redraw the panel.
+                _icons.ForgetMisses();
+
+                // Still the same build on screen? Then swap the placeholder labels for the icons.
+                if (ReferenceEquals(_build, plan))
+                    ApplyGameBuild(plan);
+            }
         }
         catch (OperationCanceledException)
         {

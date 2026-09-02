@@ -80,6 +80,24 @@ public sealed class IconCache
         }
     }
 
+    /// <summary>
+    /// Forgets which lookups came up empty, without dropping what is already decoded.
+    /// <para>
+    /// Must be called whenever files arrive after a lookup missed them. A miss is remembered for
+    /// <see cref="MissRetryDelay"/> to keep every render from stat-ing the disk for an icon that is
+    /// not there — but an on-demand download of a handful of small PNGs finishes well inside that
+    /// window, so the re-render that follows it would ask the cache and be told "still missing".
+    /// The tiles then stayed blank until some later event happened to re-render them.
+    /// </para>
+    /// </summary>
+    public void ForgetMisses()
+    {
+        lock (_lock)
+        {
+            _misses.Clear();
+        }
+    }
+
     /// <summary>Drops the cache so a data update's new files are picked up.</summary>
     public void Clear()
     {
