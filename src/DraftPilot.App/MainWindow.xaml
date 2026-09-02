@@ -372,8 +372,8 @@
                                 brand gradient runs around the frame and turns while the turn lasts:
                                 motion in a static panel draws the eye without adding a single pixel
                                 of size. Stopped on exit, so nothing animates while nobody is on the
-                                clock. 30 fps and one full turn per six seconds keep it calm and
-                                cheap under software rendering.
+                                clock. One full turn per thirty seconds - about one pick timer - at
+                                20 fps: barely perceptible motion, and cheap under software rendering.
                             -->
                             <DataTrigger Binding="{Binding IsMyTurn}" Value="True">
                                 <Setter Property="BorderBrush">
@@ -391,9 +391,9 @@
                                     <BeginStoryboard x:Name="SpinBrand">
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetProperty="(Border.BorderBrush).(LinearGradientBrush.RelativeTransform).(RotateTransform.Angle)"
-                                                             From="0" To="360" Duration="0:0:6"
+                                                             From="0" To="360" Duration="0:0:30"
                                                              RepeatBehavior="Forever"
-                                                             Timeline.DesiredFrameRate="30" />
+                                                             Timeline.DesiredFrameRate="20" />
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </DataTrigger.EnterActions>
