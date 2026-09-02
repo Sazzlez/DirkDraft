@@ -367,10 +367,9 @@
                     <Style TargetType="Border">
                         <Setter Property="BorderBrush" Value="{StaticResource LineSoft}" />
                         <Style.Triggers>
-                            <!-- Your own turn is the one moment the panel must not be overlooked.
-                                 The brand gradient, nowhere else on a border, marks exactly this. -->
+                            <!-- Your own turn is the one moment the panel must not be overlooked. -->
                             <DataTrigger Binding="{Binding IsMyTurn}" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource Brand}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
