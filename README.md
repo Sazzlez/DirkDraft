@@ -39,7 +39,11 @@ Eine neue Version veröffentlichen:
 ```
 
 Trägt die Version ins Projekt, lässt die Tests laufen, baut mit eingebauter Runtime, packt den
-Installer samt Delta-Paketen (`vpk`) und lädt alles als GitHub-Release hoch. Voraussetzungen
+Installer samt Delta-Paketen (`vpk`), checkt den Versionssprung als „Release 1.1.0" ein, setzt den
+Tag `v1.1.0`, schiebt beides nach GitHub und lädt dann erst das Release hoch — so zeigt der Tag
+genau auf den gebauten Stand. Alles andere muss vorher eingecheckt sein; sonst bricht das Skript
+ab, bevor es etwas anfasst. Der Ordner `build\Releases\` bleibt absichtlich stehen: Aus dem
+letzten Vollpaket dort entsteht das kleine Delta-Paket für installierte Kopien. Voraussetzungen
 einmalig: `dotnet tool install -g vpk`, `winget install GitHub.cli --scope user` und ein
 `gh auth login`. Der Token kommt aus dieser Anmeldung und wird nirgends gespeichert. `-NoUpload`
 baut nur den Installer nach `build\Releases\`, wenn du ihn einmal von Hand weitergeben willst. Die
