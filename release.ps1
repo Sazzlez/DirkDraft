@@ -109,8 +109,14 @@ if ($NoUpload) {
 # The token is read from the GitHub CLI session and passed on the command line only.
 $gh = Get-Command gh -ErrorAction SilentlyContinue
 if (-not $gh) {
-    $candidate = Join-Path $env:ProgramFiles 'GitHub CLI\gh.exe'
-    if (Test-Path -LiteralPath $candidate) { $gh = Get-Command $candidate }
+    # winget --scope user drops a portable copy here and only puts it on the PATH of NEW shells.
+    $candidates = @(
+        (Join-Path $env:ProgramFiles 'GitHub CLI\gh.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\GitHub.cli_Microsoft.Winget.Source_8wekyb3d8bbwe\bin\gh.exe')
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate) { $gh = Get-Command $candidate; break }
+    }
 }
 if (-not $gh) { throw 'GitHub CLI (gh) nicht gefunden. winget install GitHub.cli, dann gh auth login.' }
 
