@@ -5,6 +5,10 @@ Kopien melden sie beim nächsten Start.
 
 ## Noch nicht veröffentlicht
 
+- Dein eigenes Matchup bleibt während Pick und Ban stehen. Über der Vorschlagsliste sitzt eine
+  feste Zeile „DEIN MATCHUP" mit beiden Champions, Lane, Spielzahl und Siegquote — die Liste
+  darunter folgt weiter der Uhr, aber dein Duell springt nicht mehr weg. Klickst du einen
+  Mitspieler an, siehst du wie bisher dessen Matchup in der großen Karte.
 - Ist das Spiel vorbei, zeigt das Fenster wieder den Startbildschirm. Vorher blieb die Build-Karte
   des beendeten Spiels bis zum nächsten Draft stehen — mit Runen zum Übertragen und Items zum
   Kaufen für ein Match, das längst gelaufen war.

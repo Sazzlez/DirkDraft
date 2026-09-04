@@ -1293,6 +1293,66 @@
                     </TextBlock>
                 </Grid>
 
+                <!--
+                    The own duel, pinned. The list below follows the clock through the draft, so
+                    the full panel came and went with every turn and the own matchup was the thing
+                    that kept disappearing. One line, same numbers, never moves.
+                -->
+                <Border DockPanel.Dock="Top" Background="{StaticResource Surface}"
+                        BorderBrush="{StaticResource LineSoft}" BorderThickness="1" CornerRadius="10"
+                        Padding="12,7" Margin="0,0,10,8"
+                        ToolTip="{Binding MatchupNote}"
+                        Visibility="{Binding ShowMatchupStrip, Converter={StaticResource BoolToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="DEIN MATCHUP" Style="{StaticResource Caption}"
+                                   VerticalAlignment="Center" Margin="0,0,12,0" />
+
+                        <Image Grid.Column="1" Source="{Binding MatchupOwnIcon}" Width="24" Height="24"
+                               VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Text="vs" Style="{StaticResource Small}"
+                                   Foreground="{StaticResource Faint}" Margin="7,0,7,0"
+                                   VerticalAlignment="Center" />
+                        <Image Grid.Column="3" Source="{Binding MatchupOpponentIcon}" Width="24" Height="24"
+                               VerticalAlignment="Center" />
+
+                        <TextBlock Grid.Column="4" Style="{StaticResource Small}" Margin="9,0,0,0"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                            <Run Text="{Binding MatchupHeadline, Mode=OneWay}" />
+                            <Run Text=" · " Foreground="{StaticResource Faint}" />
+                            <Run Text="{Binding MatchupSubline, Mode=OneWay}"
+                                 Foreground="{StaticResource Muted}" />
+                        </TextBlock>
+
+                        <TextBlock Grid.Column="5" Text="{Binding MatchupFigure}"
+                                   FontFamily="{StaticResource NumFont}" FontSize="13"
+                                   FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0"
+                                   Visibility="{Binding HasMatchupFigure, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding MatchupTone}" Value="Strong">
+                                            <Setter Property="Foreground" Value="{StaticResource Good}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding MatchupTone}" Value="Fair">
+                                            <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Border>
+
                 <Grid>
                     <!-- Empty state instead of a blank gap. -->
                     <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"

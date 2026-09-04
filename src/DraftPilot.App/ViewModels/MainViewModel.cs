@@ -194,6 +194,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _isDraftActive;
     private bool _hasRecommendations;
     private bool _showMatchupPanel;
+    private bool _showMatchupStrip;
     private bool _showNarrowBuildCard;
     private bool _showIdleHero;
     private bool _showEmptyHint;
@@ -625,6 +626,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         get => _showMatchupPanel;
         private set => Set(ref _showMatchupPanel, value);
+    }
+
+    /// <summary>
+    /// The own duel as a single line over the suggestion list, for the phase in which the list
+    /// belongs to somebody else. Fills the same MatchupXxx properties as the full panel — the two
+    /// are never on screen together, so one set of values serves both.
+    /// </summary>
+    public bool ShowMatchupStrip
+    {
+        get => _showMatchupStrip;
+        private set => Set(ref _showMatchupStrip, value);
     }
 
     /// <summary>
@@ -2019,30 +2031,43 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// panel used to greet a team-mate's lane with "Dein Matchup" and "deiner Lane".
     /// </para>
     /// </summary>
-    private string? TargetTeammate()
+    private string? TargetTeammate() => _target is null ? null : TeammateLabel(_target.Slot);
+
+    /// <summary>As <see cref="TargetTeammate"/>, for a seat that is not necessarily the advised one.</summary>
+    private string? TeammateLabel(DraftSlot seat)
     {
-        if (_target is null || _target.Slot.CellId == _state.LocalCellId)
+        if (seat.CellId == _state.LocalCellId)
             return null;
 
-        var index = _state.Allies.ToList().FindIndex(slot => slot.CellId == _target.Slot.CellId);
+        var index = _state.Allies.ToList().FindIndex(slot => slot.CellId == seat.CellId);
         return index < 0 ? null : $"Mitspieler {index + 1}";
     }
 
     private void RenderMatchupPanel()
     {
-        var show = _target?.IsSettled == true;
+        // The full panel takes the column only while the advised seat has settled. During pick and
+        // ban the advice follows the clock, so it used to appear and vanish with every turn — the
+        // own duel now keeps a one-line strip above the list, which never moves.
+        var settled = _target?.IsSettled == true;
 
-        ShowMatchupPanel = show;
-        ShowEmptyHint = !show && !HasRecommendations;
-        ShowNarrowBuildCard = ShowBuildSection && !show;
+        var seat = settled
+            ? _target!.Slot
+            : _state.LocalSlot is { IsLocked: true, LockedChampionId: not 0 } own
+                ? own
+                : null;
 
-        if (!show)
+        ShowMatchupPanel = settled;
+        ShowMatchupStrip = !settled && seat is not null;
+        ShowEmptyHint = !settled && !HasRecommendations;
+        ShowNarrowBuildCard = ShowBuildSection && !settled;
+
+        if (seat is null)
             return;
 
         // Not _buildContext: that one additionally requires an opponent, and the panel has
         // something to say without one.
-        var mine = _target!.Slot;
-        var teammate = TargetTeammate();
+        var mine = seat;
+        var teammate = TeammateLabel(seat);
         var lane = mine.AssignedLane != Lane.Unknown
             ? mine.AssignedLane
             : _allyPredictions?.ForCell(mine.CellId)?.Lane ?? Lane.Unknown;
