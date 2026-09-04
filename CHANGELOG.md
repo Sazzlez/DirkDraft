@@ -5,6 +5,9 @@ Kopien melden sie beim nächsten Start.
 
 ## Noch nicht veröffentlicht
 
+- Ist das Spiel vorbei, zeigt das Fenster wieder den Startbildschirm. Vorher blieb die Build-Karte
+  des beendeten Spiels bis zum nächsten Draft stehen — mit Runen zum Übertragen und Items zum
+  Kaufen für ein Match, das längst gelaufen war.
 - Die Spielansicht zeigt unter den Skills alle fünf Lanes des fertigen Drafts: wer gegen wen
   steht, die Siegquote deiner Seite in jedem Duell und darunter den Draft als eine Zahl. Fehlt
   eine Duell-Statistik, bleibt die Zahl weg statt 50 % zu behaupten; eine Lane, auf der nur eine

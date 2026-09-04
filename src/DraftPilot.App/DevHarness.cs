@@ -12,7 +12,10 @@ namespace DraftPilot.App;
 /// <param name="DemoFrames">How many frames of the recording to play before holding.</param>
 /// <param name="ScreenshotPath">Render the window to this PNG and exit.</param>
 /// <param name="ExpandRows">Expand this many recommendation rows before capturing.</param>
-/// <param name="Phase">Simulate this gameflow phase (e.g. InProgress) before capturing.</param>
+/// <param name="Phase">
+/// Gameflow phases to simulate before capturing, comma-separated and applied in order
+/// (e.g. "InProgress" or "InProgress,EndOfGame" for a game that starts and ends).
+/// </param>
 public sealed record DevOptions(
     string? DemoRecording,
     int DemoFrames,

@@ -420,6 +420,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         IsGameRunning = running;
+
+        // Reached only on a real transition (the early return above catches repeats), so !running
+        // here means the game that WAS running has ended.
+        if (!running)
+            DiscardFinishedGame();
+
         UpdateBuildSection();
 
         if (running)
@@ -432,6 +438,33 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _gameActiveAnnounced = false;
             GameActiveChanged?.Invoke(false);
         }
+    }
+
+    /// <summary>
+    /// Drops everything that belonged to the game that just ended, so the window falls back to the
+    /// start screen instead of sitting on a finished game's shopping list.
+    /// <para>
+    /// The build deliberately outlives champion select — that is what makes it readable while the
+    /// game runs. It must not outlive the GAME too: without this the compact card stayed up until
+    /// the next draft, showing runes to import and items to buy for a match that was over.
+    /// </para>
+    /// </summary>
+    private void DiscardFinishedGame()
+    {
+        _build = null;
+        HasBuild = false;
+        _buildCardClosed = false;
+        _buildIsStandIn = false;
+        BuildTitle = string.Empty;
+        BuildSubtitle = string.Empty;
+        RuneImportText = string.Empty;
+        BuildHints.Clear();
+
+        GameMatchups.Clear();
+        HasGameMatchups = false;
+        HasGameMatchupsTotal = false;
+        GameMatchupsTotal = string.Empty;
+        GameMatchupsTotalHint = string.Empty;
     }
 
     /// <summary>The last running gameflow phase, to detect GameStart → InProgress transitions.</summary>

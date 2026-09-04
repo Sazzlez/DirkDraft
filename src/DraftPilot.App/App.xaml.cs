@@ -236,8 +236,12 @@ public partial class App : Application
                     foreach (var row in _model.Recommendations.Take(Math.Max(0, expandRows)))
                         row.IsExpanded = true;
 
-                    if (_phase is { Length: > 0 })
-                        _model.OnGameflowPhase(_phase);
+                    // Comma-separated on purpose: some behaviour only exists in the TRANSITION
+                    // between phases (a finished game clears its build), and a single injected
+                    // phase can never produce one. "InProgress,EndOfGame" reproduces a game
+                    // starting and ending.
+                    foreach (var step in (_phase ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        _model.OnGameflowPhase(step);
                 }
 
                 if (_window is not null)
