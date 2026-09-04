@@ -220,8 +220,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private string _gameMatchupsEnemyTotal = string.Empty;
     private BalanceTone _gameMatchupsTone = BalanceTone.Even;
     private bool _hasGameMatchupsTotal;
-    private GridLength _gameMatchupsAllyShare = new(1, GridUnitType.Star);
-    private GridLength _gameMatchupsEnemyShare = new(1, GridUnitType.Star);
+    private GridLength _gameMatchupsAllyRest = new(1, GridUnitType.Star);
+    private GridLength _gameMatchupsAllyAdvance = new(0, GridUnitType.Star);
+    private GridLength _gameMatchupsEnemyAdvance = new(0, GridUnitType.Star);
+    private GridLength _gameMatchupsEnemyRest = new(1, GridUnitType.Star);
     private bool _showBuildSection;
     private bool _showBuildClose;
     private string _buildTitle = string.Empty;
@@ -856,17 +858,29 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         private set => Set(ref _gameMatchupsEnemyTotal, value);
     }
 
-    /// <summary>The total as the same two-part bar as a lane; see <see cref="LaneMatchupViewModel.AllyShare"/>.</summary>
-    public GridLength GameMatchupsAllyShare
+    /// <summary>The total on the same deviation bar as a lane; see <see cref="LaneMatchupViewModel.AllyRest"/>.</summary>
+    public GridLength GameMatchupsAllyRest
     {
-        get => _gameMatchupsAllyShare;
-        private set => Set(ref _gameMatchupsAllyShare, value);
+        get => _gameMatchupsAllyRest;
+        private set => Set(ref _gameMatchupsAllyRest, value);
     }
 
-    public GridLength GameMatchupsEnemyShare
+    public GridLength GameMatchupsAllyAdvance
     {
-        get => _gameMatchupsEnemyShare;
-        private set => Set(ref _gameMatchupsEnemyShare, value);
+        get => _gameMatchupsAllyAdvance;
+        private set => Set(ref _gameMatchupsAllyAdvance, value);
+    }
+
+    public GridLength GameMatchupsEnemyAdvance
+    {
+        get => _gameMatchupsEnemyAdvance;
+        private set => Set(ref _gameMatchupsEnemyAdvance, value);
+    }
+
+    public GridLength GameMatchupsEnemyRest
+    {
+        get => _gameMatchupsEnemyRest;
+        private set => Set(ref _gameMatchupsEnemyRest, value);
     }
 
     /// <summary>The close glyph only makes sense on the post-draft card.</summary>
@@ -1947,6 +1961,30 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
 
     /// <summary>
+    /// Half the duel bar stands for this much distance from an even duel. Ten points, because that
+    /// is the range real matchups live in: on a 0–100 scale every duel between 42 % and 58 % draws
+    /// the same near-half bar, and the one thing the bar is for — how far from even — disappears.
+    /// Anything beyond it fills the half completely; the number next to it is never rounded off.
+    /// </summary>
+    private const double DuelBarFullScale = 0.10;
+
+    /// <summary>
+    /// Splits a win rate into the four star widths of a deviation bar: how far it reaches from the
+    /// centre towards our side, and how far towards theirs. Exactly one of the two ever reaches.
+    /// </summary>
+    private static (GridLength AllyRest, GridLength AllyAdvance, GridLength EnemyAdvance, GridLength EnemyRest)
+        BarParts(double rate)
+    {
+        var reach = Math.Min(1, Math.Abs(rate - 0.5) / DuelBarFullScale);
+        var ally = rate >= 0.5 ? reach : 0;
+        var enemy = rate >= 0.5 ? 0 : reach;
+
+        return (Star(1 - ally), Star(ally), Star(enemy), Star(1 - enemy));
+
+        static GridLength Star(double value) => new(value, GridUnitType.Star);
+    }
+
+    /// <summary>
     /// Keeps the lane overview in step with the draft, for the in-game view to show afterwards.
     /// <para>
     /// Only while champion select is active. Once it ends the team lists and the live matchup
@@ -1998,8 +2036,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                     _ => ScoreTone.Weak,
                 };
 
-                view.AllyShare = new GridLength(rate, GridUnitType.Star);
-                view.EnemyShare = new GridLength(1 - rate, GridUnitType.Star);
+                (view.AllyRest, view.AllyAdvance, view.EnemyAdvance, view.EnemyRest) = BarParts(rate);
 
                 view.Note = $"{row.Play.ToString("N0", culture)} Spiele in diesem Duell"
                     + (row.IsInferred ? " · aus der Gegenrichtung abgeleitet" : string.Empty);
@@ -2012,8 +2049,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 view.EnemyFigure = string.Empty;
                 view.HasFigure = false;
                 view.Tone = ScoreTone.Weak;
-                view.AllyShare = new GridLength(1, GridUnitType.Star);
-                view.EnemyShare = new GridLength(1, GridUnitType.Star);
+                (view.AllyRest, view.AllyAdvance, view.EnemyAdvance, view.EnemyRest) = BarParts(0.5);
                 view.Note = row.AllyId == 0 || row.EnemyId == 0
                     ? "Auf dieser Lane ist nur eine Seite aufgedeckt."
                     : "Für dieses Duell hat OP.GG keine Statistik.";
@@ -2029,8 +2065,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         GameMatchupsEnemyTotal = balance.HasData
             ? balance.EnemyWinRate.ToString("P1", culture)
             : string.Empty;
-        GameMatchupsAllyShare = new GridLength(balance.AllyWinRate, GridUnitType.Star);
-        GameMatchupsEnemyShare = new GridLength(balance.EnemyWinRate, GridUnitType.Star);
+        (GameMatchupsAllyRest, GameMatchupsAllyAdvance, GameMatchupsEnemyAdvance, GameMatchupsEnemyRest)
+            = BarParts(balance.HasData ? balance.AllyWinRate : 0.5);
         GameMatchupsTone = balance.AllyWinRate switch
         {
             >= 0.51 => BalanceTone.Ahead,

@@ -754,7 +754,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="LANES" Style="{StaticResource Caption}" VerticalAlignment="Top"
                                    Margin="0,7,14,0"
-                                   ToolTip="Die Lanes des fertigen Drafts. Alle Zahlen stehen neben dem Champion, für den sie gelten: links dein Team, rechts der Gegner. Der Balken zeigt dasselbe Verhältnis, 50 % wäre halb gefüllt." />
+                                   ToolTip="Die Lanes des fertigen Drafts. Jede Zahl steht neben dem Champion, für den sie gilt: links dein Team, rechts der Gegner. Der Balken schlägt von der Mitte zur führenden Seite aus; die halbe Breite sind 10 Punkte Abstand zu einem ausgeglichenen Duell." />
                         <!--
                             Shared size scope so the total's number lands in the same column as the
                             lanes' numbers instead of drifting to the panel edge.
@@ -823,39 +823,45 @@
                                                 </TextBlock.Style>
                                             </TextBlock>
 
-                                            <!-- The duel as a bar; hidden together with the number it draws. -->
-                                            <Grid Grid.Column="4" Height="8" VerticalAlignment="Center"
+                                            <!--
+                                                The duel as a deflection: the fill starts in the
+                                                middle and reaches towards whoever leads — left for
+                                                us, right for them. Hidden together with the number
+                                                it draws.
+                                            -->
+                                            <!--
+                                                Two nested grids on purpose: the outer one is taller
+                                                than the track, so the even mark can stick out above
+                                                and below it. Inside the 8 px track a taller child is
+                                                simply given the 8 px and the mark stayed invisible.
+                                            -->
+                                            <Grid Grid.Column="4" Height="16" VerticalAlignment="Center"
                                                   Margin="0,0,12,0"
                                                   Visibility="{Binding HasFigure, Converter={StaticResource BoolToVisibility}}">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="{Binding AllyShare}" />
-                                                    <ColumnDefinition Width="{Binding EnemyShare}" />
-                                                </Grid.ColumnDefinitions>
+                                                <Grid Height="8" VerticalAlignment="Center">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="{Binding AllyRest}" />
+                                                        <ColumnDefinition Width="{Binding AllyAdvance}" />
+                                                        <ColumnDefinition Width="{Binding EnemyAdvance}" />
+                                                        <ColumnDefinition Width="{Binding EnemyRest}" />
+                                                    </Grid.ColumnDefinitions>
 
-                                                <Border CornerRadius="4,0,0,4">
-                                                    <Border.Style>
-                                                        <Style TargetType="Border">
-                                                            <Setter Property="Background" Value="{StaticResource Muted}" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding Tone}" Value="Strong">
-                                                                    <Setter Property="Background" Value="{StaticResource Good}" />
-                                                                </DataTrigger>
-                                                                <DataTrigger Binding="{Binding Tone}" Value="Fair">
-                                                                    <Setter Property="Background" Value="{StaticResource Accent}" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Border.Style>
-                                                </Border>
-                                                <Border Grid.Column="1" Background="{StaticResource SurfaceAlt}"
-                                                        CornerRadius="0,4,4,0" />
+                                                    <!-- The empty track, under both fills. -->
+                                                    <Border Grid.ColumnSpan="4" CornerRadius="4"
+                                                            Background="{StaticResource SurfaceAlt}" />
+
+                                                    <Border Grid.Column="1" Background="{StaticResource Good}"
+                                                            CornerRadius="4,0,0,4" />
+                                                    <Border Grid.Column="2" Background="{StaticResource Bad}"
+                                                            CornerRadius="0,4,4,0" />
+                                                </Grid>
 
                                                 <!--
-                                                    No mark at 50 %: a bright line in the middle was
-                                                    read as the divider between the two halves, which
-                                                    put the majority on the wrong champion. The two
-                                                    printed numbers say where even is.
+                                                    The even mark: the point the bar deflects FROM,
+                                                    not a divider between two shares.
                                                 -->
+                                                <Border Width="1" HorizontalAlignment="Center"
+                                                        Background="{StaticResource Faint}" />
                                             </Grid>
 
                                             <!-- Their half of the same duel, next to their champion. -->
@@ -922,28 +928,27 @@
                                     </TextBlock.Style>
                                 </TextBlock>
 
-                                <Grid Grid.Column="4" Height="8" VerticalAlignment="Center" Margin="0,0,12,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="{Binding GameMatchupsAllyShare}" />
-                                        <ColumnDefinition Width="{Binding GameMatchupsEnemyShare}" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border CornerRadius="4,0,0,4">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Background" Value="{StaticResource Muted}" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding GameMatchupsTone}" Value="Ahead">
-                                                        <Setter Property="Background" Value="{StaticResource Good}" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding GameMatchupsTone}" Value="Behind">
-                                                        <Setter Property="Background" Value="{StaticResource Bad}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                    </Border>
-                                    <Border Grid.Column="1" Background="{StaticResource SurfaceAlt}"
-                                            CornerRadius="0,4,4,0" />
+                                <!-- Same bar, same scale, so a lane can be compared with the whole draft. -->
+                                <Grid Grid.Column="4" Height="16" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <Grid Height="8" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="{Binding GameMatchupsAllyRest}" />
+                                            <ColumnDefinition Width="{Binding GameMatchupsAllyAdvance}" />
+                                            <ColumnDefinition Width="{Binding GameMatchupsEnemyAdvance}" />
+                                            <ColumnDefinition Width="{Binding GameMatchupsEnemyRest}" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Grid.ColumnSpan="4" CornerRadius="4"
+                                                Background="{StaticResource SurfaceAlt}" />
+
+                                        <Border Grid.Column="1" Background="{StaticResource Good}"
+                                                CornerRadius="4,0,0,4" />
+                                        <Border Grid.Column="2" Background="{StaticResource Bad}"
+                                                CornerRadius="0,4,4,0" />
+                                    </Grid>
+
+                                    <Border Width="1" HorizontalAlignment="Center"
+                                            Background="{StaticResource Faint}" />
                                 </Grid>
 
                                 <TextBlock Grid.Column="5" Text="{Binding GameMatchupsEnemyTotal}"

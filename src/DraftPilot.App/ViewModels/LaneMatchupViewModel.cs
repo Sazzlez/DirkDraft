@@ -20,8 +20,10 @@ public sealed class LaneMatchupViewModel : ObservableObject
     private bool _hasFigure;
     private ScoreTone _tone = ScoreTone.Weak;
     private string _note = string.Empty;
-    private GridLength _allyShare = new(1, GridUnitType.Star);
-    private GridLength _enemyShare = new(1, GridUnitType.Star);
+    private GridLength _allyRest = new(1, GridUnitType.Star);
+    private GridLength _allyAdvance = new(0, GridUnitType.Star);
+    private GridLength _enemyAdvance = new(0, GridUnitType.Star);
+    private GridLength _enemyRest = new(1, GridUnitType.Star);
 
     /// <summary>"Top", "Jungle", …</summary>
     public string Lane
@@ -101,22 +103,40 @@ public sealed class LaneMatchupViewModel : ObservableObject
     }
 
     /// <summary>
-    /// The duel as a bar: our share and theirs, as star widths of the two halves.
+    /// The duel as a deflection from the centre: the four star widths of the bar's columns, of
+    /// which only the two around the middle carry the fill.
     /// <para>
-    /// GridLength rather than a number and a converter, because a star column IS a share — the
-    /// layout does the arithmetic, and 46 % against 54 % needs no code to become a picture. Both
-    /// stay at half while there is no rate; the bar is hidden then anyway.
+    /// A share bar (ours from the left edge, theirs filling the rest) was the obvious build and the
+    /// wrong picture: our advantage made the boundary move RIGHT, towards the opponent, and every
+    /// real duel between 42 % and 58 % looked like the same half-filled bar. This one starts at the
+    /// middle and reaches towards whoever is ahead, so the direction means what it looks like.
+    /// </para>
+    /// <para>
+    /// GridLength rather than a number plus a converter: a star column is a proportion, so the
+    /// layout does the arithmetic.
     /// </para>
     /// </summary>
-    public GridLength AllyShare
+    public GridLength AllyRest
     {
-        get => _allyShare;
-        set => Set(ref _allyShare, value);
+        get => _allyRest;
+        set => Set(ref _allyRest, value);
     }
 
-    public GridLength EnemyShare
+    public GridLength AllyAdvance
     {
-        get => _enemyShare;
-        set => Set(ref _enemyShare, value);
+        get => _allyAdvance;
+        set => Set(ref _allyAdvance, value);
+    }
+
+    public GridLength EnemyAdvance
+    {
+        get => _enemyAdvance;
+        set => Set(ref _enemyAdvance, value);
+    }
+
+    public GridLength EnemyRest
+    {
+        get => _enemyRest;
+        set => Set(ref _enemyRest, value);
     }
 }
