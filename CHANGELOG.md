@@ -3,7 +3,7 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
-## Noch nicht veröffentlicht
+## 1.0.3 — 2026-09-04
 
 - Um die Zug-Karte („Du pickst") läuft kein Verlaufsrahmen mehr. Sie hat jetzt denselben ruhigen
   Rand wie jede andere Karte; dass du am Zug bist, sagt die blaue Überschrift.
