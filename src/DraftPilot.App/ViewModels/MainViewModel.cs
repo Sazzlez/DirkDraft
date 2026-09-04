@@ -213,6 +213,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _showDraftFetchStatus;
     private bool _draftFetchFailed;
     private bool _hasBuild;
+    private bool _hasGameMatchups;
+    private string _gameMatchupsTotal = string.Empty;
+    private string _gameMatchupsTotalHint = string.Empty;
+    private BalanceTone _gameMatchupsTone = BalanceTone.Even;
+    private bool _hasGameMatchupsTotal;
     private bool _showBuildSection;
     private bool _showBuildClose;
     private string _buildTitle = string.Empty;
@@ -754,6 +759,48 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         private set => Set(ref _showBuildSection, value);
     }
 
+    /// <summary>
+    /// The five lanes of the finished draft, shown while the game runs.
+    /// <para>
+    /// Filled during the draft and deliberately NOT cleared when it ends: champion select takes the
+    /// team lists and the live matchup overlay with it, so a view that only exists afterwards has
+    /// to be built while the data is still there — exactly like the build card.
+    /// </para>
+    /// </summary>
+    public ObservableCollection<LaneMatchupViewModel> GameMatchups { get; } = [];
+
+    public bool HasGameMatchups
+    {
+        get => _hasGameMatchups;
+        private set => Set(ref _hasGameMatchups, value);
+    }
+
+    /// <summary>The whole draft as one number, frozen with the rows above. Empty when incomparable.</summary>
+    public string GameMatchupsTotal
+    {
+        get => _gameMatchupsTotal;
+        private set => Set(ref _gameMatchupsTotal, value);
+    }
+
+    public string GameMatchupsTotalHint
+    {
+        get => _gameMatchupsTotalHint;
+        private set => Set(ref _gameMatchupsTotalHint, value);
+    }
+
+    public BalanceTone GameMatchupsTone
+    {
+        get => _gameMatchupsTone;
+        private set => Set(ref _gameMatchupsTone, value);
+    }
+
+    /// <summary>Whether the total carries a number; without it the row is left out entirely.</summary>
+    public bool HasGameMatchupsTotal
+    {
+        get => _hasGameMatchupsTotal;
+        private set => Set(ref _hasGameMatchupsTotal, value);
+    }
+
     /// <summary>The close glyph only makes sense on the post-draft card.</summary>
     public bool ShowBuildClose
     {
@@ -1114,6 +1161,15 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // nothing had been picked yet, and as the wrong matchup while the new build loads.
             BuildTitle = string.Empty;
             BuildSubtitle = string.Empty;
+
+            // The lane overview survives the END of a draft on purpose (the in-game view needs it);
+            // a NEW draft is where it has to go, or the next game would open with the last one's
+            // lineup.
+            GameMatchups.Clear();
+            HasGameMatchups = false;
+            HasGameMatchupsTotal = false;
+            GameMatchupsTotal = string.Empty;
+            GameMatchupsTotalHint = string.Empty;
             _buildCardClosed = false;
             _buildProbe = default;
 
@@ -1776,6 +1832,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         var balance = DraftBalance.Estimate(_meta, _state, allyPredictions, enemyPredictions);
 
+        RenderGameMatchups(allyPredictions, enemyPredictions, balance);
+
         if (!balance.HasData)
         {
             AllyWinRateText = "—";
@@ -1818,6 +1876,95 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             + "Matchups dort, wo sich zwei Picks direkt gegenüberstehen.\n\n"
             + "50 % ist ausgeglichen, Unterschiede unter einem Punkt sind Rauschen. Noch verdeckte "
             + "Picks zählen nicht mit — die Zahl bewegt sich also mit jedem weiteren Pick.";
+    }
+
+    /// <summary>
+    /// Keeps the lane overview in step with the draft, for the in-game view to show afterwards.
+    /// <para>
+    /// Only while champion select is active. Once it ends the team lists and the live matchup
+    /// overlay are gone, and rebuilding from the empty predictions would erase the very rows this
+    /// view exists for — the same reason the build card is filled during the draft, not after it.
+    /// </para>
+    /// </summary>
+    private void RenderGameMatchups(
+        LanePredictionResult allyPredictions,
+        LanePredictionResult enemyPredictions,
+        DraftBalance balance)
+    {
+        if (!_state.IsActive)
+            return;
+
+        var rows = LaneMatchups.For(_meta, allyPredictions, enemyPredictions);
+        var culture = CultureInfo.CurrentCulture;
+
+        while (GameMatchups.Count > rows.Count)
+            GameMatchups.RemoveAt(GameMatchups.Count - 1);
+
+        while (GameMatchups.Count < rows.Count)
+            GameMatchups.Add(new LaneMatchupViewModel());
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            var view = GameMatchups[i];
+
+            view.Lane = row.Lane.Display();
+            view.Ally = row.AllyId == 0 ? "—" : _meta.ChampionName(row.AllyId);
+            view.Enemy = row.EnemyId == 0 ? "—" : _meta.ChampionName(row.EnemyId);
+            view.AllyIcon = row.AllyId == 0 ? null : _icons.Get(row.AllyId);
+            view.EnemyIcon = row.EnemyId == 0 ? null : _icons.Get(row.EnemyId);
+
+            if (row.WinRate is { } rate)
+            {
+                // Same decimals rule as everywhere else: the digits follow the sampling error, so a
+                // thin duel does not borrow the precision of a well-covered one.
+                var decimals = ScoreError.Decimals(
+                    ScoreError.LogitVariance(rate, row.Play, Shrinkage.MatchupPrior));
+
+                view.Figure = $"{rate.ToString($"P{decimals}", culture)} WR";
+                view.HasFigure = true;
+                view.Tone = (rate - 0.5) switch
+                {
+                    > 0.02 => ScoreTone.Strong,
+                    > -0.02 => ScoreTone.Fair,
+                    _ => ScoreTone.Weak,
+                };
+
+                view.Note = $"{row.Play.ToString("N0", culture)} Spiele in diesem Duell"
+                    + (row.IsInferred ? " · aus der Gegenrichtung abgeleitet" : string.Empty);
+            }
+            else
+            {
+                view.Figure = string.Empty;
+                view.HasFigure = false;
+                view.Tone = ScoreTone.Weak;
+                view.Note = row.AllyId == 0 || row.EnemyId == 0
+                    ? "Auf dieser Lane ist nur eine Seite aufgedeckt."
+                    : "Für dieses Duell hat OP.GG keine Statistik.";
+            }
+        }
+
+        HasGameMatchups = rows.Count > 0;
+
+        HasGameMatchupsTotal = balance.HasData;
+        GameMatchupsTotal = balance.HasData
+            ? $"{balance.AllyWinRate.ToString("P1", culture)} WR"
+            : string.Empty;
+        GameMatchupsTone = balance.AllyWinRate switch
+        {
+            >= 0.51 => BalanceTone.Ahead,
+            <= 0.49 => BalanceTone.Behind,
+            _ => BalanceTone.Even,
+        };
+        // Its own text rather than a copy of BalanceHint: that one is written further down in this
+        // very method, so reading it here would always show the previous render's wording.
+        GameMatchupsTotalHint = balance.HasData
+            ? $"Geschätzte Siegquote deines Teams aus {balance.RatedChampions} aufgedeckten "
+                + $"Champions und {balance.ContestedLanes} direkten Lane-Duellen. Gerechnet werden "
+                + "die Lane-Siegquoten beider Teams und die Duelle dort, wo sich zwei Picks "
+                + "gegenüberstehen. 50 % ist ausgeglichen, Unterschiede unter einem Punkt sind "
+                + "Rauschen."
+            : string.Empty;
     }
 
     /// <summary>

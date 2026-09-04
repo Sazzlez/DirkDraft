@@ -3,6 +3,13 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
+## Noch nicht veröffentlicht
+
+- Die Spielansicht zeigt unter den Skills alle fünf Lanes des fertigen Drafts: wer gegen wen
+  steht, die Siegquote deiner Seite in jedem Duell und darunter den Draft als eine Zahl. Fehlt
+  eine Duell-Statistik, bleibt die Zahl weg statt 50 % zu behaupten; eine Lane, auf der nur eine
+  Seite aufgedeckt wurde, nennt trotzdem den eigenen Champion.
+
 ## 1.0.2 — 2026-09-02
 
 - Item-Icons, die für das aktuelle Matchup neu geladen werden, erscheinen sofort. Vorher blieben

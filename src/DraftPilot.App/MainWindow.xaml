@@ -768,6 +768,138 @@
                         </ItemsControl>
                     </Grid>
 
+                    <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,10,0,10"
+                            Visibility="{Binding HasGameMatchups, Converter={StaticResource BoolToVisibility}}" />
+
+                    <!--
+                        The board, lane by lane. Only worth showing once the draft is done — during
+                        it the middle column answers the same question for the lane being picked.
+                        The rows are frozen from the last render of champion select; see
+                        RenderGameMatchups.
+                    -->
+                    <Grid Visibility="{Binding HasGameMatchups, Converter={StaticResource BoolToVisibility}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="LANES" Style="{StaticResource Caption}" VerticalAlignment="Top"
+                                   Margin="0,3,14,0"
+                                   ToolTip="Die fünf Lanes des fertigen Drafts. Die Prozentzahl ist die Siegquote deiner Seite in diesem Duell." />
+                        <!--
+                            Shared size scope so the total's figure lands in the same column as the
+                            lanes' figures instead of drifting to the panel edge.
+                        -->
+                        <StackPanel Grid.Column="1" Grid.IsSharedSizeScope="True">
+                            <ItemsControl ItemsSource="{Binding GameMatchups}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:LaneMatchupViewModel}">
+                                        <Grid Margin="0,0,0,5" ToolTip="{Binding Note}">
+                                            <!--
+                                                Fixed name columns, not stars: with stars the two
+                                                halves each took what was left and pushed "vs" into
+                                                the middle of a very wide row. Fixed widths also keep
+                                                the five rows' columns under each other.
+                                            -->
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="62" />
+                                                <ColumnDefinition Width="26" />
+                                                <ColumnDefinition Width="130" />
+                                                <ColumnDefinition Width="Auto" SharedSizeGroup="MatchupVs" />
+                                                <ColumnDefinition Width="26" />
+                                                <ColumnDefinition Width="130" />
+                                                <ColumnDefinition Width="Auto" SharedSizeGroup="MatchupFigure" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Text="{Binding Lane}" Style="{StaticResource Small}"
+                                                       Foreground="{StaticResource Faint}"
+                                                       VerticalAlignment="Center" />
+
+                                            <Border Grid.Column="1" Width="22" Height="22" CornerRadius="5"
+                                                    Background="{StaticResource SurfaceAlt}">
+                                                <Image Source="{Binding AllyIcon}" Stretch="UniformToFill" />
+                                            </Border>
+                                            <TextBlock Grid.Column="2" Text="{Binding Ally}"
+                                                       Style="{StaticResource Small}" Margin="7,0,0,0"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" />
+
+                                            <TextBlock Grid.Column="3" Text="vs" Style="{StaticResource Small}"
+                                                       Foreground="{StaticResource Faint}" Margin="4,0,8,0"
+                                                       VerticalAlignment="Center" />
+
+                                            <Border Grid.Column="4" Width="22" Height="22" CornerRadius="5"
+                                                    Background="{StaticResource SurfaceAlt}">
+                                                <Image Source="{Binding EnemyIcon}" Stretch="UniformToFill" />
+                                            </Border>
+                                            <TextBlock Grid.Column="5" Text="{Binding Enemy}"
+                                                       Style="{StaticResource Small}" Margin="7,0,0,0"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" />
+
+                                            <TextBlock Grid.Column="6" Text="{Binding Figure}"
+                                                       FontFamily="{StaticResource NumFont}" FontSize="12"
+                                                       VerticalAlignment="Center" Margin="8,0,0,0"
+                                                       Visibility="{Binding HasFigure, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Tone}" Value="Strong">
+                                                                <Setter Property="Foreground" Value="{StaticResource Good}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Tone}" Value="Fair">
+                                                                <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- The whole draft as one number, under the lanes it is made of. -->
+                            <Grid Margin="0,3,0,0"
+                                  Visibility="{Binding HasGameMatchupsTotal, Converter={StaticResource BoolToVisibility}}">
+                                <!-- Same shape as a lane row, so the two figures share one column. -->
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="62" />
+                                    <ColumnDefinition Width="26" />
+                                    <ColumnDefinition Width="130" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MatchupVs" />
+                                    <ColumnDefinition Width="26" />
+                                    <ColumnDefinition Width="130" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MatchupFigure" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.ColumnSpan="6" Text="Draft insgesamt"
+                                           Style="{StaticResource Small}"
+                                           Foreground="{StaticResource Muted}" VerticalAlignment="Center"
+                                           ToolTip="{Binding GameMatchupsTotalHint}" />
+                                <TextBlock Grid.Column="6" Text="{Binding GameMatchupsTotal}"
+                                           FontFamily="{StaticResource NumFont}" FontSize="13"
+                                           FontWeight="SemiBold" VerticalAlignment="Center"
+                                           Margin="8,0,0,0" ToolTip="{Binding GameMatchupsTotalHint}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{StaticResource Text}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding GameMatchupsTone}" Value="Ahead">
+                                                    <Setter Property="Foreground" Value="{StaticResource Good}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding GameMatchupsTone}" Value="Behind">
+                                                    <Setter Property="Foreground" Value="{StaticResource Bad}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+
                     <!-- Situational hints from the enemy composition, same chips as in the draft. -->
                     <ItemsControl ItemsSource="{Binding BuildHints}" Margin="0,10,0,0">
                         <ItemsControl.ItemsPanel>
