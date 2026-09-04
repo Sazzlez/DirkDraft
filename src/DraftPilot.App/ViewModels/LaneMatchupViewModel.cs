@@ -16,6 +16,7 @@ public sealed class LaneMatchupViewModel : ObservableObject
     private ImageSource? _allyIcon;
     private ImageSource? _enemyIcon;
     private string _figure = string.Empty;
+    private string _enemyFigure = string.Empty;
     private bool _hasFigure;
     private ScoreTone _tone = ScoreTone.Weak;
     private string _note = string.Empty;
@@ -58,6 +59,21 @@ public sealed class LaneMatchupViewModel : ObservableObject
     {
         get => _figure;
         set => Set(ref _figure, value);
+    }
+
+    /// <summary>
+    /// The counterpart on their side, the same duel read the other way round.
+    /// <para>
+    /// Printed although it is nothing but 100 % minus ours: with a single number between two
+    /// champions there is no telling whose it is, and the bar alone did not settle it either — the
+    /// mark at 50 % was read as the divider between the two halves, which put the majority on the
+    /// wrong side. Two numbers, each next to its own champion, cannot be misread.
+    /// </para>
+    /// </summary>
+    public string EnemyFigure
+    {
+        get => _enemyFigure;
+        set => Set(ref _enemyFigure, value);
     }
 
     /// <summary>

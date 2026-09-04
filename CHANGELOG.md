@@ -14,6 +14,10 @@ Kopien melden sie beim nächsten Start.
 - Ist das Spiel vorbei, zeigt das Fenster wieder den Startbildschirm. Vorher blieb die Build-Karte
   des beendeten Spiels bis zum nächsten Draft stehen — mit Runen zum Übertragen und Items zum
   Kaufen für ein Match, das längst gelaufen war.
+- In der Lane-Übersicht steht jede Siegquote neben dem Champion, für den sie gilt: links dein
+  Team, rechts der Gegner. Vorher stand nur eine Zahl zwischen beiden — sie galt immer für dein
+  Team, aber das war nicht zu erkennen, und die Markierung bei 50 % wurde als Trennlinie zwischen
+  den Hälften gelesen. Die Markierung ist deshalb weg.
 - Die Spielansicht zeigt unter den Skills alle fünf Lanes des fertigen Drafts: wer gegen wen
   steht, die Siegquote deiner Seite in jedem Duell und darunter den Draft als eine Zahl. Fehlt
   eine Duell-Statistik, bleibt die Zahl weg statt 50 % zu behaupten; eine Lane, auf der nur eine

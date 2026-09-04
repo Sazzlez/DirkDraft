@@ -217,6 +217,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _hasGameMatchups;
     private string _gameMatchupsTotal = string.Empty;
     private string _gameMatchupsTotalHint = string.Empty;
+    private string _gameMatchupsEnemyTotal = string.Empty;
     private BalanceTone _gameMatchupsTone = BalanceTone.Even;
     private bool _hasGameMatchupsTotal;
     private GridLength _gameMatchupsAllyShare = new(1, GridUnitType.Star);
@@ -846,6 +847,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         get => _hasGameMatchupsTotal;
         private set => Set(ref _hasGameMatchupsTotal, value);
+    }
+
+    /// <summary>The enemy side of the total, printed for the same reason as the lanes'.</summary>
+    public string GameMatchupsEnemyTotal
+    {
+        get => _gameMatchupsEnemyTotal;
+        private set => Set(ref _gameMatchupsEnemyTotal, value);
     }
 
     /// <summary>The total as the same two-part bar as a lane; see <see cref="LaneMatchupViewModel.AllyShare"/>.</summary>
@@ -1978,6 +1986,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                     ScoreError.LogitVariance(rate, row.Play, Shrinkage.MatchupPrior));
 
                 view.Figure = $"{rate.ToString($"P{decimals}", culture)} WR";
+
+                // Their side gets the same precision: printing 55,8 % against 44 % would suggest
+                // the two numbers were measured to different accuracy, when they are one number.
+                view.EnemyFigure = (1 - rate).ToString($"P{decimals}", culture);
                 view.HasFigure = true;
                 view.Tone = (rate - 0.5) switch
                 {
@@ -1997,6 +2009,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 // A dash, not an empty cell: the row keeps its shape, and "no statistic" is a
                 // statement the reader can see instead of a gap they have to interpret.
                 view.Figure = "—";
+                view.EnemyFigure = string.Empty;
                 view.HasFigure = false;
                 view.Tone = ScoreTone.Weak;
                 view.AllyShare = new GridLength(1, GridUnitType.Star);
@@ -2012,6 +2025,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         HasGameMatchupsTotal = balance.HasData;
         GameMatchupsTotal = balance.HasData
             ? $"{balance.AllyWinRate.ToString("P1", culture)} WR"
+            : string.Empty;
+        GameMatchupsEnemyTotal = balance.HasData
+            ? balance.EnemyWinRate.ToString("P1", culture)
             : string.Empty;
         GameMatchupsAllyShare = new GridLength(balance.AllyWinRate, GridUnitType.Star);
         GameMatchupsEnemyShare = new GridLength(balance.EnemyWinRate, GridUnitType.Star);
