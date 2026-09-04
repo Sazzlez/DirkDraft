@@ -5,6 +5,8 @@ Kopien melden sie beim nächsten Start.
 
 ## Noch nicht veröffentlicht
 
+- Um die Zug-Karte („Du pickst") läuft kein Verlaufsrahmen mehr. Sie hat jetzt denselben ruhigen
+  Rand wie jede andere Karte; dass du am Zug bist, sagt die blaue Überschrift.
 - Dein eigenes Matchup bleibt während Pick und Ban stehen. Über der Vorschlagsliste sitzt eine
   feste Zeile „DEIN MATCHUP" mit beiden Champions, Lane, Spielzahl und Siegquote — die Liste
   darunter folgt weiter der Uhr, aber dein Duell springt nicht mehr weg. Klickst du einen

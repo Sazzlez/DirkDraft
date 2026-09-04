@@ -368,50 +368,15 @@
             </Grid>
 
             <!-- ===================== Turn card (only while a draft runs) ===================== -->
+            <!--
+                No highlight frame on your own turn. The rotating brand gradient that used to run
+                around this card is gone by request; the card now carries the same quiet border as
+                every other surface, and the turn is called out by the headline's colour alone.
+            -->
             <Border Grid.Row="1" Background="{StaticResource Surface}"
+                    BorderBrush="{StaticResource LineSoft}"
                     BorderThickness="1" CornerRadius="10" Padding="13,9" Margin="0,3,0,0"
                     Visibility="{Binding IsDraftActive, Converter={StaticResource BoolToVisibility}}">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="BorderBrush" Value="{StaticResource LineSoft}" />
-                        <Style.Triggers>
-                            <!--
-                                Your own turn is the one moment the panel must not be overlooked. The
-                                brand gradient runs around the frame and turns while the turn lasts:
-                                motion in a static panel draws the eye without adding a single pixel
-                                of size. Stopped on exit, so nothing animates while nobody is on the
-                                clock. One full turn per thirty seconds - about one pick timer - at
-                                20 fps: barely perceptible motion, and cheap under software rendering.
-                            -->
-                            <DataTrigger Binding="{Binding IsMyTurn}" Value="True">
-                                <Setter Property="BorderBrush">
-                                    <Setter.Value>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                            <LinearGradientBrush.RelativeTransform>
-                                                <RotateTransform CenterX="0.5" CenterY="0.5" Angle="0" />
-                                            </LinearGradientBrush.RelativeTransform>
-                                            <GradientStop Color="#3B82F6" Offset="0" />
-                                            <GradientStop Color="#22C55E" Offset="1" />
-                                        </LinearGradientBrush>
-                                    </Setter.Value>
-                                </Setter>
-                                <DataTrigger.EnterActions>
-                                    <BeginStoryboard x:Name="SpinBrand">
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetProperty="(Border.BorderBrush).(LinearGradientBrush.RelativeTransform).(RotateTransform.Angle)"
-                                                             From="0" To="360" Duration="0:0:30"
-                                                             RepeatBehavior="Forever"
-                                                             Timeline.DesiredFrameRate="20" />
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </DataTrigger.EnterActions>
-                                <DataTrigger.ExitActions>
-                                    <StopStoryboard BeginStoryboardName="SpinBrand" />
-                                </DataTrigger.ExitActions>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
                 <!--
                     The status IS the headline. There used to be a countdown here plus a phase
                     bar; both are gone on purpose. The client only reports the remaining seconds

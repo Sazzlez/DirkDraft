@@ -38,11 +38,10 @@
         holds the same geometry — change it there and here together). Drawn as vectors so the mark
         is crisp at 20 px in the title bar and at 88 px on the idle screen alike.
 
-        The gradient is used sparingly on purpose: the mark itself, a hairline under the title bar,
-        and the border of the turn card while it is the user's turn - where it rotates, which is
-        what separates it from the static line above. As a fill on large surfaces it
-        would fight the champion portraits, which are the only colourful thing this panel should
-        have.
+        The gradient is used sparingly on purpose: the mark itself and a hairline under the title
+        bar. It used to run around the turn card as well, rotating slowly; that was taken out by
+        request. As a fill on large surfaces it would fight the champion portraits, which are the
+        only colourful thing this panel should have.
     -->
     <LinearGradientBrush x:Key="Brand" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#3B82F6" Offset="0" />
