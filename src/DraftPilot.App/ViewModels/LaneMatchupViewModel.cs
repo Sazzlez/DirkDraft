@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Media;
 
 namespace DraftPilot.App.ViewModels;
@@ -18,6 +19,8 @@ public sealed class LaneMatchupViewModel : ObservableObject
     private bool _hasFigure;
     private ScoreTone _tone = ScoreTone.Weak;
     private string _note = string.Empty;
+    private GridLength _allyShare = new(1, GridUnitType.Star);
+    private GridLength _enemyShare = new(1, GridUnitType.Star);
 
     /// <summary>"Top", "Jungle", …</summary>
     public string Lane
@@ -79,5 +82,25 @@ public sealed class LaneMatchupViewModel : ObservableObject
     {
         get => _note;
         set => Set(ref _note, value);
+    }
+
+    /// <summary>
+    /// The duel as a bar: our share and theirs, as star widths of the two halves.
+    /// <para>
+    /// GridLength rather than a number and a converter, because a star column IS a share — the
+    /// layout does the arithmetic, and 46 % against 54 % needs no code to become a picture. Both
+    /// stay at half while there is no rate; the bar is hidden then anyway.
+    /// </para>
+    /// </summary>
+    public GridLength AllyShare
+    {
+        get => _allyShare;
+        set => Set(ref _allyShare, value);
+    }
+
+    public GridLength EnemyShare
+    {
+        get => _enemyShare;
+        set => Set(ref _enemyShare, value);
     }
 }

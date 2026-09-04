@@ -219,6 +219,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private string _gameMatchupsTotalHint = string.Empty;
     private BalanceTone _gameMatchupsTone = BalanceTone.Even;
     private bool _hasGameMatchupsTotal;
+    private GridLength _gameMatchupsAllyShare = new(1, GridUnitType.Star);
+    private GridLength _gameMatchupsEnemyShare = new(1, GridUnitType.Star);
     private bool _showBuildSection;
     private bool _showBuildClose;
     private string _buildTitle = string.Empty;
@@ -844,6 +846,19 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         get => _hasGameMatchupsTotal;
         private set => Set(ref _hasGameMatchupsTotal, value);
+    }
+
+    /// <summary>The total as the same two-part bar as a lane; see <see cref="LaneMatchupViewModel.AllyShare"/>.</summary>
+    public GridLength GameMatchupsAllyShare
+    {
+        get => _gameMatchupsAllyShare;
+        private set => Set(ref _gameMatchupsAllyShare, value);
+    }
+
+    public GridLength GameMatchupsEnemyShare
+    {
+        get => _gameMatchupsEnemyShare;
+        private set => Set(ref _gameMatchupsEnemyShare, value);
     }
 
     /// <summary>The close glyph only makes sense on the post-draft card.</summary>
@@ -1942,11 +1957,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var rows = LaneMatchups.For(_meta, allyPredictions, enemyPredictions);
         var culture = CultureInfo.CurrentCulture;
 
-        while (GameMatchups.Count > rows.Count)
-            GameMatchups.RemoveAt(GameMatchups.Count - 1);
-
-        while (GameMatchups.Count < rows.Count)
-            GameMatchups.Add(new LaneMatchupViewModel());
+        GameMatchups.Resize(rows.Count, () => new LaneMatchupViewModel());
 
         for (var i = 0; i < rows.Count; i++)
         {
@@ -1975,14 +1986,21 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                     _ => ScoreTone.Weak,
                 };
 
+                view.AllyShare = new GridLength(rate, GridUnitType.Star);
+                view.EnemyShare = new GridLength(1 - rate, GridUnitType.Star);
+
                 view.Note = $"{row.Play.ToString("N0", culture)} Spiele in diesem Duell"
                     + (row.IsInferred ? " · aus der Gegenrichtung abgeleitet" : string.Empty);
             }
             else
             {
-                view.Figure = string.Empty;
+                // A dash, not an empty cell: the row keeps its shape, and "no statistic" is a
+                // statement the reader can see instead of a gap they have to interpret.
+                view.Figure = "—";
                 view.HasFigure = false;
                 view.Tone = ScoreTone.Weak;
+                view.AllyShare = new GridLength(1, GridUnitType.Star);
+                view.EnemyShare = new GridLength(1, GridUnitType.Star);
                 view.Note = row.AllyId == 0 || row.EnemyId == 0
                     ? "Auf dieser Lane ist nur eine Seite aufgedeckt."
                     : "Für dieses Duell hat OP.GG keine Statistik.";
@@ -1995,6 +2013,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         GameMatchupsTotal = balance.HasData
             ? $"{balance.AllyWinRate.ToString("P1", culture)} WR"
             : string.Empty;
+        GameMatchupsAllyShare = new GridLength(balance.AllyWinRate, GridUnitType.Star);
+        GameMatchupsEnemyShare = new GridLength(balance.EnemyWinRate, GridUnitType.Star);
         GameMatchupsTone = balance.AllyWinRate switch
         {
             >= 0.51 => BalanceTone.Ahead,

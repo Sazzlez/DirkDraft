@@ -13,6 +13,13 @@
     <SolidColorBrush x:Key="Line" Color="#2C333F" />
     <SolidColorBrush x:Key="LineSoft" Color="#232935" />
 
+    <!--
+        The 50 % mark on a duel bar. Translucent white rather than one of the line colours: it has
+        to read against the filled half (green or grey) AND against the empty one, and no opaque
+        grey does both.
+    -->
+    <SolidColorBrush x:Key="BarTick" Color="#70FFFFFF" />
+
     <SolidColorBrush x:Key="Text" Color="#EEF1F6" />
     <SolidColorBrush x:Key="Muted" Color="#9BA5B7" />
     <SolidColorBrush x:Key="Faint" Color="#6B7486" />
