@@ -122,6 +122,35 @@ internal static class MatchupFitCommand
         // What the tool does today: no baseline at all. A missing edge is an even matchup.
         yield return new Baseline("pauschal 50 %", _ => 0.5);
 
+        // The collective mean of the edges OP.GG lists, taken from the training folds only. The
+        // listed edges are not a random sample of all duels — the source reports the opponents
+        // that stand out — so their mean sits below 50 %, and that offset is a property of the
+        // list, not of the game.
+        var listedMean = train.Sum(edge => edge.Rate * edge.Play) / train.Sum(edge => (double)edge.Play);
+        yield return new Baseline($"Kantenmittel gesamt ({listedMean:P1})", _ => listedMean);
+
+        // What the two lane win rates alone imply for this duel. This is the candidate that keeps
+        // the mirror exact: swapping the two sides gives exactly the complement, so a shrunk edge
+        // and its reverse still add to 1.
+        double PairPrior(Edge edge)
+        {
+            var mine = meta.LaneStat(edge.Champion, edge.Lane);
+            var theirs = meta.LaneStat(edge.Opponent, edge.Lane);
+
+            if (mine is null || theirs is null)
+                return 0.5;
+
+            return ScoreModel.Sigmoid(ScoreModel.Logit(mine.Value.WinRate) - ScoreModel.Logit(theirs.Value.WinRate));
+        }
+
+        yield return new Baseline("Lane-Paar", PairPrior);
+
+        // The same, moved onto the listed edges' own level. Without the shift the prediction is
+        // systematically a point too optimistic for every row in this table.
+        var shift = ScoreModel.Logit(listedMean);
+        yield return new Baseline("Lane-Paar + Listenversatz", edge =>
+            ScoreModel.Sigmoid(ScoreModel.Logit(PairPrior(edge)) + shift));
+
         // The champion's overall rate on that lane, from the tier list. Different bracket than the
         // matchups, which is exactly the objection worth measuring.
         yield return new Baseline("Lane-Winrate (Tierlist)", edge =>

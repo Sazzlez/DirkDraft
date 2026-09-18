@@ -47,6 +47,14 @@ public sealed class LcuClient : IDisposable, IRunePageClient
     public Action<string>? Diagnostic { get; set; }
 
     /// <summary>
+    /// The session, with the distinction the panel needs: a client that answers "there is
+    /// none" has told us something, a read that never got through has not. Closing a running
+    /// draft on the second kind is how a two-second socket hiccup used to wipe the build.
+    /// </summary>
+    public Task<LcuRead> ReadChampSelectSessionAsync(CancellationToken ct = default)
+        => ReadAsync("/lol-champ-select/v1/session", ct);
+
+    /// <summary>
     /// The session as raw JSON. Used to seed state on connect and to record fixtures verbatim.
     /// </summary>
     public Task<string?> GetChampSelectSessionRawAsync(CancellationToken ct = default)
@@ -173,32 +181,46 @@ public sealed class LcuClient : IDisposable, IRunePageClient
     }
 
     private async Task<string?> GetRawAsync(string path, CancellationToken ct)
+        => (await ReadAsync(path, ct).ConfigureAwait(false)).Json;
+
+    /// <summary>
+    /// One GET, keeping apart the two things a null body can mean.
+    /// </summary>
+    private async Task<LcuRead> ReadAsync(string path, CancellationToken ct)
     {
         try
         {
             using var response = await _http.GetAsync(path, ct).ConfigureAwait(false);
 
-            // 404 is the normal answer for "no champion select right now".
+            // 404 is the normal answer for "no champion select right now" — and it IS an answer.
             if (response.StatusCode is HttpStatusCode.NotFound)
-                return null;
+                return new LcuRead(Answered: true, Json: null);
 
             if (!response.IsSuccessStatusCode)
             {
                 // 401 (stale password), 5xx: without a trace this is indistinguishable from
                 // "nothing going on", and the panel just stays silently empty.
                 Diagnostic?.Invoke($"LCU {path} → {(int)response.StatusCode}");
-                return null;
+                return default;
             }
 
-            return await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            return new LcuRead(Answered: true, Json: await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
         }
         catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or IOException or ObjectDisposedException)
         {
             // Client shutting down, the port went away between lockfile read and request, or this
             // instance was disposed by a reconnect while a read was still in flight.
-            return null;
+            return default;
         }
     }
 
     public void Dispose() => _http.Dispose();
 }
+
+/// <summary>One answer from the client, or the absence of one.</summary>
+/// <param name="Answered">
+/// True when the client produced a definite answer — a body, or a 404 meaning "there is none".
+/// False when nothing was learned: the connection failed, the password is stale, the client is
+/// shutting down. Nothing may be closed or cleared on a false; it is not a statement about the game.
+/// </param>
+public readonly record struct LcuRead(bool Answered, string? Json);

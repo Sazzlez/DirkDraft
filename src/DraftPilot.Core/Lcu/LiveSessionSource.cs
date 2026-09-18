@@ -208,7 +208,13 @@ public sealed class LiveSessionSource : ISessionSource
             // link that just died.
             _socketDeliveredSession = false;
             _socketDeliveredPhase = false;
-            EndSession("Event-Socket getrennt");
+
+            // Deliberately NOT ending the session. A dropped socket says nothing about the game —
+            // and treating it as "champion select is over" wiped the build, the fetched counter
+            // edges and the whole per-draft budget in the middle of a draft, over a hiccup that
+            // repairs itself in a second. The panel keeps what it has, the status line says the
+            // link is down, and the reseed on reconnect decides: it closes the panel only when the
+            // client positively answers that there is no champion select any more.
             return;
         }
 
@@ -235,13 +241,22 @@ public sealed class LiveSessionSource : ISessionSource
             if (outside)
                 return;
 
-            var raw = await client.GetChampSelectSessionRawAsync(ct).ConfigureAwait(false);
+            var session = await client.ReadChampSelectSessionAsync(ct).ConfigureAwait(false);
 
             // Discarded when the socket has spoken in the meantime: its event is newer.
-            if (raw is not null && !_socketDeliveredSession && !ct.IsCancellationRequested)
+            if (_socketDeliveredSession || ct.IsCancellationRequested)
+                return;
+
+            if (session.Json is { } raw)
             {
                 _sessionOpen = true;
                 SessionJson?.Invoke(raw);
+            }
+            else if (session.Answered)
+            {
+                // The client says there is no champion select. This is the only place a link loss
+                // can still close the panel — and it does so on an answer, not on a silence.
+                EndSession("Kein Champ Select mehr");
             }
         }
         catch (OperationCanceledException)
