@@ -216,6 +216,17 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
     {
         var results = new List<Recommendation>();
 
+        // Nobody on this lane yet: then the duel term has nothing to say, and the question the pick
+        // actually faces is how easily it can be answered later. Once an opponent is revealed the
+        // duel itself answers that far better, so this only runs while it cannot.
+        var laneIsOpen = lane != Lane.Unknown && enemyLanes.ChampionOnLane(lane) == 0;
+
+        // Everything the enemy can no longer reach for: bans, locked picks on both sides, and what
+        // an ally is hovering — that champion is as good as taken.
+        var blocked = laneIsOpen
+            ? new HashSet<int>(state.Unavailable.Concat(hoveredByOthers))
+            : [];
+
         foreach (var candidate in Candidates(lane))
         {
             if (state.Unavailable.Contains(candidate) || hoveredByOthers.Contains(candidate))
@@ -237,6 +248,9 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
                 : LaneLogOdds(candidate, lane, reasons, budget);
 
             var compFit = _comp.Fit(candidate, allyComp, reasons);
+
+            if (laneIsOpen)
+                AddCounterRisk(candidate, lane, blocked, reasons);
 
             var terms = new List<ScoreTerm>(5)
             {
@@ -314,6 +328,35 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         }
 
         return Top(results, limit);
+    }
+
+    /// <summary>
+    /// The counters this pick would still be exposed to. A chip, never a term: whether an available
+    /// counter actually gets picked is not in the data, and pretending otherwise would put a guess
+    /// into a number that calls itself an estimated win rate.
+    /// <para>
+    /// Absence of the chip means "the source lists none that stand out", not "there are none" — the
+    /// tooltip says so, because OP.GG only ever lists the notable opponents of a champion.
+    /// </para>
+    /// </summary>
+    private void AddCounterRisk(int candidate, Lane lane, IReadOnlySet<int> blocked, ICollection<Reason> reasons)
+    {
+        var threats = CounterRisk.Open(_meta, candidate, lane, blocked, limit: 0);
+        if (threats.Count == 0)
+            return;
+
+        var named = string.Join(", ", threats.Take(3).Select(threat =>
+            $"{_meta.ChampionName(threat.ChampionId)} {threat.WinRate:P0} aus {threat.Play:N0} Spielen"));
+
+        var more = threats.Count > 3 ? $" und {threats.Count - 3} weitere" : string.Empty;
+
+        reasons.Add(Reason.Contra(
+            threats.Count == 1 ? "1 offener Konter" : $"{threats.Count} offene Konter",
+            $"Auf {lane.Display()} ist noch niemand aufgedeckt, und diese Champions sind noch frei "
+            + $"und schneiden gegen {_meta.ChampionName(candidate)} besser ab als seine Gegner "
+            + $"üblicherweise: {named}{more}. Sie zu nehmen steht dem Gegner frei — ob er es tut, "
+            + "sagen die Daten nicht, deshalb zählt das hier nicht in die Prozentzahl hinein. "
+            + "Aufgelistet ist, was OP.GG als auffällige Gegner kennt, nicht jeder mögliche."));
     }
 
     /// <summary>Two terms can legitimately notice the same fact; the user should read it once.</summary>

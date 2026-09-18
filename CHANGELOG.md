@@ -5,6 +5,12 @@ Kopien melden sie beim nächsten Start.
 
 ## 1.1.0 — noch nicht veröffentlicht
 
+- **Frühe Picks sehen ihr Konterrisiko.** Solange auf deiner Lane niemand aufgedeckt ist, trägt
+  jede Zeile „N offene Konter": noch freie Champions, die gegen diesen Pick besser abschneiden als
+  seine Gegner üblicherweise. Im Blind-Draft liegen Singed und Nasus bei drei, Malphite bei sieben
+  — bei fünf statistisch gleichwertigen Zeilen ist das der Unterschied, nach dem man sucht. Zählt
+  nicht in die Prozentzahl hinein: ob der Gegner sie nimmt, sagen die Daten nicht.
+
 - **Die Zahlen können jetzt deine Liga beschreiben.** `Tools -- settings tier gold` (oder
   `platinum`, `platinum_plus`, …) stellt das Rang-Bracket ein; Lane-Zahlen, Duelle und Tier kommen
   dann von dort. Vorher mischte ein einziger Score zwei Populationen: Lane-Stärke aus OP.GGs

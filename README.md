@@ -102,7 +102,13 @@ wieder herunterzuladen.
   auf — pro Kriterium ein Urteil in Worten, ein Balken und der Beitrag in Prozentpunkten. Kriterien
   ohne Datengrundlage stehen dort als *keine Daten*, nicht als Null. Die Farbe einer Zeile misst
   den Abstand zu Platz 1 derselben Liste, nicht den zu 50 % — auf einer starken Lane liegt jede
-  Zeile über 50 %, und das sagt nichts darüber, welche man nehmen sollte. Bans rechnen dieselbe
+  Zeile über 50 %, und das sagt nichts darüber, welche man nehmen sollte.
+  Solange auf deiner Lane niemand aufgedeckt ist, trägt jede Zeile zusätzlich **„N offene
+  Konter"**: Champions, die noch frei sind und gegen diesen Pick besser abschneiden als seine
+  Gegner üblicherweise. Das ist die Frage, die ein früher Pick wirklich hat — und sie zählt
+  bewusst *nicht* in die Prozentzahl hinein, denn ob der Gegner sie nimmt, sagen die Daten nicht.
+  Der Tooltip nennt die Namen mit Siegquote und Spielzahl. Gezählt wird, was OP.GG als auffällige
+  Gegner kennt; kein Chip heißt „keiner fällt auf", nicht „es gibt keinen". Bans rechnen dieselbe
   Einheit aus Gegnersicht: Stärke mal Wahrscheinlichkeit, dass der Champion überhaupt genommen wird.
 - **Dein Build**: nach deinem Pick Runen, Shards, Startitems, Schuhe und Kern-Items für genau dieses
   Matchup, plus Hinweise zur gegnerischen Aufstellung. Unter Start/Schuhen und unter dem Kern steht
