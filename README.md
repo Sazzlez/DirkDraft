@@ -60,10 +60,13 @@ oder Speicher-Peak entsteht. Bricht ein Update ab, bleibt der vorherige Stand vo
 
 Der zweite und letzte Netzweg sind die **Draft-Daten**: Sobald im Champ Select ein Champion
 aufgedeckt wird, holt das Tool dessen aktuelle Counter-Zahlen, und nach deinem eigenen Pick den
-passenden Build. Das sind höchstens sechs kleine Abrufe pro Draft — einer je Gegner, einer für den
-Build —, jeder nur einmal, alles lokal gecacht. Ohne diese Abrufe wäre die Vorratsmatrix pro
-Champion und Lane nur etwa drei Counter tief, und genau die fünf Gegner, gegen die du wirklich
-spielst, wären meistens nicht darin. Außerhalb eines Champ Select passiert nichts.
+passenden Build. Das sind ein paar kleine Abrufe pro Draft — einer je Gegner, einer für den Build,
+gedeckelt auf sechzehn für den ganzen Draft —, jeder nur einmal, alles lokal gecacht. Ohne diese
+Abrufe wäre die Vorratsmatrix pro Champion und Lane nur etwa drei Counter tief, und genau die fünf
+Gegner, gegen die du wirklich spielst, wären meistens nicht darin. Jeder Abruf hat zehn Sekunden
+Zeit — länger als eine Pick-Phase dauert, hilft nicht mehr —, und was dreimal scheitert, wird für
+diesen Draft nicht mehr versucht; die Statuszeile sagt beides. Außerhalb eines Champ Select
+passiert nichts.
 
 ## Wo Daten liegen
 
@@ -97,12 +100,23 @@ wieder herunterzuladen.
   halben Punkt sind Rauschen, und liegen die Spitzenkandidaten gleichauf, sagt die Kopfzeile das.
   Jeder Chip erklärt sich beim Überfahren mit der Maus; der Pfeil rechts klappt die Aufschlüsselung
   auf — pro Kriterium ein Urteil in Worten, ein Balken und der Beitrag in Prozentpunkten. Kriterien
-  ohne Datengrundlage stehen dort als *keine Daten*, nicht als Null. Bans rechnen dieselbe Einheit
-  aus Gegnersicht: Stärke mal Wahrscheinlichkeit, dass der Champion überhaupt genommen wird.
+  ohne Datengrundlage stehen dort als *keine Daten*, nicht als Null. Die Farbe einer Zeile misst
+  den Abstand zu Platz 1 derselben Liste, nicht den zu 50 % — auf einer starken Lane liegt jede
+  Zeile über 50 %, und das sagt nichts darüber, welche man nehmen sollte. Bans rechnen dieselbe
+  Einheit aus Gegnersicht: Stärke mal Wahrscheinlichkeit, dass der Champion überhaupt genommen wird.
 - **Dein Build**: nach deinem Pick Runen, Shards, Startitems, Schuhe und Kern-Items für genau dieses
-  Matchup, plus Hinweise zur gegnerischen Aufstellung. **Runen übertragen** legt die Seite als
-  „DirkRunen · …" im Client an und wählt sie aus — der einzige Schreibzugriff des Tools, nur auf
-  Klick, und gelöscht wird nur die eigene Seite (eine fremde erst nach Nachfrage mit Namen).
+  Matchup, plus Hinweise zur gegnerischen Aufstellung. Unter Start/Schuhen und unter dem Kern steht
+  „auch gespielt": die übrigen Sätze, die OP.GG zu dieser Paarung mitliefert, mit Siegquote und
+  Spielzahl. Nichts davon wird vorgezogen oder hervorgehoben — oben steht die häufigste Wahl, und
+  welche davon richtig ist, entscheidet das Spiel. Unter 50 Spielen steht statt einer Prozentzahl
+  „dünne Datenlage": dort ist ein Standardfehler rund sieben Punkte breit.
+  **Runen übertragen** legt die Seite als „DirkRunen · …" im Client an und wählt sie aus — der
+  einzige Schreibzugriff des Tools, nur auf Klick, und gelöscht wird nur die eigene Seite (eine
+  fremde erst nach Nachfrage mit Namen).
+- **In ARAM** gibt es keine Lanes, also auch keine Lane-Empfehlungen: die Vorschlagsliste bleibt
+  weg, Lane-Beschriftungen und Duell-Prozente ebenso. Was bleibt, ist der **ARAM-Build** für deinen
+  zugeteilten Champion (OP.GGs eigene ARAM-Zahlen, ein Abruf) und der Vergleich beider
+  Aufstellungen, der dort genauso gilt.
 - **Im Spiel**: sobald das Spiel startet, zeigt das Fenster den Build groß — Item-Bilder in
   Kaufreihenfolge (Start → Schuhe → Kern → Spät), Beschwörerzauber und die Skill-Tabelle für
   Stufe 1–18. Die Stufen 16–18 liefert die Quelle nicht; sie sind abgeleitet und blasser
@@ -124,6 +138,10 @@ dotnet run --project src\DraftPilot.Tools -- update
 dotnet run --project src\DraftPilot.Tools -- icons
 dotnet run --project src\DraftPilot.Tools -- inspect
 dotnet run --project src\DraftPilot.Tools -- recommend mid "Jax,Elise,Syndra" "Aatrox,LeeSin"
+dotnet run --project src\DraftPilot.Tools -- settings
+dotnet run --project src\DraftPilot.Tools -- settings tier gold
+dotnet run --project src\DraftPilot.Tools -- opgg tools
+dotnet run --project src\DraftPilot.Tools -- opgg try lol_get_champion_analysis game_mode=aram champion=DARIUS position=mid desired_output_fields=@data.core_items.ids_names,data.core_items.play,data.core_items.win
 ```
 
 `record` und `replay` sind der Grund, warum die Logik ohne laufenden Client entwickelt und getestet
@@ -133,6 +151,12 @@ werden kann.
 Von außen sehen alle fünf Schichten gleich aus („nicht verbunden"), und genau das hat schon einmal
 Zeit gekostet. `events` schreibt jedes Client-Event roh mit, wenn man wissen muss, *warum* das
 Werkzeug einen Zustand annimmt.
+
+`opgg` fragt die Schnittstelle selbst: `opgg tools` listet alle Werkzeuge samt Argument-Schemas,
+`opgg tools <name>` das vollständige Schema eines einzelnen, und `opgg try <name> schlüssel=wert …`
+ruft eines einmal auf und zeigt die rohe Antwort (`@a,b,c` ist eine Liste, `--out datei.json`
+schreibt alles). Der Grund dafür steht in `docs\opgg-schnittstelle.md`: mehrere Annahmen dieses
+Projekts über das, was OP.GG *nicht* kann, waren aus dem eigenen Abruf-Code abgelesen — und falsch.
 
 ### Aufzeichnungen enthalten keine persönlichen Daten
 
@@ -184,12 +208,40 @@ matschig, und 16 px ist die Größe, in der ein Icon tatsächlich angeschaut wir
   einblenden.
 - **Kein Autostart, kein Dienst.** Das Tool läuft, wenn du es startest.
 
+## Welche Liga die Zahlen beschreiben
+
+Standardmäßig holt das Tool die Matchups über alle Ränge und die Tierlist aus OP.GGs eigenem
+Standard-Bracket (gemessen: Emerald und höher). Wer in Gold spielt, wird damit aus einer anderen
+Spielerpopulation beraten — und die unterscheidet sich: Darius' auffälligste Gegner auf Top heißen
+in Gold Wukong, Warwick und Malzahar, in Platin Zaahen, Kennen und Heimerdinger.
+
+```powershell
+dotnet run --project src\DraftPilot.Tools -- settings tier gold
+```
+
+Möglich sind `iron`, `bronze`, `silver`, `gold`, `platinum`, `emerald`, `diamond`, `master`,
+die Sammel-Brackets `emerald_plus`, `platinum_plus`, `diamond_plus` — oder `all` für alle Ränge
+zusammen. Ein benanntes Bracket gilt für Lane-Zahlen, Duelle und Tier; die Synergien kennen bei
+OP.GG keinen Rangfilter und kommen weiter aus dem Standard-Bracket. Die Fußzeile nennt, was gerade
+gilt, und der Wechsel wird mit dem nächsten **Daten aktualisieren** wirksam.
+
+Regionale Daten (EUW, NA …) gibt es über diese Schnittstelle nicht: der Region-Parameter existiert
+nur bei den Werkzeugen, die einen Spielernamen abfragen, und die bleiben hier ungenutzt. Details
+und die Messungen dazu: `docs\opgg-schnittstelle.md`.
+
 ## Grenzen der Datenlage
 
 Das solltest du wissen, bevor du den Empfehlungen zu viel zutraust:
 
 - **Tierlist und Lane-Verteilung sind solide.** Die Rollen-Anteile, aus denen die Lane-Vorhersage
   rechnet, sind Verhältnisse großer Zahlen und entsprechend belastbar.
+- **Die Abdeckung ist der harte Deckel.** Von den möglichen Lane-Duellen kennt der Vorrat je nach
+  Lane nur 14 bis 23 %. Für das konkrete Duell, um das es geht, liegt also meistens nichts vor —
+  dafür gibt es die Draft-Abrufe, und wo auch die nichts liefern, steht „keine Daten".
+- **Die Reihenfolge der Liste ist oft Rauschen.** Zieht man denselben Draft wiederholt aus seinen
+  Stichproben (`Tools -- noise`), bleibt Platz 1 je nach Datenlage nur in 49 bis 92 % der Ziehungen
+  derselbe Champion. Deshalb sagt die Kopfzeile, wie viele Zeilen gleichauf liegen, und die Farbe
+  jeder Zeile misst den Abstand zu Platz 1 — nicht den zu 50 %.
 - **Die Vorrats-Counter-Matrix ist dünn.** Die Quelle liefert pro Champion und Lane nur die
   auffälligsten drei Gegner — keine vollständige Matrix. Genau dafür gibt es die automatischen
   Draft-Abrufe: für die fünf real aufgedeckten Gegner kommen dichte, aktuelle Zahlen nach. Wo
