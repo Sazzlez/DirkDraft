@@ -150,6 +150,19 @@ public sealed class MetaSnapshot
     /// <summary>Rank filter used, or <see langword="null"/> for the all-tier aggregate.</summary>
     public string? Tier { get; set; }
 
+    /// <summary>
+    /// Mean log-odds of the shrunk duo win rates in this file — what an AVERAGE listed duo is worth.
+    /// Measured at build time rather than assumed to be zero, because OP.GG only lists duos worth
+    /// mentioning: on the file this was introduced with, the mean sat at 0.0552, i.e. 51,4 %.
+    /// <para>
+    /// The synergy term subtracts it, so a duo pays only for being better than the usual listed
+    /// one. Without that, merely HAVING a duo row was worth 0,8 points, and the estimated win rate
+    /// grew with the draft's progress instead of with the quality of the pick. Zero in files written
+    /// before this was measured, which leaves their behaviour exactly as it was.
+    /// </para>
+    /// </summary>
+    public double SynergyBaseline { get; set; }
+
     public List<ChampionEntry> Champions { get; set; } = [];
 
     public List<LaneStat> LaneStats { get; set; } = [];

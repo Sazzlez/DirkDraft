@@ -789,7 +789,14 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
 
             // Synergy tiers run 0..4 with 2 in the middle.
             var tierNudge = synergy.Tier is >= 0 and <= 4 ? ScoreModel.TierNudge * (2 - synergy.Tier) : 0;
-            var logOdds = ScoreModel.Logit(synergy.WinRate) + tierNudge;
+
+            // Measured against what an average LISTED duo is worth, not against 50 %: OP.GG lists
+            // the duos worth mentioning, so the mean of the stored rows sits above even (0.0552 on
+            // the file this was measured on, i.e. 51,4 %). Uncentred, merely having a duo row was
+            // worth 0,8 points, the estimate grew as allies locked in rather than with the quality
+            // of the pick, and a candidate without a row was penalised for a gap in OP.GG's
+            // selection. The baseline is zero in older files, which leaves them as they were.
+            var logOdds = ScoreModel.Logit(synergy.WinRate) + tierNudge - _meta.SynergyBaseline;
 
             total += logOdds;
             variance += ScoreError.LogitVariance(synergy.WinRate, synergy.Play, Shrinkage.SynergyPrior);
@@ -806,12 +813,15 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         if (counted == 0)
             return null;
 
+        // The threshold is now measured against the average listed duo, not against even — which is
+        // what the chip was always claiming to say. Duos that merely exist no longer earn one.
         if (bestPartner is not null && bestLogOdds > 0.08)
         {
             reasons.Add(Reason.Pro(
                 $"spielt gut mit {bestPartner}",
                 $"Zusammen mit {bestPartner} im selben Team liegt die Siegquote bei "
-                + $"{bestView.WinRate:P1} aus {bestView.Play:N0} Spielen. 50 % wäre Durchschnitt."));
+                + $"{bestView.WinRate:P1} aus {bestView.Play:N0} Spielen — besser als die üblichen "
+                + "Duos, die OP.GG überhaupt auflistet."));
         }
 
         // Thin duo samples are where the score is least certain; the damping applies to the

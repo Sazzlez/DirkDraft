@@ -85,5 +85,15 @@ internal sealed class MetaBuilder
 
     public MetaSnapshot Snapshot() => _snapshot;
 
+    /// <summary>
+    /// What an average listed duo is worth in this fixture. Zero unless a test says otherwise —
+    /// which is also what every snapshot written before it was measured carries.
+    /// </summary>
+    public MetaBuilder SynergyBaseline(double logOdds)
+    {
+        _snapshot.SynergyBaseline = logOdds;
+        return this;
+    }
+
     public MetaLookup Build() => new(_snapshot);
 }

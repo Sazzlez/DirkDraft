@@ -203,6 +203,7 @@ public sealed class SnapshotBuilder : IDisposable
         }
 
         Deduplicate(snapshot);
+        snapshot.SynergyBaseline = MeasureSynergyBaseline(snapshot.Synergies);
         AddCoverageWarnings(snapshot, MissingFields());
 
         progress?.Report(new BuildProgress("Fertig", 1, 1));
@@ -997,6 +998,35 @@ public sealed class SnapshotBuilder : IDisposable
         // average of two numbers that belong to neither.
         UnroundPickRates([.. snapshot.LaneStats.Where(stat => stat.FromTierList)]);
         UnroundPickRates([.. snapshot.LaneStats.Where(stat => !stat.FromTierList)]);
+    }
+
+    /// <summary>
+    /// What an average listed duo is worth, in log-odds of the shrunk rate. OP.GG lists the duos
+    /// worth mentioning, not all of them, so this is not zero — measured on the file this was
+    /// written for: 0.0552, i.e. 51,4 %. The recommender subtracts it, so a duo counts for being
+    /// better than the usual one rather than for existing.
+    /// <para>
+    /// Measured here, once per file, because it is a property of the fetched data: a different
+    /// bracket or a different patch may well list a different selection.
+    /// </para>
+    /// </summary>
+    public static double MeasureSynergyBaseline(IReadOnlyList<SynergyStat> synergies)
+    {
+        var total = 0.0;
+        var counted = 0;
+
+        foreach (var synergy in synergies)
+        {
+            if (synergy.Play <= 0)
+                continue;
+
+            total += ScoreModel.Logit(Shrinkage.Apply(synergy.WinRate, synergy.Play, Shrinkage.SynergyPrior));
+            counted++;
+        }
+
+        // Too few rows to average would put a guess where a measurement belongs; zero then leaves
+        // the term exactly as it was before any of this.
+        return counted >= 50 ? total / counted : 0;
     }
 
     /// <summary>

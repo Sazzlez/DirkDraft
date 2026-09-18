@@ -986,6 +986,60 @@ public class RecommenderTests
     }
 
     /// <summary>
+    /// OP.GG lists the duos worth mentioning, not all of them, so the average stored duo sits above
+    /// even — measured on a real snapshot at 0.0552 log-odds, i.e. 51,4 %. The term is therefore
+    /// measured against THAT, not against 50 %: a duo that is merely as good as the usual listed
+    /// one says nothing about this pick. Uncentred, having any duo row at all was worth 0,8 points,
+    /// and the estimated win rate grew as allies locked in rather than with the quality of the pick.
+    /// </summary>
+    [Fact]
+    public void ADuoAsGoodAsTheAverageListedOne_AddsNothing()
+    {
+        // The fixture's one duo IS the average of the file it comes from.
+        var rate = Shrinkage.Apply(0.53, 2000, Shrinkage.SynergyPrior);
+
+        var meta = new MetaBuilder()
+            .Champion(Strong, "Strong").InLane(Strong, Lane.Mid, winRate: 0.52, play: 2000)
+            .Champion(AllySupport, "AllySupport")
+            .Synergy(Strong, AllySupport, winRate: 0.53, play: 2000)
+            .SynergyBaseline(ScoreModel.Logit(rate))
+            .Build();
+
+        Assert.Equal(0, SynergyTerm(meta), precision: 3);
+    }
+
+    [Fact]
+    public void ADuoBetterThanTheAverageListedOne_StillCounts()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Strong, "Strong").InLane(Strong, Lane.Mid, winRate: 0.52, play: 2000)
+            .Champion(AllySupport, "AllySupport")
+            .Synergy(Strong, AllySupport, winRate: 0.60, play: 2000)
+            .SynergyBaseline(ScoreModel.Logit(Shrinkage.Apply(0.53, 2000, Shrinkage.SynergyPrior)))
+            .Build();
+
+        Assert.True(SynergyTerm(meta) > 0.1, "Ein ueberdurchschnittliches Duo muss zaehlen.");
+    }
+
+    /// <summary>The Synergy term of the one candidate with a duo row, in log-odds.</summary>
+    private static double SynergyTerm(MetaLookup meta)
+    {
+        var state = DraftState.From(new SessionBuilder()
+            .LocalPlayer(2)
+            .Locked(4, AllySupport)
+            .OnClock(2, "pick")
+            .Build());
+
+        var target = new TurnTracker().Resolve(state)!;
+
+        return new Recommender(meta, TraitTable.Empty)
+            .Recommend(state, target, LanePredictionResult.Empty, limit: 50).Items
+            .Single(item => item.ChampionId == Strong)
+            .Breakdown.Single(term => term.Kind == ScoreTermKind.Synergy)
+            .LogOdds ?? 0;
+    }
+
+    /// <summary>
     /// The off-lane term promises to count LESS than the direct duel. With four enemies at the
     /// same matchup rate, its weighted mean must stay at OffLaneShare of one duel — the old sum
     /// reached 1.4 duels.

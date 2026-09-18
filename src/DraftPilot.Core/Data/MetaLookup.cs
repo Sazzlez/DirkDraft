@@ -94,6 +94,12 @@ public sealed class MetaLookup
     /// </summary>
     public string Tier => _snapshot.Tier ?? string.Empty;
 
+    /// <summary>
+    /// What an average listed duo is worth in this file — see <see cref="MetaSnapshot.SynergyBaseline"/>.
+    /// The synergy term measures against it instead of against 50 %.
+    /// </summary>
+    public double SynergyBaseline => _snapshot.SynergyBaseline;
+
     public IReadOnlyList<string> Warnings => _snapshot.Warnings;
 
     public IReadOnlyList<ChampionEntry> Champions => _champions;
