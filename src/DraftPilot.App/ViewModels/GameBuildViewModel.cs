@@ -216,9 +216,14 @@ public sealed class GameBuildViewModel : ObservableObject
         IconCache icons,
         bool isStandIn = false)
     {
-        Title = isStandIn
-            ? $"{plan.ChampionName} · {plan.Lane.Display()} — gegen den üblichen Gegner ({plan.OpponentName})"
-            : $"{plan.ChampionName} vs {plan.OpponentName} · {plan.Lane.Display()}";
+        // A mode build answers for the champion, not for a pairing — naming an opponent it was
+        // never measured against would be the one thing this card must not do.
+        Title = (BuildModes.Display(plan.Mode), isStandIn) switch
+        {
+            ({ Length: > 0 } mode, _) => $"{plan.ChampionName} · {mode}",
+            (_, true) => $"{plan.ChampionName} · {plan.Lane.Display()} — gegen den üblichen Gegner ({plan.OpponentName})",
+            _ => $"{plan.ChampionName} vs {plan.OpponentName} · {plan.Lane.Display()}",
+        };
 
         var runes = plan.Runes;
         var caveat = isStandIn ? " · Gegner unbekannt, Items nur als Richtung" : string.Empty;

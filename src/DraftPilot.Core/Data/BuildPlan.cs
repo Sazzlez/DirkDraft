@@ -10,6 +10,23 @@ namespace DraftPilot.Core.Data;
 /// Carries both names (for display) and Riot's ids: the ids address the rune icons on disk and are
 /// what the client's rune-page endpoint expects, so nothing has to be reverse-translated later.
 /// </remarks>
+/// <summary>
+/// Which game mode a plan describes when it is not a lane matchup — <c>aram</c> today. Empty means
+/// the normal case: one champion against one named opponent on one lane. Persisted, because the
+/// cache is read back long after the draft that fetched it.
+/// </summary>
+public static class BuildModes
+{
+    public const string Aram = "aram";
+
+    /// <summary>The mode in the words the window uses, or empty for a lane matchup.</summary>
+    public static string Display(string mode) => mode switch
+    {
+        Aram => "ARAM",
+        _ => string.Empty,
+    };
+}
+
 public sealed class RunePage
 {
     public string PrimaryPath { get; set; } = string.Empty;
@@ -84,6 +101,12 @@ public sealed class BuildPlan
     public string OpponentName { get; set; } = string.Empty;
 
     public Lane Lane { get; set; }
+
+    /// <summary>
+    /// The game mode when this plan is not about a lane matchup — see <see cref="BuildModes"/>.
+    /// Empty for the normal case, where <see cref="OpponentName"/> carries the answer instead.
+    /// </summary>
+    public string Mode { get; set; } = string.Empty;
 
     public string Patch { get; set; } = string.Empty;
 

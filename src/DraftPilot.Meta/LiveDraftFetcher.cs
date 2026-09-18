@@ -286,6 +286,46 @@ public static class MatchupGuideParser
 public sealed class LiveDraftFetcher(
     OpGgMcpClient client, string gameMode, string tier = "all", Action<string>? diagnostic = null)
 {
+    /// <summary>
+    /// The build for a champion in a mode that has no lane opponent to speak of — ARAM above all,
+    /// where the matchup guide has nothing to answer about. One call, no opponent, no stand-in.
+    /// </summary>
+    public async Task<BuildPlan?> FetchModeBuildAsync(
+        ChampionEntry me,
+        string mode,
+        string patch,
+        CancellationToken ct)
+    {
+        foreach (var name in ChampionResolver.ApiNames(me))
+        {
+            var arguments = new JsonObject
+            {
+                ["game_mode"] = mode,
+                ["champion"] = name,
+                // Required by the schema and ignored for ARAM — measured: mid, adc and top answer
+                // with identical numbers.
+                ["position"] = "mid",
+                ["desired_output_fields"] = OpGgMcpClient.Fields(AnalysisBuildParser.Fields),
+            };
+
+            try
+            {
+                var response = await client.CallToolAsync("lol_get_champion_analysis", arguments, ct)
+                    .ConfigureAwait(false);
+
+                var plan = AnalysisBuildParser.Parse(response, me, Lane.Unknown, mode, patch);
+                return plan.IsEmpty ? null : plan;
+            }
+            catch (OpGgApiException ex) when (ex.Status is null)
+            {
+                // A rejected spelling; try the next one. A transport failure is not ours to swallow.
+                diagnostic?.Invoke($"{me.Name} ({mode}): {ex.Message}");
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>Build, runes and spells for one concrete matchup, or null if OP.GG has nothing.</summary>
     public async Task<BuildPlan?> FetchBuildAsync(
         ChampionEntry me,

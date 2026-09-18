@@ -1698,9 +1698,22 @@
 
                                         <Image Source="{Binding MatchupOwnIcon}" Width="42" Height="42"
                                                VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="1" Text="vs" Style="{StaticResource Small}"
+                                        <!-- No opponent, no "vs": in a mode without lanes the card
+                                             is about one champion, and the word would promise a
+                                             duel the panel goes on to say does not exist. -->
+                                        <TextBlock Grid.Column="1" Text="vs"
                                                    Foreground="{StaticResource Faint}" Margin="9,0,9,0"
-                                                   VerticalAlignment="Center" />
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding MatchupOpponentIcon}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                         <Image Grid.Column="2" Source="{Binding MatchupOpponentIcon}"
                                                Width="42" Height="42" VerticalAlignment="Center" />
 

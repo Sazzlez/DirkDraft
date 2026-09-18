@@ -177,6 +177,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// update button was last pressed, and only the client says which game is running now.
     /// </summary>
     private string _clientPatch = string.Empty;
+
+    /// <summary>
+    /// OP.GG game mode for a build that needs no opponent, e.g. <c>aram</c>; empty when the normal
+    /// matchup guide applies. Lives beside <see cref="_buildContext"/> because the queue decides
+    /// it, not the seat.
+    /// </summary>
+    private string _buildMode = string.Empty;
     private DraftTracker _tracker;
 
     private MetaLookup _meta;
@@ -1467,6 +1474,28 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _buildContext = null;
 
         _buildIsStandIn = false;
+        _buildMode = string.Empty;
+
+        // A mode without lanes has no lane opponent to build against — and OP.GG answers for the
+        // champion alone there, so the honest build is the mode's own. ARAM is the one this tool
+        // sees; Arena and the rotating modes have no OP.GG mode to ask for, and get no build rather
+        // than a Rift one.
+        if (!_state.Queue.UsesLanes())
+        {
+            if (_state.Queue == QueueKind.Aram
+                && _state.LocalSlot is { IsLocked: true } aramSeat
+                && aramSeat.LockedChampionId != 0)
+            {
+                _buildMode = "aram";
+                _buildContext = (aramSeat.LockedChampionId, Lane.Unknown, 0);
+            }
+
+            TryLoadCachedBuild();
+            UpdateBuildSection();
+            RenderMatchupPanel();
+            TryFetchDraftData();
+            return;
+        }
 
         if (_state.LocalSlot is { IsLocked: true } mine && mine.LockedChampionId != 0)
         {
@@ -1689,11 +1718,15 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // arrived after the draft had already ended. Nothing the enemy calls fetch can change
             // which build is wanted: _buildContext comes from lane predictions and the locked pick,
             // and the predictor does not read matchups.
+            // Opponent 0 is the mode build (ARAM): there is nobody to build against, and asking the
+            // matchup guide for a pairing that does not exist would answer nothing.
             if (_buildContext is { } context && !BuildMatchesContext
                 && !_buildFetched.Contains(context)
                 && _meta.Champion(context.Champion) is { } me
-                && _meta.Champion(context.Opponent) is { } opponent)
+                && (context.Opponent == 0 || _meta.Champion(context.Opponent) is not null))
             {
+                var opponent = context.Opponent == 0 ? null : _meta.Champion(context.Opponent);
+
                 attempted++;
                 ReportFetch($"lädt Build für {me.Name}…");
 
@@ -1844,7 +1877,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         LiveDraftFetcher fetcher,
         (int Champion, Lane Lane, int Opponent) context,
         ChampionEntry me,
-        ChampionEntry opponent,
+        ChampionEntry? opponent,
         CancellationToken token)
     {
         try
@@ -1853,8 +1886,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // that kept flipping produced a new guide request per flip with nothing to stop it.
             _liveCallsThisDraft++;
 
-            var plan = await fetcher.FetchBuildAsync(me, opponent, context.Lane, _meta.Patch, token)
-                .ConfigureAwait(true);
+            var plan = opponent is null
+                ? await fetcher.FetchModeBuildAsync(me, _buildMode, _meta.Patch, token).ConfigureAwait(true)
+                : await fetcher.FetchBuildAsync(me, opponent, context.Lane, _meta.Patch, token)
+                    .ConfigureAwait(true);
 
             if (token.IsCancellationRequested)
                 return true;
@@ -1876,7 +1911,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
         catch (Exception ex) when (IsRecoverable(ex, token))
         {
-            CrashLog.Note("Draft-Abruf", $"Build {me.Name} vs {opponent.Name}: {ex.Message}");
+            var against = opponent is null ? _buildMode : $"vs {opponent.Name}";
+            CrashLog.Note("Draft-Abruf", $"Build {me.Name} {against}: {ex.Message}");
 
             // Three attempts, then stop asking: a matchup OP.GG cannot answer would otherwise keep
             // the retry timer alive for the whole draft.
@@ -1960,9 +1996,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         // No opponent in the title for a stand-in: the 280 px column truncates it and the caveat is
         // exactly the half that gets cut off. It becomes a chip below instead, where it wraps.
-        BuildTitle = _buildIsStandIn
-            ? $"{plan.ChampionName} · {plan.Lane.Display()}"
-            : $"{plan.ChampionName} vs {plan.OpponentName} · {plan.Lane.Display()}";
+        BuildTitle = (BuildModes.Display(plan.Mode), _buildIsStandIn) switch
+        {
+            ({ Length: > 0 } mode, _) => $"{plan.ChampionName} · {mode}",
+            (_, true) => $"{plan.ChampionName} · {plan.Lane.Display()}",
+            _ => $"{plan.ChampionName} vs {plan.OpponentName} · {plan.Lane.Display()}",
+        };
 
         var runes = plan.Runes;
         BuildSubtitle = runes is null
@@ -2380,6 +2419,31 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 ? own
                 : null;
 
+        // Without lanes the panel keeps its place — the composition comparison below it is just as
+        // true in ARAM — but the duel line at the top is not: there is no lane and no lane opponent
+        // to name. The strip above the list goes away with it.
+        if (!_state.Queue.UsesLanes())
+        {
+            ShowMatchupPanel = seat is not null;
+            ShowMatchupStrip = false;
+            ShowEmptyHint = seat is null;
+
+            if (seat is not null)
+            {
+                MatchupOwnIcon = _icons.Get(seat.LockedChampionId);
+                MatchupOpponentIcon = null;
+                MatchupHeadline = _meta.ChampionName(seat.LockedChampionId);
+                MatchupSubline = _state.Queue.Display();
+                MatchupFigure = string.Empty;
+                HasMatchupFigure = false;
+                MatchupTone = ScoreTone.Weak;
+                MatchupNote = "Kein Lane-Duell in diesem Modus — was unten steht, beschreibt beide "
+                    + "Aufstellungen, und der Build links gilt für genau diesen Modus.";
+            }
+
+            return;
+        }
+
         ShowMatchupPanel = settled;
         ShowMatchupStrip = !settled && seat is not null;
         ShowEmptyHint = !settled && !HasRecommendations;
@@ -2663,7 +2727,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             row.Icon = _icons.Get(slot.EffectiveChampionId);
 
             var lane = slot.AssignedLane != Lane.Unknown ? slot.AssignedLane : prediction?.Lane ?? Lane.Unknown;
-            row.LaneText = lane == Lane.Unknown ? "?" : lane.Display();
+
+            // In a mode without lanes the predictor still assigns five of them, because that is all
+            // it can do — printing them would claim a board that does not exist.
+            var lanesApply = _state.Queue.UsesLanes();
+            row.LaneText = !lanesApply ? string.Empty : lane == Lane.Unknown ? "?" : lane.Display();
 
             // The dropdown shows the lane that is actually in effect, predicted or overridden, so it
             // reads as information rather than as an empty control.
@@ -2683,7 +2751,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
             row.Warning = isAlly ? HoverWarning(slot) : null;
 
-            ApplySeatDuel(row, laneDuels, lane, slot.EffectiveChampionId, isAlly);
+            // The seat figure is a lane duel; without lanes there is none to show.
+            ApplySeatDuel(row, laneDuels, lanesApply ? lane : Lane.Unknown, slot.EffectiveChampionId, isAlly);
         }
     }
 
@@ -2785,6 +2854,24 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // Without a seat there is nothing these chips could be about; leaving the previous
             // draft's findings standing would be worse than an empty row.
             Warnings.Clear();
+            return;
+        }
+
+        // A mode without lanes gets no pick list at all. Every number in it would be a Summoner's
+        // Rift lane statistic about a game that has no lanes — and in ARAM there is nothing to act
+        // on either, because the champion is assigned. What still holds is the composition reading
+        // and the build below, so those stay.
+        if (!_state.Queue.UsesLanes())
+        {
+            Recommendations.Clear();
+            HasRecommendations = false;
+            ListHeader = _state.Queue.Display() is { Length: > 0 } queue ? queue : "Ohne Lanes";
+            EmptyHint = _state.Queue.LaneCaveat();
+
+            var modeFindings = new List<string>();
+            var modeComp = _comp.Analyze([.. _state.Allies.Select(slot => slot.EffectiveChampionId)]);
+            modeFindings.AddRange(modeComp.Findings.Select(finding => finding.Text));
+            Warnings.ReplaceAll(modeFindings);
             return;
         }
 
