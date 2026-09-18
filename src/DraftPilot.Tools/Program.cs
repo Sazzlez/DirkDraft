@@ -88,6 +88,9 @@ try
         case "runes":
             return await RunesCommand.RunAsync(lifetime.Token);
 
+        case "opgg":
+            return await OpGgCommand.RunAsync(args, lifetime.Token);
+
         default:
             Console.Error.WriteLine($"Unbekannter Befehl: {args[0]}");
             PrintUsage();
@@ -136,6 +139,10 @@ static void PrintUsage()
           matchupfit [folds]     Kanten zurueckhalten und pruefen, welche Grundannahme ein
                                  unbekanntes Matchup am besten vorhersagt
           runes                  Runenseiten des Accounts anzeigen (nur lesend)
+          opgg tools [name]      Werkzeuge der OP.GG-Schnittstelle auflisten, mit Namen das
+                                 vollstaendige Argument-Schema eines Werkzeugs
+          opgg try <werkzeug> [schluessel=wert ...] [--out datei.json]
+                                 Ein Werkzeug einmal aufrufen und die rohe Antwort ansehen
         """);
 }
 

@@ -77,6 +77,43 @@ public sealed class OpGgMcpClient : IDisposable
         return ExtractText(result);
     }
 
+    /// <summary>
+    /// The endpoint's own tool catalogue, straight from <c>tools/list</c>: names, descriptions and
+    /// the JSON schema of every argument. Nothing in the app calls this — the diagnostic command
+    /// does, because "does OP.GG offer X" cannot be answered by reading our own request code,
+    /// which only ever shows what we already ask for.
+    /// <para>
+    /// Follows the cursor: a catalogue that answers in pages would otherwise look like a short one.
+    /// </para>
+    /// </summary>
+    public async Task<IReadOnlyList<JsonNode>> ListToolsAsync(CancellationToken ct)
+    {
+        await EnsureSessionAsync(ct).ConfigureAwait(false);
+
+        var tools = new List<JsonNode>();
+        string? cursor = null;
+
+        do
+        {
+            var parameters = cursor is null ? null : new JsonObject { ["cursor"] = cursor };
+            var result = await SendAsync("tools/list", parameters, ct).ConfigureAwait(false);
+
+            if (result["tools"] is JsonArray array)
+            {
+                foreach (var tool in array)
+                {
+                    if (tool is not null)
+                        tools.Add(tool.DeepClone());
+                }
+            }
+
+            cursor = result["nextCursor"]?.GetValue<string>();
+        }
+        while (!string.IsNullOrEmpty(cursor));
+
+        return tools;
+    }
+
     /// <summary>Convenience for the string-array shape every OP.GG tool uses for field selection.</summary>
     public static JsonArray Fields(params string[] names)
     {
@@ -138,15 +175,16 @@ public sealed class OpGgMcpClient : IDisposable
 
         for (var attempt = 0; ; attempt++)
         {
-            // Captured per attempt: with up to three calls in flight, the invalidation below must
-            // be able to tell "MY session died" from "somebody already replaced it".
+            // Captured per attempt: with up to ten calls in flight during an update, the
+            // invalidation below must be able to tell "MY session died" from "somebody already
+            // replaced it".
             var usedSession = _sessionId;
             using var response = await PostAsyncWithSession(method, parameters, isNotification: false, usedSession, ct).ConfigureAwait(false);
 
             if (IsTransient(response.StatusCode) && attempt < 3)
             {
-                // The server's own Retry-After wins over the blind backoff — with six calls in
-                // parallel, respecting the throttle is what keeps the higher concurrency safe.
+                // The server's own Retry-After wins over the blind backoff — at the update run's
+                // ten calls in parallel, respecting the throttle is what keeps that safe.
                 await Task.Delay(RetryAfterOrDefault(response, delay), ct).ConfigureAwait(false);
                 delay *= 2;
                 continue;
