@@ -65,6 +65,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly HashSet<(int Champion, Lane Lane)> _liveFetched = [];
 
     /// <summary>
+    /// Failed counter attempts per enemy and lane. Three of them retire that pairing for the rest
+    /// of the draft, so one champion OP.GG cannot answer for does not keep the retry timer alive.
+    /// </summary>
+    private readonly Dictionary<(int Champion, Lane Lane), int> _enemyFailures = [];
+
+    /// <summary>
     /// OP.GG calls made this draft — counters AND build guides. A prediction that keeps flipping
     /// would otherwise buy a new request on every flip, and the build was not counted at all, so a
     /// wobbling lane could quietly outspend the whole budget on guides.
@@ -1289,6 +1295,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // as the post-draft card, so the shopping order is still readable during the game.
             _meta.ClearLiveMatchups();
             _liveFetched.Clear();
+            _enemyFailures.Clear();
             _buildFetched.Clear();
             _liveCallsThisDraft = 0;
             _fetchFailures = 0;
@@ -1329,6 +1336,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // A fresh draft starts clean: no stale build card, no leftover overlay.
             _meta.ClearLiveMatchups();
             _liveFetched.Clear();
+            _enemyFailures.Clear();
             _buildFetched.Clear();
             _liveCallsThisDraft = 0;
             _fetchFailures = 0;
@@ -1638,7 +1646,20 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private void TryFetchDraftData()
     {
         if (!_state.IsActive || _meta.IsEmpty || PendingFetch().Total == 0)
+        {
+            // "versuche es weiter" was left standing after the last thing worth trying was given
+            // up on, and then nothing tried anything again for the rest of the draft. Either the
+            // line is true or it goes.
+            if (DraftFetchFailed && _state.IsActive)
+            {
+                DraftFetchFailed = false;
+                ReportFetch(_liveCallsThisDraft >= MaxLiveCallsPerDraft
+                    ? "Abruf-Grenze für diesen Draft erreicht — es bleibt bei den vorhandenen Zahlen."
+                    : "keine weiteren Abrufe für diesen Draft — es bleibt bei den vorhandenen Zahlen.");
+            }
+
             return;
+        }
 
         // One request at a time; whatever appeared meanwhile is picked up when this one finishes.
         // The fetch loop's own Refresh() lands here too — that is progress being painted, not new
@@ -1837,9 +1858,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         try
         {
-            _liveCallsThisDraft++;
             var stats = await fetcher.FetchEnemyCountersAsync(enemy, entry.Lane, resolver, token)
                 .ConfigureAwait(true);
+
+            // Counted after the call, not before it: a failed attempt used to spend the draft's
+            // budget, so four timed-out rounds emptied it and the remaining enemies stayed on the
+            // stored matrix for good. Failures are bounded by their own counter below instead.
+            _liveCallsThisDraft++;
 
             // The draft may have ended while this was in flight: the sets and the lookup have been
             // cleared by now, and writing into them would leave the NEXT draft with stale edges.
@@ -1868,6 +1893,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         catch (Exception ex) when (IsRecoverable(ex, token))
         {
             CrashLog.Note("Draft-Abruf", $"{entry.Name}: {ex.Message}");
+
+            // Three attempts per enemy and lane, then stop asking — the same rule the build has
+            // followed for a while. Before, the budget did this job badly: a champion OP.GG cannot
+            // answer for spent the whole draft's allowance instead of only its own.
+            var key = (entry.Champion, entry.Lane);
+            var failures = _enemyFailures.GetValueOrDefault(key) + 1;
+            _enemyFailures[key] = failures;
+
+            if (failures >= 3)
+                _liveFetched.Add(key);
+
             return false;
         }
     }
@@ -2006,7 +2042,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var runes = plan.Runes;
         BuildSubtitle = runes is null
             ? $"Patch {plan.Patch}"
-            : $"Runen: {runes.WinRate:P0} Winrate über {runes.Play} Spiele · Patch {plan.Patch}";
+            // Below fifty games one standard error is about seven points, so a percentage there
+            // would be a number without a meaning — the sample says more than the rate.
+            : runes.Play >= 50
+                ? $"Runen: {runes.WinRate:P0} Winrate über {runes.Play:N0} Spiele · Patch {plan.Patch}"
+                : $"Runen: dünne Datenlage, {runes.Play:N0} Spiele · Patch {plan.Patch}";
 
         // The tiles themselves — runes, purchase order, spells, skills — all live in GameBuild;
         // the draft column and the in-game view render the same content at different sizes.
@@ -2552,20 +2592,29 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         if (_enemyComp.Count >= 3)
         {
+            // "der Gegner macht 67 % physischen Schaden" was a claim about damage dealt, and this
+            // number is not that: it counts champions by their prevailing damage type (a hybrid
+            // counts half) and divides by the ones whose type is known. With five enemies only
+            // multiples of ten can come out — the percentage was describing something nobody
+            // measured. Same number, honest sentence.
             if (_enemyComp.PhysicalShare >= 0.65)
             {
                 hints.Add(Reason.Neutral(
-                    $"Gegner macht {_enemyComp.PhysicalShare:P0} physischen Schaden → Rüstung zuerst",
-                    "Von dem Schaden, den das gegnerische Team austeilt, ist der größte Teil "
-                    + "physisch. Rüstung wirkt hier stärker als Magieresistenz."));
+                    $"{_enemyComp.PhysicalShare:P0} der Gegner-Champions sind physisch → Rüstung zuerst",
+                    "Gezählt wird je aufgedecktem Gegner die vorwiegende Schadensart aus den "
+                    + "Riot-Daten (Mischtypen zählen halb) — nicht der Schaden, den sie im Spiel "
+                    + "tatsächlich anrichten. Bei diesem Übergewicht wirkt Rüstung stärker als "
+                    + "Magieresistenz."));
             }
 
             if (_enemyComp.MagicShare >= 0.65)
             {
                 hints.Add(Reason.Neutral(
-                    $"Gegner macht {_enemyComp.MagicShare:P0} magischen Schaden → Magieresistenz zuerst",
-                    "Von dem Schaden, den das gegnerische Team austeilt, ist der größte Teil "
-                    + "magisch. Magieresistenz wirkt hier stärker als Rüstung."));
+                    $"{_enemyComp.MagicShare:P0} der Gegner-Champions sind magisch → Magieresistenz zuerst",
+                    "Gezählt wird je aufgedecktem Gegner die vorwiegende Schadensart aus den "
+                    + "Riot-Daten (Mischtypen zählen halb) — nicht der Schaden, den sie im Spiel "
+                    + "tatsächlich anrichten. Bei diesem Übergewicht wirkt Magieresistenz stärker "
+                    + "als Rüstung."));
             }
 
             if (_enemyComp.TotalCrowdControl >= 6)

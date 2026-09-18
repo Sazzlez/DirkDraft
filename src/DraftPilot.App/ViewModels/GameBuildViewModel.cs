@@ -229,7 +229,7 @@ public sealed class GameBuildViewModel : ObservableObject
         var caveat = isStandIn ? " · Gegner unbekannt, Items nur als Richtung" : string.Empty;
         Subtitle = runes is null
             ? $"Patch {plan.Patch}{caveat}"
-            : $"Runen: {runes.WinRate:P0} WR über {runes.Play} Spiele · Patch {plan.Patch}{caveat}";
+            : $"Runen: {Sample(runes.WinRate, runes.Play)} · Patch {plan.Patch}{caveat}";
 
         PrimaryPath = runes?.PrimaryPath ?? string.Empty;
         SecondaryPath = runes?.SecondaryPath ?? string.Empty;
@@ -256,7 +256,7 @@ public sealed class GameBuildViewModel : ObservableObject
         HasCoreAlternatives = CoreAlternatives.Count > 0;
 
         var core = plan.CoreItems.FirstOrDefault();
-        CoreStats = core is null ? string.Empty : $"{core.WinRate:P0} WR · {core.Play} Spiele";
+        CoreStats = core is null ? string.Empty : Sample(core.WinRate, core.Play);
 
         // Update in place like every other row — Resize(0) first tore all containers down and
         // rebuilt them, which made the spell chips visibly flicker on the second Apply (the one
@@ -343,6 +343,22 @@ public sealed class GameBuildViewModel : ObservableObject
     private const int MinimumAlternativePlay = 20;
 
     /// <summary>
+    /// Below this many games the win rate is not printed at all — only the sample. At fifty games
+    /// one standard error is about seven percentage points, so "59 %" and "45 %" are the same
+    /// statement; the matchup-specific sets regularly land there (measured: 11 games for the most
+    /// played core of one stored matchup). The recommendation list next to this card has followed
+    /// its own error bar for a while; the build card claimed a precision nobody could back.
+    /// </summary>
+    private const int MinimumPlayForRate = 50;
+
+    /// <summary>Win rate and sample, or just the sample when the sample cannot carry a rate.</summary>
+    private static string Sample(double winRate, int play) => play >= MinimumPlayForRate
+        ? $"{winRate:P0} WR · {play:N0} Spiele"
+        : play > 0
+            ? $"dünne Datenlage · {play:N0} Spiele"
+            : string.Empty;
+
+    /// <summary>
     /// The runners-up of one slot — one chip per set, each carrying its own win rate and sample.
     /// The first set is skipped; that one is the build shown above. Nothing is reordered and
     /// nothing is marked as better: which of them is the right buy depends on the game, and the
@@ -369,7 +385,9 @@ public sealed class GameBuildViewModel : ObservableObject
 
             target[i].Icon = merged.Count > 0 ? icons.GetItem(merged[0].Id) : null;
             target[i].Label = label;
-            target[i].Figure = $"{set.WinRate:P0} · {set.Play:N0}";
+            target[i].Figure = set.Play >= MinimumPlayForRate
+                ? $"{set.WinRate:P0} · {set.Play:N0}"
+                : $"{set.Play:N0} Spiele";
             target[i].Hint = $"{label} — {set.WinRate:P0} Siegquote aus {set.Play:N0} Spielen, "
                 + $"gewählt in {set.PickRate:P0} der Fälle. Oben steht die häufigste Wahl, nicht die beste; "
                 + "welche hier richtig ist, entscheidet das Spiel.";

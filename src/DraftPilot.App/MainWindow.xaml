@@ -417,25 +417,33 @@
                                        FontSize="11" Margin="0,4,0,0" Foreground="{StaticResource Muted}"
                                        ToolTip="Reihenfolge, in der die Fähigkeiten gemaxt werden. Die Tabelle für jede einzelne Stufe zeigt das Fenster nach Spielstart." />
     
-                            <!-- Situational pointers from the enemy composition. -->
-                            <ItemsControl ItemsSource="{Binding BuildHints}" Margin="0,6,0,0">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Background="{StaticResource AccentSoft}" CornerRadius="9"
-                                                Padding="8,2" Margin="0,0,5,4"
-                                                ToolTip="{Binding Hint}">
-                                            <TextBlock Text="{Binding Text}" FontSize="11" TextWrapping="Wrap"
-                                                       Foreground="{StaticResource Accent}" />
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
                         </StackPanel>
+
+                        <!--
+                            Situational pointers from the enemy composition — OUTSIDE the build's
+                            visibility bracket. They come from the draft and the curated traits, not
+                            from the build fetch, so "no build" must not also mean "no armour
+                            advice": every queue OP.GG has no build for, and every draft whose fetch
+                            failed, still deserves the one piece of shopping advice that needs no
+                            network at all.
+                        -->
+                        <ItemsControl ItemsSource="{Binding BuildHints}" Margin="0,6,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource AccentSoft}" CornerRadius="9"
+                                            Padding="8,2" Margin="0,0,5,4"
+                                            ToolTip="{Binding Hint}">
+                                        <TextBlock Text="{Binding Text}" FontSize="11" TextWrapping="Wrap"
+                                                   Foreground="{StaticResource Accent}" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
             </StackPanel>
         </DataTemplate>
     </Window.Resources>
