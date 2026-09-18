@@ -98,7 +98,17 @@ public sealed class RecommendationViewModel : ObservableObject
     /// Bans and picks score in different units: a pick's score is an estimated win rate, a ban's
     /// the win-rate points denied to the enemy.
     /// </param>
-    public void Apply(int rank, Recommendation recommendation, ImageSource? icon, bool isBan, int precision = 1)
+    /// <param name="standing">
+    /// How this row stands against the leader of the same list, in standard errors of the
+    /// difference. Decided by the caller because only it can see the whole list.
+    /// </param>
+    public void Apply(
+        int rank,
+        Recommendation recommendation,
+        ImageSource? icon,
+        bool isBan,
+        int precision = 1,
+        ScoreStanding standing = ScoreStanding.Tied)
     {
         if (_championId != recommendation.ChampionId)
         {
@@ -142,33 +152,35 @@ public sealed class RecommendationViewModel : ObservableObject
             var margin = ScoreError.AsPoints(recommendation.Uncertainty);
             Score = $"{recommendation.Score.ToString($"P{precision}", culture)} WR";
 
-            // The verdict is measured in the score's own standard errors, not against a fixed
-            // 53 %. On a draft with no enemy revealed, four champions cleared that old threshold on
-            // lane data alone and each got a "starke Wahl" badge the numbers never supported.
+            // The verdict answers the question the list is FOR: is this one of the picks worth
+            // taking, or is something above it measurably better? Against a fixed 50 % it could not
+            // — the list is always the best eight of a lane, so every row cleared any absolute bar
+            // and eight identical green pills said nothing. Measured on the stored data: a top
+            // draft shows eight rows between 53,4 % and 52,0 % with errors of 0,15 to 0,40 points.
             var hasError = recommendation.Uncertainty > 0;
-            var sigmas = hasError ? ScoreModel.Logit(recommendation.Score) / recommendation.Uncertainty : 0;
 
-            Tone = (hasError, sigmas) switch
+            Tone = (hasError, standing) switch
             {
                 (false, _) => ScoreTone.Weak,
-                (_, >= ScoreError.ClearSigma) => ScoreTone.Strong,
-                (_, >= ScoreError.TieSigma) => ScoreTone.Fair,
+                (_, ScoreStanding.Tied) => ScoreTone.Strong,
+                (_, ScoreStanding.Ahead) => ScoreTone.Fair,
                 _ => ScoreTone.Weak,
             };
 
-            ScoreVerdict = (hasError, sigmas) switch
+            ScoreVerdict = (hasError, rank, standing) switch
             {
-                (false, _) => "Datenlage zu dünn",
-                (_, >= ScoreError.ClearSigma) => "klar im Vorteil",
-                (_, >= ScoreError.TieSigma) => "leicht im Vorteil",
-                (_, > -ScoreError.TieSigma) => "ausgeglichen",
-                _ => "eher nicht",
+                (false, _, _) => "Datenlage zu dünn",
+                (_, 1, _) => "beste Wahl der Liste",
+                (_, _, ScoreStanding.Tied) => "gleichauf mit Platz 1",
+                (_, _, ScoreStanding.Ahead) => "knapp dahinter",
+                _ => "deutlich dahinter",
             };
 
             ScoreHint = "Geschätzte Siegquote dieser Aufstellung nach OP.GG-Daten — nicht deine persönliche. "
                 + "50 % ist ausgeglichen. Aus den Stichprobengrößen hinter den Kriterien folgt ein "
                 + $"Streubereich von ±{margin.ToString("N1", culture)} Punkten; Unterschiede darunter "
-                + "bedeuten nichts. Der Pfeil rechts zeigt, woraus sich die Zahl zusammensetzt.";
+                + "bedeuten nichts. Die Einordnung darunter vergleicht mit Platz 1 der Liste, nicht "
+                + "mit 50 %. Der Pfeil rechts zeigt, woraus sich die Zahl zusammensetzt.";
             TotalLabel = "Geschätzte Siegquote";
         }
 

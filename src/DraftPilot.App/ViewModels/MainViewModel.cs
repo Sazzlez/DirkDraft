@@ -2842,9 +2842,21 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // One precision for the whole column, decided by the list, not by each row.
         var precision = isBan ? 1 : ScoreError.Decimals(set.Items);
 
+        // Each row is coloured by its distance to the LEADER of this list, not to 50 % — the list is
+        // always the best of a lane, so against 50 % every row looked equally good. Bans have no
+        // error bar (their score is denied points, not a rate), so they keep their own thresholds.
+        var leader = set.Items.Count > 0 ? set.Items[0] : null;
+
         Recommendations.Resize(set.Items.Count, () => new RecommendationViewModel());
         for (var i = 0; i < set.Items.Count; i++)
-            Recommendations[i].Apply(i + 1, set.Items[i], _icons.Get(set.Items[i].ChampionId), isBan, precision);
+        {
+            var item = set.Items[i];
+            var standing = isBan || leader is null
+                ? ScoreStanding.Tied
+                : ScoreError.Standing(leader.Score, leader.Uncertainty, item.Score, item.Uncertainty);
+
+            Recommendations[i].Apply(i + 1, item, _icons.Get(item.ChampionId), isBan, precision, standing);
+        }
     }
 
     private void Clear()
