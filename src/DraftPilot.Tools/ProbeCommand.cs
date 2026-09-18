@@ -159,6 +159,9 @@ internal static class ProbeCommand
 
         var session = await client.GetChampSelectSessionRawAsync(ct);
         Console.WriteLine($"  champ-select session:        {(session is null ? "kein Champ Select" : $"{session.Length} Zeichen")}");
+
+        var version = await client.GetGameVersionAsync(ct);
+        Console.WriteLine($"  Spielversion des Clients:    {version ?? "keine Antwort"}");
     }
 
     /// <summary>

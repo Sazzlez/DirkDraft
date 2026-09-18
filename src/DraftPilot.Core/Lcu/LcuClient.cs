@@ -56,6 +56,38 @@ public sealed class LcuClient : IDisposable, IRunePageClient
     public async Task<HashSet<int>> GetPickableChampionIdsAsync(CancellationToken ct = default)
         => [.. await GetAsync("/lol-champ-select/v1/pickable-champion-ids", LcuJson.Default.ListInt32, ct) ?? []];
 
+    /// <summary>
+    /// The patch the client is running, e.g. <c>16.18.1</c>. The one thing only the client knows:
+    /// the snapshot carries whatever patch was current when somebody last pressed the update
+    /// button, and nothing else in the app can tell whether that is still the game being played.
+    /// <para>
+    /// Two endpoints because the first is the specific one and the second is the one that has been
+    /// there forever; a null from both is an answer too and simply leaves the comparison out.
+    /// </para>
+    /// </summary>
+    public async Task<string?> GetGameVersionAsync(CancellationToken ct = default)
+    {
+        if (Clean(await GetRawAsync("/lol-patch/v1/game-version", ct)) is { Length: > 0 } version)
+            return version;
+
+        var build = await GetRawAsync("/system/v1/builds", ct);
+        if (build is null)
+            return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(build);
+            return document.RootElement.TryGetProperty("version", out var value) ? value.GetString() : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The raw body is a quoted JSON string; the quotes are not part of the version.</summary>
+    private static string? Clean(string? raw) => raw?.Trim().Trim('"');
+
     /// <summary>Raw gameflow phase, e.g. <c>ChampSelect</c>, <c>Lobby</c>, <c>InProgress</c>.</summary>
     public async Task<string?> GetGameflowPhaseAsync(CancellationToken ct = default)
     {

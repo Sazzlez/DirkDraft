@@ -356,6 +356,47 @@ public sealed class SnapshotBuilder : IDisposable
 
         if (unresolved.Count > 0)
             snapshot.Warnings.Add($"Tierlist: {unresolved.Count} Namen nicht zugeordnet ({string.Join(", ", unresolved.Take(5))}).");
+
+        UnroundPickRates(snapshot.LaneStats);
+    }
+
+    /// <summary>
+    /// Recomputes every pick rate from its own game count. OP.GG rounds <c>pick_rate</c> to two
+    /// decimals, which puts 85 of 276 rows on exactly 0.01 and 48 on 0.02 — and the ban value reads
+    /// <c>pickRate × 8</c>, so one rounding step is 0.08 of a gate that rarely exceeds 0.6.
+    /// <para>
+    /// The divisor is not given, but it follows from the data: <c>play / pick_rate</c> is the same
+    /// sample size for every row, so the median over the rows where the rounding hurts least is a
+    /// robust estimate of it. Measured on the stored snapshot the estimates cluster within ±10 % —
+    /// exactly the spread two decimals allow — around 1.13 million games.
+    /// </para>
+    /// <para>
+    /// Only the pick rate. The ban rate has no counter to divide (a ban is not a game played), and
+    /// the role rate is a share of the champion's own games, of which the tier list shows only the
+    /// lanes it happens to list.
+    /// </para>
+    /// </summary>
+    public static void UnroundPickRates(List<LaneStat> rows)
+    {
+        // Above 5 % the two decimals are worth at most a tenth of the value, which is what makes
+        // these rows usable as a ruler for the rest.
+        var estimates = rows
+            .Where(row => row.Play > 0 && row.PickRate >= 0.05)
+            .Select(row => row.Play / row.PickRate)
+            .OrderBy(value => value)
+            .ToList();
+
+        // Too thin a base and the divisor would be noisier than the rounding it replaces.
+        if (estimates.Count < 10)
+            return;
+
+        var games = estimates[estimates.Count / 2];
+
+        foreach (var row in rows)
+        {
+            if (row.Play > 0)
+                row.PickRate = row.Play / games;
+        }
     }
 
     /// <summary>

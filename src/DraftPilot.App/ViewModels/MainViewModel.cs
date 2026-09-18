@@ -165,6 +165,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _hasUpdate;
     private bool _isInstallingUpdate;
     private LiveSessionSource? _source;
+
+    /// <summary>
+    /// The patch line the League client reports for itself, empty until it has answered. The one
+    /// thing the snapshot cannot know about itself: it carries whatever patch was current when the
+    /// update button was last pressed, and only the client says which game is running now.
+    /// </summary>
+    private string _clientPatch = string.Empty;
     private DraftTracker _tracker;
 
     private MetaLookup _meta;
@@ -309,7 +316,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // CanImportRunes depends on Client, and Client changes on every reconnect — without this
         // the button froze in whatever state the last session event left it.
         if (_source is not null)
-            _source.ClientChanged += () => DispatchFromClientThread(() => ImportRunesCommand?.RaiseCanExecuteChanged());
+        {
+            _source.ClientChanged += () => DispatchFromClientThread(() =>
+            {
+                ImportRunesCommand?.RaiseCanExecuteChanged();
+                _ = ReadClientPatchAsync();
+            });
+        }
 
         UpdateSnapshotText();
         WatchSnapshotFile();
@@ -322,6 +335,37 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // may be replacing it.
         var maintenancePatch = _meta.IsEmpty || string.IsNullOrWhiteSpace(_meta.Patch) ? null : _meta.Patch;
         _ = Task.Run(() => RunMaintenance(maintenancePatch));
+    }
+
+    /// <summary>
+    /// Asks the client which patch it runs, once per connection. Failure is silent by design: this
+    /// only ever adds a sentence to the footer, and a client that does not answer simply leaves the
+    /// comparison out instead of claiming a mismatch.
+    /// </summary>
+    private async Task ReadClientPatchAsync()
+    {
+        if (_source?.Client is not { } client)
+            return;
+
+        try
+        {
+            var version = await client.GetGameVersionAsync(_lifetime.Token).ConfigureAwait(true);
+            var line = PatchVersion.Line(version);
+
+            if (line.Length == 0 || string.Equals(line, _clientPatch, StringComparison.Ordinal))
+                return;
+
+            _clientPatch = line;
+            UpdateSnapshotText();
+        }
+        catch (OperationCanceledException)
+        {
+            // Shutting down.
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Note("Client-Patch", ex.Message);
+        }
     }
 
     /// <summary>
@@ -2901,8 +2945,15 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 ? $" · vor {(int)age.Value.TotalDays} Tagen geholt"
                 : $" · vor {(int)age.Value.TotalHours} h geholt";
 
-        // No scolding below a week: a two-day-old snapshot in the same patch is perfectly current.
-        var nudge = age is { TotalDays: >= 7 } ? " · ein Update lohnt sich" : string.Empty;
+        // A patch change beats every age rule: numbers from the previous patch describe a game that
+        // is no longer being played, however fresh the file is. Below that, no scolding under a
+        // week — a two-day-old snapshot in the same patch is perfectly current.
+        var stored = _meta.DataPatch.Length > 0 ? _meta.DataPatch : _meta.Patch;
+        var patchChanged = _clientPatch.Length > 0 && !PatchVersion.SameLine(stored, _clientPatch);
+
+        var nudge = patchChanged
+            ? $" · das Spiel läuft auf {_clientPatch} — bitte aktualisieren"
+            : age is { TotalDays: >= 7 } ? " · ein Update lohnt sich" : string.Empty;
 
         var patchText = _meta.DataPatch.Length > 0
             ? $"OP.GG-Patch {_meta.DataPatch}"
@@ -2929,6 +2980,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         if (_meta.DataPatch.Length > 0 && !_meta.Patch.StartsWith(_meta.DataPatch, StringComparison.Ordinal))
             lines.Add("OP.GG lag beim Abruf einen Patch zurück.");
+
+        if (_clientPatch.Length > 0)
+        {
+            var stored = _meta.DataPatch.Length > 0 ? _meta.DataPatch : _meta.Patch;
+
+            lines.Add(PatchVersion.SameLine(stored, _clientPatch)
+                ? $"Der Client läuft auf {_clientPatch} — dieselbe Patch-Reihe wie die Daten."
+                : $"Der Client läuft auf {_clientPatch}, die Daten beschreiben {PatchVersion.Line(stored)}. "
+                    + "Tierlist, Counter und Synergien gelten damit für ein anderes Spiel.");
+        }
 
         // Snapshot warnings had no reader in the app at all — the update wrote them and only the
         // console tool ever showed them.

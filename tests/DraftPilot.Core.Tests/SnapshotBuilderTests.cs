@@ -183,5 +183,68 @@ public class SnapshotBuilderTests
         Assert.Null(asOf);
     }
 
+    /// <summary>
+    /// OP.GG rounds the pick rate to two decimals, and the ban value reads it times eight — one
+    /// rounding step is 0.08 of a gate that rarely exceeds 0.6. The divisor is not in the response
+    /// but follows from it: play / pick_rate is the same sample size in every row.
+    /// </summary>
+    [Fact]
+    public void PickRates_AreRecomputedFromTheGameCounts()
+    {
+        var rows = Rows(
+            // The ruler: rates far enough above the rounding to be worth dividing by.
+            (100_000, 0.10),
+            (120_000, 0.12),
+            (80_000, 0.08),
+            (200_000, 0.20),
+            (50_000, 0.05),
+            (60_000, 0.06),
+            (70_000, 0.07),
+            (90_000, 0.09),
+            (110_000, 0.11),
+            (130_000, 0.13),
+            // Two champions the rounding cannot tell apart: both arrive as 0.01.
+            (14_900, 0.01),
+            (5_100, 0.01));
+
+        SnapshotBuilder.UnroundPickRates(rows);
+
+        Assert.Equal(0.0149, rows[^2].PickRate, precision: 4);
+        Assert.Equal(0.0051, rows[^1].PickRate, precision: 4);
+    }
+
+    [Fact]
+    public void WithoutEnoughThickRows_ThePickRatesAreLeftAlone()
+    {
+        var rows = Rows((100_000, 0.10), (14_900, 0.01));
+
+        SnapshotBuilder.UnroundPickRates(rows);
+
+        Assert.Equal(0.01, rows[^1].PickRate, precision: 4);
+    }
+
+    /// <summary>A row without a game count has nothing to divide; it must not end up at zero.</summary>
+    [Fact]
+    public void ARowWithoutGames_KeepsItsRate()
+    {
+        var rows = Rows(
+            (100_000, 0.10), (120_000, 0.12), (80_000, 0.08), (200_000, 0.20), (50_000, 0.05),
+            (60_000, 0.06), (70_000, 0.07), (90_000, 0.09), (110_000, 0.11), (130_000, 0.13),
+            (0, 0.02));
+
+        SnapshotBuilder.UnroundPickRates(rows);
+
+        Assert.Equal(0.02, rows[^1].PickRate, precision: 4);
+    }
+
+    private static List<LaneStat> Rows(params (int Play, double PickRate)[] entries)
+        => [.. entries.Select((entry, index) => new LaneStat
+        {
+            ChampionId = index + 1,
+            Lane = Lane.Top,
+            Play = entry.Play,
+            PickRate = entry.PickRate,
+        })];
+
     private static OpGgNode Inline(string payload) => OpGgResponseParser.Parse(payload);
 }
