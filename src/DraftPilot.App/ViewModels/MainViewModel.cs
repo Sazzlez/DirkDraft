@@ -488,15 +488,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// <summary>Set once <see cref="GameActiveChanged"/> announced the running game.</summary>
     private bool _gameActiveAnnounced;
 
-    /// <summary>The boots preference the build tiles were last rendered with.</summary>
-    private BootsPreference _appliedBootsPreference;
-
-    /// <summary>Renders the build tiles with the current situational boots preference.</summary>
+    /// <summary>Renders the build tiles exactly as the fetched plan ranks them.</summary>
     private void ApplyGameBuild(BuildPlan plan)
-    {
-        _appliedBootsPreference = SituationalBuild.PreferredBoots(_enemyComp);
-        GameBuild.Apply(plan, _names, _icons, _appliedBootsPreference, _buildIsStandIn);
-    }
+        => GameBuild.Apply(plan, _names, _icons, _buildIsStandIn);
 
     /// <summary>
     /// Fires the auto-show event when a game runs AND a build exists. Called from the phase
@@ -1952,10 +1946,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
 
     /// <summary>
-    /// Situational pointers from the enemy composition. They order the alternatives the data
-    /// already offers — they never invent an item the statistics did not surface.
-    /// </summary>
-    /// <summary>
     /// The two numbers over the team columns. Deliberately a dash until champions are actually
     /// revealed: a confident "50,0 %" before anyone has picked would be a claim about nothing.
     /// </summary>
@@ -2380,16 +2370,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         };
     }
 
+    /// <summary>
+    /// Situational pointers from the enemy composition, shown as chips next to the build. They
+    /// are advice for the person playing, not an edit to the build.
+    /// </summary>
     private void RenderBuildHints()
     {
         var hints = new List<Reason>();
 
-        // The boots slot ADAPTS to these hints (the one slot that does): when the fetched
-        // alternatives contain the matching boot, the build shows it and the chip says so —
-        // otherwise the chip stays plain advice. Applied lazily below so a late enemy reveal
-        // (composition shifting after my pick) updates the shown boots too.
-        var preference = SituationalBuild.PreferredBoots(_enemyComp);
-        var adjusted = _build is { } plan && SituationalBuild.PickBoots(plan.Boots, preference) is not null;
+        // These stay POINTERS. They never reorder the shown build: the tiles are what OP.GG
+        // ranked for this matchup, the chips are what the enemy composition suggests on top of
+        // it. Deciding the boots slot from them made the same buy appear in nearly every draft.
 
         // Named first, because everything below it is advice about an opponent we do not have.
         if (_buildIsStandIn && _build is { } standIn)
@@ -2407,41 +2398,28 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         {
             if (_enemyComp.PhysicalShare >= 0.65)
             {
-                var acted = adjusted && preference == BootsPreference.Armor;
                 hints.Add(Reason.Neutral(
-                    $"Gegner macht {_enemyComp.PhysicalShare:P0} physischen Schaden → "
-                        + (acted ? "Stahlkappen im Build vorgezogen" : "Rüstung zuerst"),
+                    $"Gegner macht {_enemyComp.PhysicalShare:P0} physischen Schaden → Rüstung zuerst",
                     "Von dem Schaden, den das gegnerische Team austeilt, ist der größte Teil "
-                    + "physisch. Rüstung wirkt hier stärker als Magieresistenz."
-                    + (acted ? " Die Schuhwahl im Build ist entsprechend angepasst." : string.Empty)));
+                    + "physisch. Rüstung wirkt hier stärker als Magieresistenz."));
             }
 
             if (_enemyComp.MagicShare >= 0.65)
             {
-                var acted = adjusted && preference == BootsPreference.MagicResist;
                 hints.Add(Reason.Neutral(
-                    $"Gegner macht {_enemyComp.MagicShare:P0} magischen Schaden → "
-                        + (acted ? "Merkurstiefel im Build vorgezogen" : "Magieresistenz zuerst"),
+                    $"Gegner macht {_enemyComp.MagicShare:P0} magischen Schaden → Magieresistenz zuerst",
                     "Von dem Schaden, den das gegnerische Team austeilt, ist der größte Teil "
-                    + "magisch. Magieresistenz wirkt hier stärker als Rüstung."
-                    + (acted ? " Die Schuhwahl im Build ist entsprechend angepasst." : string.Empty)));
+                    + "magisch. Magieresistenz wirkt hier stärker als Rüstung."));
             }
 
             if (_enemyComp.TotalCrowdControl >= 6)
             {
-                var acted = adjusted && preference == BootsPreference.Tenacity;
                 hints.Add(Reason.Neutral(
-                    "viele Betäubungen im Gegnerteam → "
-                        + (acted ? "Merkurstiefel im Build vorgezogen" : "Zähigkeit einplanen"),
+                    "viele Betäubungen im Gegnerteam → Zähigkeit einplanen",
                     "Das gegnerische Team hat auffällig viele Effekte, die dich bewegungsunfähig "
-                    + "machen. Zähigkeit (z. B. Merkurstiefel) verkürzt deren Dauer."
-                    + (acted ? " Die Schuhwahl im Build ist entsprechend angepasst." : string.Empty)));
+                    + "machen. Zähigkeit (z. B. Merkurstiefel) verkürzt deren Dauer."));
             }
         }
-
-        // A revealed enemy can shift the preference after the build already landed.
-        if (_build is { } current && preference != _appliedBootsPreference)
-            ApplyGameBuild(current);
 
         BuildHints.ReplaceAll(hints);
     }
