@@ -195,7 +195,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _hasRecommendations;
     private bool _showMatchupPanel;
     private bool _showMatchupStrip;
-    private bool _showNarrowBuildCard;
     private bool _showIdleHero;
     private bool _showEmptyHint;
     private bool _hasMatchupFigure;
@@ -645,18 +644,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
 
     /// <summary>
-    /// The narrow build card in the left column. Hidden while the matchup panel shows the same
-    /// build in the wide column — two copies on one screen are noise. Expressed as one property
-    /// rather than a style trigger, because the local Visibility attribute on that Border would
-    /// win against any trigger.
-    /// </summary>
-    public bool ShowNarrowBuildCard
-    {
-        get => _showNarrowBuildCard;
-        private set => Set(ref _showNarrowBuildCard, value);
-    }
-
-    /// <summary>
     /// The centred brand-and-status hero that fills the otherwise empty window between drafts. It
     /// yields to any build card: the two would overlap, and a shopping order the user kept open
     /// beats a logo.
@@ -802,7 +789,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         private set => Set(ref _hasBuild, value);
     }
 
-    /// <summary>The build block in the draft view and the stand-alone card after it.</summary>
+    /// <summary>
+    /// The build card: under the team column during the draft, full width as a stand-alone card
+    /// after it.
+    /// <para>
+    /// One place for the whole draft, independent of what the wide column is doing. The card used
+    /// to move into the wide column the moment the own pick settled — which is exactly when the
+    /// user starts reading it, and it had sat bottom left through every team-mate's pick until
+    /// then.
+    /// </para>
+    /// </summary>
     public bool ShowBuildSection
     {
         get => _showBuildSection;
@@ -2135,7 +2131,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         ShowMatchupPanel = settled;
         ShowMatchupStrip = !settled && seat is not null;
         ShowEmptyHint = !settled && !HasRecommendations;
-        ShowNarrowBuildCard = ShowBuildSection && !settled;
 
         if (seat is null)
             return;
@@ -2184,7 +2179,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             MatchupNote = $"Für dieses Duell hat OP.GG keine Statistik — von den möglichen "
                 + $"Paarungen auf {(lanePart.Length > 0 ? lanePart : "einer Lane")} ist nur etwa "
                 + "ein Fünftel erfasst."
-                + (HasBuild ? " Der Build unten stammt aus einem eigenen Abruf." : string.Empty);
+                + (HasBuild ? " Der Build links stammt aus einem eigenen Abruf." : string.Empty);
             return;
         }
 
@@ -2373,7 +2368,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             ShowIdleCard = false;
             ShowBuildClose = false;
             ShowBuildSection = HasBuild || _buildContext is not null;
-            ShowNarrowBuildCard = ShowBuildSection && !ShowMatchupPanel;
             ShowIdleHero = false;
 
             // The old text claimed to be waiting for the pick and the lane opponent — in the only
@@ -2400,7 +2394,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // there when the user tabs out mid-game. Closed by hand or by the next draft.
         ShowBuildClose = true;
         ShowBuildSection = HasBuild && !_buildCardClosed && !ShowGameView;
-        ShowNarrowBuildCard = ShowBuildSection;
         ShowIdleHero = ShowIdleCard && !ShowBuildSection;
         BuildHint = string.Empty;
     }

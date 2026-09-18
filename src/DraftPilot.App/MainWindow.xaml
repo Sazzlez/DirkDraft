@@ -1339,7 +1339,7 @@
             <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource Surface}"
                     BorderBrush="{StaticResource LineSoft}"
                     BorderThickness="1" CornerRadius="10" Padding="13,9" Margin="0,11,0,0"
-                    Visibility="{Binding ShowNarrowBuildCard, Converter={StaticResource BoolToVisibility}}">
+                    Visibility="{Binding ShowBuildSection, Converter={StaticResource BoolToVisibility}}">
                 <Border.Style>
                     <Style TargetType="Border">
                         <Style.Triggers>
@@ -1347,12 +1347,6 @@
                                  build card takes the full width instead of one narrow column. -->
                             <DataTrigger Binding="{Binding IsDraftActive}" Value="False">
                                 <Setter Property="Grid.ColumnSpan" Value="5" />
-                            </DataTrigger>
-
-                            <!-- The matchup panel shows the same build in the wide column; two
-                                 copies of it on one screen would be noise. -->
-                            <DataTrigger Binding="{Binding ShowMatchupPanel}" Value="True">
-                                <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -1489,8 +1483,12 @@
                     <!--
                         Once the own pick is locked and nobody on our team is on the clock, a list
                         of alternatives is advice about a settled decision. The column that carries
-                        the window then shows the duel that WILL be played, and the build gets the
-                        width it needs — the same markup as the narrow card, wrapped wider.
+                        the window then shows the duel that WILL be played.
+
+                        The build does NOT move in here with it. It keeps its place under the team
+                        column for the whole draft — the same spot it holds while a team-mate picks,
+                        so the one thing the user acts on stays where they last saw it instead of
+                        jumping across the window the moment their own pick settles.
                     -->
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                                   Visibility="{Binding ShowMatchupPanel, Converter={StaticResource BoolToVisibility}}">
@@ -1565,33 +1563,6 @@
                                 </StackPanel>
                             </Border>
 
-                            <!--
-                                Only when there is a build, or a matchup one is being fetched for.
-                                Without the condition this card appeared under every matchup panel -
-                                including one for a team-mate while we had not picked at all, where
-                                it showed an empty body under a heading left over from the last draft.
-                            -->
-                            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
-                                    BorderThickness="1" CornerRadius="10" Padding="14,11" Margin="0,11,0,0"
-                                    Visibility="{Binding ShowBuildSection, Converter={StaticResource BoolToVisibility}}">
-                                <StackPanel>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="DEIN BUILD" Style="{StaticResource Caption}"
-                                                   VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="1" Text="{Binding BuildTitle}"
-                                                   Style="{StaticResource Small}" Foreground="{StaticResource Muted}"
-                                                   Margin="10,0,0,0" VerticalAlignment="Center"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   ToolTip="{Binding BuildSubtitle}" />
-                                    </Grid>
-
-                                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource BuildBody}" />
-                                </StackPanel>
-                            </Border>
                         </StackPanel>
                     </ScrollViewer>
 
