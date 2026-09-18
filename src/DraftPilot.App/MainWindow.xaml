@@ -138,6 +138,47 @@
             </Border>
         </DataTemplate>
         <!--
+            One runner-up of a build slot: the icon, and right beside it the number that makes it
+            worth showing. Without the figure this row would be an unexplained second build; with
+            it, it is what it is — what else people played, and how it went for them.
+        -->
+        <DataTemplate x:Key="AlternativeChip" DataType="{x:Type vm:IconChipViewModel}">
+            <StackPanel Orientation="Horizontal" Margin="0,0,10,2" ToolTip="{Binding Hint}">
+                <Border CornerRadius="5" ClipToBounds="True" Background="{StaticResource SurfaceAlt}">
+                    <Grid>
+                        <Image Source="{Binding Icon}" Width="20" Height="20" Stretch="UniformToFill"
+                               RenderOptions.BitmapScalingMode="HighQuality">
+                            <Image.Style>
+                                <Style TargetType="Image">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Icon}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Image.Style>
+                        </Image>
+                        <TextBlock Text="{Binding Label}" FontSize="9" Margin="5,2"
+                                   Foreground="{StaticResource Faint}" VerticalAlignment="Center"
+                                   MaxWidth="70" TextTrimming="CharacterEllipsis">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Icon}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Border>
+                <TextBlock Text="{Binding Figure}" FontSize="10" Margin="4,0,0,0"
+                           Foreground="{StaticResource Muted}" VerticalAlignment="Center" />
+            </StackPanel>
+        </DataTemplate>
+        <!--
             One team's damage mix: a split bar and the two shares as text. Defined once and
             placed twice, once per side, so both bars are drawn by the same markup and cannot
             drift apart.
@@ -282,6 +323,39 @@
                                     </StackPanel>
                                 </WrapPanel>
                             </Grid>
+                            <!--
+                                The sets OP.GG delivered alongside the shown one. They were always
+                                fetched and cached and then dropped at render time — in a real draft
+                                that meant showing 46 % boots while 49 % and 52 % sat in the same
+                                file. Shown, not preferred: the order is OP.GG's, nothing is marked.
+                            -->
+                            <Grid Margin="0,1,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding GameBuild.HasEarlyAlternatives}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <TextBlock Text="auch" Style="{StaticResource Small}" FontSize="10"
+                                           Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                           Margin="0,3,7,3" MinWidth="34"
+                                           ToolTip="Was sonst noch gekauft wurde, mit Siegquote und Spielzahl. Oben steht die häufigste Wahl — nicht zwingend die beste." />
+                                <WrapPanel Grid.Column="1">
+                                    <ItemsControl ItemsSource="{Binding GameBuild.StarterAlternatives}"
+                                                  ItemTemplate="{StaticResource AlternativeChip}"
+                                                  ItemsPanel="{StaticResource ChipRow}" />
+                                    <ItemsControl ItemsSource="{Binding GameBuild.BootAlternatives}"
+                                                  ItemTemplate="{StaticResource AlternativeChip}"
+                                                  ItemsPanel="{StaticResource ChipRow}" />
+                                </WrapPanel>
+                            </Grid>
                             <Grid Margin="0,3,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -291,7 +365,7 @@
                                 <TextBlock Text="Kern" Style="{StaticResource Small}" FontSize="10"
                                            Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                            Margin="0,6,7,3" MinWidth="34"
-                                           ToolTip="In dieser Reihenfolge kaufen — die meistgespielte Kombination dieses Matchups." />
+                                           ToolTip="Die meistgespielte Dreierkombination dieses Matchups. OP.GG liefert sie als Kombination; ob die Reihenfolge so gemeint ist, sagt die Quelle nicht." />
                                 <!-- Stats ride along inside the wrap row so they stay next to the items
                                      instead of drifting to the far edge on a wide card. -->
                                 <WrapPanel Grid.Column="1">
@@ -302,6 +376,28 @@
                                                FontSize="10" Foreground="{StaticResource Faint}"
                                                VerticalAlignment="Top" Margin="6,6,0,3" />
                                 </WrapPanel>
+                            </Grid>
+                            <Grid Margin="0,1,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding GameBuild.HasCoreAlternatives}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <TextBlock Text="auch" Style="{StaticResource Small}" FontSize="10"
+                                           Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                           Margin="0,3,7,3" MinWidth="34"
+                                           ToolTip="Andere Dreierkombinationen dieses Matchups. Das Symbol steht für die ganze Kombination — die Namen stehen im Tooltip." />
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding GameBuild.CoreAlternatives}"
+                                              ItemTemplate="{StaticResource AlternativeChip}"
+                                              ItemsPanel="{StaticResource ChipRow}" />
                             </Grid>
                             <Grid Margin="0,3,0,0">
                                 <Grid.ColumnDefinitions>
@@ -672,6 +768,35 @@
                                     </StackPanel>
                                 </WrapPanel>
                             </Grid>
+                            <!-- The runners-up of the same two slots. In game this is the row that
+                                 matters most: the shop is open, and the boots are bought once. -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding GameBuild.HasEarlyAlternatives}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <TextBlock Text="auch gespielt" Style="{StaticResource Small}" FontSize="11"
+                                           Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                           Margin="0,4,8,4" MinWidth="70"
+                                           ToolTip="Was sonst noch gekauft wurde, mit Siegquote und Spielzahl. Oben steht die häufigste Wahl — nicht zwingend die beste." />
+                                <WrapPanel Grid.Column="1">
+                                    <ItemsControl ItemsSource="{Binding GameBuild.StarterAlternatives}"
+                                                  ItemTemplate="{StaticResource AlternativeChip}"
+                                                  ItemsPanel="{StaticResource ChipRow}" />
+                                    <ItemsControl ItemsSource="{Binding GameBuild.BootAlternatives}"
+                                                  ItemTemplate="{StaticResource AlternativeChip}"
+                                                  ItemsPanel="{StaticResource ChipRow}" />
+                                </WrapPanel>
+                            </Grid>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -681,7 +806,7 @@
                                 <TextBlock Text="Kern" Style="{StaticResource Small}" FontSize="11"
                                            Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                            Margin="0,7,8,4" MinWidth="70"
-                                           ToolTip="In dieser Reihenfolge kaufen — die meistgespielte Kombination dieses Matchups." />
+                                           ToolTip="Die meistgespielte Dreierkombination dieses Matchups. OP.GG liefert sie als Kombination; ob die Reihenfolge so gemeint ist, sagt die Quelle nicht." />
                                 <!-- Stats ride along inside the wrap row so they stay next to the
                                      items instead of drifting to the far edge. -->
                                 <WrapPanel Grid.Column="1">
@@ -692,6 +817,28 @@
                                                FontSize="11" Foreground="{StaticResource Faint}"
                                                VerticalAlignment="Top" Margin="10,7,0,4" />
                                 </WrapPanel>
+                            </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding GameBuild.HasCoreAlternatives}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <TextBlock Text="auch gespielt" Style="{StaticResource Small}" FontSize="11"
+                                           Foreground="{StaticResource Faint}" VerticalAlignment="Top"
+                                           Margin="0,4,8,4" MinWidth="70"
+                                           ToolTip="Andere Dreierkombinationen dieses Matchups. Das Symbol steht für die ganze Kombination — die Namen stehen im Tooltip." />
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding GameBuild.CoreAlternatives}"
+                                              ItemTemplate="{StaticResource AlternativeChip}"
+                                              ItemsPanel="{StaticResource ChipRow}" />
                             </Grid>
                             <Grid>
                                 <Grid.ColumnDefinitions>

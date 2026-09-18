@@ -40,6 +40,18 @@ public sealed class IconChipViewModel : ObservableObject
         get => _isHighlighted;
         set => Set(ref _isHighlighted, value);
     }
+
+    /// <summary>
+    /// The number next to an alternative, e.g. <c>49 % · 493</c>. Empty on every chip of the shown
+    /// build itself — there the figure belongs to the whole row, not to each tile.
+    /// </summary>
+    public string Figure
+    {
+        get => _figure;
+        set => Set(ref _figure, value);
+    }
+
+    private string _figure = string.Empty;
 }
 
 /// <summary>One level in the skill table.</summary>
@@ -91,6 +103,8 @@ public sealed class GameBuildViewModel : ObservableObject
     private string _coreStats = string.Empty;
     private string _skillText = string.Empty;
     private bool _hasSkillOrder;
+    private bool _hasEarlyAlternatives;
+    private bool _hasCoreAlternatives;
 
     public ObservableCollection<IconChipViewModel> PrimaryRunes { get; } = [];
 
@@ -105,6 +119,23 @@ public sealed class GameBuildViewModel : ObservableObject
     public ObservableCollection<IconChipViewModel> LateItems { get; } = [];
 
     public ObservableCollection<IconChipViewModel> Spells { get; } = [];
+
+    /// <summary>
+    /// The other sets OP.GG delivered for the same slot, each with its own win rate and sample.
+    /// They were always fetched, parsed and cached — and then thrown away at render time, which in
+    /// a real draft meant showing Plated Steelcaps at 46,5 % out of 1974 games while Mercury's
+    /// Treads (49,1 %, 493) and Boots of Swiftness (52,2 %, 136) sat unused in the same file.
+    /// <para>
+    /// Deliberately a second row rather than a reordering: the shown build stays what the data
+    /// ranked first, and nothing here is highlighted or preferred. That distinction is the whole
+    /// point — the tool says what was played, the player decides.
+    /// </para>
+    /// </summary>
+    public ObservableCollection<IconChipViewModel> StarterAlternatives { get; } = [];
+
+    public ObservableCollection<IconChipViewModel> BootAlternatives { get; } = [];
+
+    public ObservableCollection<IconChipViewModel> CoreAlternatives { get; } = [];
 
     public ObservableCollection<SkillCellViewModel> SkillCells { get; } = [];
 
@@ -152,6 +183,19 @@ public sealed class GameBuildViewModel : ObservableObject
         set => Set(ref _hasSkillOrder, value);
     }
 
+    /// <summary>Whether the starter or boots slot has runners-up worth a row of their own.</summary>
+    public bool HasEarlyAlternatives
+    {
+        get => _hasEarlyAlternatives;
+        set => Set(ref _hasEarlyAlternatives, value);
+    }
+
+    public bool HasCoreAlternatives
+    {
+        get => _hasCoreAlternatives;
+        set => Set(ref _hasCoreAlternatives, value);
+    }
+
     /// <summary>The compact priority, e.g. <c>Skills: Q &gt; E &gt; W</c>; the draft column has no
     /// room for the full 18-level table the in-game view shows.</summary>
     public string SkillText
@@ -191,13 +235,20 @@ public sealed class GameBuildViewModel : ObservableObject
         FillRunes(PrimaryRunes, runes?.PrimaryRuneIds ?? [], runes?.PrimaryRunes ?? [], names, icons, keystoneFirst: true);
         FillRunes(SecondaryRunes, runes?.SecondaryRuneIds ?? [], runes?.SecondaryRunes ?? [], names, icons, keystoneFirst: false);
 
+        // The shown build stays the most-played set, like every other slot: what it says is what
+        // the data ranked first. A swap driven by our own composition read looked like a
+        // recommendation the numbers never made. The runners-up go into their own row instead.
         FillItems(StartItems, plan.Starters.FirstOrDefault(), names, icons);
-        // The boots stay the most-played set, like every other slot: what the shown build says is
-        // what the data ranked first. A swap driven by our own composition read looked like a
-        // recommendation the numbers never made.
         FillItems(BootItems, plan.Boots.FirstOrDefault(), names, icons);
         FillItems(CoreItems, plan.CoreItems.FirstOrDefault(), names, icons);
         FillSingles(LateItems, plan.LateItems, names, icons);
+
+        FillAlternatives(StarterAlternatives, plan.Starters, names, icons);
+        FillAlternatives(BootAlternatives, plan.Boots, names, icons);
+        FillAlternatives(CoreAlternatives, plan.CoreItems, names, icons);
+
+        HasEarlyAlternatives = StarterAlternatives.Count > 0 || BootAlternatives.Count > 0;
+        HasCoreAlternatives = CoreAlternatives.Count > 0;
 
         var core = plan.CoreItems.FirstOrDefault();
         CoreStats = core is null ? string.Empty : $"{core.WinRate:P0} WR · {core.Play} Spiele";
@@ -280,6 +331,47 @@ public sealed class GameBuildViewModel : ObservableObject
     }
 
     /// <summary>Pairs ids with their fallback names positionally, dropping entries that have neither.</summary>
+    /// <summary>
+    /// Below this many games a percentage is theatre, not a number. The real case: a fourth boot
+    /// set with "0 % out of 3 games" would take the room of one that says something.
+    /// </summary>
+    private const int MinimumAlternativePlay = 20;
+
+    /// <summary>
+    /// The runners-up of one slot — one chip per set, each carrying its own win rate and sample.
+    /// The first set is skipped; that one is the build shown above. Nothing is reordered and
+    /// nothing is marked as better: which of them is the right buy depends on the game, and the
+    /// numbers are there so the player can decide it.
+    /// </summary>
+    private static void FillAlternatives(
+        ObservableCollection<IconChipViewModel> target,
+        IReadOnlyList<ItemSet> sets,
+        AssetNames names,
+        IconCache icons)
+    {
+        var entries = sets.Skip(1).Where(set => set.Play >= MinimumAlternativePlay).ToList();
+
+        target.Resize(entries.Count, () => new IconChipViewModel());
+
+        for (var i = 0; i < entries.Count; i++)
+        {
+            var set = entries[i];
+            var merged = Merge(set.ItemIds, set.Items);
+
+            var label = string.Join(
+                " + ",
+                merged.Select(entry => names.Item(entry.Id, entry.Fallback)).Where(name => name.Length > 0));
+
+            target[i].Icon = merged.Count > 0 ? icons.GetItem(merged[0].Id) : null;
+            target[i].Label = label;
+            target[i].Figure = $"{set.WinRate:P0} · {set.Play:N0}";
+            target[i].Hint = $"{label} — {set.WinRate:P0} Siegquote aus {set.Play:N0} Spielen, "
+                + $"gewählt in {set.PickRate:P0} der Fälle. Oben steht die häufigste Wahl, nicht die beste; "
+                + "welche hier richtig ist, entscheidet das Spiel.";
+            target[i].IsHighlighted = false;
+        }
+    }
+
     private static List<(int Id, string Fallback)> Merge(IReadOnlyList<int> ids, IReadOnlyList<string> fallbackNames)
     {
         var count = Math.Max(ids.Count, fallbackNames.Count);
