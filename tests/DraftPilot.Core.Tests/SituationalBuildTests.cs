@@ -13,7 +13,7 @@ public class SituationalBuildTests
 {
     private static CompProfile Comp(double physicalShare, double magicShare, int totalCc, int count = 5)
         => new(count, physicalShare, magicShare, FrontlineCount: 1, RangedCount: 2,
-            MaxEngage: 1, MaxPeel: 1, totalCc, LateScalingCount: 0, TraitCoverage: 1, Findings: []);
+            MaxEngage: 1, MaxPeel: 1, totalCc, LateScalingCount: 0, TraitsKnown: count, Findings: []);
 
     private static ItemSet Boots(int id, int play = 100) => new()
     {

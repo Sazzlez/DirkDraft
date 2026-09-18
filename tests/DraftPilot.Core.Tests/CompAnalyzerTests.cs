@@ -348,4 +348,16 @@ public class CompAnalyzerTests
         Assert.NotNull(fit);
         Assert.InRange(fit!.Value, -1, 1);
     }
+
+    /// <summary>
+    /// The damage mix is shown as two shares. "0 % / 0 %" would read as a team that deals no
+    /// damage, where the truth is that no champion's damage type is known yet.
+    /// </summary>
+    [Fact]
+    public void WithoutASingleKnownDamageType_ThereIsNoMixToShow()
+    {
+        Assert.False(CompProfile.Empty.HasDamageMix);
+        Assert.False(Analyzer().Analyze([Unknown]).HasDamageMix);
+        Assert.True(Analyzer().Analyze([Unknown, Ad1]).HasDamageMix);
+    }
 }

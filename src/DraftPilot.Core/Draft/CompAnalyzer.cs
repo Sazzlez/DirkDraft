@@ -18,8 +18,9 @@ public enum CompIssue
 public sealed record CompFinding(CompIssue Issue, string Text, double Severity);
 
 /// <summary>
-/// What a set of champions adds up to. <see cref="TraitCoverage"/> says how much of it rests on
-/// curated data, so the UI can be honest about which checks actually ran.
+/// What a set of champions adds up to. <see cref="TraitsKnown"/> says how much of it rests on
+/// curated data, so the UI can be honest about which checks actually ran — and what the trait
+/// numbers are a sum over.
 /// </summary>
 public sealed record CompProfile(
     int Count,
@@ -31,10 +32,23 @@ public sealed record CompProfile(
     int MaxPeel,
     int TotalCrowdControl,
     int LateScalingCount,
-    double TraitCoverage,
+    int TraitsKnown,
     IReadOnlyList<CompFinding> Findings)
 {
+    /// <summary>Share of the champions the curated traits cover; 0 when none of them do.</summary>
+    public double TraitCoverage => Count == 0 ? 0 : (double)TraitsKnown / Count;
+
     public static CompProfile Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, []);
+
+    /// <summary>
+    /// At least one champion's damage type is known, so the two shares mean something.
+    /// <para>
+    /// Without this the pair reads as "0 % physisch · 0 % magisch" — a composition that deals no
+    /// damage at all — where the truth is that nothing about its damage has been read yet. The
+    /// shares add up to 1 as soon as a single champion is known, so their sum is the test.
+    /// </para>
+    /// </summary>
+    public bool HasDamageMix => PhysicalShare + MagicShare > 0;
 
     public bool Has(CompIssue issue) => Findings.Any(finding => finding.Issue == issue);
 
@@ -122,7 +136,6 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
 
         var physicalShare = damageKnown > 0 ? physical / damageKnown : 0;
         var magicShare = damageKnown > 0 ? magic / damageKnown : 0;
-        var coverage = (double)traitsKnown / ids.Count;
 
         var findings = Evaluate(
             damageKnown, physicalShare, magicShare,
@@ -130,7 +143,7 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
 
         return new CompProfile(
             ids.Count, physicalShare, magicShare, frontline, ranged,
-            maxEngage, maxPeel, totalCc, lateScaling, coverage, findings);
+            maxEngage, maxPeel, totalCc, lateScaling, traitsKnown, findings);
     }
 
     private static List<CompFinding> Evaluate(

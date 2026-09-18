@@ -171,6 +171,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private LanePredictor _predictor;
     private Recommender _recommender;
 
+    /// <summary>
+    /// For the pre-game comparison. Not the recommender's profiles: those describe the team a
+    /// candidate would JOIN, so the advised seat is left out of its own side — right for scoring a
+    /// pick, wrong for a panel that says what this team is.
+    /// </summary>
+    private CompAnalyzer _comp;
+
     private CancellationTokenSource? _updateScope;
     private DraftState _state = DraftState.Inactive;
     private RecommendationTarget? _target;
@@ -214,6 +221,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _draftFetchFailed;
     private bool _hasBuild;
     private bool _hasGameMatchups;
+    private bool _hasDraftPreview;
+    private string _draftPreviewNote = string.Empty;
     private string _gameMatchupsTotal = string.Empty;
     private string _gameMatchupsTotalHint = string.Empty;
     private string _gameMatchupsEnemyTotal = string.Empty;
@@ -255,6 +264,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _meta = preloaded is { } ready ? UseSnapshot(ready.Load) : LoadMeta();
         _predictor = new LanePredictor(_meta, _seatPriors);
         _recommender = new Recommender(_meta, _traits);
+        _comp = new CompAnalyzer(_meta, _traits);
 
         _names = AssetNames.Load(_settings.DataLanguage);
 
@@ -815,6 +825,42 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// </summary>
     public ObservableCollection<LaneMatchupViewModel> GameMatchups { get; } = [];
 
+    /// <summary>
+    /// The pre-game comparison, shown in the wide column once the own pick has settled: what both
+    /// teams bring to a team fight, line by line.
+    /// <para>
+    /// Everything here is read off the picks — damage types and classes from the data, the
+    /// judgement traits from the curated file — and nothing is predicted. It answers the question
+    /// the last minute of a draft is actually about: not "what should I pick", which is decided,
+    /// but "what kind of game is this going to be".
+    /// </para>
+    /// </summary>
+    public ObservableCollection<TeamStatViewModel> DraftStats { get; } = [];
+
+    /// <summary>Our damage mix, as a bar and as text.</summary>
+    public TeamDamageViewModel AllyDamage { get; } = new() { Side = "Dein Team" };
+
+    /// <summary>Theirs, read the same way.</summary>
+    public TeamDamageViewModel EnemyDamage { get; } = new() { Side = "Gegner" };
+
+    /// <summary>At least one champion is revealed, so the comparison has something to compare.</summary>
+    public bool HasDraftPreview
+    {
+        get => _hasDraftPreview;
+        private set => Set(ref _hasDraftPreview, value);
+    }
+
+    /// <summary>
+    /// What the lines rest on: how many champions on each side, and whether curated traits were
+    /// missing for some of them. Printed, not hidden in a tooltip — a comparison of five against
+    /// three is a different statement than five against five.
+    /// </summary>
+    public string DraftPreviewNote
+    {
+        get => _draftPreviewNote;
+        private set => Set(ref _draftPreviewNote, value);
+    }
+
     public bool HasGameMatchups
     {
         get => _hasGameMatchups;
@@ -1134,6 +1180,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _meta = meta;
             _predictor = new LanePredictor(_meta, _seatPriors);
             _recommender = new Recommender(_meta, _traits);
+            _comp = new CompAnalyzer(_meta, _traits);
 
             // New portraits arrive with new data; a stale cache would keep showing blanks.
             _icons.Clear();
@@ -1333,6 +1380,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         RenderBalance(allyPredictions, enemyPredictions, laneDuels);
 
         RenderRecommendations(enemyPredictions, allyPredictions);
+        RenderDraftPreview();
 
         // Re-derived on every render, not only when a build lands: the enemy composition keeps
         // growing after my own pick, and a hint frozen at "78 % physisch" from three revealed
@@ -2084,6 +2132,128 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             : string.Empty;
     }
 
+    /// <summary>Top of the curated crowd-control scale, per champion: the comparison's denominator.</summary>
+    private const int MaxCrowdControlPerChampion = 3;
+
+    /// <summary>
+    /// Fills the pre-game comparison: both compositions side by side, read off the revealed picks.
+    /// <para>
+    /// Deliberately without a verdict. Nothing here says which team is better — the draft's one
+    /// number stands over the team columns and comes from win rates. These lines say what the two
+    /// teams ARE, which is what decides how the first twenty minutes should be played, and no win
+    /// rate carries that.
+    /// </para>
+    /// </summary>
+    private void RenderDraftPreview()
+    {
+        var ally = _comp.Analyze([.. _state.Allies.Select(slot => slot.EffectiveChampionId)]);
+        var enemy = _comp.Analyze([.. _state.Enemies.Select(slot => slot.EffectiveChampionId)]);
+
+        HasDraftPreview = ally.Count > 0 || enemy.Count > 0;
+
+        if (!HasDraftPreview)
+        {
+            DraftStats.Clear();
+            DraftPreviewNote = string.Empty;
+            return;
+        }
+
+        ApplyDamageMix(AllyDamage, ally);
+        ApplyDamageMix(EnemyDamage, enemy);
+
+        (string Label, string Ally, string Enemy, string Hint)[] rows =
+        [
+            ("Frontline", OutOf(ally.FrontlineCount, ally.Count), OutOf(enemy.FrontlineCount, enemy.Count),
+                "Champions, die im Teamfight vorne stehen und Schaden abfangen können — Tank-Klasse "
+                + "oder hoher Verteidigungswert aus den Riot-Daten. Ohne Frontline trifft alles "
+                + "direkt die Schadensausteiler."),
+
+            ("Kontrolle", Control(ally), Control(enemy),
+                "Betäubungen, Verwurzeln, Hochwerfen: je Champion 0 bis 3 Punkte aus den gepflegten "
+                + "Angaben, aufsummiert. Die zweite Zahl ist das Maximum für die Champions, die "
+                + "gezählt werden konnten — so lassen sich auch unterschiedlich weit aufgedeckte "
+                + "Teams vergleichen. Etwa ein Punkt je zwei Champions ist die Untergrenze für "
+                + "einen spielbaren Teamfight."),
+
+            ("Eröffnen", Engage(ally), Engage(enemy),
+                "Mindestens ein Champion kann einen Teamfight von sich aus starten. Fehlt das, "
+                + "bestimmt immer die andere Seite, wann gekämpft wird."),
+
+            ("Peel", Peel(ally), Peel(enemy),
+                "Mindestens ein Champion kann Gegner von den eigenen Carrys wegdrängen. Fehlt das, "
+                + "kommt ein Assassine ungestört durch."),
+
+            ("Auf Distanz", OutOf(ally.RangedCount, ally.Count), OutOf(enemy.RangedCount, enemy.Count),
+                "Fernkämpfer nach Angriffsreichweite. Ein Team aus lauter Nahkämpfern muss sich "
+                + "jeden Kampf erarbeiten, gegen Reichweite noch mehr."),
+
+            ("Spätes Spiel", OutOf(ally.LateScalingCount, ally.Count), OutOf(enemy.LateScalingCount, enemy.Count),
+                "Champions, die spät im Spiel stärker werden. Die Seite mit mehr davon gewinnt "
+                + "durch Zeit — die andere muss das Spiel früh entscheiden."),
+        ];
+
+        DraftStats.Resize(rows.Length, () => new TeamStatViewModel());
+
+        for (var i = 0; i < rows.Length; i++)
+        {
+            var (label, allyText, enemyText, hint) = rows[i];
+            var view = DraftStats[i];
+
+            view.Label = label;
+            view.Ally = allyText;
+            view.Enemy = enemyText;
+            view.Hint = hint;
+        }
+
+        var enemyPart = enemy.Count == 0
+            ? "noch kein aufgedeckter Gegner"
+            : $"{enemy.Count} aufgedeckte gegnerische";
+
+        DraftPreviewNote = $"Grundlage: {ally.Count} eigene und {enemyPart} Champions."
+            + (ally.TraitCoverage < 1 || enemy.TraitCoverage < 1
+                ? " Für einzelne Champions fehlen gepflegte Angaben — Kontrolle, Eröffnen und Peel "
+                    + "zählen sie nicht mit."
+                : string.Empty);
+
+        void ApplyDamageMix(TeamDamageViewModel view, CompProfile profile)
+        {
+            var culture = CultureInfo.CurrentCulture;
+
+            view.HasMix = profile.HasDamageMix;
+            view.Physical = new GridLength(profile.PhysicalShare, GridUnitType.Star);
+            view.Magic = new GridLength(profile.MagicShare, GridUnitType.Star);
+
+            // Whole percent: the share comes from at most five champions, so a decimal would
+            // dress up "three of five" as a measurement.
+            view.Text = profile.HasDamageMix
+                ? $"{profile.PhysicalShare.ToString("P0", culture)} physisch · "
+                    + $"{profile.MagicShare.ToString("P0", culture)} magisch"
+                : profile.Count == 0
+                    ? "noch nichts aufgedeckt"
+                    : "Schadensart unbekannt";
+        }
+
+        // "2 von 5", never a bare count: the two sides can rest on a different number of revealed
+        // champions, and then the counts alone would compare nothing.
+        static string OutOf(int value, int total) => total == 0 ? "—" : $"{value} von {total}";
+
+        // Against the maximum the counted champions could reach, not as a bare sum: five revealed
+        // champions out-total three of them whatever they are, and the two columns sit next to
+        // each other inviting exactly that comparison.
+        static string Control(CompProfile profile)
+            => profile.TraitsKnown > 0
+                ? OutOf(profile.TotalCrowdControl, profile.TraitsKnown * MaxCrowdControlPerChampion)
+                : "—";
+
+        // Every trait line reads "—" without curated data rather than the "no" that the absence
+        // of a value would otherwise print.
+        static string Engage(CompProfile profile)
+            => profile.TraitsKnown > 0 ? (profile.MaxEngage >= 2 ? "ja" : "nein") : "—";
+
+        static string Peel(CompProfile profile)
+            => profile.TraitsKnown > 0 ? (profile.MaxPeel >= 2 ? "ja" : "nein") : "—";
+    }
+
     /// <summary>
     /// Decides whether the widest column shows a pick list or the matchup, and fills the latter.
     /// <para>
@@ -2615,7 +2785,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         Recommendations.Clear();
         Warnings.Clear();
+        DraftStats.Clear();
         HasRecommendations = false;
+        HasDraftPreview = false;
+        DraftPreviewNote = string.Empty;
         ShowMatchupPanel = false;
         ShowEmptyHint = false;
         PhaseText = string.Empty;
@@ -2838,6 +3011,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _meta = new MetaLookup(snapshot);
             _predictor = new LanePredictor(_meta, _seatPriors);
             _recommender = new Recommender(_meta, _traits);
+            _comp = new CompAnalyzer(_meta, _traits);
 
             // Newly downloaded portraits and names would otherwise stay invisible until restart.
             _icons.Clear();

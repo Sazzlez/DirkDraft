@@ -138,10 +138,54 @@
             </Border>
         </DataTemplate>
         <!--
-            The build body, defined once and placed twice: in the narrow left card during a
-            draft, and in the wide middle column once the own pick is locked and nobody on
-            our team is on the clock. The chip rows wrap, so the same markup uses whatever
-            width it is given instead of needing a second, wider copy.
+            One team's damage mix: a split bar and the two shares as text. Defined once and
+            placed twice, once per side, so both bars are drawn by the same markup and cannot
+            drift apart.
+        -->
+        <DataTemplate x:Key="DamageMix">
+            <Grid Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="78" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="DamageFigure" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="{Binding Side}" Style="{StaticResource Small}"
+                           Foreground="{StaticResource Faint}" VerticalAlignment="Center" />
+
+                <!-- The bar itself only where a damage type is actually known; the text next to
+                     it says why it is missing otherwise. -->
+                <Grid Grid.Column="1" Height="8" Margin="0,0,12,0" VerticalAlignment="Center"
+                      Visibility="{Binding HasMix, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="{Binding Physical}" />
+                        <ColumnDefinition Width="{Binding Magic}" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border CornerRadius="4,0,0,4" Background="{StaticResource Warn}" />
+                    <Border Grid.Column="1" CornerRadius="0,4,4,0" Background="{StaticResource Accent}" />
+                </Grid>
+
+                <TextBlock Grid.Column="2" Text="{Binding Text}"
+                           VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
+                            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasMix}" Value="False">
+                                    <Setter Property="Foreground" Value="{StaticResource Faint}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </DataTemplate>
+
+        <!--
+            The build body, defined once: in the narrow left card, which holds it for the whole
+            draft and afterwards. The chip rows wrap, so the same markup uses whatever width it
+            is given.
         -->
         <DataTemplate x:Key="BuildBody">
             <StackPanel>
@@ -1560,6 +1604,107 @@
                                     <TextBlock Text="{Binding MatchupNote}" Style="{StaticResource Small}"
                                                Foreground="{StaticResource Muted}" TextWrapping="Wrap"
                                                Margin="0,9,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <!--
+                                ===================== Before the game =====================
+                                Both compositions side by side. The draft is decided at this
+                                point, so the column stops advising and starts describing: what
+                                kind of game this is going to be, which is what the last minute
+                                before the loading screen is actually good for.
+
+                                Everything here is read off the picks — no prediction, no verdict.
+                                Which team is ahead is answered by the one number over the team
+                                columns, and it is a different question from this one.
+                            -->
+                            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
+                                    BorderThickness="1" CornerRadius="10" Padding="14,11" Margin="0,11,0,0"
+                                    Grid.IsSharedSizeScope="True"
+                                    Visibility="{Binding HasDraftPreview, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Text="SCHADEN" Style="{StaticResource Caption}"
+                                                   VerticalAlignment="Center" />
+
+                                        <!-- Legend, because the bar itself carries no labels. -->
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                    HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <Border Width="9" Height="9" CornerRadius="2"
+                                                    Background="{StaticResource Warn}" VerticalAlignment="Center" />
+                                            <TextBlock Text="physisch" Style="{StaticResource Small}"
+                                                       Foreground="{StaticResource Faint}" Margin="5,0,12,0" />
+                                            <Border Width="9" Height="9" CornerRadius="2"
+                                                    Background="{StaticResource Accent}" VerticalAlignment="Center" />
+                                            <TextBlock Text="magisch" Style="{StaticResource Small}"
+                                                       Foreground="{StaticResource Faint}" Margin="5,0,0,0" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <ContentControl Content="{Binding AllyDamage}" Margin="0,10,0,0"
+                                                    ContentTemplate="{StaticResource DamageMix}"
+                                                    ToolTip="Anteil der Schadensarten in deinem Team, gezählt über die aufgedeckten Champions. Gemischte Champions zählen zur Hälfte auf jeder Seite. Wovon der Gegner mehr abbekommt, entscheidet, ob er Rüstung oder Magieresistenz kauft." />
+                                    <ContentControl Content="{Binding EnemyDamage}" Margin="0,7,0,0"
+                                                    ContentTemplate="{StaticResource DamageMix}"
+                                                    ToolTip="Dasselbe für das gegnerische Team. Überwiegt hier eine Seite deutlich, steht die passende Abwehr in deinem Build als Hinweis-Chip." />
+
+                                    <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,12,0,0" />
+
+                                    <!-- Column header for the lines below; the two value columns
+                                         keep their width through the shared size groups, so the
+                                         header sits over its own numbers. -->
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="StatAlly" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="StatEnemy" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Text="TEAMFIGHT" Style="{StaticResource Caption}" />
+                                        <TextBlock Grid.Column="1" Text="DEIN TEAM" Style="{StaticResource Caption}"
+                                                   HorizontalAlignment="Right" MinWidth="86" />
+                                        <TextBlock Grid.Column="2" Text="GEGNER" Style="{StaticResource Caption}"
+                                                   HorizontalAlignment="Right" MinWidth="86" />
+                                    </Grid>
+
+                                    <ItemsControl ItemsSource="{Binding DraftStats}" Margin="0,6,0,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type vm:TeamStatViewModel}">
+                                                <!-- Transparent so the whole line carries its
+                                                     tooltip, not only the glyphs on it. -->
+                                                <Grid Background="Transparent" Margin="0,0,0,5"
+                                                      ToolTip="{Binding Hint}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" SharedSizeGroup="StatAlly" />
+                                                        <ColumnDefinition Width="Auto" SharedSizeGroup="StatEnemy" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <TextBlock Text="{Binding Label}" Style="{StaticResource Small}"
+                                                               Foreground="{StaticResource Muted}"
+                                                               VerticalAlignment="Center" />
+
+                                                    <TextBlock Grid.Column="1" Text="{Binding Ally}"
+                                                               Style="{StaticResource Small}"
+                                                               Foreground="{StaticResource Text}"
+                                                               HorizontalAlignment="Right" MinWidth="86" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding Enemy}"
+                                                               Style="{StaticResource Small}"
+                                                               Foreground="{StaticResource Muted}"
+                                                               HorizontalAlignment="Right" MinWidth="86" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <TextBlock Text="{Binding DraftPreviewNote}" Style="{StaticResource Small}"
+                                               Foreground="{StaticResource Faint}" TextWrapping="Wrap"
+                                               Margin="0,5,0,0" />
                                 </StackPanel>
                             </Border>
 
