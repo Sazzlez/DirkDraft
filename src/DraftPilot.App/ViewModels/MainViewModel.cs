@@ -65,12 +65,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly HashSet<(int Champion, Lane Lane)> _liveFetched = [];
 
     /// <summary>
-    /// Counter calls made this draft. A prediction that keeps flipping would otherwise buy a new
-    /// request on every flip; twelve is well above what an honest draft needs.
+    /// OP.GG calls made this draft — counters AND build guides. A prediction that keeps flipping
+    /// would otherwise buy a new request on every flip, and the build was not counted at all, so a
+    /// wobbling lane could quietly outspend the whole budget on guides.
     /// </summary>
     private int _liveCallsThisDraft;
 
-    private const int MaxLiveCallsPerDraft = 12;
+    /// <summary>
+    /// Five enemies at up to two lanes each, plus a handful of build guides: sixteen is above what
+    /// an honest draft needs and below what a flapping prediction could spend.
+    /// </summary>
+    private const int MaxLiveCallsPerDraft = 16;
 
     /// <summary>Consecutive rounds that ended with at least one failed call; drives the backoff.</summary>
     private int _fetchFailures;
@@ -1223,6 +1228,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // New portraits arrive with new data; a stale cache would keep showing blanks.
             _icons.Clear();
 
+            // The same update also rewrites the item, rune and spell names, and a snapshot whose
+            // patch differs leaves build plans of the previous one behind. Both belong to this
+            // moment — this is also the path an update that landed mid-draft comes back through.
+            _names = AssetNames.Load(_settings.DataLanguage);
+
+            var sweepPatch = _meta.IsEmpty || string.IsNullOrWhiteSpace(_meta.Patch) ? null : _meta.Patch;
+            _ = Task.Run(() => RunMaintenance(sweepPatch));
+
             SetSnapshotRetryRunning(_meta.IsEmpty);
             UpdateSnapshotText();
             Refresh();
@@ -1445,6 +1458,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _allyPredictions = allyPredictions;
         _pendingEnemyCount = PendingEnemies().Count;
 
+        // Hitting the ceiling used to be silent: the status line cleared, and the rest of the draft
+        // ran on the stored matrix without a word. Say it — the numbers on screen are then what
+        // they are, and the reader should know why they stopped growing.
+        if (_liveCallsThisDraft >= MaxLiveCallsPerDraft && PendingEnemies(ignoreBudget: true).Count > 0)
+            ReportFetch("Abruf-Grenze für diesen Draft erreicht — es bleibt bei den vorhandenen Zahlen.");
+
         _buildContext = null;
 
         _buildIsStandIn = false;
@@ -1540,11 +1559,18 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// the lane became part of the key, and a pending count that never reaches zero turns every
     /// client event into an empty round.
     /// </summary>
-    private List<(int Champion, Lane Lane, string Name)> PendingEnemies()
+    /// <param name="ignoreBudget">
+    /// Asks what is still missing regardless of the call ceiling — which is how the window can say
+    /// that it stopped fetching instead of just going quiet.
+    /// </param>
+    private List<(int Champion, Lane Lane, string Name)> PendingEnemies(bool ignoreBudget = false)
     {
         var pending = new List<(int Champion, Lane Lane, string Name)>();
 
-        if (_enemyPredictions is not { } predictions || _liveCallsThisDraft >= MaxLiveCallsPerDraft)
+        if (_enemyPredictions is not { } predictions)
+            return pending;
+
+        if (!ignoreBudget && _liveCallsThisDraft >= MaxLiveCallsPerDraft)
             return pending;
 
         var seen = new HashSet<(int, Lane)>();
@@ -1643,7 +1669,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         try
         {
             var resolver = new ChampionResolver(_meta.Champions);
-            _opGg ??= new OpGgMcpClient();
+
+            // Its own deadline, not the update's: a pick phase lasts thirty seconds, so a call that
+            // is still waiting after thirty has already missed the moment it was for — and it
+            // blocked the retry that might have made it in time. A healthy call answers in two to
+            // four seconds; ten leaves room for a slow one and still two attempts in one phase.
+            _opGg ??= new OpGgMcpClient(timeout: TimeSpan.FromSeconds(10));
             var fetcher = new LiveDraftFetcher(
                 _opGg, _settings.GameMode, message => CrashLog.Note("Draft-Abruf", message));
 
@@ -1812,6 +1843,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         try
         {
+            // Counted like a counter call: the build was free of the budget, so a lane prediction
+            // that kept flipping produced a new guide request per flip with nothing to stop it.
+            _liveCallsThisDraft++;
+
             var plan = await fetcher.FetchBuildAsync(me, opponent, context.Lane, _meta.Patch, token)
                 .ConfigureAwait(true);
 
@@ -3059,6 +3094,22 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
             // Written atomically; a failure above leaves the previous snapshot in place and in use.
             _store.Save(snapshot);
+
+            // CanUpdate is checked once, at the click — and four minutes later a champ select can
+            // easily be running. Swapping _meta then would drop the live matchups THIS draft paid
+            // for, while _liveFetched keeps claiming those enemies are done, so they would never
+            // come back: the rest of the draft would be advised from the thin stored matrix alone.
+            // The file is saved either way; the swap waits for the draft to end, exactly as the
+            // file watcher's reload already does.
+            if (_state.IsActive)
+            {
+                _reloadDeferred = true;
+                UpdateSnapshotText();
+                UpdateStatus = $"Aktualisiert in {updateClock.Elapsed:m\\:ss}: "
+                    + $"{snapshot.Champions.Count} Champions, {snapshot.Matchups.Count} Matchups "
+                    + "— aktiv ab dem nächsten Draft, der laufende behält seine geholten Zahlen";
+                return;
+            }
 
             _meta = new MetaLookup(snapshot);
             _predictor = new LanePredictor(_meta, _seatPriors);

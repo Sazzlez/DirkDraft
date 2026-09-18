@@ -41,10 +41,15 @@ public sealed class OpGgMcpClient : IDisposable
     private int _nextId;
     private int _callCount;
 
-    public OpGgMcpClient(HttpClient? http = null)
+    /// <param name="timeout">
+    /// How long one call may take. Thirty seconds suits the update, which runs unattended for
+    /// minutes; during a draft the same number means one slow call eats a whole pick phase, so that
+    /// caller passes its own. Ignored when an <see cref="HttpClient"/> is supplied.
+    /// </param>
+    public OpGgMcpClient(HttpClient? http = null, TimeSpan? timeout = null)
     {
         _ownsHttp = http is null;
-        _http = http ?? new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        _http = http ?? new HttpClient { Timeout = timeout ?? TimeSpan.FromSeconds(30) };
         _http.DefaultRequestHeaders.Accept.Clear();
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
