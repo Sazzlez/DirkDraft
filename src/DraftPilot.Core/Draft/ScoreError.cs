@@ -160,6 +160,4 @@ public sealed class ErrorBudget
         if (double.IsFinite(variance) && variance > 0)
             _variance += variance;
     }
-
-    public void Reset() => _variance = 0;
 }

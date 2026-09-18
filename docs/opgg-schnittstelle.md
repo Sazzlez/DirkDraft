@@ -84,6 +84,22 @@ Damit fällt eine Annahme, auf der der Blind-Pick-Pfad beruht: „OP.GG hat kein
 stimmt nicht. Der Ersatzgegner (`StandInOpponent`) ist nicht nötig, um überhaupt einen Build zu
 zeigen — und für dünne Matchups gibt es jetzt eine belastbare Vergleichszahl.
 
+## Welcher Abruf welchen Filter kennt (nachgemessen am 19.09.2026)
+
+Wichtig, weil die Fußzeile ein Bracket nennt und das Bracket eben **nicht** für alles gilt:
+
+| Datenteil | Werkzeug | `tier` | `game_mode` |
+|---|---|:--:|:--:|
+| Lane-Zahlen (Grundgerüst) | `lol_list_lane_meta_champions` | nein | nein |
+| Lane-Zahlen rangspezifisch, Counter, Champion-Build | `lol_get_champion_analysis` | **ja** | **ja** |
+| Duos | `lol_get_champion_synergies` | nein | nein |
+| Matchup-Build | `lol_get_lane_matchup_guide` | nein | nein |
+
+Ein Snapshot mit `tier=gold` ist also in den Lane-Zahlen und den Countern Gold, in den Duos und im
+Matchup-Build aber weiterhin „alle Ränge". Dasselbe gilt für die Warteschlange: Solo/Duo gegen Flex
+unterscheidet nur die Analyse. Die Fußzeile sagt das seitdem im Langtext; abstellen lässt es sich
+nicht, die Parameter existieren dort schlicht nicht.
+
 ## Was die Tierlist kann und nicht kann
 
 `lol_list_lane_meta_champions` nimmt nur `lang`, `position`, `desired_output_fields` — **kein**

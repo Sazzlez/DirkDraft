@@ -165,6 +165,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     private bool _isGameRunning;
     private bool _showGameView;
+    private bool _showGameWithoutBuild;
     private bool _showIdleCard = true;
     private bool _isImportingRunes;
     private string _runeImportText = string.Empty;
@@ -459,7 +460,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         private set => Set(ref _showGameView, value);
     }
 
-    /// <summary>The compact status card: outside a draft AND outside a game with a build.</summary>
+    /// <summary>
+    /// The in-game view is up but no build belongs to it. The build's own sections then stay away
+    /// and a line says so; the lane overview below is the reason the view opens regardless.
+    /// </summary>
+    public bool ShowGameWithoutBuild
+    {
+        get => _showGameWithoutBuild;
+        private set => Set(ref _showGameWithoutBuild, value);
+    }
+
+    /// <summary>The compact status card: outside a draft AND outside a running game.</summary>
     public bool ShowIdleCard
     {
         get => _showIdleCard;
@@ -529,6 +540,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private void DiscardFinishedGame()
     {
         _build = null;
+        _gameSeat = 0;
         HasBuild = false;
         _buildCardClosed = false;
         _buildIsStandIn = false;
@@ -544,6 +556,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         GameMatchupsTotalHint = string.Empty;
     }
 
+    /// <summary>
+    /// The champion the user locked, kept past the end of champion select. The in-game view needs a
+    /// name for its heading, and by then the draft state has been cleared.
+    /// </summary>
+    private int _gameSeat;
+
     /// <summary>The last running gameflow phase, to detect GameStart → InProgress transitions.</summary>
     private string _lastGamePhase = string.Empty;
 
@@ -555,13 +573,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         => GameBuild.Apply(plan, _names, _icons, _buildIsStandIn);
 
     /// <summary>
-    /// Fires the auto-show event when a game runs AND a build exists. Called from the phase
-    /// change and again when a build lands — a slow fetch used to mean the phase event found no
-    /// build, never fired, and the window stayed in the tray for the whole game.
+    /// Fires the auto-show event when a game runs and there is something to show. Called from the
+    /// phase change and again when a build lands — a slow fetch used to mean the phase event found
+    /// no build, never fired, and the window stayed in the tray for the whole game.
+    /// <para>
+    /// The lane overview counts as something to show. It survives champion select on purpose, and
+    /// a game whose build could not be fetched still has five duels worth reading.
+    /// </para>
     /// </summary>
     private void AnnounceGameActive()
     {
-        if (!IsGameRunning || !HasBuild || _gameActiveAnnounced)
+        if (!IsGameRunning || (!HasBuild && !HasGameMatchups) || _gameActiveAnnounced)
             return;
 
         _gameActiveAnnounced = true;
@@ -1480,6 +1502,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             ReportFetch("Abruf-Grenze für diesen Draft erreicht — es bleibt bei den vorhandenen Zahlen.");
 
         _buildContext = null;
+
+        // Kept for the game: by then champion select is over and _state is empty, and the in-game
+        // view still has to be able to name whose game this is — also when no build was found.
+        if (_state.LocalSlot is { IsLocked: true } seat && seat.LockedChampionId != 0)
+            _gameSeat = seat.LockedChampionId;
 
         _buildIsStandIn = false;
         _buildMode = string.Empty;
@@ -2637,8 +2664,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
 
     /// <summary>
-    /// Import works while the page can still change: during champion select and up to the load
-    /// screen. Once in game the client ignores page changes, so the button locks.
+    /// Import works during champion select and locks the moment the game starts — and GameStart is
+    /// the loading screen, so that is where it stops, not after it.
+    /// <para>
+    /// The gate is the conservative half of the two possible readings, and stays that way until
+    /// somebody has actually measured whether the client still accepts a page change on the loading
+    /// screen. The tooltip was the half that claimed otherwise; it now says what the gate does.
+    /// </para>
     /// </summary>
     public bool CanImportRunes
         => !_isImportingRunes
@@ -2740,8 +2772,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         // While the game runs, the full-width build view takes over from both the idle card and
         // the compact post-draft card — it is the same content with room to breathe.
-        ShowGameView = IsGameRunning && HasBuild && !_buildCardClosed;
+        //
+        // No longer conditional on a build. A game for which none could be fetched used to show
+        // the start screen for its whole length — "Wartet auf das nächste Champ Select", during
+        // the match it was meant to help with, with the lane overview sitting right there unused.
+        ShowGameView = IsGameRunning && !_buildCardClosed;
+        ShowGameWithoutBuild = ShowGameView && !HasBuild;
         ShowIdleCard = !ShowGameView;
+
+        if (ShowGameWithoutBuild)
+            GameBuild.ShowWithoutBuild(_gameSeat == 0 ? string.Empty : _meta.ChampionName(_gameSeat), HasGameMatchups);
 
         // After the draft the build stays on screen as a card, so the shopping order is still
         // there when the user tabs out mid-game. Closed by hand or by the next draft.
@@ -3207,6 +3247,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                     + "Tierlist, Counter und Synergien gelten damit für ein anderes Spiel.");
         }
 
+        lines.AddRange(DescribeScope());
+
         // Snapshot warnings had no reader in the app at all — the update wrote them and only the
         // console tool ever showed them.
         lines.AddRange(_meta.Warnings);
@@ -3215,6 +3257,59 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         return string.Join("\n", lines);
     }
+
+    /// <summary>
+    /// What the file's bracket and queue actually cover, and whether they still match the settings.
+    /// <para>
+    /// Both were written into every snapshot from the start and read by nobody, so a file built as
+    /// Solo/Duo could be used for weeks under a setting that said Flex without a word anywhere.
+    /// </para>
+    /// <para>
+    /// The coverage line is not a detail. Measured against OP.GG's schemas on 2026-09-19, only
+    /// <c>lol_get_champion_analysis</c> takes a bracket and a queue at all; the tier list, the duo
+    /// tool and the matchup guide take neither. A footer that says "Gold" without saying that the
+    /// duos are not Gold claims more than the data does.
+    /// </para>
+    /// </summary>
+    private IEnumerable<string> DescribeScope()
+    {
+        var tier = _meta.Tier;
+        var mode = _meta.GameMode;
+
+        if (RankBracketName(tier) is { Length: > 0 } bracket)
+        {
+            yield return $"Bracket {bracket}: gilt für die Lane-Zahlen, die Counter und den "
+                + "Champion-Build. Duos und der Matchup-Build kennen bei OP.GG kein Bracket und "
+                + "stammen weiter aus allen Rängen.";
+        }
+
+        if (QueueName(mode) is { Length: > 0 } queue)
+            yield return $"Abgerufen für {queue}. Duos und Tierlist kennen bei OP.GG keine Warteschlange.";
+
+        if (tier.Length > 0 && !tier.Equals(_settings.Tier, StringComparison.OrdinalIgnoreCase))
+        {
+            var wanted = RankBracketName(_settings.Tier);
+            yield return $"Die Einstellung steht auf {(wanted.Length > 0 ? wanted : _settings.Tier)}, "
+                + "die Datei auf etwas anderem — erst der nächste Datenabruf holt das nach.";
+        }
+
+        if (mode.Length > 0 && !mode.Equals(_settings.GameMode, StringComparison.OrdinalIgnoreCase))
+        {
+            var other = QueueName(_settings.GameMode);
+            yield return $"Die Einstellung steht auf {(other.Length > 0 ? other : _settings.GameMode)}, "
+                + "die Datei wurde für eine andere Warteschlange geholt.";
+        }
+    }
+
+    private static string QueueName(string mode) => mode.ToLowerInvariant() switch
+    {
+        "ranked" => "Ranked Solo/Duo",
+        "flex" => "Flex",
+        "aram" => "ARAM",
+        "urf" => "URF",
+        "nexus_blitz" => "Nexus Blitz",
+        _ => string.Empty,
+    };
 
     /// <summary>Version plus the executable's write time — the only reliable "which build is this".</summary>
     private static string DescribeBuild()

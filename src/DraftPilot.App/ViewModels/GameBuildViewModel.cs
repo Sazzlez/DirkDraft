@@ -97,6 +97,7 @@ public sealed class GameBuildViewModel : ObservableObject
 {
     private string _title = string.Empty;
     private string _subtitle = string.Empty;
+    private string _missingNote = string.Empty;
     private string _primaryPath = string.Empty;
     private string _secondaryPath = string.Empty;
     private string _shardText = string.Empty;
@@ -149,6 +150,28 @@ public sealed class GameBuildViewModel : ObservableObject
     {
         get => _subtitle;
         set => Set(ref _subtitle, value);
+    }
+
+    /// <summary>What stands in the in-game view when no build belongs to this game.</summary>
+    public string MissingNote
+    {
+        get => _missingNote;
+        private set => Set(ref _missingNote, value);
+    }
+
+    /// <summary>
+    /// Heading and note for a game the tool has no build for. It says what is missing and what is
+    /// there instead — and it deliberately leaves every build field untouched, so nothing from an
+    /// earlier game can show through the gaps.
+    /// </summary>
+    public void ShowWithoutBuild(string championName, bool hasLaneOverview)
+    {
+        Title = championName is { Length: > 0 } ? championName : "Im Spiel";
+        Subtitle = string.Empty;
+
+        MissingNote = hasLaneOverview
+            ? "Für dieses Spiel liegt kein Build vor — unten stehen die Lanes des Drafts."
+            : "Für dieses Spiel liegt kein Build vor.";
     }
 
     public string PrimaryPath
@@ -216,6 +239,8 @@ public sealed class GameBuildViewModel : ObservableObject
         IconCache icons,
         bool isStandIn = false)
     {
+        MissingNote = string.Empty;
+
         // A mode build answers for the champion, not for a pairing — naming an opponent it was
         // never measured against would be the one thing this card must not do.
         Title = (BuildModes.Display(plan.Mode), isStandIn) switch

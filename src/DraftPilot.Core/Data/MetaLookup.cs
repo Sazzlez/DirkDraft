@@ -95,6 +95,13 @@ public sealed class MetaLookup
     public string Tier => _snapshot.Tier ?? string.Empty;
 
     /// <summary>
+    /// The queue these numbers were fetched for, e.g. <c>ranked</c> or <c>flex</c>. Written since
+    /// the first version and read by nobody until now — which meant a file built for one queue
+    /// could be used under a setting that said another, without a word anywhere.
+    /// </summary>
+    public string GameMode => _snapshot.GameMode ?? string.Empty;
+
+    /// <summary>
     /// What an average listed duo is worth in this file — see <see cref="MetaSnapshot.SynergyBaseline"/>.
     /// The synergy term measures against it instead of against 50 %.
     /// </summary>
@@ -147,21 +154,6 @@ public sealed class MetaLookup
         return double.IsFinite(prior) && prior > 0 ? prior : 0;
     }
 
-    /// <summary>True when the snapshot knows which lanes this champion actually plays.</summary>
-    public bool HasRoleData(int championId)
-    {
-        if (!_indexById.TryGetValue(championId, out var index))
-            return false;
-
-        for (var lane = 0; lane < Lanes.Count; lane++)
-        {
-            if (_rolePriors[(lane * _champions.Length) + index] > 0)
-                return true;
-        }
-
-        return false;
-    }
-
     /// <summary><paramref name="championId"/>'s prospects against <paramref name="opponentId"/> in a lane.</summary>
     public MatchupView? Matchup(int championId, int opponentId, Lane lane)
     {
@@ -179,7 +171,8 @@ public sealed class MetaLookup
         return _matchups.TryGetValue(key, out var view) ? view : null;
     }
 
-    /// <summary>How many live matchup edges are currently overlaid; shown in the UI.</summary>
+    /// <summary>How many live matchup edges are currently overlaid. Nothing shows it; the tests
+    /// assert on it, which is what the overlay's clearing rules are pinned by.</summary>
     public int LiveMatchupCount => _liveMatchups.Count;
 
     /// <summary>
