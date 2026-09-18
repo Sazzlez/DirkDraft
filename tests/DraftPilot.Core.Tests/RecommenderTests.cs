@@ -557,6 +557,53 @@ public class RecommenderTests
     }
 
     /// <summary>
+    /// OP.GG's ladder starts at 0 (OP), not at 1 (S) — measured on the stored snapshot the mean win
+    /// rate falls monotonically from tier 0 to tier 5, and the two tier-0 rows are Jinx on Bot over
+    /// 192.549 games and Thresh on Support over 168.018. Read as "unrated", both lost the full
+    /// nudge: three points of estimated win rate on two of the most played champions there are.
+    /// </summary>
+    [Fact]
+    public void TheOpTier_CountsOneStepAboveS()
+    {
+        static double LaneTerm(int tier)
+        {
+            var meta = new MetaBuilder()
+                .Champion(Strong, "Strong", DamageType.Magic, ["Mage"], 550, 3)
+                .InLane(Strong, Lane.Mid, winRate: 0.52, play: 40_000, tier: tier)
+                .Build();
+
+            var state = DraftState.From(new SessionBuilder().LocalPlayer(2).OnClock(2, "pick").Build());
+            var target = new TurnTracker().Resolve(state)!;
+            var lanes = new LanePredictor(meta).Predict(state.Enemies);
+
+            return new Recommender(meta, TraitTable.Empty).Recommend(state, target, lanes).Items
+                .Single(item => item.ChampionId == Strong)
+                .Breakdown.Single(term => term.Kind == ScoreTermKind.LaneStrength)
+                .LogOdds ?? 0;
+        }
+
+        Assert.Equal(ScoreModel.TierNudge, LaneTerm(0) - LaneTerm(1), precision: 6);
+        Assert.Equal(ScoreModel.TierNudge, LaneTerm(1) - LaneTerm(2), precision: 6);
+    }
+
+    /// <summary>
+    /// The other half of the same rule, and the reason the fix is not simply "count tier 0": rows
+    /// the analysis writes for a lane the tier list never listed carry no tier AND no games. Those
+    /// must stay unrated — otherwise a champion with no data at all would be nudged to the top of
+    /// its lane. The game count is what tells the two apart, in old files as well as new ones.
+    /// </summary>
+    [Fact]
+    public void ATierWithoutGamesBehind_It_StaysUnrated()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Strong, "Strong", DamageType.Magic, ["Mage"], 550, 3)
+            .InLane(Strong, Lane.Mid, winRate: 0.5, play: 0, tier: 0)
+            .Build();
+
+        Assert.Equal(-1, meta.LaneStat(Strong, Lane.Mid)!.Value.Tier);
+    }
+
+    /// <summary>
     /// The rest of the enemy team is measured the same way as the direct duel: against what this
     /// champion does anyway. Averaged over opponents, a duel log-odds IS the champion's general
     /// strength, and that already sits in the lane term — so an edge that merely matches the

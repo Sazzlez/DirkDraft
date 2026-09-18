@@ -65,7 +65,7 @@ public sealed record ScoreTerm(ScoreTermKind Kind, double? LogOdds)
     public string Hint => Kind switch
     {
         ScoreTermKind.LaneStrength =>
-            "Wie gut der Champion auf dieser Lane allgemein läuft — Siegquote und OP.GG-Tier (S bis D).",
+            "Wie gut der Champion auf dieser Lane allgemein läuft — Siegquote und OP.GG-Tier (OP bis D).",
         ScoreTermKind.LaneMatchup =>
             "Wie viel besser oder schlechter dieser Champion gegen den erwarteten Lane-Gegner "
             + "abschneidet als auf dieser Lane üblich. Die allgemeine Stärke steckt schon in der "
@@ -356,11 +356,11 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         // The tier nudge is a label, not a measurement, so only the win rate carries error.
         budget.Add(ScoreError.LogitVariance(stat.WinRate, stat.Play, Shrinkage.LanePrior));
 
-        if (stat.Tier is 1 or 2)
+        if (stat.Tier is >= 0 and <= 2)
         {
             reasons.Add(Reason.Pro(
                 $"{ScoreModel.TierName(stat.Tier)} auf {lane.Display()}",
-                $"OP.GGs Tierliste für {lane.Display()}, von S (stärkste) bis D (schwächste). "
+                $"OP.GGs Tierliste für {lane.Display()}, von OP (stärkste) über S bis D (schwächste). "
                 + $"Siegquote: {stat.WinRate:P1} über {stat.Play:N0} Spiele."));
         }
         else if (stat.WinRateDelta > 0.015)
@@ -373,8 +373,16 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         return logOdds;
     }
 
+    /// <summary>
+    /// Tier 0 counts: it is OP.GG's OP tier, one step above S, and the ladder measured on the
+    /// stored rows is monotone through it. What it is NOT is a missing value — rows without a tier
+    /// arrive as -1 (see <see cref="MetaLookup"/>, which maps a tier without games to unknown), and
+    /// those get no nudge. Before this, the two champions OP.GG rates highest on their lane —
+    /// Jinx on Bot over 192.549 games and Thresh on Support over 168.018 — were read as unrated and
+    /// silently lost three points of win rate each.
+    /// </summary>
     private static double TierNudge(int tier)
-        => tier is >= 1 and <= 5 ? ScoreModel.TierNudge * (3 - tier) : 0;
+        => tier is >= 0 and <= 5 ? ScoreModel.TierNudge * (3 - tier) : 0;
     /// <summary>
     /// How strong the candidate is on the lane the enemy would play them. Names that lane in a chip
     /// only when it differs from the advised seat's own — otherwise the threat term below says the
@@ -828,7 +836,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
 
         if (logOdds > 0.05)
         {
-            var strength = stat.Tier is >= 1 and <= 5
+            var strength = stat.Tier is >= 0 and <= 5
                 ? ScoreModel.TierName(stat.Tier)
                 : $"{stat.WinRate:P1} WR";
 

@@ -230,7 +230,12 @@ public sealed class MetaLookup
                 PickRate: stat.PickRate,
                 BanRate: stat.BanRate,
                 RoleRate: stat.RoleRate,
-                Tier: stat.Tier,
+                // Tier 0 means two different things depending on where the row came from: OP.GG's
+                // OP tier in the tier list, and "no tier at all" in the fallback rows the analysis
+                // writes for lanes the tier list never listed. Those fallbacks carry no games, so
+                // the game count tells the two apart — in either direction, and in files written
+                // before this distinction existed.
+                Tier: stat.Play > 0 ? stat.Tier : -1,
                 Play: stat.Play);
 
             _rolePriors[slot] = Math.Max(0, stat.RoleRate);

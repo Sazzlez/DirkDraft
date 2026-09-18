@@ -54,11 +54,17 @@ public static class ScoreModel
     public const double BanAllyShare = 0.5;
 
     /// <summary>
-    /// OP.GG's numeric lane tiers (1 = best of 5) in the letters every tier list uses. "S-Tier"
-    /// needs no explanation; "Stufe 1 von 5" did.
+    /// OP.GG's numeric lane tiers in the letters every tier list uses. "S-Tier" needs no
+    /// explanation; "Stufe 1 von 5" did.
+    /// <para>
+    /// Tier 0 is OP.GG's OP tier, one step above S, and not a missing value — measured on the
+    /// stored snapshot the ladder is monotone: 0 → 52,0 %, 1 → 51,0 %, 2 → 50,6 %, 3 → 50,3 %,
+    /// 4 → 49,5 %, 5 → 47,3 %. Unknown is -1, written by the fallback that has no tier at all.
+    /// </para>
     /// </summary>
     public static string TierName(int tier) => tier switch
     {
+        0 => "OP-Tier",
         1 => "S-Tier",
         2 => "A-Tier",
         3 => "B-Tier",

@@ -36,7 +36,7 @@ internal sealed class MetaBuilder
         double roleRate = 0.9,
         double winRate = 0.5,
         int play = 1000,
-        int tier = 0,
+        int tier = -1,
         double pickRate = 0,
         double banRate = 0)
     {
