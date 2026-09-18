@@ -66,4 +66,36 @@ public static class LaneMatchups
 
         return rows;
     }
+
+    /// <summary>
+    /// The duel one seat is standing in: the row for its lane, but only when the seat's own
+    /// champion is the one that row has on that side.
+    /// <para>
+    /// The champion check is what makes this safe to call per seat. A lane holds one seat per side,
+    /// so matching the lane alone is enough while the rows come from the same prediction the seat
+    /// was rendered from — and hands a seat its neighbour's number the moment that stops being
+    /// true. Cheap to verify, so it is verified.
+    /// </para>
+    /// </summary>
+    /// <param name="rows">Rows from <see cref="For"/>.</param>
+    /// <param name="lane">The lane the seat is on, predicted or assigned.</param>
+    /// <param name="championId">What the seat has revealed; 0 while it has revealed nothing.</param>
+    /// <param name="isAlly">Which side of the row to compare the champion against.</param>
+    public static LaneMatchup? ForSeat(
+        IReadOnlyList<LaneMatchup> rows,
+        Lane lane,
+        int championId,
+        bool isAlly)
+    {
+        if (lane == Lane.Unknown || championId == 0)
+            return null;
+
+        foreach (var row in rows)
+        {
+            if (row.Lane == lane && (isAlly ? row.AllyId : row.EnemyId) == championId)
+                return row;
+        }
+
+        return null;
+    }
 }

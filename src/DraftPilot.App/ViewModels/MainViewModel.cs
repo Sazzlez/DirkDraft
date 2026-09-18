@@ -1327,9 +1327,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         TurnText = DescribeTurn();
         IsMyTurn = _state.Turn is { IsLocalPlayer: true };
 
-        RenderTeam(Allies, _state.Allies, allyPredictions, isAlly: true);
-        RenderTeam(Enemies, _state.Enemies, enemyPredictions, isAlly: false);
-        RenderBalance(allyPredictions, enemyPredictions);
+        // One set of lane duels for the whole render pass: the seat rows, the lane overview and the
+        // balance over the columns all read the same pairings, so the seat figures and the team
+        // figure above them cannot end up describing two different boards.
+        var laneDuels = LaneMatchups.For(_meta, allyPredictions, enemyPredictions);
+
+        RenderTeam(Allies, _state.Allies, allyPredictions, laneDuels, isAlly: true);
+        RenderTeam(Enemies, _state.Enemies, enemyPredictions, laneDuels, isAlly: false);
+        RenderBalance(allyPredictions, enemyPredictions, laneDuels);
 
         RenderRecommendations(enemyPredictions, allyPredictions);
 
@@ -1910,11 +1915,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// The two numbers over the team columns. Deliberately a dash until champions are actually
     /// revealed: a confident "50,0 %" before anyone has picked would be a claim about nothing.
     /// </summary>
-    private void RenderBalance(LanePredictionResult allyPredictions, LanePredictionResult enemyPredictions)
+    private void RenderBalance(
+        LanePredictionResult allyPredictions,
+        LanePredictionResult enemyPredictions,
+        IReadOnlyList<LaneMatchup> laneDuels)
     {
         var balance = DraftBalance.Estimate(_meta, _state, allyPredictions, enemyPredictions);
 
-        RenderGameMatchups(allyPredictions, enemyPredictions, balance);
+        RenderGameMatchups(laneDuels, balance);
 
         if (!balance.HasData)
         {
@@ -1992,15 +2000,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// view exists for — the same reason the build card is filled during the draft, not after it.
     /// </para>
     /// </summary>
-    private void RenderGameMatchups(
-        LanePredictionResult allyPredictions,
-        LanePredictionResult enemyPredictions,
-        DraftBalance balance)
+    private void RenderGameMatchups(IReadOnlyList<LaneMatchup> rows, DraftBalance balance)
     {
         if (!_state.IsActive)
             return;
 
-        var rows = LaneMatchups.For(_meta, allyPredictions, enemyPredictions);
         var culture = CultureInfo.CurrentCulture;
 
         GameMatchups.Resize(rows.Count, () => new LaneMatchupViewModel());
@@ -2405,6 +2409,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         ObservableCollection<SlotViewModel> rows,
         IReadOnlyList<DraftSlot> slots,
         LanePredictionResult predictions,
+        IReadOnlyList<LaneMatchup> laneDuels,
         bool isAlly)
     {
         rows.Resize(slots.Count, () => new SlotViewModel());
@@ -2444,7 +2449,80 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 && prediction is { IsUncertain: true };
 
             row.Warning = isAlly ? HoverWarning(slot) : null;
+
+            ApplySeatDuel(row, laneDuels, lane, slot.EffectiveChampionId, isAlly);
         }
+    }
+
+    /// <summary>
+    /// Puts this seat's own side of its lane duel on the row — and only once both lanes are filled.
+    /// <para>
+    /// A seat facing nobody gets no figure rather than a placeholder: half the rows of an early
+    /// draft would otherwise carry a dash, and the number's whole purpose is that it appears
+    /// exactly where a duel exists. Our row shows what our champion wins, their row the same duel
+    /// from their side; the two add up to 100 %, so either column can be read on its own.
+    /// </para>
+    /// </summary>
+    private void ApplySeatDuel(
+        SlotViewModel row,
+        IReadOnlyList<LaneMatchup> laneDuels,
+        Lane lane,
+        int championId,
+        bool isAlly)
+    {
+        var culture = CultureInfo.CurrentCulture;
+        var seat = LaneMatchups.ForSeat(laneDuels, lane, championId, isAlly);
+
+        if (seat is not { } duel || duel.AllyId == 0 || duel.EnemyId == 0)
+        {
+            row.WinRate = string.Empty;
+            row.HasDuel = false;
+            row.HasWinRate = false;
+            row.WinRateTone = ScoreTone.Fair;
+            row.WinRateHint = string.Empty;
+            return;
+        }
+
+        if (!duel.HasWinRate)
+        {
+            // The duel is on, the statistic is not there. A dash rather than a blank: the reader
+            // asked the question by picking into this lane, and "no data" is an answer — while an
+            // empty spot looks like the tool did not notice the lane was filled.
+            row.WinRate = "—";
+            row.HasDuel = true;
+            row.HasWinRate = false;
+            row.WinRateTone = ScoreTone.Fair;
+            row.WinRateHint = $"{_meta.ChampionName(duel.AllyId)} gegen {_meta.ChampionName(duel.EnemyId)} "
+                + $"auf {duel.Lane.Display()}: für dieses Duell hat OP.GG keine Statistik.";
+            return;
+        }
+
+        var allyRate = duel.WinRate!.Value;
+        var seatRate = isAlly ? allyRate : 1 - allyRate;
+
+        // Both rows take their precision from the same reading: the digits follow the sampling
+        // error of one duel, and 55,8 % opposite 44 % would claim the two halves of it were
+        // measured to different accuracy.
+        var decimals = ScoreError.Decimals(
+            ScoreError.LogitVariance(allyRate, duel.Play, Shrinkage.MatchupPrior));
+
+        row.WinRate = seatRate.ToString($"P{decimals}", culture);
+        row.HasDuel = true;
+        row.HasWinRate = true;
+
+        // A point either way is noise; the same band the balance above the column uses.
+        row.WinRateTone = (seatRate - 0.5) switch
+        {
+            > 0.02 => ScoreTone.Strong,
+            > -0.02 => ScoreTone.Fair,
+            _ => ScoreTone.Weak,
+        };
+
+        row.WinRateHint = $"Lane-Duell auf {duel.Lane.Display()}: "
+            + $"{_meta.ChampionName(duel.AllyId)} {allyRate.ToString($"P{decimals}", culture)} gegen "
+            + $"{_meta.ChampionName(duel.EnemyId)} {(1 - allyRate).ToString($"P{decimals}", culture)}, "
+            + $"aus {duel.Play.ToString("N0", culture)} Spielen"
+            + (duel.IsInferred ? " · aus der Gegenrichtung abgeleitet." : ".");
     }
 
     /// <summary>Flags an ally hover that cannot work out, which is worth saying before they lock it.</summary>
@@ -2575,6 +2653,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             row.IsManualLane = false;
             row.HasChampion = false;
             row.Warning = null;
+            row.WinRate = string.Empty;
+            row.HasDuel = false;
+            row.HasWinRate = false;
+            row.WinRateTone = ScoreTone.Fair;
+            row.WinRateHint = string.Empty;
         }
     }
 

@@ -1029,7 +1029,9 @@
                            ToolTip="{Binding BalanceHint}" />
             </Grid>
 
-            <ItemsControl ItemsSource="{Binding Enemies}">
+            <!-- Shared size scope: the duel figures line up in a column of their own, whether or
+                 not the seat next to them has one. -->
+            <ItemsControl ItemsSource="{Binding Enemies}" Grid.IsSharedSizeScope="True">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:SlotViewModel}">
                         <!--
@@ -1046,6 +1048,7 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="40" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="EnemySeatFigure" />
                             </Grid.ColumnDefinitions>
 
                             <Border Style="{StaticResource IconTile}" Width="32" Height="32">
@@ -1057,7 +1060,31 @@
                                        Style="{StaticResource ChampionName}" Margin="8,0,8,0"
                                        TextTrimming="CharacterEllipsis" />
 
-                            <StackPanel Grid.Row="1" Grid.Column="1"
+                            <!--
+                                Their side of the lane duel, and only where there is one: both
+                                lanes filled. Never coloured, for the same reason the total above
+                                this column is not — green on their number reads as good news.
+                            -->
+                            <TextBlock Grid.Column="2" Text="{Binding WinRate}"
+                                       FontFamily="{StaticResource NumFont}" FontSize="12"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right"
+                                       ToolTip="{Binding WinRateHint}"
+                                       Visibility="{Binding HasDuel, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                        <Style.Triggers>
+                                            <!-- The dash of a duel without a statistic stands back;
+                                                 it is a note, not a reading. -->
+                                            <DataTrigger Binding="{Binding HasWinRate}" Value="False">
+                                                <Setter Property="Foreground" Value="{StaticResource Faint}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
                                         Orientation="Horizontal" Margin="8,4,0,0">
                                 <TextBlock Text="{Binding Label}" Style="{StaticResource Small}"
                                            Foreground="{StaticResource Faint}" FontSize="11"
@@ -1149,7 +1176,8 @@
                 </TextBlock>
             </Grid>
 
-            <ItemsControl ItemsSource="{Binding Allies}">
+            <!-- Shared size scope: see the enemy column. -->
+            <ItemsControl ItemsSource="{Binding Allies}" Grid.IsSharedSizeScope="True">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:SlotViewModel}">
                         <Button Style="{StaticResource RowButton}" Margin="0,0,0,6"
@@ -1178,7 +1206,8 @@
                                         <ColumnDefinition Width="3" />
                                         <ColumnDefinition Width="40" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" SharedSizeGroup="SeatLane" />
+                                        <ColumnDefinition Width="Auto" SharedSizeGroup="SeatFigure" />
                                     </Grid.ColumnDefinitions>
 
                                     <!-- Accent bar marks the seat the list is advising. -->
@@ -1208,7 +1237,42 @@
                                                HorizontalAlignment="Right" VerticalAlignment="Center"
                                                Margin="0,0,8,0" />
 
-                                    <StackPanel Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2"
+                                    <!--
+                                        This seat's side of its lane duel. Appears only where a duel
+                                        exists — our champion and theirs both standing on the lane —
+                                        so the column stays quiet through the early picks instead of
+                                        filling up with dashes. Coloured on our rows only: the scale
+                                        is the one the total above the column uses, a point either
+                                        way being noise.
+                                    -->
+                                    <TextBlock Grid.Column="4" Text="{Binding WinRate}"
+                                               FontFamily="{StaticResource NumFont}" FontSize="12"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Margin="0,0,4,0"
+                                               ToolTip="{Binding WinRateHint}"
+                                               Visibility="{Binding HasDuel, Converter={StaticResource BoolToVisibility}}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                                <Style.Triggers>
+                                                    <!-- A duel without a statistic shows its dash
+                                                         quietly; the tone triggers below cannot
+                                                         fire for it, it is never ahead or behind. -->
+                                                    <DataTrigger Binding="{Binding HasWinRate}" Value="False">
+                                                        <Setter Property="Foreground" Value="{StaticResource Faint}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding WinRateTone}" Value="Strong">
+                                                        <Setter Property="Foreground" Value="{StaticResource Good}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding WinRateTone}" Value="Weak">
+                                                        <Setter Property="Foreground" Value="{StaticResource Bad}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <StackPanel Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="3"
                                                 Orientation="Horizontal" Margin="8,3,0,0">
                                         <!-- Which seat this is. Your own row says so in accent and
                                              bold — the accent BAR on the left means something else

@@ -26,6 +26,11 @@ public sealed class SlotViewModel : ObservableObject
     private bool _hasChampion;
     private string? _warning;
     private ImageSource? _icon;
+    private string _winRate = string.Empty;
+    private bool _hasDuel;
+    private bool _hasWinRate;
+    private ScoreTone _winRateTone = ScoreTone.Fair;
+    private string _winRateHint = string.Empty;
 
     public static IReadOnlyList<string> LaneOptions => LaneChoices;
 
@@ -126,6 +131,58 @@ public sealed class SlotViewModel : ObservableObject
     }
 
     public bool HasWarning => !string.IsNullOrEmpty(_warning);
+
+    /// <summary>
+    /// This seat's own side of its lane duel, as text — empty until both lanes are filled.
+    /// <para>
+    /// It is the seat's number, not the duel's: the ally row shows what our champion wins, the
+    /// enemy row the same duel read from their side. The two add up to 100 %, which is the point —
+    /// one number standing between two champions never says whose it is.
+    /// </para>
+    /// </summary>
+    public string WinRate
+    {
+        get => _winRate;
+        set => Set(ref _winRate, value);
+    }
+
+    /// <summary>
+    /// Both lanes are filled, so this seat is facing someone — the figure belongs on the row.
+    /// A seat with nobody opposite shows nothing at all: half an early draft would otherwise be
+    /// dashes, and the number is worth noticing exactly where a duel exists.
+    /// </summary>
+    public bool HasDuel
+    {
+        get => _hasDuel;
+        set => Set(ref _hasDuel, value);
+    }
+
+    /// <summary>
+    /// Whether <see cref="WinRate"/> is a number rather than the dash. False means the duel is on
+    /// but OP.GG has no row for it — which is worth showing, and worth not dressing up as 50 %.
+    /// </summary>
+    public bool HasWinRate
+    {
+        get => _hasWinRate;
+        set => Set(ref _hasWinRate, value);
+    }
+
+    /// <summary>
+    /// Colour of the figure on our own rows. The enemy rows stay muted whatever this says: green
+    /// on their number would read as good news.
+    /// </summary>
+    public ScoreTone WinRateTone
+    {
+        get => _winRateTone;
+        set => Set(ref _winRateTone, value);
+    }
+
+    /// <summary>Tooltip for the figure: which duel it is about and how many games are behind it.</summary>
+    public string WinRateHint
+    {
+        get => _winRateHint;
+        set => Set(ref _winRateHint, value);
+    }
 
     /// <summary>Maps a lane onto its dropdown index.</summary>
     public static int IndexOf(Lane lane) => lane switch

@@ -122,4 +122,66 @@ public class LaneMatchupsTests
 
         Assert.Empty(rows);
     }
+
+    /// <summary>
+    /// The seat lookup behind the figures in the team columns: each row gets the duel it is
+    /// actually standing in, read from its own side.
+    /// </summary>
+    [Fact]
+    public void ASeat_FindsTheDuelItStandsIn_FromEitherSide()
+    {
+        var meta = Meta();
+        var (allies, enemies) = Predict(meta);
+        var rows = LaneMatchups.For(meta, allies, enemies);
+
+        var ours = LaneMatchups.ForSeat(rows, Lane.Top, AllyTop, isAlly: true);
+        var theirs = LaneMatchups.ForSeat(rows, Lane.Top, EnemyTop, isAlly: false);
+
+        Assert.NotNull(ours);
+        Assert.Equal(Lane.Top, ours!.Value.Lane);
+        Assert.Equal(ours, theirs);
+    }
+
+    /// <summary>The champion is checked, not just the lane — otherwise a seat borrows the pick
+    /// that actually stands there.</summary>
+    [Fact]
+    public void ASeatOnALaneSomebodyElseHolds_GetsNoDuel()
+    {
+        var meta = Meta();
+        var (allies, enemies) = Predict(meta);
+        var rows = LaneMatchups.For(meta, allies, enemies);
+
+        Assert.Null(LaneMatchups.ForSeat(rows, Lane.Top, AllyMid, isAlly: true));
+
+        // Right champion, wrong side: our top laner is not the enemy of the top row.
+        Assert.Null(LaneMatchups.ForSeat(rows, Lane.Top, AllyTop, isAlly: false));
+    }
+
+    [Fact]
+    public void ASeatWithoutAPickOrALane_GetsNoDuel()
+    {
+        var meta = Meta();
+        var (allies, enemies) = Predict(meta);
+        var rows = LaneMatchups.For(meta, allies, enemies);
+
+        Assert.Null(LaneMatchups.ForSeat(rows, Lane.Top, championId: 0, isAlly: true));
+        Assert.Null(LaneMatchups.ForSeat(rows, Lane.Unknown, AllyTop, isAlly: true));
+    }
+
+    /// <summary>
+    /// Blind pick: the seat is found, so its lane still reads, but the row carries no rate — the
+    /// figure stays away rather than turning an unopposed lane into a number.
+    /// </summary>
+    [Fact]
+    public void ASeatFacingNobody_FindsItsRow_WithoutARate()
+    {
+        var meta = Meta();
+        var (allies, enemies) = Predict(meta, withEnemies: false);
+        var rows = LaneMatchups.For(meta, allies, enemies);
+
+        var seat = LaneMatchups.ForSeat(rows, Lane.Top, AllyTop, isAlly: true);
+
+        Assert.NotNull(seat);
+        Assert.False(seat!.Value.HasWinRate);
+    }
 }
