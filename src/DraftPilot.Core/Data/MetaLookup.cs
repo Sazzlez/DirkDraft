@@ -87,6 +87,13 @@ public sealed class MetaLookup
 
     public DateTimeOffset BuiltAtUtc => _snapshot.BuiltAtUtc;
 
+    /// <summary>
+    /// The rank bracket these numbers describe, e.g. <c>gold</c> or <c>all</c>. Read by the live
+    /// fetch, so the counters it adds during a draft come from the same population as the file, and
+    /// by the footer, so the player can see which league the advice is about.
+    /// </summary>
+    public string Tier => _snapshot.Tier ?? string.Empty;
+
     public IReadOnlyList<string> Warnings => _snapshot.Warnings;
 
     public IReadOnlyList<ChampionEntry> Champions => _champions;

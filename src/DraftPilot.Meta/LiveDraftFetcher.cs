@@ -278,7 +278,13 @@ public static class MatchupGuideParser
 /// counter lists for the enemies actually being faced. Runs automatically as picks are revealed —
 /// at most one call per enemy champion and one per matchup for the whole draft, cached on disk.
 /// </summary>
-public sealed class LiveDraftFetcher(OpGgMcpClient client, string gameMode, Action<string>? diagnostic = null)
+/// <param name="tier">
+/// The rank bracket the stored snapshot was built for. The live counters have to come from the same
+/// one — a duel from a different population than the lane rate it is compared against is not a
+/// comparison at all.
+/// </param>
+public sealed class LiveDraftFetcher(
+    OpGgMcpClient client, string gameMode, string tier = "all", Action<string>? diagnostic = null)
 {
     /// <summary>Build, runes and spells for one concrete matchup, or null if OP.GG has nothing.</summary>
     public async Task<BuildPlan?> FetchBuildAsync(
@@ -352,8 +358,11 @@ public sealed class LiveDraftFetcher(OpGgMcpClient client, string gameMode, Acti
                 ["game_mode"] = gameMode,
                 ["champion"] = name,
                 ["position"] = requested.ToOpGg(),
-                // "all" is mandatory: rank-filtered counter samples are almost always empty.
-                ["tier"] = "all",
+                // The same bracket the snapshot was built for. The claim that used to stand here —
+                // rank-filtered counters come back almost always empty — was measured on 2026-09-18
+                // and does not hold: tier=gold answers for Darius Top with counters over 241 to 343
+                // games each (docs/opgg-schnittstelle.md).
+                ["tier"] = tier,
                 ["desired_output_fields"] = OpGgMcpClient.Fields(
                     "data.summary.positions[].name",
                     "data.summary.positions[].counters[].champion_name",

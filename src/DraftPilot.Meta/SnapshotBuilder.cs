@@ -13,10 +13,24 @@ public sealed record SnapshotBuildOptions
     public string GameMode { get; init; } = "ranked";
 
     /// <summary>
-    /// Rank filter for the analysis calls. Effectively fixed at <c>all</c>: without it OP.GG
-    /// returns no matchup data whatsoever, which was verified against the live endpoint.
+    /// Rank bracket for the per-champion analysis — lane stats, counters and tier all come back
+    /// for it. <c>all</c> is the all-rank aggregate, an empty value leaves the parameter off
+    /// (OP.GG then answers with <c>emerald_plus</c>, which is also what the tier list always
+    /// returns). A named bracket such as <c>gold</c> or <c>platinum</c> makes the analysis rows
+    /// authoritative for the lane stats too, because otherwise one score would mix two populations.
+    /// <para>
+    /// The old comment here claimed rank-filtered calls come back empty. Measured on 2026-09-18
+    /// against the live endpoint, they do not: <c>tier=gold</c> answers for Darius Top with 100.734
+    /// games and counters over 241 to 343 games each (docs/opgg-schnittstelle.md).
+    /// </para>
     /// </summary>
-    public string CounterTier { get; init; } = "all";
+    public string Tier { get; init; } = "all";
+
+    /// <summary>
+    /// Whether <see cref="Tier"/> names one bracket rather than an aggregate. Only then may the
+    /// analysis rows replace the tier list's, which always describes OP.GG's default bracket.
+    /// </summary>
+    public bool HasRankBracket => Tier.Length > 0 && !Tier.Equals("all", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Pull the richer duo lists for bot lane, which is where duo choice actually matters.</summary>
     public bool IncludeDuoSynergies { get; init; } = true;
@@ -71,6 +85,13 @@ public sealed class SnapshotBuilder : IDisposable
         "data.summary.positions[].stats.ban_rate",
         "data.summary.positions[].stats.role_rate",
         "data.summary.positions[].stats.tier_data.tier",
+        // The only exact win counter this endpoint has: positions[].stats reports win_rate rounded
+        // to two decimals, the role split reports wins AND games. Measured against the tier list's
+        // exact number for the same bracket, the reconstruction lands within 0.10 points — a tenth
+        // of what the rounding costs. The roles cover ~98 % of a lane's games; the rest carries no
+        // role and simply does not enter.
+        "data.summary.positions[].roles[].stats.play",
+        "data.summary.positions[].roles[].stats.win",
         "data.summary.positions[].counters[].champion_name",
         "data.summary.positions[].counters[].play",
         "data.summary.positions[].counters[].win",
@@ -139,7 +160,7 @@ public sealed class SnapshotBuilder : IDisposable
         var snapshot = new MetaSnapshot
         {
             GameMode = options.GameMode,
-            Tier = options.CounterTier,
+            Tier = options.Tier,
             BuiltAtUtc = DateTimeOffset.UtcNow,
         };
 
@@ -356,8 +377,6 @@ public sealed class SnapshotBuilder : IDisposable
 
         if (unresolved.Count > 0)
             snapshot.Warnings.Add($"Tierlist: {unresolved.Count} Namen nicht zugeordnet ({string.Join(", ", unresolved.Take(5))}).");
-
-        UnroundPickRates(snapshot.LaneStats);
     }
 
     /// <summary>
@@ -489,7 +508,7 @@ public sealed class SnapshotBuilder : IDisposable
                     }
                     else
                     {
-                        Absorb(snapshot, resolver, champion, requested, node);
+                        Absorb(snapshot, resolver, champion, requested, node, options.HasRankBracket);
                         RecordFieldDiagnostics(node, AnalysisFields);
 
                         var (version, asOf) = ReadDataStamp(node);
@@ -616,7 +635,7 @@ public sealed class SnapshotBuilder : IDisposable
                 ["game_mode"] = options.GameMode,
                 ["champion"] = name,
                 ["position"] = requested.ToOpGg(),
-                ["tier"] = options.CounterTier,
+                ["tier"] = options.Tier,
                 ["desired_output_fields"] = OpGgMcpClient.Fields(AnalysisFields),
             };
 
@@ -642,7 +661,8 @@ public sealed class SnapshotBuilder : IDisposable
         ChampionResolver resolver,
         ChampionEntry champion,
         Lane requested,
-        OpGgNode node)
+        OpGgNode node,
+        bool rankSpecific)
     {
         var data = node["data"];
 
@@ -655,7 +675,7 @@ public sealed class SnapshotBuilder : IDisposable
             if (lane == Lane.Unknown)
                 continue;
 
-            AddLaneFallback(snapshot, champion.Id, lane, position["stats"]);
+            AddLaneFallback(snapshot, champion.Id, lane, position["stats"], position["roles"], rankSpecific);
 
             foreach (var counter in position["counters"].Items)
             {
@@ -707,22 +727,34 @@ public sealed class SnapshotBuilder : IDisposable
     }
 
     /// <summary>
-    /// Records role and win rate for a lane the tier list did not list. Keeps off-meta picks from
-    /// falling out of the lane predictor entirely.
+    /// Records role and win rate for a lane from the analysis response. Two jobs in one, decided by
+    /// <paramref name="rankSpecific"/>:
+    /// <list type="bullet">
+    /// <item>Without a rank bracket it fills the gaps only — lanes the tier list did not list — so
+    /// off-meta picks do not fall out of the lane predictor entirely. The tier list keeps every lane
+    /// it covers: its sample counts a different population than an <c>all</c>-tier analysis, so the
+    /// bigger number is not the better one.</item>
+    /// <item>With a bracket configured it REPLACES the tier list's row, because that one always
+    /// describes OP.GG's default bracket (emerald_plus). Mixing the two would put two populations
+    /// into one score — the lane strength from one, the duels from the other.</item>
+    /// </list>
     /// </summary>
-    private static void AddLaneFallback(MetaSnapshot snapshot, int championId, Lane lane, OpGgNode stats)
+    private static void AddLaneFallback(
+        MetaSnapshot snapshot, int championId, Lane lane, OpGgNode stats, OpGgNode? roles, bool rankSpecific)
     {
-        if (ReadFallbackLaneStat(stats, championId, lane) is not { } fallback)
+        if (ReadFallbackLaneStat(stats, championId, lane, roles) is not { } fallback)
             return;
 
-        // The tier list wins whenever it covers this lane. Its sample counts a different population
-        // than the analysis call (which runs with tier="all"), so the two numbers are not comparable
-        // and the larger one is not the better one.
-        var alreadyKnown = snapshot.LaneStats.Any(stat => stat.ChampionId == championId && stat.Lane == lane);
-        if (alreadyKnown)
-            return;
+        var known = snapshot.LaneStats.FindIndex(stat => stat.ChampionId == championId && stat.Lane == lane);
 
-        snapshot.LaneStats.Add(fallback);
+        if (known < 0)
+        {
+            snapshot.LaneStats.Add(fallback);
+            return;
+        }
+
+        if (rankSpecific)
+            snapshot.LaneStats[known] = fallback;
     }
 
     /// <summary>
@@ -735,7 +767,12 @@ public sealed class SnapshotBuilder : IDisposable
     /// 50 %, which is not what "off-meta lane" means.
     /// </para>
     /// </summary>
-    public static LaneStat? ReadFallbackLaneStat(OpGgNode stats, int championId, Lane lane)
+    /// <param name="roles">
+    /// The position's role split, when the response carried one. It is the only place this endpoint
+    /// reports wins as a counter rather than a rounded rate, so it recovers the precision the
+    /// rounding costs — and that matters as soon as these rows are the authoritative ones.
+    /// </param>
+    public static LaneStat? ReadFallbackLaneStat(OpGgNode stats, int championId, Lane lane, OpGgNode? roles = null)
     {
         var roleRate = stats["role_rate"].AsNumber(-1);
         if (roleRate < 0)
@@ -745,7 +782,7 @@ public sealed class SnapshotBuilder : IDisposable
         {
             ChampionId = championId,
             Lane = lane,
-            WinRate = stats["win_rate"].AsNumber(0.5),
+            WinRate = ExactWinRate(roles) ?? stats["win_rate"].AsNumber(0.5),
             PickRate = stats["pick_rate"].AsNumber(),
             BanRate = stats["ban_rate"].AsNumber(),
             RoleRate = roleRate,
@@ -753,6 +790,32 @@ public sealed class SnapshotBuilder : IDisposable
             Tier = stats["tier_data"]["tier"].AsInt(),
             Play = stats["play"].AsInt(),
         };
+    }
+
+    /// <summary>
+    /// The win rate summed over a position's role split, or <see langword="null"/> when there is no
+    /// split to sum. Deliberately strict: a partial split would describe a different set of games
+    /// than the position it is supposed to measure, and the rounded rate is the better answer then.
+    /// </summary>
+    private static double? ExactWinRate(OpGgNode? roles)
+    {
+        if (roles is null)
+            return null;
+
+        var play = 0;
+        var wins = 0;
+
+        foreach (var role in roles.Items)
+        {
+            var stats = role["stats"];
+            if (!stats["play"].HasValue || !stats["win"].HasValue)
+                return null;
+
+            play += stats["play"].AsInt();
+            wins += stats["win"].AsInt();
+        }
+
+        return play > 0 ? (double)wins / play : null;
     }
 
     private static void AddMatchup(
@@ -921,12 +984,19 @@ public sealed class SnapshotBuilder : IDisposable
 
         // Tier list first, sample size only as a tie-break: an analysis row carries the all-tier
         // aggregate and can outnumber a tier list row for the same lane by thirty to one without
-        // being the better answer. AddLaneFallback already prevents the collision; this keeps the
-        // rule where it is visible instead of resting on a check 200 lines away.
+        // being the better answer. AddLaneFallback already prevents the collision — and with a rank
+        // bracket configured it resolves it the other way, by replacing the row outright; this keeps
+        // the rule where it is visible instead of resting on a check 200 lines away.
         snapshot.LaneStats = [.. snapshot.LaneStats
             .GroupBy(stat => (stat.ChampionId, stat.Lane))
             .Select(group => group.OrderByDescending(stat => stat.FromTierList).ThenByDescending(stat => stat.Play).First())
             .OrderBy(stat => stat.Lane).ThenByDescending(stat => stat.RoleRate)];
+
+        // Per source, not over the whole list: the divisor is a sample size, and a tier list row and
+        // an analysis row count different populations. Mixing them would de-round both against an
+        // average of two numbers that belong to neither.
+        UnroundPickRates([.. snapshot.LaneStats.Where(stat => stat.FromTierList)]);
+        UnroundPickRates([.. snapshot.LaneStats.Where(stat => !stat.FromTierList)]);
     }
 
     /// <summary>
@@ -945,9 +1015,17 @@ public sealed class SnapshotBuilder : IDisposable
         if (thin > 0)
             snapshot.Warnings.Add($"{thin} Matchups mit unter 50 Spielen — werden stark zur Mitte gezogen.");
 
-        snapshot.Warnings.Add(
-            $"Synergien: {snapshot.Synergies.Count} Paare. Tierlist stammt aus OP.GGs Standard-Bracket, " +
-            $"Matchups aus dem Bracket '{snapshot.Tier}'.");
+        // Which population the numbers describe, per source — the one thing about this file that
+        // cannot be seen by looking at the numbers themselves.
+        var bracket = snapshot.Tier ?? string.Empty;
+        var rankFiltered = bracket.Length > 0 && !bracket.Equals("all", StringComparison.OrdinalIgnoreCase);
+
+        snapshot.Warnings.Add(rankFiltered
+            ? $"Synergien: {snapshot.Synergies.Count} Paare. Lane-Zahlen, Duelle und Tier stammen aus dem "
+                + $"Bracket '{snapshot.Tier}'; Synergien kennen keinen Rangfilter und stammen aus OP.GGs "
+                + "Standard-Bracket (Emerald und höher)."
+            : $"Synergien: {snapshot.Synergies.Count} Paare. Tierlist stammt aus OP.GGs Standard-Bracket "
+                + $"(Emerald und höher), Matchups aus dem Bracket '{snapshot.Tier}'.");
 
         // The one failure neither the parser nor OP.GG's own diagnostics report: if a class stops
         // being declared in the header, every field falls back to a positional name, every lookup

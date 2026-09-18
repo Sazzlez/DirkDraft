@@ -91,6 +91,9 @@ try
         case "opgg":
             return await OpGgCommand.RunAsync(args, lifetime.Token);
 
+        case "settings":
+            return SettingsCommand.Run(args);
+
         default:
             Console.Error.WriteLine($"Unbekannter Befehl: {args[0]}");
             PrintUsage();
@@ -143,6 +146,8 @@ static void PrintUsage()
                                  vollstaendige Argument-Schema eines Werkzeugs
           opgg try <werkzeug> [schluessel=wert ...] [--out datei.json]
                                  Ein Werkzeug einmal aufrufen und die rohe Antwort ansehen
+          settings [name wert]   Einstellungen zeigen; mit Namen und Wert aendern
+                                 (tier, gamemode, recommendationcount)
         """);
 }
 

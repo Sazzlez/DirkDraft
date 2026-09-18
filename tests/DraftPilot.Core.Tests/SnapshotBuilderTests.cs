@@ -184,6 +184,43 @@ public class SnapshotBuilderTests
     }
 
     /// <summary>
+    /// With a rank bracket configured, the lane row comes from the analysis — and that endpoint
+    /// rounds its win rate to two decimals. The role split under the same position does report a
+    /// win counter, so the rate is recoverable: measured against the tier list's exact number for
+    /// the same bracket, the reconstruction lands within 0.10 points instead of 1.
+    /// </summary>
+    [Fact]
+    public void WithARoleSplit_TheLaneRateComesFromTheWinCounters()
+    {
+        var stats = Inline("class Stats: play,win_rate,role_rate\n\nStats(100734,0.49,0.87)");
+        var roles = Inline(
+            "class Role: stats\nclass Stats1: play,win\n\n"
+            + "[Role(Stats1(52710,26597)),Role(Stats1(41190,20062)),Role(Stats1(3257,1243)),Role(Stats1(1817,869))]");
+
+        var stat = SnapshotBuilder.ReadFallbackLaneStat(stats, championId: 122, Lane.Top, roles);
+
+        Assert.NotNull(stat);
+
+        // 48.771 Siege aus 98.974 Spielen — die gerundete Angabe sagt 0,49.
+        Assert.Equal(0.4928, stat.WinRate, precision: 4);
+    }
+
+    /// <summary>
+    /// A partial split would describe a different set of games than the position it is meant to
+    /// measure. Then the rounded rate is the better answer, not the more precise wrong one.
+    /// </summary>
+    [Fact]
+    public void WithoutWinCountersInTheSplit_TheRoundedRateStands()
+    {
+        var stats = Inline("class Stats: play,win_rate,role_rate\n\nStats(100734,0.49,0.87)");
+        var roles = Inline("class Role: stats\nclass Stats1: play\n\n[Role(Stats1(52710)),Role(Stats1(41190))]");
+
+        var stat = SnapshotBuilder.ReadFallbackLaneStat(stats, championId: 122, Lane.Top, roles);
+
+        Assert.Equal(0.49, stat!.WinRate, precision: 4);
+    }
+
+    /// <summary>
     /// OP.GG rounds the pick rate to two decimals, and the ban value reads it times eight — one
     /// rounding step is 0.08 of a gate that rarely exceeds 0.6. The divisor is not in the response
     /// but follows from it: play / pick_rate is the same sample size in every row.

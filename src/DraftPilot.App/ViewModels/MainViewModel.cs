@@ -1675,8 +1675,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // blocked the retry that might have made it in time. A healthy call answers in two to
             // four seconds; ten leaves room for a slow one and still two attempts in one phase.
             _opGg ??= new OpGgMcpClient(timeout: TimeSpan.FromSeconds(10));
+            // The bracket of the file we are comparing against, not the setting: after changing the
+            // setting the snapshot still describes the old one until the next update, and mixing the
+            // two would be worse than being a bracket behind.
             var fetcher = new LiveDraftFetcher(
-                _opGg, _settings.GameMode, message => CrashLog.Note("Draft-Abruf", message));
+                _opGg,
+                _settings.GameMode,
+                _meta.Tier is { Length: > 0 } tier ? tier : _settings.Tier,
+                message => CrashLog.Note("Draft-Abruf", message));
 
             // The build goes first. It is the only result of this whole round the user can act on —
             // the rune button hangs off it — and behind up to five serial enemy calls it regularly
@@ -3006,10 +3012,37 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             ? $"OP.GG-Patch {_meta.DataPatch}"
             : $"Patch {_meta.Patch}";
 
+        // Which league the numbers describe belongs next to the patch: both answer "do these
+        // numbers fit my games", and only one of them used to be on screen.
+        var bracket = RankBracketName(_meta.Tier) is { Length: > 0 } name ? $" · {name}" : string.Empty;
+
         HasMeta = true;
-        SnapshotText = $"Daten: {patchText}{ageText}{nudge}";
+        SnapshotText = $"Daten: {patchText}{bracket}{ageText}{nudge}";
         SnapshotDetail = DescribeDataProvenance();
     }
+
+    /// <summary>
+    /// OP.GG's bracket ids in the words the client uses. Empty for the all-rank aggregate: "alle
+    /// Ränge" in the footer would read as a setting somebody chose, when it is simply what this
+    /// tool has always fetched.
+    /// </summary>
+    private static string RankBracketName(string tier) => tier.ToLowerInvariant() switch
+    {
+        "iron" => "Eisen",
+        "bronze" => "Bronze",
+        "silver" => "Silber",
+        "gold" => "Gold",
+        "platinum" => "Platin",
+        "emerald" => "Smaragd",
+        "diamond" => "Diamant",
+        "master" => "Meister",
+        "grandmaster" => "Großmeister",
+        "challenger" => "Herausforderer",
+        "platinum_plus" => "Platin+",
+        "emerald_plus" => "Smaragd+",
+        "diamond_plus" => "Diamant+",
+        _ => string.Empty,
+    };
 
     /// <summary>
     /// The long form behind the footer: which numbers, from when, and whether OP.GG was still on the
@@ -3099,7 +3132,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
             var snapshot = await Task.Run(
                 () => builder.BuildAsync(
-                    new SnapshotBuildOptions { GameMode = _settings.GameMode, Language = _settings.DataLanguage },
+                    new SnapshotBuildOptions { GameMode = _settings.GameMode, Tier = _settings.Tier, Language = _settings.DataLanguage },
                     progress,
                     scope.Token),
                 scope.Token).ConfigureAwait(true);

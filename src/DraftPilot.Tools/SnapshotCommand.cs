@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DraftPilot.Core.Config;
 using DraftPilot.Core.Data;
 using DraftPilot.Core.Draft;
 using DraftPilot.Meta;
@@ -36,7 +37,19 @@ internal static class SnapshotCommand
         MetaSnapshot snapshot;
         try
         {
-            snapshot = await builder.BuildAsync(new SnapshotBuildOptions(), progress, ct);
+            // The same settings the window uses: a snapshot built here must describe the same
+            // population as one built by the button, or the two would silently differ.
+            var settings = AppSettings.Load();
+
+            snapshot = await builder.BuildAsync(
+                new SnapshotBuildOptions
+                {
+                    GameMode = settings.GameMode,
+                    Tier = settings.Tier,
+                    Language = settings.DataLanguage,
+                },
+                progress,
+                ct);
         }
         catch (OperationCanceledException)
         {

@@ -55,6 +55,21 @@ public sealed class AppSettings
     /// <summary>OP.GG game mode for updates: <c>ranked</c> or <c>flex</c>.</summary>
     public string GameMode { get; set; } = "ranked";
 
+    /// <summary>
+    /// Rank bracket the numbers should describe: <c>iron</c>, <c>bronze</c>, <c>silver</c>,
+    /// <c>gold</c>, <c>platinum</c>, <c>emerald</c>, <c>diamond</c>, <c>master</c>, the aggregates
+    /// <c>emerald_plus</c>, <c>platinum_plus</c>, <c>diamond_plus</c> — or <c>all</c> for every rank
+    /// at once, which is what this defaults to and what it always sent.
+    /// <para>
+    /// A named bracket describes the games the player actually plays: measured on 2026-09-18, Darius
+    /// Top has 100.734 games in gold and 88.193 in platinum, and the champions listed as his
+    /// strongest counters differ between the two. It also makes the file consistent — with
+    /// <c>all</c>, lane strength comes from OP.GG's default bracket and the duels from every rank,
+    /// which are two different populations inside one score. Takes effect on the next data update.
+    /// </para>
+    /// </summary>
+    public string Tier { get; set; } = "all";
+
     public static AppSettings Load()
     {
         try
