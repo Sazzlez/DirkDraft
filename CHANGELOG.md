@@ -3,7 +3,7 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
-## 1.1.0 — noch nicht veröffentlicht
+## 1.1.0 — 2026-09-19
 
 - **OP.GGs Tier zählt nicht mehr in die Prozentzahl.** Es steht weiter neben jeder Zeile, jetzt als
   grauer Hinweis statt als Argument. Gemessen an den 273 Lane-Zeilen des Gold-Snapshots erklärt das
@@ -28,13 +28,11 @@ Kopien melden sie beim nächsten Start.
   gespeicherte und nachgerechnete Basislinien nebeneinander.
 - Auch die Ban-Liste zählt die allgemeine Stärke nicht mehr doppelt: „schlägt unseren X" misst
   jetzt, wie viel mehr als üblich.
-
 - **Frühe Picks sehen ihr Konterrisiko.** Solange auf deiner Lane niemand aufgedeckt ist, trägt
   jede Zeile „N offene Konter": noch freie Champions, die gegen diesen Pick besser abschneiden als
   seine Gegner üblicherweise. Im Blind-Draft liegen Singed und Nasus bei drei, Malphite bei sieben
   — bei fünf statistisch gleichwertigen Zeilen ist das der Unterschied, nach dem man sucht. Zählt
   nicht in die Prozentzahl hinein: ob der Gegner sie nimmt, sagen die Daten nicht.
-
 - **Die Zahlen können jetzt deine Liga beschreiben.** `Tools -- settings tier gold` (oder
   `platinum`, `platinum_plus`, …) stellt das Rang-Bracket ein; Lane-Zahlen, Duelle und Tier kommen
   dann von dort. Vorher mischte ein einziger Score zwei Populationen: Lane-Stärke aus OP.GGs
@@ -78,7 +76,6 @@ Kopien melden sie beim nächsten Start.
   Schemas nimmt nur die Champion-Analyse beide Parameter an — Tierlist, Duo-Werkzeug und
   Matchup-Guide keinen von beiden. Ein Gold-Snapshot ist in den Lane-Zahlen und Countern Gold, in
   den Duos nicht. Steht die Einstellung auf etwas anderem als die Datei, steht auch das da.
-
 ## 1.0.3 — 2026-09-04
 
 - Um die Zug-Karte („Du pickst") läuft kein Verlaufsrahmen mehr. Sie hat jetzt denselben ruhigen
