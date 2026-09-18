@@ -155,6 +155,16 @@ internal static class SnapshotCommand
             Console.WriteLine($"  {lane.Display(),-8} {string.Join("  ", best)}");
         }
 
+        // Stored beside re-measured: a file written before a baseline existed carries 0, and 0 is a
+        // legitimate value, so the two columns are the only way to tell "measured as zero" from
+        // "never measured".
+        Console.WriteLine();
+        Console.WriteLine("Basislinien (Logit)         gespeichert   aus diesen Zeilen");
+        Baseline("Lane", snapshot.LaneBaseline, SnapshotBuilder.MeasureLaneBaseline(snapshot.LaneStats));
+        Baseline("Matchup (Listenversatz)", snapshot.MatchupBaseline,
+            SnapshotBuilder.MeasureMatchupBaseline(snapshot.Matchups, snapshot.LaneStats));
+        Baseline("Synergie", snapshot.SynergyBaseline, SnapshotBuilder.MeasureSynergyBaseline(snapshot.Synergies));
+
         var damageKnown = snapshot.Champions.Count(champion => champion.Damage != DamageType.Unknown);
         Console.WriteLine();
         Console.WriteLine($"Schadensart bekannt für {damageKnown} von {snapshot.Champions.Count} Champions.");
@@ -166,5 +176,14 @@ internal static class SnapshotCommand
         Console.WriteLine("Hinweise:");
         foreach (var warning in snapshot.Warnings)
             Console.WriteLine($"  - {warning}");
+    }
+
+    private static void Baseline(string name, double stored, double measured)
+    {
+        var note = Math.Abs(stored - measured) < 1e-9
+            ? string.Empty
+            : "   ← weicht ab, nächster Abruf schreibt den gemessenen Wert";
+
+        Console.WriteLine($"  {name,-24} {stored,10:N4}   {measured,14:N4}{note}");
     }
 }

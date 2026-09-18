@@ -65,7 +65,9 @@ public sealed record ScoreTerm(ScoreTermKind Kind, double? LogOdds)
     public string Hint => Kind switch
     {
         ScoreTermKind.LaneStrength =>
-            "Wie gut der Champion auf dieser Lane allgemein läuft — Siegquote und OP.GG-Tier (OP bis D).",
+            "Wie gut der Champion auf dieser Lane allgemein läuft: die Siegquote, geglättet nach "
+            + "Stichprobe. OP.GGs Tier steht als eigener Hinweis daneben und zählt hier nicht mit — "
+            + "es mischt Siegquote und Beliebtheit, und die Siegquote ist schon diese Zeile.",
         ScoreTermKind.LaneMatchup =>
             "Wie viel besser oder schlechter dieser Champion gegen den erwarteten Lane-Gegner "
             + "abschneidet als auf dieser Lane üblich. Die allgemeine Stärke steckt schon in der "
@@ -124,7 +126,8 @@ public sealed record RecommendationSet(
 /// <para>
 /// Every piece of evidence is a shift in log-odds of winning (see <see cref="ScoreModel"/>); the
 /// shifts add and the sum maps back to an estimated win rate. The rates arriving here are already
-/// shrunk towards 50 % by sample size, so thin data fades out by itself — no second confidence
+/// shrunk towards what the rest of the data already implies (see Shrinkage and MetaLookup), so thin
+/// data fades out by itself — no second confidence
 /// factor, no clamps, no per-criterion weights to tune.
 /// </para>
 /// <para>
@@ -387,45 +390,52 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
 
     /// <summary>
     /// The base term: how the champion does on this lane regardless of opponents. The shrunk win
-    /// rate carries the strength; the OP.GG tier adds the small extra its pick/ban blend knows.
+    /// rate carries it, and nothing else does.
+    /// <para>
+    /// The OP.GG tier used to be added on top, worth 0,04 log-odds per step. Measured on the stored
+    /// Gold snapshot (273 lane rows), that was a mistake twice over. It duplicates: the tier
+    /// explains 46,8 % of the variance of the very win rate it is added to, and its span across the
+    /// ladder — 0,16 log-odds from tier 0 to tier 5 — is the same size as the win-rate span it
+    /// duplicates (tier 1 averages 51,7 %, tier 5 averages 47,8 %; 0,156 log-odds). And it smuggles
+    /// in popularity: the tier explains 45,2 % of the variance of the PICK rate, so a strong but
+    /// rarely played champion was docked points for being rare — in a tool whose whole point is the
+    /// best pick for this game, not the most common one.
+    /// </para>
+    /// <para>
+    /// The tier stays on screen as its own chip. It is OP.GG's judgement and worth seeing; it is
+    /// simply not a second measurement, and it cannot carry an error bar the way every other term
+    /// in this score does.
+    /// </para>
     /// </summary>
     private double? LaneLogOdds(int championId, Lane lane, ICollection<Reason> reasons, ErrorBudget budget)
     {
         if (_meta.LaneStat(championId, lane) is not { } stat)
             return null;
 
-        var logOdds = ScoreModel.Logit(stat.WinRate) + TierNudge(stat.Tier);
+        var logOdds = ScoreModel.Logit(stat.WinRate);
 
-        // The tier nudge is a label, not a measurement, so only the win rate carries error.
-        budget.Add(ScoreError.LogitVariance(stat.WinRate, stat.Play, Shrinkage.LanePrior));
+        budget.Add(ScoreError.LogitVariance(stat.WinRate, stat.Play, Shrinkage.LanePrior, _meta.LaneTarget));
 
-        if (stat.Tier is >= 0 and <= 2)
-        {
-            reasons.Add(Reason.Pro(
-                $"{ScoreModel.TierName(stat.Tier)} auf {lane.Display()}",
-                $"OP.GGs Tierliste für {lane.Display()}, von OP (stärkste) über S bis D (schwächste). "
-                + $"Siegquote: {stat.WinRate:P1} über {stat.Play:N0} Spiele."));
-        }
-        else if (stat.WinRateDelta > 0.015)
+        if (stat.WinRateDelta > 0.015)
         {
             reasons.Add(Reason.Pro(
                 $"{stat.WinRate:P1} WR auf {lane.Display()}",
                 $"Aus {stat.Play:N0} Spielen im aktuellen Patch. 50 % wäre Durchschnitt."));
         }
 
+        // Neutral, because it no longer moves the number: context beside the score, not a part of
+        // it. Tier 0 is OP.GG's OP tier, one step above S, and -1 means the row has no tier at all.
+        if (stat.Tier is >= 0 and <= 2)
+        {
+            reasons.Add(Reason.Neutral(
+                $"{ScoreModel.TierName(stat.Tier)} auf {lane.Display()}",
+                $"OP.GGs eigene Einstufung für {lane.Display()}, von OP (stärkste) über S bis D "
+                + "(schwächste). Zählt nicht in die Prozentzahl: sie mischt Siegquote und "
+                + "Beliebtheit, und die Siegquote steckt schon drin."));
+        }
+
         return logOdds;
     }
-
-    /// <summary>
-    /// Tier 0 counts: it is OP.GG's OP tier, one step above S, and the ladder measured on the
-    /// stored rows is monotone through it. What it is NOT is a missing value — rows without a tier
-    /// arrive as -1 (see <see cref="MetaLookup"/>, which maps a tier without games to unknown), and
-    /// those get no nudge. Before this, the two champions OP.GG rates highest on their lane —
-    /// Jinx on Bot over 192.549 games and Thresh on Support over 168.018 — were read as unrated and
-    /// silently lost three points of win rate each.
-    /// </summary>
-    private static double TierNudge(int tier)
-        => tier is >= 0 and <= 5 ? ScoreModel.TierNudge * (3 - tier) : 0;
     /// <summary>
     /// How strong the candidate is on the lane the enemy would play them. Names that lane in a chip
     /// only when it differs from the advised seat's own — otherwise the threat term below says the
@@ -436,7 +446,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         if (banLane is not { } best)
             return null;
 
-        var logOdds = ScoreModel.Logit(best.Stat.WinRate) + TierNudge(best.Stat.Tier);
+        var logOdds = ScoreModel.Logit(best.Stat.WinRate);
 
         // 0.08 log-odds ≈ +2 percentage points: strong enough to be worth a chip.
         if (best.Lane != seatLane && logOdds > 0.08)
@@ -571,7 +581,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             if (_meta.LaneStat(championId, lane) is not { } stat)
                 continue;
 
-            var logOdds = ScoreModel.Logit(stat.WinRate) + TierNudge(stat.Tier);
+            var logOdds = ScoreModel.Logit(stat.WinRate);
 
             if (best is not null && logOdds <= best)
                 continue;
@@ -582,14 +592,14 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         }
 
         if (best is not null)
-            budget.Add(ScoreError.LogitVariance(bestStat.WinRate, bestStat.Play, Shrinkage.LanePrior));
+            budget.Add(ScoreError.LogitVariance(bestStat.WinRate, bestStat.Play, Shrinkage.LanePrior, _meta.LaneTarget));
 
         // 0.08 log-odds ≈ +2 percentage points: strong enough to be worth a chip.
         if (bestLane != Lane.Unknown && bestLane != seatLane && best > 0.08)
         {
             reasons.Add(Reason.Pro(
                 $"stark auf {bestLane.Display()}",
-                $"Gemessen an Siegquote und OP.GG-Tier ist {bestLane.Display()} die Lane, auf der "
+                $"Gemessen an der Siegquote ist {bestLane.Display()} die Lane, auf der "
                 + "dieser Champion gerade am gefährlichsten ist."));
         }
 
@@ -606,15 +616,18 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         if (lane == Lane.Unknown)
             return null;
 
-        // Centred on what this champion does on the lane in general, because that is already in the
-        // lane term two lines up. Measured on the stored edges: the duel rate tracks the lane rate
-        // with a slope of 1.23, so adding both counted a champion's general strength about 2.2
-        // times over — worth 1.8 points for a champion one standard deviation above the middle,
-        // which is the same order as the gaps this list is sorted by. With the baseline subtracted,
-        // a known duel REPLACES the general rate for the contested lane instead of piling on top of
-        // it, and an unknown one still leaves the general rate standing.
-        var baseline = _meta.LaneStat(championId, lane) is { } own ? ScoreModel.Logit(own.WinRate) : 0;
-
+        // Centred, because the champion's general strength is already in the lane term two lines
+        // up. Measured on the stored edges: the duel rate tracks the lane rate with a slope of
+        // 1.23, so adding both counted a champion's general strength about 2.2 times over — 1.8
+        // points for a champion one standard deviation above the middle, the same order as the gaps
+        // this list is sorted by.
+        //
+        // The baseline is per opponent, and it is the same number the rate was shrunk towards (see
+        // MetaLookup.MatchupBaseline). That is what makes the term mean one thing only: a thin edge
+        // and a missing edge both contribute zero, and a measured one contributes exactly how much
+        // it beats what the two lane rates already said. Centring on the own rate alone left a thin
+        // edge worth minus the champion's own strength — a penalty for being good, handed out
+        // wherever OP.GG's sample happened to be small.
         var total = 0.0;
         var variance = 0.0;
         var counted = 0;
@@ -636,12 +649,24 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
 
             counted++;
 
-            // Only the matchup's own error, although the term also subtracts the lane rate whose
-            // error the lane term already booked. The two partially cancel, so the reported bar is
-            // slightly WIDER than the truth — visible in Tools -- noise as 1,10 analytic against
-            // 0,95 resampled. Erring toward "less certain than stated" is the right direction.
+            var baseline = _meta.MatchupBaseline(championId, prediction.ChampionId, lane);
+
+            // Two sources, because the term is a difference of two measured things: the duel's own
+            // rate, and the OPPONENT's lane rate inside the baseline, which nothing else in the sum
+            // books. (The candidate's own rate is in there too, but with the opposite sign to the
+            // lane term, so those cancel rather than add.) Worth about 0,01 points in Tools --
+            // noise, because a lane rate rests on tens of thousands of games; it is here because a
+            // term that subtracts a measured number and books none of its error is simply wrong,
+            // not because the bar moved. The bar still reads narrower than resampling on rows with
+            // many terms (1,30 against 1,56 for Irelia) — that gap is older than this and lives in
+            // what resampling also varies: which enemy the predictor puts on which lane.
             variance += probability * probability
-                * ScoreError.LogitVariance(matchup.WinRate, matchup.Play, Shrinkage.MatchupPrior);
+                * (ScoreError.LogitVariance(
+                        matchup.WinRate,
+                        matchup.Play,
+                        Shrinkage.MatchupPrior,
+                        ScoreModel.Sigmoid(baseline))
+                    + OpponentLaneVariance(prediction.ChampionId, lane));
 
             // No extra confidence factor: the win rate is already shrunk by its sample size, and
             // multiplying a second damping on top made thin data vanish entirely.
@@ -705,6 +730,15 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         return text;
     }
 
+    /// <summary>
+    /// The error the opponent's own lane rate contributes to a centred duel term. Zero when there
+    /// is no row for them — the baseline then falls back to a constant, which carries no error.
+    /// </summary>
+    private double OpponentLaneVariance(int opponentId, Lane lane)
+        => _meta.LaneStat(opponentId, lane) is { } stat
+            ? ScoreError.LogitVariance(stat.WinRate, stat.Play, Shrinkage.LanePrior, _meta.LaneTarget)
+            : 0;
+
     /// <summary>P(this seat ends up on the lane). Manual overrides and assigned lanes are already
     /// hard constraints inside the predictor, so the marginal is all that is needed.</summary>
     private static double ProbabilityOnLane(LanePrediction prediction, Lane lane)
@@ -720,11 +754,11 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
     /// exact opposite of what this term promises everywhere it is described. Each enemy enters the
     /// mean with the share of them NOT already covered by the lane term, so nobody counts twice.
     /// <para>
-    /// Centred on the champion's own lane rate, exactly like the direct duel: averaged over several
-    /// opponents, a duel log-odds IS the champion's general strength, which the lane term already
-    /// carries. Uncentred, a candidate with edges banked that strength a second time at 0.35 weight
-    /// while a candidate without edges banked nothing at all — and which candidates have edges is
-    /// decided by whom OP.GG lists as a notable counter, not by how good the pick is.
+    /// Centred on the pair, exactly like the direct duel: averaged over several opponents, a duel
+    /// log-odds IS the champion's general strength, which the lane term already carries. Uncentred,
+    /// a candidate with edges banked that strength a second time at 0.35 weight while a candidate
+    /// without edges banked nothing at all — and which candidates have edges is decided by whom
+    /// OP.GG lists as a notable counter, not by how good the pick is.
     /// </para>
     /// </summary>
     private double? OffLaneMatchupLogOdds(
@@ -734,11 +768,6 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         ICollection<Reason> reasons,
         ErrorBudget budget)
     {
-        // Without a lane there is no own rate to measure against — the base term is then the
-        // champion's best lane and the duels may come from any lane at all. Rare enough (customs,
-        // blind pick) to leave as it was rather than invent a reference.
-        var baseline = _meta.LaneStat(championId, lane) is { } own ? ScoreModel.Logit(own.WinRate) : 0;
-
         var total = 0.0;
         var weightSum = 0.0;
         var variance = 0.0;
@@ -754,17 +783,27 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             if (offLane < 0.05)
                 continue;
 
-            var view = FindAnyLaneMatchup(championId, prediction.ChampionId);
-            if (view is null)
+            if (FindAnyLaneMatchup(championId, prediction.ChampionId) is not { } found)
                 continue;
+
+            var view = found.View;
+
+            // Measured against the pair on the lane the edge was measured on — which need not be
+            // this seat's lane at all, and whose reference is therefore not this seat's rate.
+            var baseline = _meta.MatchupBaseline(championId, prediction.ChampionId, found.Lane);
 
             counted++;
             weightSum += offLane;
-            total += offLane * (ScoreModel.Logit(view.Value.WinRate) - baseline);
+            total += offLane * (ScoreModel.Logit(view.WinRate) - baseline);
             variance += offLane * offLane
-                * ScoreError.LogitVariance(view.Value.WinRate, view.Value.Play, Shrinkage.MatchupPrior);
+                * (ScoreError.LogitVariance(
+                        view.WinRate,
+                        view.Play,
+                        Shrinkage.MatchupPrior,
+                        ScoreModel.Sigmoid(baseline))
+                    + OpponentLaneVariance(prediction.ChampionId, found.Lane));
 
-            if (view.Value.WinRateDelta > 0.01)
+            if (view.WinRateDelta > 0.01)
                 favourable++;
         }
 
@@ -792,17 +831,17 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
     /// Matchup data is recorded per lane. When comparing champions from different lanes, take the
     /// lane where the pairing was actually observed.
     /// </summary>
-    private MatchupView? FindAnyLaneMatchup(int championId, int opponentId)
+    private (Lane Lane, MatchupView View)? FindAnyLaneMatchup(int championId, int opponentId)
     {
-        MatchupView? best = null;
+        (Lane Lane, MatchupView View)? best = null;
 
         foreach (var lane in Lanes.All)
         {
             if (_meta.Matchup(championId, opponentId, lane) is not { } view)
                 continue;
 
-            if (best is null || view.Confidence > best.Value.Confidence)
-                best = view;
+            if (best is null || view.Confidence > best.Value.View.Confidence)
+                best = (lane, view);
         }
 
         return best;
@@ -830,8 +869,11 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             if (_meta.Synergy(championId, ally) is not { } synergy)
                 continue;
 
-            // Synergy tiers run 0..4 with 2 in the middle.
-            var tierNudge = synergy.Tier is >= 0 and <= 4 ? ScoreModel.TierNudge * (2 - synergy.Tier) : 0;
+            // The synergy tier is out for the same reason the lane tier is, plus one of its own:
+            // measured on 2.909 stored duos it explains 2,9 % of the variance of the very win rate
+            // it was added to. Near-zero correlation means it is either an independent signal or
+            // noise, and nothing here can tell which — while it moved the term by up to 0,12
+            // log-odds either way.
 
             // Measured against what an average LISTED duo is worth, not against 50 %: OP.GG lists
             // the duos worth mentioning, so the mean of the stored rows sits above even (0.0552 on
@@ -839,10 +881,10 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             // worth 0,8 points, the estimate grew as allies locked in rather than with the quality
             // of the pick, and a candidate without a row was penalised for a gap in OP.GG's
             // selection. The baseline is zero in older files, which leaves them as they were.
-            var logOdds = ScoreModel.Logit(synergy.WinRate) + tierNudge - _meta.SynergyBaseline;
+            var logOdds = ScoreModel.Logit(synergy.WinRate) - _meta.SynergyBaseline;
 
             total += logOdds;
-            variance += ScoreError.LogitVariance(synergy.WinRate, synergy.Play, Shrinkage.SynergyPrior);
+            variance += ScoreError.LogitVariance(synergy.WinRate, synergy.Play, Shrinkage.SynergyPrior, _meta.SynergyTarget);
             counted++;
 
             if (logOdds > bestLogOdds)
@@ -885,16 +927,12 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         if (lane == Lane.Unknown || _meta.LaneStat(championId, lane) is not { } stat)
             return null;
 
-        var logOdds = ScoreModel.BanLaneFocus * (ScoreModel.Logit(stat.WinRate) + TierNudge(stat.Tier));
+        var logOdds = ScoreModel.BanLaneFocus * ScoreModel.Logit(stat.WinRate);
 
         if (logOdds > 0.05)
         {
-            var strength = stat.Tier is >= 0 and <= 5
-                ? ScoreModel.TierName(stat.Tier)
-                : $"{stat.WinRate:P1} WR";
-
             reasons.Add(Reason.Pro(
-                $"{strength} auf {lane.Display()}",
+                $"{stat.WinRate:P1} WR auf {lane.Display()}",
                 // "diese Lane", not "deine": the engine also advises team-mate seats.
                 $"Genau die Lane dieses Slots: {stat.WinRate:P1} Siegquote aus "
                 + $"{stat.Play:N0} Spielen. Ein Bann wirkt hier direkt."));
@@ -903,7 +941,12 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         return logOdds;
     }
 
-    /// <summary>For bans: how badly this champion beats the allies already locked in.</summary>
+    /// <summary>
+    /// For bans: how badly this champion beats the allies already locked in — beyond what its own
+    /// strength and theirs already predict. Centred like every other duel term in this file, and
+    /// for the same reason: the champion's general strength is already the term above this one, and
+    /// counting it twice put whoever OP.GG happens to list a lot of edges for at the top.
+    /// </summary>
     private double? ThreatToAlliesLogOdds(int championId, List<int> allyChampions, ICollection<Reason> reasons)
     {
         var total = 0.0;
@@ -914,19 +957,18 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
 
         foreach (var ally in allyChampions)
         {
-            var view = FindAnyLaneMatchup(championId, ally);
-            if (view is null)
+            if (FindAnyLaneMatchup(championId, ally) is not { } found)
                 continue;
 
             counted++;
-            var logOdds = ScoreModel.Logit(view.Value.WinRate);
+            var logOdds = ScoreModel.Logit(found.View.WinRate) - _meta.MatchupBaseline(championId, ally, found.Lane);
             total += logOdds;
 
             if (logOdds > worstLogOdds)
             {
                 worstLogOdds = logOdds;
                 worst = _meta.ChampionName(ally);
-                worstView = view.Value;
+                worstView = found.View;
             }
         }
 

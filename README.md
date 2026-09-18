@@ -96,7 +96,9 @@ wieder herunterzuladen.
   schaltet auf einen anderen Slot, das Pin-Symbol oben hält sie dort fest.
 - **Empfehlungen**: Der Score ist eine **geschätzte Siegquote** — Lane-Stärke, Matchups, Synergien
   und Team-Bedarf werden als Log-Odds-Verschiebungen addiert und zurück in Prozent übersetzt
-  (`ScoreModel.cs` dokumentiert jede Konstante). 50 % ist ausgeglichen; Unterschiede unter einem
+  (`ScoreModel.cs` dokumentiert jede Konstante). Alles darin ist eine gemessene Quote mit
+  Stichprobe; OP.GGs Tier steht als Hinweis daneben und zählt nicht mit, weil es zur Hälfte
+  dieselbe Siegquote und zur Hälfte Beliebtheit ist. 50 % ist ausgeglichen; Unterschiede unter einem
   halben Punkt sind Rauschen, und liegen die Spitzenkandidaten gleichauf, sagt die Kopfzeile das.
   Jeder Chip erklärt sich beim Überfahren mit der Maus; der Pfeil rechts klappt die Aufschlüsselung
   auf — pro Kriterium ein Urteil in Worten, ein Balken und der Beitrag in Prozentpunkten. Kriterien
@@ -227,9 +229,11 @@ dotnet run --project src\DraftPilot.Tools -- settings tier gold
 
 Möglich sind `iron`, `bronze`, `silver`, `gold`, `platinum`, `emerald`, `diamond`, `master`,
 die Sammel-Brackets `emerald_plus`, `platinum_plus`, `diamond_plus` — oder `all` für alle Ränge
-zusammen. Ein benanntes Bracket gilt für Lane-Zahlen, Duelle und Tier; die Synergien kennen bei
-OP.GG keinen Rangfilter und kommen weiter aus dem Standard-Bracket. Die Fußzeile nennt, was gerade
-gilt, und der Wechsel wird mit dem nächsten **Daten aktualisieren** wirksam.
+zusammen. Ein benanntes Bracket gilt für Lane-Zahlen, Duelle und Tier; Synergien und der
+Matchup-Build kennen bei OP.GG keinen Rangfilter und kommen weiter aus dem Standard-Bracket.
+Dasselbe gilt für die Warteschlange: Solo/Duo gegen Flex unterscheidet nur die Champion-Analyse.
+Die Fußzeile nennt im Langtext, was wofür gilt, und der Wechsel wird mit dem nächsten
+**Daten aktualisieren** wirksam — bis dahin sagt die Fußzeile auch das.
 
 Regionale Daten (EUW, NA …) gibt es über diese Schnittstelle nicht: der Region-Parameter existiert
 nur bei den Werkzeugen, die einen Spielernamen abfragen, und die bleiben hier ungenutzt. Details

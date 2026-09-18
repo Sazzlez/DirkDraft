@@ -163,6 +163,28 @@ public sealed class MetaSnapshot
     /// </summary>
     public double SynergyBaseline { get; set; }
 
+    /// <summary>
+    /// Mean log-odds of the lane win rates in this file. Measured at 0.0086 (50,21 %) on the Gold
+    /// file this was introduced with — near enough to even that it barely moves a lane row with its
+    /// tens of thousands of games, and the honest target for the rare row that has a few hundred.
+    /// Zero in older files, which is exactly the 50 % they were shrunk towards.
+    /// </summary>
+    public double LaneBaseline { get; set; }
+
+    /// <summary>
+    /// How far a listed matchup sits, in log-odds, from what the two champions' lane win rates
+    /// already imply. Measured at -0.0295 on the file this was introduced with: OP.GG lists the
+    /// opponents that STAND OUT against a champion, so a listed edge is on average about 0,7 points
+    /// worse for that champion than the pair alone would suggest. That offset is a property of the
+    /// list, not of the game.
+    /// <para>
+    /// A thin edge is pulled towards <c>lane rate of mine − lane rate of theirs + this</c> rather
+    /// than towards 50 %. Zero in older files, which still leaves the far better per-pair target in
+    /// place — just without the listing correction on top.
+    /// </para>
+    /// </summary>
+    public double MatchupBaseline { get; set; }
+
     public List<ChampionEntry> Champions { get; set; } = [];
 
     public List<LaneStat> LaneStats { get; set; } = [];

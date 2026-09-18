@@ -557,13 +557,14 @@ public class RecommenderTests
     }
 
     /// <summary>
-    /// OP.GG's ladder starts at 0 (OP), not at 1 (S) — measured on the stored snapshot the mean win
-    /// rate falls monotonically from tier 0 to tier 5, and the two tier-0 rows are Jinx on Bot over
-    /// 192.549 games and Thresh on Support over 168.018. Read as "unrated", both lost the full
-    /// nudge: three points of estimated win rate on two of the most played champions there are.
+    /// The OP.GG tier does not move the score. It is not an independent measurement: on the stored
+    /// Gold snapshot it explains 46,8 % of the variance of the very lane win rate it used to be
+    /// added to, and 45,2 % of the pick rate — half a second helping of the win rate, half a
+    /// popularity vote, and worth as much (0,16 log-odds across the ladder) as the win-rate spread
+    /// it duplicated (0,156). It stays on screen as a chip; it stays out of the number.
     /// </summary>
     [Fact]
-    public void TheOpTier_CountsOneStepAboveS()
+    public void TheOpGgTier_DoesNotMoveTheScore()
     {
         static double LaneTerm(int tier)
         {
@@ -582,8 +583,34 @@ public class RecommenderTests
                 .LogOdds ?? 0;
         }
 
-        Assert.Equal(ScoreModel.TierNudge, LaneTerm(0) - LaneTerm(1), precision: 6);
-        Assert.Equal(ScoreModel.TierNudge, LaneTerm(1) - LaneTerm(2), precision: 6);
+        // Every step of the ladder, including the -1 that means "no tier at all".
+        var terms = new[] { -1, 0, 1, 2, 3, 4, 5 }.Select(LaneTerm).ToList();
+
+        Assert.All(terms, term => Assert.Equal(terms[0], term, precision: 9));
+    }
+
+    /// <summary>
+    /// The tier is still shown — as context, not as an argument. A chip that scores nothing must
+    /// not be coloured as if it did, or the list would look like the tier had moved it.
+    /// </summary>
+    [Fact]
+    public void TheTierChip_IsNeutral()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Strong, "Strong", DamageType.Magic, ["Mage"], 550, 3)
+            .InLane(Strong, Lane.Mid, winRate: 0.52, play: 40_000, tier: 1)
+            .Build();
+
+        var state = DraftState.From(new SessionBuilder().LocalPlayer(2).OnClock(2, "pick").Build());
+        var target = new TurnTracker().Resolve(state)!;
+        var lanes = new LanePredictor(meta).Predict(state.Enemies);
+
+        var reasons = new Recommender(meta, TraitTable.Empty).Recommend(state, target, lanes).Items
+            .Single(item => item.ChampionId == Strong)
+            .Reasons;
+
+        var chip = Assert.Single(reasons, reason => reason.Text.Contains("Tier", StringComparison.Ordinal));
+        Assert.Equal(ReasonTone.Neutral, chip.Tone);
     }
 
     /// <summary>
@@ -1093,14 +1120,14 @@ public class RecommenderTests
     [Fact]
     public void ADuoAsGoodAsTheAverageListedOne_AddsNothing()
     {
-        // The fixture's one duo IS the average of the file it comes from.
-        var rate = Shrinkage.Apply(0.53, 2000, Shrinkage.SynergyPrior);
-
+        // The fixture's one duo IS the average of the file it comes from — measured on the raw
+        // rate, which is also what the shrinkage now pulls towards, so the two agree exactly and
+        // the term lands on zero without any rounding slack.
         var meta = new MetaBuilder()
             .Champion(Strong, "Strong").InLane(Strong, Lane.Mid, winRate: 0.52, play: 2000)
             .Champion(AllySupport, "AllySupport")
             .Synergy(Strong, AllySupport, winRate: 0.53, play: 2000)
-            .SynergyBaseline(ScoreModel.Logit(rate))
+            .SynergyBaseline(ScoreModel.Logit(0.53))
             .Build();
 
         Assert.Equal(0, SynergyTerm(meta), precision: 3);

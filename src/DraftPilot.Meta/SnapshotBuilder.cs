@@ -204,6 +204,8 @@ public sealed class SnapshotBuilder : IDisposable
 
         Deduplicate(snapshot);
         snapshot.SynergyBaseline = MeasureSynergyBaseline(snapshot.Synergies);
+        snapshot.LaneBaseline = MeasureLaneBaseline(snapshot.LaneStats);
+        snapshot.MatchupBaseline = MeasureMatchupBaseline(snapshot.Matchups, snapshot.LaneStats);
         AddCoverageWarnings(snapshot, MissingFields());
 
         progress?.Report(new BuildProgress("Fertig", 1, 1));
@@ -1011,16 +1013,70 @@ public sealed class SnapshotBuilder : IDisposable
     /// </para>
     /// </summary>
     public static double MeasureSynergyBaseline(IReadOnlyList<SynergyStat> synergies)
+        => MeanLogit(synergies
+            .Where(synergy => synergy.Play >= Shrinkage.SynergyPrior)
+            .Select(synergy => synergy.WinRate));
+
+    /// <summary>
+    /// What an average lane row is worth, in log-odds. Measured at 0.0086 (50,21 %) on the file
+    /// this was written for — near enough to even that it barely moves a row with tens of thousands
+    /// of games, and the right target for the rare row that has a few hundred.
+    /// </summary>
+    public static double MeasureLaneBaseline(IReadOnlyList<LaneStat> lanes)
+        => MeanLogit(lanes
+            .Where(stat => stat.Play >= Shrinkage.LanePrior && stat.Lane != Lane.Unknown)
+            .Select(stat => stat.WinRate));
+
+    /// <summary>
+    /// How far a listed matchup sits from what the two champions' lane win rates already imply, in
+    /// log-odds. OP.GG lists the opponents that stand out against a champion, so the stored edges
+    /// are a selection, not a sample: measured at -0.0295 on the file this was written for, i.e.
+    /// about 0,7 points worse for the listed champion than the pair alone would suggest.
+    /// <para>
+    /// Rows without both lane win rates are skipped rather than counted against 50 % — that would
+    /// be measuring the offset against a reference this number is supposed to replace.
+    /// </para>
+    /// </summary>
+    public static double MeasureMatchupBaseline(IReadOnlyList<MatchupStat> matchups, IReadOnlyList<LaneStat> lanes)
+    {
+        var laneRates = new Dictionary<(int Champion, Lane Lane), double>(lanes.Count);
+
+        foreach (var stat in lanes)
+        {
+            if (stat.Play > 0 && stat.Lane != Lane.Unknown && stat.WinRate is > 0 and < 1)
+                laneRates[(stat.ChampionId, stat.Lane)] = stat.WinRate;
+        }
+
+        return MeanLogit(matchups
+            .Where(stat => stat.Play >= Shrinkage.MatchupPrior && stat.Lane != Lane.Unknown)
+            .Where(stat => laneRates.ContainsKey((stat.ChampionId, stat.Lane))
+                && laneRates.ContainsKey((stat.OpponentId, stat.Lane)))
+            .Select(stat => ScoreModel.Sigmoid(
+                ScoreModel.Logit(stat.WinRate)
+                - ScoreModel.Logit(laneRates[(stat.ChampionId, stat.Lane)])
+                + ScoreModel.Logit(laneRates[(stat.OpponentId, stat.Lane)]))));
+    }
+
+    /// <summary>
+    /// The mean of the log-odds of rates that carry enough games to speak for themselves.
+    /// <para>
+    /// Deliberately raw: the earlier version of this shrank every row towards 50 % first and then
+    /// averaged, which measured the pull it was supposed to replace. On the stored file that cost
+    /// 0,018 log-odds of the synergy baseline — 0,45 points on every duo, in the direction of
+    /// "duos matter less than they do".
+    /// </para>
+    /// </summary>
+    private static double MeanLogit(IEnumerable<double> rates)
     {
         var total = 0.0;
         var counted = 0;
 
-        foreach (var synergy in synergies)
+        foreach (var rate in rates)
         {
-            if (synergy.Play <= 0)
+            if (rate is not (> 0 and < 1))
                 continue;
 
-            total += ScoreModel.Logit(Shrinkage.Apply(synergy.WinRate, synergy.Play, Shrinkage.SynergyPrior));
+            total += ScoreModel.Logit(rate);
             counted++;
         }
 
@@ -1043,7 +1099,10 @@ public sealed class SnapshotBuilder : IDisposable
 
         var thin = snapshot.Matchups.Count(stat => stat.Play < 50);
         if (thin > 0)
-            snapshot.Warnings.Add($"{thin} Matchups mit unter 50 Spielen — werden stark zur Mitte gezogen.");
+        {
+            snapshot.Warnings.Add($"{thin} Matchups mit unter 50 Spielen — sie zählen fast nur noch als das, "
+                + "was die beiden Lane-Siegquoten ohnehin sagen.");
+        }
 
         // Which population the numbers describe, per source — the one thing about this file that
         // cannot be seen by looking at the numbers themselves.

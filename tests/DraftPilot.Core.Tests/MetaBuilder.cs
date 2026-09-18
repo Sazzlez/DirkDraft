@@ -95,5 +95,13 @@ internal sealed class MetaBuilder
         return this;
     }
 
+    /// <summary>How far a listed matchup sits from what the two lane rates imply; see
+    /// <see cref="MetaSnapshot.MatchupBaseline"/>. Zero unless a test says otherwise.</summary>
+    public MetaBuilder MatchupBaseline(double logOdds)
+    {
+        _snapshot.MatchupBaseline = logOdds;
+        return this;
+    }
+
     public MetaLookup Build() => new(_snapshot);
 }

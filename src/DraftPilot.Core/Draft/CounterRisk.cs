@@ -47,13 +47,8 @@ public static class CounterRisk
         IReadOnlySet<int> unavailable,
         int limit = 3)
     {
-        if (lane == Lane.Unknown || meta.LaneStat(championId, lane) is not { } own)
+        if (lane == Lane.Unknown || meta.LaneStat(championId, lane) is null)
             return [];
-
-        // What an average opponent achieves against this champion: the other side of its own lane
-        // win rate. Without this reference the list would fill up with champions that are simply
-        // strong, which says nothing about picking INTO them.
-        var expected = ScoreModel.Logit(1 - own.WinRate);
 
         var threats = new List<CounterThreat>();
 
@@ -65,7 +60,10 @@ public static class CounterRisk
             if (meta.Matchup(candidate, championId, lane) is not { } view)
                 continue;
 
-            var edge = ScoreModel.Logit(view.WinRate) - expected;
+            // Measured against what this pair alone predicts — the same reference the duel term
+            // subtracts and the same one the rate was shrunk towards. Without it the list fills up
+            // with champions that are simply strong, which says nothing about picking INTO them.
+            var edge = ScoreModel.Logit(view.WinRate) - meta.MatchupBaseline(candidate, championId, lane);
             if (edge <= MinimumEdge)
                 continue;
 

@@ -107,6 +107,67 @@ public sealed class MetaLookup
     /// </summary>
     public double SynergyBaseline => _snapshot.SynergyBaseline;
 
+    /// <summary>The rate a lane row is shrunk towards — see <see cref="MetaSnapshot.LaneBaseline"/>.</summary>
+    public double LaneTarget => ScoreModel.Sigmoid(_snapshot.LaneBaseline);
+
+    /// <summary>The rate a duo row is shrunk towards — see <see cref="MetaSnapshot.SynergyBaseline"/>.</summary>
+    public double SynergyTarget => ScoreModel.Sigmoid(_snapshot.SynergyBaseline);
+
+    /// <summary>
+    /// The rate a matchup row is shrunk towards — see <see cref="MatchupBaseline"/>. Public because
+    /// reversing a shrinkage needs the prior it was done with, and the error bars do exactly that.
+    /// </summary>
+    public double MatchupTarget(int championId, int opponentId, Lane lane)
+        => ScoreModel.Sigmoid(MatchupBaseline(championId, opponentId, lane));
+
+    /// <summary>
+    /// What a duel between these two is expected to be before their own duel games are counted:
+    /// the difference of their lane win rates, plus the offset that OP.GG's choice of what to list
+    /// carries (see <see cref="MetaSnapshot.MatchupBaseline"/>). In log-odds.
+    /// <para>
+    /// This one number is both the target every matchup rate is shrunk towards and the baseline the
+    /// duel terms subtract, and it has to be both or the two disagree: shrinking towards one number
+    /// while centring on another makes "no data" read as an edge. With them equal, a thin matchup
+    /// contributes exactly nothing, a missing one contributes exactly nothing, and a measured one
+    /// contributes exactly how much it beats what the two lane rates already said.
+    /// </para>
+    /// </summary>
+    public double MatchupBaseline(int championId, int opponentId, Lane lane)
+    {
+        // Falling back to the champion's own main lane matters for the off-lane term, where the
+        // edge was recorded on the OPPONENT's lane and our candidate has no row there at all.
+        var mine = LaneStat(championId, lane)?.WinRate ?? MainLaneWinRate(championId);
+        var theirs = LaneStat(opponentId, lane)?.WinRate ?? MainLaneWinRate(opponentId);
+
+        // Without both rates there is no pair to reason about; the listing offset alone is still
+        // better than claiming an even duel.
+        if (mine is null || theirs is null)
+            return _snapshot.MatchupBaseline;
+
+        return ScoreModel.Logit(mine.Value)
+            - ScoreModel.Logit(theirs.Value)
+            + _snapshot.MatchupBaseline;
+    }
+
+    /// <summary>The champion's win rate on the lane it is played on most — "how good is it, in
+    /// general", for duels recorded somewhere it has no row of its own.</summary>
+    private double? MainLaneWinRate(int championId)
+    {
+        double? rate = null;
+        var mostPlayed = 0;
+
+        foreach (var lane in Lanes.All)
+        {
+            if (LaneStat(championId, lane) is not { } stat || stat.Play <= mostPlayed)
+                continue;
+
+            mostPlayed = stat.Play;
+            rate = stat.WinRate;
+        }
+
+        return rate;
+    }
+
     public IReadOnlyList<string> Warnings => _snapshot.Warnings;
 
     public IReadOnlyList<ChampionEntry> Champions => _champions;
@@ -190,7 +251,7 @@ public sealed class MetaLookup
                 continue;
 
             var view = new MatchupView(
-                WinRate: Shrinkage.Apply(stat.WinRate, stat.Play, Shrinkage.MatchupPrior),
+                WinRate: ShrinkMatchup(stat.ChampionId, stat.OpponentId, stat.Lane, stat.WinRate, stat.Play),
                 Play: stat.Play,
                 Confidence: Shrinkage.Confidence(stat.Play, Shrinkage.MatchupPrior),
                 IsInferred: false,
@@ -202,7 +263,7 @@ public sealed class MetaLookup
 
             var mirrorView = view with
             {
-                WinRate = Shrinkage.Apply(1 - stat.WinRate, stat.Play, Shrinkage.MatchupPrior),
+                WinRate = 1 - view.WinRate,
                 IsInferred = true,
             };
             var mirror = MatchupKey(stat.Lane, b, a);
@@ -232,7 +293,7 @@ public sealed class MetaLookup
             var slot = ((int)stat.Lane * _champions.Length) + index;
 
             _laneStats[slot] = new LaneView(
-                WinRate: Shrinkage.Apply(stat.WinRate, stat.Play, Shrinkage.LanePrior),
+                WinRate: Shrinkage.Apply(stat.WinRate, stat.Play, Shrinkage.LanePrior, LaneTarget),
                 PickRate: stat.PickRate,
                 BanRate: stat.BanRate,
                 RoleRate: stat.RoleRate,
@@ -296,7 +357,7 @@ public sealed class MetaLookup
                 continue;
 
             map[key] = new MatchupView(
-                WinRate: Shrinkage.Apply(stat.WinRate, stat.Play, Shrinkage.MatchupPrior),
+                WinRate: ShrinkMatchup(stat.ChampionId, stat.OpponentId, stat.Lane, stat.WinRate, stat.Play),
                 Play: stat.Play,
                 Confidence: Shrinkage.Confidence(stat.Play, Shrinkage.MatchupPrior),
                 IsInferred: false);
@@ -314,8 +375,11 @@ public sealed class MetaLookup
             if (map.ContainsKey(mirror))
                 continue;
 
+            // Mirrored AFTER shrinking, not shrunk from the mirrored rate. The listing offset
+            // belongs to the direction OP.GG stored — it lists the opponents that stand out — so
+            // the reverse edge is its exact complement and the two still add up to 1.
             map[mirror] = new MatchupView(
-                WinRate: Shrinkage.Apply(1 - stat.WinRate, stat.Play, Shrinkage.MatchupPrior),
+                WinRate: 1 - ShrinkMatchup(stat.ChampionId, stat.OpponentId, stat.Lane, stat.WinRate, stat.Play),
                 Play: stat.Play,
                 Confidence: Shrinkage.Confidence(stat.Play, Shrinkage.MatchupPrior),
                 IsInferred: true);
@@ -323,6 +387,17 @@ public sealed class MetaLookup
 
         return map;
     }
+
+    /// <summary>
+    /// One matchup rate, pulled towards what the two lane win rates imply for the pair rather than
+    /// towards 50 % — see <see cref="MatchupBaseline"/> for why, and for the measurement.
+    /// </summary>
+    private double ShrinkMatchup(int championId, int opponentId, Lane lane, double winRate, int play)
+        => Shrinkage.Apply(
+            winRate,
+            play,
+            Shrinkage.MatchupPrior,
+            ScoreModel.Sigmoid(MatchupBaseline(championId, opponentId, lane)));
 
     private Dictionary<long, SynergyView> BuildSynergies(MetaSnapshot snapshot)
     {
@@ -334,7 +409,7 @@ public sealed class MetaLookup
                 continue;
 
             var view = new SynergyView(
-                WinRate: Shrinkage.Apply(stat.WinRate, stat.Play, Shrinkage.SynergyPrior),
+                WinRate: Shrinkage.Apply(stat.WinRate, stat.Play, Shrinkage.SynergyPrior, SynergyTarget),
                 Play: stat.Play,
                 Confidence: Shrinkage.Confidence(stat.Play, Shrinkage.SynergyPrior),
                 Tier: stat.Tier);

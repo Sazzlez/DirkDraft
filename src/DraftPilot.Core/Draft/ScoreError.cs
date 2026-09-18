@@ -50,18 +50,27 @@ public static class ScoreError
     /// the binomial variance belongs to the raw measurement, not to the shrunk value.
     /// </para>
     /// </summary>
-    public static double LogitVariance(double shrunkRate, int play, int prior)
+    /// <param name="priorRate">
+    /// What the rate was shrunk towards, if not 50 %. It only enters the recovery of the raw
+    /// proportion, and the binomial variance is nearly flat around the middle, so the difference
+    /// this makes is under a percent of the bar — it is here because reversing a shrinkage with the
+    /// wrong prior is the kind of quiet mistake that survives for years.
+    /// </param>
+    public static double LogitVariance(double shrunkRate, int play, int prior, double priorRate = 0.5)
     {
-        // No sample means shrinkage pinned the rate to 0.5 and the term carries no information at
-        // all: no contribution, and no division by zero.
+        // No sample means shrinkage pinned the rate to the prior and the term carries no
+        // information at all: no contribution, and no division by zero.
         if (play <= 0)
             return 0;
 
+        if (!double.IsFinite(priorRate) || priorRate is <= 0 or >= 1)
+            priorRate = 0.5;
+
         var factor = (double)play / (play + prior);
-        var raw = Math.Clamp(0.5 + ((shrunkRate - 0.5) / factor), 0, 1);
+        var raw = Math.Clamp(priorRate + ((shrunkRate - priorRate) / factor), 0, 1);
         var shrunk = Math.Clamp(shrunkRate, 0.01, 0.99);
 
-        // d/dp Logit(0.5 + f(p - 0.5)) = f / (q(1-q)) with q the shrunk rate.
+        // d/dp Logit(m + f(p - m)) = f / (q(1-q)) with q the shrunk rate and m the prior.
         var slope = factor / (shrunk * (1 - shrunk));
 
         return slope * slope * raw * (1 - raw) / play;

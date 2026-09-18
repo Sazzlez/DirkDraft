@@ -71,16 +71,12 @@ public readonly record struct DraftBalance(
             if (ally == 0 || enemy == 0 || meta.Matchup(ally, enemy, lane) is not { } matchup)
                 continue;
 
-            // What the two lane rates alone would predict for this duel: in log-odds, a champion's
-            // strength against the field minus the opponent's. Only the difference to that is news.
-            // Uncentred, the same advantage was counted twice — once in strengthEdge above, once
-            // here — so a lane where the stronger champion also wins the duel (the usual case) was
-            // worth about double what it is.
-            var expected =
-                (meta.LaneStat(ally, lane) is { } allyStat ? ScoreModel.Logit(allyStat.WinRate) : 0)
-                - (meta.LaneStat(enemy, lane) is { } enemyStat ? ScoreModel.Logit(enemyStat.WinRate) : 0);
-
-            duelSum += ScoreModel.Logit(matchup.WinRate) - expected;
+            // What the two lane rates alone would predict for this duel — the same reference the
+            // rate was shrunk towards. Only the difference to it is news. Uncentred, the same
+            // advantage was counted twice — once in strengthEdge above, once here — so a lane where
+            // the stronger champion also wins the duel (the usual case) was worth about double what
+            // it is.
+            duelSum += ScoreModel.Logit(matchup.WinRate) - meta.MatchupBaseline(ally, enemy, lane);
             contested++;
         }
 

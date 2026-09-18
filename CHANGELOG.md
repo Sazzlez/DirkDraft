@@ -5,6 +5,30 @@ Kopien melden sie beim nächsten Start.
 
 ## 1.1.0 — noch nicht veröffentlicht
 
+- **OP.GGs Tier zählt nicht mehr in die Prozentzahl.** Es steht weiter neben jeder Zeile, jetzt als
+  grauer Hinweis statt als Argument. Gemessen an den 273 Lane-Zeilen des Gold-Snapshots erklärt das
+  Tier 46,8 % der Streuung genau der Siegquote, zu der es addiert wurde — und 45,2 % der Streuung
+  der *Pickrate*. Es war zur Hälfte eine zweite Portion Siegquote und zur Hälfte eine
+  Beliebtheitsstimme, und zwar in voller Höhe: über die Leiter hinweg 0,16 Logit gegen 0,156 Logit
+  Siegquoten-Spanne. Sichtbar wird das dort, wo bisher „S-Tier auf Top" die einzige Begründung war:
+  Mordekaiser und Teemo verlassen die ersten acht, Camille (53 % gegen Darius) und Heimerdinger
+  (53,2 % WR) kommen hinein. Die Ban-Punkte halbieren sich, weil das Tier dort doppelt hing.
+- **Dünne Duelle behaupten nichts mehr.** Eine Matchup-Quote wird nicht mehr auf 50 % gezogen,
+  sondern auf das, was die beiden Lane-Siegquoten ohnehin sagen — plus den Versatz, den OP.GGs
+  Auswahl mitbringt (sie listet die Gegner, die auffallen, nicht alle). Das ist kein Detail: das
+  mittlere gespeicherte Duell hat 197 Spiele gegen ein Prior-Gewicht von 150, der Prior trägt also
+  43 % dessen, was der Score liest, bei 60 Spielen 71 %. In der Kreuzvalidierung über alle 1.482
+  Kanten (`Tools -- matchupfit`) schlägt die neue Grundannahme die alte um 0,58 % LogLoss und
+  halbiert den quadratischen Fehler beinahe (Brier 0,00236 gegen 0,00438); ein pauschaler
+  Mittelwert gewann 0,03 %. Zusammen mit derselben Zentrierung im Duell-Term heißt „wir wissen es
+  kaum" jetzt auch genau das — vorher war es für einen starken Champion ein Abzug.
+- Die Duo-Basislinie wurde an sich selbst gemessen: sie mittelte Quoten, die vorher auf 50 %
+  gezogen worden waren. Roh gemessen liegt sie bei 0,0743 statt 0,0563 Logit — 0,45 Punkte, die
+  jedem Duo fehlten. Wirksam mit dem nächsten Datenabruf; `Tools -- inspect` zeigt jetzt
+  gespeicherte und nachgerechnete Basislinien nebeneinander.
+- Auch die Ban-Liste zählt die allgemeine Stärke nicht mehr doppelt: „schlägt unseren X" misst
+  jetzt, wie viel mehr als üblich.
+
 - **Frühe Picks sehen ihr Konterrisiko.** Solange auf deiner Lane niemand aufgedeckt ist, trägt
   jede Zeile „N offene Konter": noch freie Champions, die gegen diesen Pick besser abschneiden als
   seine Gegner üblicherweise. Im Blind-Draft liegen Singed und Nasus bei drei, Malphite bei sieben
@@ -23,8 +47,9 @@ Kopien melden sie beim nächsten Start.
 - **ARAM bekommt einen ARAM-Build** statt eines Kluft-Builds gegen einen erfundenen Gegner — und
   keine Lane-Empfehlungen, keine Lane-Beschriftungen, keine Duell-Prozente mehr. Der
   Aufstellungsvergleich bleibt.
-- **OP-Tier zählt.** OP.GGs beste Stufe (0) wurde als „unbewertet" gelesen: Jinx auf Bot und Thresh
-  auf Support verloren dadurch je drei Punkte und standen nicht einmal in den ersten fünf.
+- **OP-Tier wurde falsch gelesen** — OP.GGs beste Stufe (0) galt als „unbewertet", was Jinx auf Bot
+  und Thresh auf Support je drei Punkte kostete. Erledigt sich durch den Punkt ganz oben: das Tier
+  zählt gar nicht mehr in den Score. Der Chip zeigt jetzt für beide korrekt OP statt gar nichts.
 - **Ein Update räumt keinen laufenden Draft mehr aus.** Wer in der Lobby aktualisiert und dann in
   einen Champ Select kommt, verlor bisher mitten im Draft alle geholten Zahlen — still.
 - **Der Patch wird geprüft.** Läuft das Spiel auf einem neueren Patch als die Daten, sagt die
@@ -39,6 +64,20 @@ Kopien melden sie beim nächsten Start.
   wenn kein Build geladen werden konnte.
 - Draft-Abrufe haben zehn Sekunden statt dreißig, Fehlversuche kosten kein Kontingent mehr, und
   wenn nichts mehr geholt wird, sagt die Statuszeile das statt „versuche es weiter".
+- **Ein Aussetzer der Verbindung beendet keinen Draft mehr.** Bricht der Event-Socket kurz weg,
+  galt das als „Champ Select vorbei": Build weg, alle geholten Konter-Kanten weg, Abruf-Kontingent
+  auf null. Der Grund war, dass „der Client sagt, es läuft keins" und „die Anfrage kam nicht durch"
+  denselben Wert hatten. Jetzt schließt nur eine Antwort das Panel, kein Schweigen.
+- **Ein Spiel ohne Build zeigt nicht mehr den Startbildschirm.** „Wartet auf das nächste Champ
+  Select" stand die ganze Partie lang da, während die fertige Lane-Übersicht ungenutzt daneben lag.
+  Die Spielansicht hängt jetzt am laufenden Spiel; ohne Build bleiben Runen und Kaufreihenfolge
+  weg und eine Zeile sagt, dass keiner vorliegt.
+- Der Runen-Knopf versprach „funktioniert bis zum Ladebildschirm" und sperrte genau dort. Jetzt
+  sagt er, was er tut: klickbar bis zum Spielstart.
+- **Die Fußzeile sagt, wofür Bracket und Warteschlange überhaupt gelten.** Gemessen an OP.GGs
+  Schemas nimmt nur die Champion-Analyse beide Parameter an — Tierlist, Duo-Werkzeug und
+  Matchup-Guide keinen von beiden. Ein Gold-Snapshot ist in den Lane-Zahlen und Countern Gold, in
+  den Duos nicht. Steht die Einstellung auf etwas anderem als die Datei, steht auch das da.
 
 ## 1.0.3 — 2026-09-04
 

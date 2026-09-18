@@ -21,12 +21,13 @@ public static class ScoreModel
     /// </summary>
     public const double OffLaneShare = 0.35;
 
-    /// <summary>
-    /// Log-odds per OP.GG tier step above/below the middle tier (3). Small on purpose: the win
-    /// rate already carries the champion's strength; the tier only adds what OP.GG's own blend of
-    /// pick and ban pressure knows on top. One step ≈ one percentage point near 50 %.
-    /// </summary>
-    public const double TierNudge = 0.04;
+    // There used to be a TierNudge of 0.04 log-odds per tier step here, on the argument that the
+    // tier "only adds what OP.GG's blend of pick and ban pressure knows on top". Measured on the
+    // stored Gold snapshot, the argument does not hold: across the ladder the nudge spans 0,16
+    // log-odds while the win rate it is added to spans 0,156 across the same ladder, and the tier
+    // explains 46,8 % of that win rate's variance — and 45,2 % of the PICK rate's. It was half a
+    // second helping of the win rate and half a popularity vote. The tier is now a chip, not a
+    // term. See Recommender.LaneLogOdds.
 
     /// <summary>
     /// Damping for duo win rates. They are the thinnest data in the snapshot and correlated across
