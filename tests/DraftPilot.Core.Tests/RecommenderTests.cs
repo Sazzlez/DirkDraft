@@ -761,6 +761,104 @@ public class RecommenderTests
         Assert.Equal(2, Recommender().Recommend(state, target, lanes, limit: 2).Items.Count);
     }
 
+    /// <summary>
+    /// <c>RecommendationCount</c> is user-editable JSON, and Top() clamps with Max(0, …) rather
+    /// than Max(1, …) on purpose: a zero means an empty list, not a surprise single row.
+    /// </summary>
+    [Fact]
+    public void LimitZero_ReturnsNothing()
+    {
+        var (state, target, lanes) = Scenario();
+
+        Assert.Empty(Recommender().Recommend(state, target, lanes, limit: 0).Items);
+    }
+
+    /// <summary>
+    /// A lane whose roster is empty must not end the list — every champion is then a candidate,
+    /// scored on whatever the data says. The case is real for a snapshot built before a lane's
+    /// tier list had any entries at all.
+    /// </summary>
+    [Fact]
+    public void ALaneWithoutARoster_FallsBackToEveryChampion()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Strong, "Strong", DamageType.Magic, ["Mage"], 550, 3)
+            .Champion(Average, "Average", DamageType.Magic, ["Mage"], 525, 3)
+            // Both are listed on Mid only; the advised seat sits on Top, whose roster is empty.
+            .InLane(Strong, Lane.Mid, winRate: 0.54, play: 2000)
+            .InLane(Average, Lane.Mid, winRate: 0.50, play: 2000)
+            .Build();
+
+        var state = DraftState.From(new SessionBuilder().LocalPlayer(0).OnClock(0, "pick").Build());
+        var target = new TurnTracker().Resolve(state)!;
+
+        var items = new Recommender(meta, TraitTable.Empty)
+            .Recommend(state, target, LanePredictionResult.Empty, limit: 20).Items;
+
+        Assert.Equal(2, items.Count);
+    }
+
+    /// <summary>
+    /// The ban score is denied win-rate points: the gate (how likely the enemy takes the champion)
+    /// times the edge the champion would give them, in points. Pinned numerically because the three
+    /// relative ban tests would all still pass if the formula silently changed scale.
+    /// </summary>
+    [Fact]
+    public void ABanScore_IsTheGateTimesTheDeniedPoints()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Menace, "Menace", DamageType.Physical, ["Fighter"], 175, 5)
+            // Tier 3 is the middle, so the tier nudge contributes nothing to this check.
+            .InLane(Menace, Lane.Top, winRate: 0.56, play: 40_000, tier: 3, pickRate: 0.05, banRate: 0.05)
+            .Build();
+
+        var state = DraftState.From(new SessionBuilder().LocalPlayer(0).OnClock(0, "ban").Build());
+        var target = new TurnTracker().Resolve(state)!;
+
+        var item = new Recommender(meta, TraitTable.Empty)
+            .Recommend(state, target, LanePredictionResult.Empty, limit: 20).Items
+            .Single(entry => entry.ChampionId == Menace);
+
+        var strength = ScoreModel.Logit(Shrinkage.Apply(0.56, 40_000, Shrinkage.LanePrior));
+
+        // Strength plus the seat's own lane threat at half weight — the deliberate double count.
+        var threat = strength + (ScoreModel.BanLaneFocus * strength);
+        var gate = Math.Clamp((0.05 * 8) + (0.05 * 4), 0, 1);
+
+        Assert.Equal(gate * (ScoreModel.Sigmoid(threat) - 0.5) * 100, item.Score, precision: 6);
+    }
+
+    /// <summary>
+    /// Only LOCKED enemies discount a lane for the ban list. A hover can still change, and treating
+    /// it as taken would quietly drop that lane's champions out of the list one pick too early.
+    /// </summary>
+    [Fact]
+    public void AHoveredEnemy_DoesNotYetCloseItsLane()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Menace, "Menace", DamageType.Physical, ["Fighter"], 175, 5)
+            .Champion(EnemyTop, "EnemyTop", DamageType.Physical, ["Fighter"], 175, 5)
+            .InLane(Menace, Lane.Top, winRate: 0.56, play: 40_000, pickRate: 0.05, banRate: 0.05)
+            .InLane(EnemyTop, Lane.Top, winRate: 0.52, play: 40_000)
+            .Build();
+
+        static double BanValue(MetaLookup meta, SessionBuilder session)
+        {
+            var state = DraftState.From(session.Build());
+            var target = new TurnTracker().Resolve(state)!;
+            var lanes = new LanePredictor(meta).Predict(state.Enemies);
+
+            return new Recommender(meta, TraitTable.Empty)
+                .Recommend(state, target, lanes, limit: 20).Items
+                .Single(entry => entry.ChampionId == Menace).Score;
+        }
+
+        var hovering = BanValue(meta, new SessionBuilder().LocalPlayer(0).Hovering(5, EnemyTop).OnClock(0, "ban"));
+        var locked = BanValue(meta, new SessionBuilder().LocalPlayer(0).Locked(5, EnemyTop).OnClock(0, "ban"));
+
+        Assert.True(hovering > locked, $"Ein Hover darf die Lane nicht schliessen ({hovering} gegen {locked}).");
+    }
+
     [Fact]
     public void BanMode_LooksAcrossAllLanes()
     {
