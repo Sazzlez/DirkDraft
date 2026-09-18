@@ -152,6 +152,43 @@ public class DraftBalanceTests
     }
 
     /// <summary>
+    /// A duel counts by its surprise, not by its absolute rate. Both lane rates are already in the
+    /// strength difference; a duel that lands exactly where those rates predict (in log-odds:
+    /// ally minus enemy) therefore adds nothing. Uncentred, the usual case — the stronger champion
+    /// also wins the duel — was worth about double what the data says.
+    /// </summary>
+    [Fact]
+    public void ADuelThatMerelyConfirmsTheLaneRates_IsNotCountedTwice()
+    {
+        // 56 % against 44 % on top: in log-odds those two rates predict a 61,8 % duel.
+        var withoutDuel = Meta(allyTopWinRate: 0.56, enemyTopWinRate: 0.44);
+        var withDuel = Meta(allyTopWinRate: 0.56, enemyTopWinRate: 0.44, topMatchup: 0.618);
+
+        var plain = Estimate(withoutDuel);
+        var confirmed = Estimate(withDuel);
+
+        Assert.Equal(1, confirmed.ContestedLanes);
+        Assert.True(
+            Math.Abs(confirmed.AllyWinRate - plain.AllyWinRate) < 0.01,
+            $"erwartet nahezu unverändert, war {plain.AllyWinRate:P2} gegen {confirmed.AllyWinRate:P2}");
+    }
+
+    /// <summary>The other half of the same rule: a duel that beats the prediction still counts.</summary>
+    [Fact]
+    public void ADuelBetterThanTheLaneRatesPredict_StillTipsItOurWay()
+    {
+        var meta = Meta(allyTopWinRate: 0.56, enemyTopWinRate: 0.44, topMatchup: 0.70);
+
+        Assert.True(Estimate(meta).AllyWinRate > Estimate(Meta(allyTopWinRate: 0.56, enemyTopWinRate: 0.44)).AllyWinRate);
+    }
+
+    private static DraftBalance Estimate(MetaLookup meta)
+    {
+        var (state, allies, enemies) = Draft(meta);
+        return DraftBalance.Estimate(meta, state, allies, enemies);
+    }
+
+    /// <summary>
     /// Five champions at 52 % are not a 95 % team: the terms are averaged, never summed, so the
     /// number stays in the band real drafts live in.
     /// </summary>

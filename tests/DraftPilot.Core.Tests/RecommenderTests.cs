@@ -556,6 +556,64 @@ public class RecommenderTests
             $"Der Reputationsvorsprung darf nicht durchschlagen: {gap:N4} gegen {reputationGap:N4} Logit.");
     }
 
+    /// <summary>
+    /// The rest of the enemy team is measured the same way as the direct duel: against what this
+    /// champion does anyway. Averaged over opponents, a duel log-odds IS the champion's general
+    /// strength, and that already sits in the lane term — so an edge that merely matches the
+    /// champion's own rate says nothing about THESE opponents and must not move the score.
+    /// <para>
+    /// Uncentred it did, at 0.35 weight, and only for candidates OP.GG happens to list a counter
+    /// for. That favoured the better documented picks, not the better ones.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void OffLaneDuelsAtTheChampionsUsualRate_AddNothing()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Strong, "Strong", DamageType.Magic, ["Mage"], 550, 3)
+            .Champion(EnemyTop, "EnemyTop", DamageType.Physical, ["Fighter"], 175, 5)
+            .InLane(Strong, Lane.Mid, winRate: 0.56, play: 40_000)
+            .InLane(EnemyTop, Lane.Top, winRate: 0.50, play: 40_000)
+            // Recorded on THEIR lane, so this is an off-lane edge for our mid candidate — and it is
+            // exactly what the champion does on its own lane anyway.
+            .Matchup(Strong, EnemyTop, Lane.Top, winRate: 0.56, play: 40_000)
+            .Build();
+
+        Assert.Equal(0, OffLaneTerm(meta), precision: 2);
+    }
+
+    [Fact]
+    public void OffLaneDuelsAboveTheChampionsUsualRate_StillCount()
+    {
+        var meta = new MetaBuilder()
+            .Champion(Strong, "Strong", DamageType.Magic, ["Mage"], 550, 3)
+            .Champion(EnemyTop, "EnemyTop", DamageType.Physical, ["Fighter"], 175, 5)
+            .InLane(Strong, Lane.Mid, winRate: 0.50, play: 40_000)
+            .InLane(EnemyTop, Lane.Top, winRate: 0.50, play: 40_000)
+            .Matchup(Strong, EnemyTop, Lane.Top, winRate: 0.60, play: 40_000)
+            .Build();
+
+        Assert.True(OffLaneTerm(meta) > 0.1, "Ein echter Vorteil gegen das übrige Team muss zählen.");
+    }
+
+    /// <summary>The EnemyTeam term of the one candidate that has matchup data, in log-odds.</summary>
+    private static double OffLaneTerm(MetaLookup meta)
+    {
+        var state = DraftState.From(new SessionBuilder()
+            .LocalPlayer(2)
+            .Locked(5, EnemyTop)
+            .OnClock(2, "pick")
+            .Build());
+
+        var target = new TurnTracker().Resolve(state)!;
+        var lanes = new LanePredictor(meta).Predict(state.Enemies);
+
+        return new Recommender(meta, TraitTable.Empty).Recommend(state, target, lanes).Items
+            .Single(item => item.ChampionId == Strong)
+            .Breakdown.Single(term => term.Kind == ScoreTermKind.EnemyTeam)
+            .LogOdds ?? 0;
+    }
+
     /// <summary>The LaneMatchup term of the one candidate that has matchup data, in log-odds.</summary>
     private static double DuelTerm(MetaLookup meta)
     {

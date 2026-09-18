@@ -668,6 +668,13 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
     /// enemies outweighed the direct lane duel (4 × 0.35 = 1.4 versus the lane term's 1.0) — the
     /// exact opposite of what this term promises everywhere it is described. Each enemy enters the
     /// mean with the share of them NOT already covered by the lane term, so nobody counts twice.
+    /// <para>
+    /// Centred on the champion's own lane rate, exactly like the direct duel: averaged over several
+    /// opponents, a duel log-odds IS the champion's general strength, which the lane term already
+    /// carries. Uncentred, a candidate with edges banked that strength a second time at 0.35 weight
+    /// while a candidate without edges banked nothing at all — and which candidates have edges is
+    /// decided by whom OP.GG lists as a notable counter, not by how good the pick is.
+    /// </para>
     /// </summary>
     private double? OffLaneMatchupLogOdds(
         int championId,
@@ -676,6 +683,11 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         ICollection<Reason> reasons,
         ErrorBudget budget)
     {
+        // Without a lane there is no own rate to measure against — the base term is then the
+        // champion's best lane and the duels may come from any lane at all. Rare enough (customs,
+        // blind pick) to leave as it was rather than invent a reference.
+        var baseline = _meta.LaneStat(championId, lane) is { } own ? ScoreModel.Logit(own.WinRate) : 0;
+
         var total = 0.0;
         var weightSum = 0.0;
         var variance = 0.0;
@@ -697,7 +709,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
 
             counted++;
             weightSum += offLane;
-            total += offLane * ScoreModel.Logit(view.Value.WinRate);
+            total += offLane * (ScoreModel.Logit(view.Value.WinRate) - baseline);
             variance += offLane * offLane
                 * ScoreError.LogitVariance(view.Value.WinRate, view.Value.Play, Shrinkage.MatchupPrior);
 

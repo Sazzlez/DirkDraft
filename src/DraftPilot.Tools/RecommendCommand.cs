@@ -67,7 +67,24 @@ internal static class RecommendCommand
         PrintRecommendations("Bans", bans);
 
         PrintComp(bans);
+        PrintBalance(meta, state, predictions);
         return 0;
+    }
+
+    /// <summary>
+    /// The figure the window prints over the two team columns. Here because a scoring change has to
+    /// be measurable on both surfaces — the list and the one number that judges the whole draft.
+    /// </summary>
+    private static void PrintBalance(MetaLookup meta, DraftState state, LanePredictionResult enemies)
+    {
+        var allies = new LanePredictor(meta, SeatPriors.Load()).Predict(state.Allies);
+        var balance = DraftBalance.Estimate(meta, state, allies, enemies);
+
+        Console.WriteLine();
+        Console.WriteLine(balance.HasData
+            ? $"Draft-Balance: {balance.AllyWinRate:P1} zu {balance.EnemyWinRate:P1} "
+                + $"({balance.RatedChampions} bewertete Champions, {balance.ContestedLanes} umkämpfte Lanes)"
+            : "Draft-Balance: — (eine Seite ist nicht aufgedeckt)");
     }
 
     /// <summary>

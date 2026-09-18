@@ -1369,6 +1369,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // figure above them cannot end up describing two different boards.
         var laneDuels = LaneMatchups.For(_meta, allyPredictions, enemyPredictions);
 
+        // The enemy composition is derived here rather than taken from the recommendation pass.
+        // That pass returns early once the seat is settled — which is the whole last stretch of the
+        // draft, exactly when the remaining enemies are revealed. The build hints read this, and a
+        // hint frozen at "67 % magisch" from three revealed enemies is wrong shopping advice once
+        // the last two turn out to be bruisers.
+        _enemyComp = _comp.Analyze([.. _state.Enemies.Select(slot => slot.EffectiveChampionId)]);
+
         RenderTeam(Allies, _state.Allies, allyPredictions, laneDuels, isAlly: true);
         RenderTeam(Enemies, _state.Enemies, enemyPredictions, laneDuels, isAlly: false);
         RenderBalance(allyPredictions, enemyPredictions, laneDuels);
@@ -2689,6 +2696,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             HasRecommendations = false;
             ListHeader = "Empfehlungen";
             EmptyHint = "Kein eigener Slot erkannt.";
+
+            // Without a seat there is nothing these chips could be about; leaving the previous
+            // draft's findings standing would be worse than an empty row.
+            Warnings.Clear();
             return;
         }
 
@@ -2704,6 +2715,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var isBan = set.Action == TurnAction.Ban;
         var mode = isBan ? "Bans" : "Picks";
         var suffix = _target.IsFollowingTurn ? string.Empty : " (Ausblick)";
+
+        // Before the settled return below: the comp findings describe the draft, not the list, and
+        // the draft keeps moving after the own lock. The queue caveat goes first — everything after
+        // it is lane advice, and in a mode without lanes that is what the reader has to know first.
+        var findings = new List<string>();
+
+        if (_state.Queue.LaneCaveat() is { Length: > 0 } caveat)
+            findings.Add(caveat);
+
+        findings.AddRange(set.AllyComp.Findings.Select(finding => finding.Text));
+        Warnings.ReplaceAll(findings);
 
         // The matchup panel takes the column in this phase, so the header names that instead of a
         // list nobody can act on.
@@ -2744,19 +2766,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Recommendations.Resize(set.Items.Count, () => new RecommendationViewModel());
         for (var i = 0; i < set.Items.Count; i++)
             Recommendations[i].Apply(i + 1, set.Items[i], _icons.Get(set.Items[i].ChampionId), isBan, precision);
-
-        _enemyComp = set.EnemyComp;
-
-        // The queue caveat goes first: everything after it is lane advice, and in a mode without
-        // lanes that is the one thing the reader has to know before reading the rest.
-        var findings = new List<string>();
-
-        if (_state.Queue.LaneCaveat() is { Length: > 0 } caveat)
-            findings.Add(caveat);
-
-        findings.AddRange(set.AllyComp.Findings.Select(finding => finding.Text));
-
-        Warnings.ReplaceAll(findings);
     }
 
     private void Clear()
@@ -2764,6 +2773,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Recommendations.Clear();
         Warnings.Clear();
         DraftStats.Clear();
+
+        // The build hints read this between drafts too; without the reset the first render of the
+        // next draft would answer with the last one's enemies.
+        _enemyComp = CompProfile.Empty;
         HasRecommendations = false;
         HasDraftPreview = false;
         DraftPreviewNote = string.Empty;

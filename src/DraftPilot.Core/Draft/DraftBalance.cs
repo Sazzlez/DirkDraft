@@ -6,10 +6,11 @@ namespace DraftPilot.Core.Draft;
 /// How the draft stands: one estimated win rate for the own team, the counterpart for theirs.
 /// <para>
 /// Built from the same evidence as the pick recommendations — shrunk lane win rates and shrunk
-/// direct matchups of the champions actually revealed — combined in log-odds. Two deliberate
+/// direct matchups of the champions actually revealed — combined in log-odds. Three deliberate
 /// choices keep the number honest: everything is a MEAN, never a sum (five champions at 52 %
-/// are not a 95 % team), and unrevealed seats simply do not count instead of being guessed.
-/// It is a reading of the data, not a prediction of the game.
+/// are not a 95 % team); unrevealed seats simply do not count instead of being guessed; and a duel
+/// counts only by how far it deviates from what the two lane rates already predict, so the same
+/// advantage is not counted twice. It is a reading of the data, not a prediction of the game.
 /// </para>
 /// </summary>
 /// <param name="AllyWinRate">Estimated win rate of the own team, 0..1.</param>
@@ -70,8 +71,16 @@ public readonly record struct DraftBalance(
             if (ally == 0 || enemy == 0 || meta.Matchup(ally, enemy, lane) is not { } matchup)
                 continue;
 
-            // Already centred: an even matchup contributes exactly zero.
-            duelSum += ScoreModel.Logit(matchup.WinRate);
+            // What the two lane rates alone would predict for this duel: in log-odds, a champion's
+            // strength against the field minus the opponent's. Only the difference to that is news.
+            // Uncentred, the same advantage was counted twice — once in strengthEdge above, once
+            // here — so a lane where the stronger champion also wins the duel (the usual case) was
+            // worth about double what it is.
+            var expected =
+                (meta.LaneStat(ally, lane) is { } allyStat ? ScoreModel.Logit(allyStat.WinRate) : 0)
+                - (meta.LaneStat(enemy, lane) is { } enemyStat ? ScoreModel.Logit(enemyStat.WinRate) : 0);
+
+            duelSum += ScoreModel.Logit(matchup.WinRate) - expected;
             contested++;
         }
 
