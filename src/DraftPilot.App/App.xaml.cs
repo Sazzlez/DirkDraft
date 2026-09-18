@@ -212,7 +212,50 @@ public partial class App : Application
         _phase = dev.Phase;
 
         if (dev.IsScreenshot)
+        {
             ScheduleScreenshot(dev.ScreenshotPath!, dev.ScreenshotDelaySeconds, dev.ExpandRows);
+        }
+        else if (dev.IsDemo && _phase is { Length: > 0 })
+        {
+            // A replay you can click through, not just photograph. Without this the injected phase
+            // only ever reached the screenshot path, so the in-game view was the one screen that
+            // could be pictured but not visited.
+            ApplyPhasesWhenSettled(_phase);
+        }
+    }
+
+    /// <summary>
+    /// Feeds the simulated gameflow phases into the model once the replayed draft is over and its
+    /// build has arrived. Comma-separated and in order, so "InProgress,EndOfGame" walks a game that
+    /// starts and ends.
+    /// <para>
+    /// The waiting is the point. The in-game view needs champion select to be FINISHED and a build
+    /// to be in hand, and how long the build takes is not knowable in advance: a cached matchup is
+    /// instant, an uncached one is an OP.GG round trip, and after a patch every cache entry is
+    /// stale. A fixed delay got this right on a warm cache and showed an empty start screen on a
+    /// cold one.
+    /// </para>
+    /// </summary>
+    private void ApplyPhasesWhenSettled(string phases)
+    {
+        _ = Dispatcher.InvokeAsync(async () =>
+        {
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(45);
+
+            while (DateTime.UtcNow < deadline && _model is { IsDraftActive: true } or { HasBuild: false })
+                await Task.Delay(TimeSpan.FromMilliseconds(400)).ConfigureAwait(true);
+
+            if (_model is null)
+                return;
+
+            foreach (var step in phases.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                _model.OnGameflowPhase(step);
+
+            // A recording that ends the draft sends the window to the tray on its way, and whether
+            // it comes back is a user setting. In a mode whose whole purpose is looking at the
+            // screen, it comes back either way.
+            ShowWindow(reloadSnapshot: false);
+        });
     }
 
     /// <summary>
