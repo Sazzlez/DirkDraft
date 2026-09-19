@@ -94,7 +94,7 @@ internal static class MatchupFitCommand
         var mean = edges.Average(edge => edge.Rate);
         var weighted = edges.Sum(edge => edge.Rate * edge.Play) / edges.Sum(edge => (double)edge.Play);
 
-        Console.WriteLine($"Mittelwert der Kanten:          {mean:N4}  (nach Spielen gewichtet {weighted:N4})");
+        Console.WriteLine($"Mittelwert der Kanten:          {mean:N4}  (nach Games gewichtet {weighted:N4})");
 
         var pairs = edges
             .Select(edge => (
@@ -107,13 +107,13 @@ internal static class MatchupFitCommand
         var spreadDuel = StandardDeviation(pairs.Select(pair => pair.Duel));
         var spreadLane = StandardDeviation(pairs.Select(pair => pair.Lane));
 
-        Console.WriteLine($"Korrelation Lane-Term/Duell-Term: {r:N4}   erklaerte Varianz {r * r:P1}");
-        Console.WriteLine($"Streuung Duell-Term {spreadDuel:N4} Logit, Lane-Term {spreadLane:N4} Logit");
+        Console.WriteLine($"Korrelation Lane-Term/Matchup-Term: {r:N4}   erklaerte Varianz {r * r:P1}");
+        Console.WriteLine($"Streuung Matchup-Term {spreadDuel:N4} Logit, Lane-Term {spreadLane:N4} Logit");
 
         // How much of the duel term is the lane term counted twice: the regression slope times one
         // standard deviation of lane strength, expressed in the same points the breakdown shows.
         var overCredit = ScoreModel.AsPoints(r * spreadDuel);
-        Console.WriteLine($"Doppelzaehlung fuer einen Champion 1 Sigma ueber dem Mittel: {overCredit:N2} Punkte");
+        Console.WriteLine($"Doppelzaehlung fuer einen Champ 1 Sigma ueber dem Mittel: {overCredit:N2} Punkte");
         Console.WriteLine();
     }
 

@@ -37,7 +37,7 @@ public sealed class TeamDamageViewModel : ObservableObject
         set => Set(ref _magic, value);
     }
 
-    /// <summary>"67 % physisch · 33 % magisch", or why there is nothing to show.</summary>
+    /// <summary>"67 % AD · 33 % AP", or why there is nothing to show.</summary>
     public string Text
     {
         get => _text;
@@ -68,7 +68,7 @@ public sealed class TeamStatViewModel : ObservableObject
     private string _enemy = "—";
     private string _hint = string.Empty;
 
-    /// <summary>"Frontline", "Kontrolle", …</summary>
+    /// <summary>"Frontline", "CC", …</summary>
     public string Label
     {
         get => _label;

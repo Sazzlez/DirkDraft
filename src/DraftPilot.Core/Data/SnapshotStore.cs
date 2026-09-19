@@ -68,9 +68,9 @@ public sealed class SnapshotStore(string? path = null)
             }
 
             if (snapshot.Champions.Count == 0)
-                return new SnapshotLoadResult(null, SnapshotLoadStatus.Empty, "keine Champions enthalten");
+                return new SnapshotLoadResult(null, SnapshotLoadStatus.Empty, "keine Champs enthalten");
 
-            return new SnapshotLoadResult(snapshot, SnapshotLoadStatus.Ok, $"{snapshot.Champions.Count} Champions");
+            return new SnapshotLoadResult(snapshot, SnapshotLoadStatus.Ok, $"{snapshot.Champions.Count} Champs");
         }
         catch (JsonException ex)
         {

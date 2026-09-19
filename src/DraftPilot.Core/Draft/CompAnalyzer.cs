@@ -43,7 +43,7 @@ public sealed record CompProfile(
     /// <summary>
     /// At least one champion's damage type is known, so the two shares mean something.
     /// <para>
-    /// Without this the pair reads as "0 % physisch · 0 % magisch" — a composition that deals no
+    /// Without this the pair reads as "0 % AD · 0 % AP" — a composition that deals no
     /// damage at all — where the truth is that nothing about its damage has been read yet. The
     /// shares add up to 1 as soon as a single champion is known, so their sum is the test.
     /// </para>
@@ -191,7 +191,7 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
             findings.Add(new CompFinding(CompIssue.NoFrontline, "kein Frontline", 0.8));
 
         if (staticKnown >= 4 && ranged == 0)
-            findings.Add(new CompFinding(CompIssue.AllMelee, "nur Nahkampf", 0.6));
+            findings.Add(new CompFinding(CompIssue.AllMelee, "nur Melee", 0.6));
 
         // Trait-driven rules need enough curated champions on the board to mean anything.
         if (traitsKnown < MinimumForRoleRules)
@@ -245,18 +245,18 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
         {
             score += 0.5 * profile.SeverityOf(CompIssue.NoMagicDamage);
             reasons.Add(Reason.Pro(
-                "bringt fehlenden magischen Schaden",
-                "Dein Team macht fast nur physischen Schaden. Dagegen reicht dem Gegner Rüstung — "
-                + "magischer Schaden zwingt ihn, sich gegen beides zu wappnen."));
+                "bringt fehlenden AP-Schaden",
+                "Dein Team macht fast nur AD-Schaden. Dagegen reicht dem Gegner Armor — "
+                + "AP-Schaden zwingt ihn, sich gegen beides zu wappnen."));
         }
 
         if (profile.Has(CompIssue.NoPhysicalDamage) && champion.Damage is DamageType.Physical or DamageType.Mixed)
         {
             score += 0.5 * profile.SeverityOf(CompIssue.NoPhysicalDamage);
             reasons.Add(Reason.Pro(
-                "bringt fehlenden physischen Schaden",
-                "Dein Team macht fast nur magischen Schaden. Dagegen reicht dem Gegner "
-                + "Magieresistenz — physischer Schaden zwingt ihn, sich gegen beides zu wappnen."));
+                "bringt fehlenden AD-Schaden",
+                "Dein Team macht fast nur AP-Schaden. Dagegen reicht dem Gegner "
+                + "MR — AD-Schaden zwingt ihn, sich gegen beides zu wappnen."));
         }
 
         if (champion.HasStaticData)
@@ -265,18 +265,18 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
             {
                 score += 0.4;
                 reasons.Add(Reason.Pro(
-                    "hält vorne Schaden aus",
+                    "steht vorne",
                     "In deinem Team ist noch niemand, der im Teamfight vorne stehen und Schaden "
-                    + "abfangen kann — ohne so einen Champion trifft alles direkt die Carrys."));
+                    + "abfangen kann — ohne so einen Champ trifft alles direkt die Carrys."));
             }
 
             if (profile.Has(CompIssue.AllMelee) && champion.IsRanged)
             {
                 score += 0.25;
                 reasons.Add(Reason.Pro(
-                    "kämpft auf Distanz",
-                    "Dein Team besteht bisher nur aus Nahkämpfern. Ein Champion mit Reichweite kann "
-                    + "Schaden machen, ohne selbst in den Nahkampf zu müssen."));
+                    "ist Ranged",
+                    "Dein Team besteht bisher nur aus Melees. Ein Champ mit Range kann "
+                    + "Schaden machen, ohne selbst ins Melee zu müssen."));
             }
         }
 
@@ -286,7 +286,7 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
             {
                 score += 0.45;
                 reasons.Add(Reason.Pro(
-                    "kann Kämpfe eröffnen",
+                    "kann engagen",
                     "In deinem Team kann bisher niemand einen Teamfight von sich aus starten "
                     + "(Engage). Dann bestimmt immer der Gegner, wann gekämpft wird."));
             }
@@ -296,7 +296,7 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
                 score += 0.25;
                 reasons.Add(Reason.Pro(
                     "schützt deine Carrys",
-                    "Niemand in deinem Team kann Gegner von den eigenen Schadensausteilern "
+                    "Niemand in deinem Team kann Gegner von den eigenen Carrys "
                     + "wegdrängen (Peel). Ein Assassine kommt so ungestört durch."));
             }
 
@@ -304,7 +304,7 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
             {
                 score += 0.3;
                 reasons.Add(Reason.Pro(
-                    "kann Gegner festsetzen",
+                    "bringt Hard CC",
                     "Deinem Team fehlen Effekte, die Gegner bewegungsunfähig machen — betäuben, "
                     + "hochwerfen, festhalten (CC). Ohne die entkommt jeder Gegner."));
             }
@@ -316,18 +316,18 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
         {
             score -= 0.2;
             reasons.Add(Reason.Contra(
-                "noch mehr physischer Schaden",
-                "Dein Team macht schon fast nur physischen Schaden. Ein weiterer solcher Champion "
-                + "macht es dem Gegner leicht: Er kauft Rüstung und ist gegen alles gewappnet."));
+                "noch mehr AD-Schaden",
+                "Dein Team macht schon fast nur AD-Schaden. Ein weiterer solcher Champ "
+                + "macht es dem Gegner leicht: Er kauft Armor und ist gegen alles gewappnet."));
         }
 
         if (profile.MagicShare >= 0.75 && champion.Damage == DamageType.Magic)
         {
             score -= 0.2;
             reasons.Add(Reason.Contra(
-                "noch mehr magischer Schaden",
-                "Dein Team macht schon fast nur magischen Schaden. Ein weiterer solcher Champion "
-                + "macht es dem Gegner leicht: Er kauft Magieresistenz und ist gegen alles gewappnet."));
+                "noch mehr AP-Schaden",
+                "Dein Team macht schon fast nur AP-Schaden. Ein weiterer solcher Champ "
+                + "macht es dem Gegner leicht: Er kauft MR und ist gegen alles gewappnet."));
         }
 
         // --- What the pick does about THEIR line-up. -------------------------------------------
@@ -345,7 +345,7 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
                 reasons.Add(Reason.Pro(
                     "ihre Backline steht frei",
                     "Im gegnerischen Team steht bisher niemand vorne, der Schaden abfangen kann. "
-                    + "Ein Champion, der gezielt auf die hinteren Reihen geht, kommt dort ohne "
+                    + "Ein Champ, der gezielt auf die hinteren Reihen geht, kommt dort ohne "
                     + "Umweg hin."));
             }
 
@@ -357,7 +357,7 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
                 score -= 0.2;
                 reasons.Add(Reason.Contra(
                     "kommt schwer an ihre Carrys",
-                    "Der Gegner hat schon zwei Champions, die vorne stehen und Schaden aushalten. "
+                    "Der Gegner hat schon zwei Champs, die vorne stehen und Schaden aushalten. "
                     + "Sie stehen genau zwischen diesem Pick und den Zielen, für die er gebaut ist."));
             }
 
@@ -365,8 +365,8 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
             {
                 score += 0.25;
                 reasons.Add(Reason.Pro(
-                    "Reichweite gegen ein Nahkampf-Team",
-                    "Der Gegner besteht bisher nur aus Nahkämpfern. Wer auf Distanz Schaden macht, "
+                    "Range gegen ein Melee-Team",
+                    "Der Gegner besteht bisher nur aus Melees. Wer auf Distanz Schaden macht, "
                     + "zwingt sie, den Weg zu ihm erst zurückzulegen."));
             }
         }
@@ -378,7 +378,7 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
                 score += 0.3;
                 reasons.Add(Reason.Pro(
                     "hält ihr Engage auf",
-                    "Der Gegner hat einen Champion, der einen Teamfight von sich aus starten kann. "
+                    "Der Gegner hat einen Champ, der einen Teamfight von sich aus starten kann. "
                     + "Dieser Pick kann die Getroffenen wieder herausholen — sonst entscheidet ihr "
                     + "Anspiel den Kampf."));
             }
@@ -391,9 +391,9 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
             {
                 score += 0.25;
                 reasons.Add(Reason.Pro(
-                    "früh stark gegen ein spätes Team",
+                    "Earlygame gegen ein Scaling-Team",
                     "Mindestens die Hälfte der aufgedeckten Gegner wird erst im späten Spiel "
-                    + "gefährlich. Dieser Champion ist umgekehrt früh am stärksten — er kann das "
+                    + "gefährlich. Dieser Champ ist umgekehrt früh am stärksten — er kann das "
                     + "Spiel entscheiden, bevor ihre Kurve greift."));
             }
         }

@@ -207,7 +207,7 @@ public class CompAnalyzerTests
         var score = analyzer.Fit(Ap1, profile, CompProfile.Empty, reasons);
 
         Assert.True(score > 0);
-        AssertChip(reasons, "magischen Schaden", ReasonTone.Pro);
+        AssertChip(reasons, "AP-Schaden", ReasonTone.Pro);
     }
 
     [Fact]
@@ -219,7 +219,7 @@ public class CompAnalyzerTests
 
         analyzer.Fit(TankTagged, profile, CompProfile.Empty, reasons);
 
-        AssertChip(reasons, "vorne Schaden aus", ReasonTone.Pro);
+        AssertChip(reasons, "steht vorne", ReasonTone.Pro);
     }
 
     [Fact]
@@ -232,7 +232,7 @@ public class CompAnalyzerTests
 
         analyzer.Fit(TankTagged, profile, CompProfile.Empty, reasons);
 
-        AssertChip(reasons, "Kämpfe eröffnen", ReasonTone.Pro);
+        AssertChip(reasons, "kann engagen", ReasonTone.Pro);
     }
 
     [Fact]
@@ -246,7 +246,7 @@ public class CompAnalyzerTests
         var score = analyzer.Fit(Ad4, profile, CompProfile.Empty, reasons);
 
         Assert.True(score < 0);
-        AssertChip(reasons, "mehr physischer Schaden", ReasonTone.Contra);
+        AssertChip(reasons, "mehr AD-Schaden", ReasonTone.Contra);
     }
 
     /// <summary>
@@ -443,7 +443,7 @@ public class CompAnalyzerTests
         var score = analyzer.Fit(Ap1, CompProfile.Empty, enemies, reasons);
 
         Assert.True(score > 0);
-        AssertChip(reasons, "früh stark", ReasonTone.Pro);
+        AssertChip(reasons, "Earlygame", ReasonTone.Pro);
     }
 
     /// <summary>

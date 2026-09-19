@@ -78,13 +78,13 @@ public static class QueueKinds
         QueueKind.RankedFlex => "Ranked Flex",
         QueueKind.NormalDraft => "Normal Draft",
         QueueKind.NormalBlind => "Normal Blind",
-        QueueKind.Quickplay => "Schnellsuche",
+        QueueKind.Quickplay => "Quickplay",
         QueueKind.Clash => "Clash",
-        QueueKind.Bots => "Gegen Bots",
+        QueueKind.Bots => "Co-op vs. AI",
         QueueKind.Aram => "ARAM",
         QueueKind.Arena => "Arena",
-        QueueKind.Rotating => "Wechselmodus",
-        QueueKind.Custom => "Eigenes Spiel",
+        QueueKind.Rotating => "Rotating Gamemode",
+        QueueKind.Custom => "Custom Game",
         _ => string.Empty,
     };
 
@@ -94,11 +94,11 @@ public static class QueueKinds
     /// </summary>
     public static string LaneCaveat(this QueueKind kind) => kind switch
     {
-        QueueKind.Aram => "ARAM: alle Zahlen sind Lane-Statistiken von der Kluft. Runen und Items "
+        QueueKind.Aram => "ARAM: alle Zahlen sind Lane-Statistiken von Summoner's Rift. Runen und Items "
             + "taugen als Richtung, die Reihenfolge der Vorschläge nicht.",
         QueueKind.Arena => "Arena: 2v2v2v2 ohne Lanes — die Vorschläge beruhen auf "
             + "Lane-Statistiken und sagen hier nichts.",
-        QueueKind.Rotating => "Wechselmodus: die Zahlen stammen aus der normalen Kluft und "
+        QueueKind.Rotating => "Rotating Gamemode: die Zahlen stammen von Summoner's Rift und "
             + "beschreiben ein anderes Spiel als dieses.",
         _ => string.Empty,
     };

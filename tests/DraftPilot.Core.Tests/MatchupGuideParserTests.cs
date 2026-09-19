@@ -151,7 +151,7 @@ public class MatchupGuideParserTests
         // stat_mod_ids arrive as bare numbers; the display must not show "5008".
         Assert.Equal(3, Plan.Runes!.Shards.Count);
         Assert.All(Plan.Runes.Shards, shard => Assert.DoesNotMatch("^5\\d{3}$", shard));
-        Assert.Contains("Adaptive Stärke", Plan.Runes.Shards);
+        Assert.Contains("Adaptive Force", Plan.Runes.Shards);
     }
 
     [Fact]

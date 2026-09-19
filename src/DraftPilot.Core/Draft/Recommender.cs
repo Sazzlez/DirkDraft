@@ -50,14 +50,14 @@ public sealed record ScoreTerm(ScoreTermKind Kind, double? LogOdds)
     public string Label => Kind switch
     {
         ScoreTermKind.LaneStrength => "Lane-Stärke",
-        ScoreTermKind.LaneMatchup => "Duell mit Gegner",
-        ScoreTermKind.EnemyTeam => "Übrige Gegner",
-        ScoreTermKind.Synergy => "Synergie im Team",
-        ScoreTermKind.Composition => "Team-Aufstellung",
+        ScoreTermKind.LaneMatchup => "Matchup",
+        ScoreTermKind.EnemyTeam => "Enemy-Team",
+        ScoreTermKind.Synergy => "Synergie",
+        ScoreTermKind.Composition => "Teamcomp",
         ScoreTermKind.BanStrength => "Stärke allgemein",
         ScoreTermKind.BanLaneThreat => "Gefahr auf Lane",
         ScoreTermKind.BanTeamThreat => "Gefahr fürs Team",
-        ScoreTermKind.BanPopularity => "Wie oft genommen",
+        ScoreTermKind.BanPopularity => "Pick- und Banrate",
         _ => Kind.ToString(),
     };
 
@@ -65,27 +65,27 @@ public sealed record ScoreTerm(ScoreTermKind Kind, double? LogOdds)
     public string Hint => Kind switch
     {
         ScoreTermKind.LaneStrength =>
-            "Wie gut der Champion auf dieser Lane allgemein läuft: die Siegquote, geglättet nach "
+            "Wie gut der Champ auf dieser Lane allgemein läuft: die Winrate, geglättet nach "
             + "Stichprobe. OP.GGs Tier steht als eigener Hinweis daneben und zählt hier nicht mit — "
-            + "es mischt Siegquote und Beliebtheit, und die Siegquote ist schon diese Zeile.",
+            + "es mischt Winrate und Pickrate, und die Winrate ist schon diese Zeile.",
         ScoreTermKind.LaneMatchup =>
-            "Wie viel besser oder schlechter dieser Champion gegen den erwarteten Lane-Gegner "
+            "Wie viel besser oder schlechter dieser Champ gegen den erwarteten Lane-Gegner "
             + "abschneidet als auf dieser Lane üblich. Die allgemeine Stärke steckt schon in der "
             + "Zeile darüber — sonst würde sie zweimal zählen.",
         ScoreTermKind.EnemyTeam =>
-            "Siegquote gegen die übrigen aufgedeckten Gegner; zählt gedämpft, weil sie nicht auf deiner Lane stehen.",
+            "Winrate gegen die restlichen aufgedeckten Gegner — alle außer dem Lane-Gegner. Zählt gedämpft, weil sie nicht auf deiner Lane stehen.",
         ScoreTermKind.Synergy =>
-            "Siegquote zusammen mit den Mitspielern, die schon gepickt haben.",
+            "Winrate zusammen mit den Teammates, die schon gepickt haben.",
         ScoreTermKind.Composition =>
-            "Ob der Pick füllt, was dem Team fehlt — Schadensart, Frontline, Engage, CC. Der einzige Punkt ohne Winrate-Grundlage, deshalb bewusst klein gehalten.",
+            "Ob der Pick füllt, was dem Team fehlt und was gegen ihre Comp hilft — AD/AP, Frontline, Engage, CC. Der einzige Punkt ohne Winrate-Grundlage, deshalb bewusst klein gehalten.",
         ScoreTermKind.BanStrength =>
-            "Wie stark der Champion auf seiner besten Lane gerade ist.",
+            "Wie stark der Champ auf seiner besten Lane gerade ist.",
         ScoreTermKind.BanLaneThreat =>
-            "Wie stark der Champion genau auf deiner Lane wäre — dort trifft dich ein Nicht-Bann direkt.",
+            "Wie stark der Champ genau auf deiner Lane wäre — dort trifft dich ein Nicht-Ban direkt.",
         ScoreTermKind.BanTeamThreat =>
-            "Siegquote des Champions gegen die Mitspieler, die schon gepickt haben.",
+            "Winrate des Champs gegen die Teammates, die schon gepickt haben.",
         ScoreTermKind.BanPopularity =>
-            "Wie wahrscheinlich der Gegner den Champion überhaupt nimmt — Pick- und Banrate. Ein Bann auf einen Champion, den niemand spielt, ist verschenkt.",
+            "Wie wahrscheinlich der Gegner den Champ überhaupt nimmt — Pick- und Banrate. Ein Ban auf einen Champ, den niemand spielt, ist verschenkt.",
         _ => string.Empty,
     };
 }
@@ -350,13 +350,13 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             return;
 
         var named = string.Join(", ", threats.Take(3).Select(threat =>
-            $"{_meta.ChampionName(threat.ChampionId)} {threat.WinRate:P0} aus {threat.Play:N0} Spielen"));
+            $"{_meta.ChampionName(threat.ChampionId)} {threat.WinRate:P0} aus {threat.Play:N0} Games"));
 
         var more = threats.Count > 3 ? $" und {threats.Count - 3} weitere" : string.Empty;
 
         reasons.Add(Reason.Contra(
-            threats.Count == 1 ? "1 offener Konter" : $"{threats.Count} offene Konter",
-            $"Auf {lane.Display()} ist noch niemand aufgedeckt, und diese Champions sind noch frei "
+            threats.Count == 1 ? "1 offener Counter" : $"{threats.Count} offene Counter",
+            $"Auf {lane.Display()} ist noch niemand aufgedeckt, und diese Champs sind noch frei "
             + $"und schneiden gegen {_meta.ChampionName(candidate)} besser ab als seine Gegner "
             + $"üblicherweise: {named}{more}. Sie zu nehmen steht dem Gegner frei — ob er es tut, "
             + "sagen die Daten nicht, deshalb zählt das hier nicht in die Prozentzahl hinein. "
@@ -421,7 +421,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         {
             reasons.Add(Reason.Pro(
                 $"{stat.WinRate:P1} WR auf {lane.Display()}",
-                $"Aus {stat.Play:N0} Spielen im aktuellen Patch. 50 % wäre Durchschnitt."));
+                $"Aus {stat.Play:N0} Games im aktuellen Patch. 50 % wäre Durchschnitt."));
         }
 
         // Neutral, because it no longer moves the number: context beside the score, not a part of
@@ -431,8 +431,8 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             reasons.Add(Reason.Neutral(
                 $"{ScoreModel.TierName(stat.Tier)} auf {lane.Display()}",
                 $"OP.GGs eigene Einstufung für {lane.Display()}, von OP (stärkste) über S bis D "
-                + "(schwächste). Zählt nicht in die Prozentzahl: sie mischt Siegquote und "
-                + "Beliebtheit, und die Siegquote steckt schon drin."));
+                + "(schwächste). Zählt nicht in die Prozentzahl: sie mischt Winrate und "
+                + "Pickrate, und die Winrate steckt schon drin."));
         }
 
         return logOdds;
@@ -454,9 +454,9 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         {
             reasons.Add(Reason.Pro(
                 $"stark auf {best.Lane.Display()}",
-                $"{best.Lane.Display()} ist die Lane, auf der dieser Champion gerade am "
+                $"{best.Lane.Display()} ist die Lane, auf der dieser Champ gerade am "
                 + $"gefährlichsten ist und auf der ihn der Gegner am ehesten spielt: "
-                + $"{best.Stat.WinRate:P1} Siegquote aus {best.Stat.Play:N0} Spielen."));
+                + $"{best.Stat.WinRate:P1} Winrate aus {best.Stat.Play:N0} Games."));
         }
 
         return logOdds;
@@ -475,12 +475,12 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         {
             reasons.Add(best.Stat.BanRate > best.Stat.PickRate
                 ? Reason.Neutral(
-                    $"in {best.Stat.BanRate:P0} der Spiele gebannt",
-                    "So oft bannen andere diesen Champion. Ein hoher Wert heißt: viele halten ihn "
+                    $"in {best.Stat.BanRate:P0} der Games gebannt",
+                    "So oft bannen andere diesen Champ. Ein hoher Wert heißt: viele halten ihn "
                     + "für gefährlich — aber vielleicht bannt ihn ohnehin jemand anders.")
                 : Reason.Neutral(
-                    $"in {best.Stat.PickRate:P0} der Spiele gepickt",
-                    "So oft wird dieser Champion gespielt. Je häufiger, desto wahrscheinlicher "
+                    $"in {best.Stat.PickRate:P0} der Games gepickt",
+                    "So oft wird dieser Champ gespielt. Je häufiger, desto wahrscheinlicher "
                     + "nimmt ihn der Gegner, wenn du ihn nicht bannst."));
         }
 
@@ -611,8 +611,8 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         {
             reasons.Add(Reason.Pro(
                 $"stark auf {mainLane.Display()}",
-                $"{mainLane.Display()} ist die Lane, auf der dieser Champion meistens gespielt wird: "
-                + $"{main.WinRate:P1} Siegquote aus {main.Play:N0} Spielen."));
+                $"{mainLane.Display()} ist die Lane, auf der dieser Champ meistens gespielt wird: "
+                + $"{main.WinRate:P1} Winrate aus {main.Play:N0} Games."));
         }
 
         return logOdds;
@@ -720,23 +720,23 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
     /// </summary>
     private static string DescribeMatchup(MatchupView view, string opponent, Lane lane, double probability)
     {
-        var text = $"Von den ausgewerteten Spielen auf {lane.Display()} gewinnt dieser Champion "
+        var text = $"Von den ausgewerteten Games auf {lane.Display()} gewinnt dieser Champ "
             + $"{view.WinRate:P1} gegen {opponent}. 50 % wäre ausgeglichen.";
 
         text += view.Play > 0
-            ? $"\n\nDatenlage: {view.Play:N0} Spiele."
+            ? $"\n\nDatenlage: {view.Play:N0} Games."
             : "\n\nDatenlage: sehr dünn, entsprechend vorsichtig gewichtet.";
 
         if (view.IsLive)
             text += " Gerade für diesen Draft von OP.GG geholt.";
 
         if (view.IsInferred)
-            text += $" Abgeleitet aus der Gegenrichtung — gemessen wurde {opponent} gegen diesen Champion.";
+            text += $" Abgeleitet aus der Gegenrichtung — gemessen wurde {opponent} gegen diesen Champ.";
 
         if (probability < 0.6)
         {
             text += $"\n\n{opponent} steht nur mit {probability:P0} Wahrscheinlichkeit auf dieser Lane, "
-                + "deshalb zählt das Duell hier nur anteilig.";
+                + "deshalb zählt das Matchup hier nur anteilig.";
         }
 
         return text;
@@ -832,8 +832,8 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         {
             reasons.Add(Reason.Pro(
                 $"über 50 % WR gegen {favourable} von {counted} weiteren Gegnern",
-                "Gegner außerhalb der eigenen Lane: gegen so viele von ihnen hat dieser Champion "
-                + "eine Siegquote über 50 %. Zählt weniger als das direkte Lane-Duell."));
+                "Gegner außerhalb der eigenen Lane: gegen so viele von ihnen hat dieser Champ "
+                + "eine Winrate über 50 %. Zählt weniger als das direkte Lane-Matchup."));
         }
 
         return meanLogOdds;
@@ -916,8 +916,8 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         {
             reasons.Add(Reason.Pro(
                 $"spielt gut mit {bestPartner}",
-                $"Zusammen mit {bestPartner} im selben Team liegt die Siegquote bei "
-                + $"{bestView.WinRate:P1} aus {bestView.Play:N0} Spielen — besser als die üblichen "
+                $"Zusammen mit {bestPartner} im selben Team liegt die Winrate bei "
+                + $"{bestView.WinRate:P1} aus {bestView.Play:N0} Games — besser als die üblichen "
                 + "Duos, die OP.GG überhaupt auflistet."));
         }
 
@@ -946,8 +946,8 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             reasons.Add(Reason.Pro(
                 $"{stat.WinRate:P1} WR auf {lane.Display()}",
                 // "diese Lane", not "deine": the engine also advises team-mate seats.
-                $"Genau die Lane dieses Slots: {stat.WinRate:P1} Siegquote aus "
-                + $"{stat.Play:N0} Spielen. Ein Bann wirkt hier direkt."));
+                $"Genau die Lane dieses Slots: {stat.WinRate:P1} Winrate aus "
+                + $"{stat.Play:N0} Games. Ein Ban wirkt hier direkt."));
         }
 
         return logOdds;
@@ -991,8 +991,8 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         {
             reasons.Add(Reason.Pro(
                 $"schlägt unseren {worst}",
-                $"Im direkten Duell gewinnt dieser Champion {worstView.WinRate:P1} gegen {worst}, "
-                + $"der bei uns schon gepickt ist. Aus {worstView.Play:N0} Spielen."));
+                $"Im direkten Matchup gewinnt dieser Champ {worstView.WinRate:P1} gegen {worst}, "
+                + $"der bei uns schon gepickt ist. Aus {worstView.Play:N0} Games."));
         }
 
         // Mean, not sum, for the same reason as the synergy term: otherwise the ban value climbed

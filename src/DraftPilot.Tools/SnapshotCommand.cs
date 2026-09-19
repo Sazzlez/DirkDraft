@@ -102,7 +102,7 @@ internal static class SnapshotCommand
             .DownloadMissingAsync(snapshot.Champions, snapshot.Patch, warnings, progress, ct);
 
         Console.WriteLine();
-        Console.WriteLine($"{added} Icons geladen, {snapshot.Champions.Count} Champions im Snapshot.");
+        Console.WriteLine($"{added} Icons geladen, {snapshot.Champions.Count} Champs im Snapshot.");
 
         foreach (var warning in warnings)
             Console.WriteLine($"  - {warning}");
@@ -133,7 +133,7 @@ internal static class SnapshotCommand
 
         Console.WriteLine();
         Console.WriteLine($"Patch {snapshot.Patch}   gebaut {snapshot.BuiltAtUtc:yyyy-MM-dd HH:mm}Z   {sizeKb:F0} KB");
-        Console.WriteLine($"Champions {snapshot.Champions.Count}   Lane-Einträge {snapshot.LaneStats.Count}   "
+        Console.WriteLine($"Champs {snapshot.Champions.Count}   Lane-Einträge {snapshot.LaneStats.Count}   "
             + $"Matchups {snapshot.Matchups.Count}   Synergien {snapshot.Synergies.Count}");
 
         Console.WriteLine();
@@ -167,7 +167,7 @@ internal static class SnapshotCommand
 
         var damageKnown = snapshot.Champions.Count(champion => champion.Damage != DamageType.Unknown);
         Console.WriteLine();
-        Console.WriteLine($"Schadensart bekannt für {damageKnown} von {snapshot.Champions.Count} Champions.");
+        Console.WriteLine($"Schadensart bekannt für {damageKnown} von {snapshot.Champions.Count} Champs.");
 
         if (snapshot.Warnings.Count == 0)
             return;

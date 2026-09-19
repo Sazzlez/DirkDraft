@@ -308,7 +308,7 @@
                                                   ItemTemplate="{StaticResource IconChipSmall}"
                                                   ItemsPanel="{StaticResource ChipRow}" />
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Schuhe" Style="{StaticResource Small}" FontSize="11"
+                                        <TextBlock Text="Boots" Style="{StaticResource Small}" FontSize="11"
                                                    Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                                    Margin="10,6,7,3" />
                                         <ItemsControl ItemsSource="{Binding GameBuild.BootItems}"
@@ -348,7 +348,7 @@
                                 <TextBlock Text="auch" Style="{StaticResource Small}" FontSize="11"
                                            Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                            Margin="0,3,7,3" MinWidth="34"
-                                           ToolTip="Was sonst noch gekauft wurde, mit Siegquote und Spielzahl. Oben steht die häufigste Wahl — nicht zwingend die beste." />
+                                           ToolTip="Was sonst noch gekauft wurde, mit Winrate und Anzahl Games. Oben steht die häufigste Wahl — nicht zwingend die beste." />
                                 <WrapPanel Grid.Column="1">
                                     <ItemsControl ItemsSource="{Binding GameBuild.StarterAlternatives}"
                                                   ItemTemplate="{StaticResource AlternativeChip}"
@@ -364,7 +364,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Kern" Style="{StaticResource Small}" FontSize="11"
+                                <TextBlock Text="Core" Style="{StaticResource Small}" FontSize="11"
                                            Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                            Margin="0,6,7,3" MinWidth="34"
                                            ToolTip="Die meistgespielte Dreierkombination dieses Matchups. OP.GG liefert sie als Kombination; ob die Reihenfolge so gemeint ist, sagt die Quelle nicht." />
@@ -406,7 +406,7 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Spät" Style="{StaticResource Small}" FontSize="11"
+                                <TextBlock Text="Late" Style="{StaticResource Small}" FontSize="11"
                                            Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                            Margin="0,6,7,3" MinWidth="34"
                                            ToolTip="Häufige Käufe für die letzten Slots — Optionen, keine feste Reihenfolge." />
@@ -417,7 +417,7 @@
     
                             <TextBlock Text="{Binding GameBuild.SkillText}" Style="{StaticResource Small}"
                                        FontSize="11" Margin="0,4,0,0" Foreground="{StaticResource Muted}"
-                                       ToolTip="Reihenfolge, in der die Fähigkeiten gemaxt werden. Die Tabelle für jede einzelne Stufe zeigt das Fenster nach Spielstart." />
+                                       ToolTip="Reihenfolge, in der die Skills gemaxt werden. Die Tabelle für jede einzelne Stufe zeigt das Fenster nach Spielstart." />
     
                         </StackPanel>
 
@@ -752,9 +752,9 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="KAUFEN" Style="{StaticResource Caption}" VerticalAlignment="Top"
+                        <TextBlock Text="ITEMS" Style="{StaticResource Caption}" VerticalAlignment="Top"
                                    Margin="0,10,14,0"
-                                   ToolTip="Reihenfolge: Start-Items → Schuhe → die drei Kern-Items → späte Optionen." />
+                                   ToolTip="Reihenfolge: Start-Items → Boots → die drei Core-Items → Late-Optionen." />
                         <!--
                             Each purchase row is a Grid, not a StackPanel or DockPanel: only the
                             star column bounds the wrap panel (a StackPanel measured it with
@@ -779,7 +779,7 @@
                                                   ItemTemplate="{StaticResource IconChip}"
                                                   ItemsPanel="{StaticResource ChipRow}" />
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Schuhe" Style="{StaticResource Small}" FontSize="11"
+                                        <TextBlock Text="Boots" Style="{StaticResource Small}" FontSize="11"
                                                    Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                                    Margin="16,7,8,4" />
                                         <ItemsControl ItemsSource="{Binding GameBuild.BootItems}"
@@ -807,7 +807,7 @@
                                 <TextBlock Text="auch gespielt" Style="{StaticResource Small}" FontSize="11"
                                            Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                            Margin="0,4,8,4" MinWidth="70"
-                                           ToolTip="Was sonst noch gekauft wurde, mit Siegquote und Spielzahl. Oben steht die häufigste Wahl — nicht zwingend die beste." />
+                                           ToolTip="Was sonst noch gekauft wurde, mit Winrate und Anzahl Games. Oben steht die häufigste Wahl — nicht zwingend die beste." />
                                 <WrapPanel Grid.Column="1">
                                     <ItemsControl ItemsSource="{Binding GameBuild.StarterAlternatives}"
                                                   ItemTemplate="{StaticResource AlternativeChip}"
@@ -823,7 +823,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Kern" Style="{StaticResource Small}" FontSize="11"
+                                <TextBlock Text="Core" Style="{StaticResource Small}" FontSize="11"
                                            Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                            Margin="0,7,8,4" MinWidth="70"
                                            ToolTip="Die meistgespielte Dreierkombination dieses Matchups. OP.GG liefert sie als Kombination; ob die Reihenfolge so gemeint ist, sagt die Quelle nicht." />
@@ -865,7 +865,7 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Spät" Style="{StaticResource Small}" FontSize="11"
+                                <TextBlock Text="Late" Style="{StaticResource Small}" FontSize="11"
                                            Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                            Margin="0,7,8,4" MinWidth="70"
                                            ToolTip="Häufige Käufe für die letzten Slots — Optionen, keine feste Reihenfolge." />
@@ -897,7 +897,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="SKILLS" Style="{StaticResource Caption}" VerticalAlignment="Center"
                                    Margin="0,0,14,0"
-                                   ToolTip="Welche Fähigkeit auf welcher Stufe einen Punkt bekommt. Stufen 16–18 sind abgeleitet (blasser), nicht gemessen — die Daten reichen bis 15." />
+                                   ToolTip="Welcher Skill auf welcher Stufe einen Punkt bekommt. Stufen 16–18 sind abgeleitet (blasser), nicht gemessen — die Daten reichen bis 15." />
                         <ItemsControl Grid.Column="1" ItemsSource="{Binding GameBuild.SkillCells}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -965,7 +965,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="LANES" Style="{StaticResource Caption}" VerticalAlignment="Top"
                                    Margin="0,7,14,0"
-                                   ToolTip="Die Lanes des fertigen Drafts. Jede Zahl steht neben dem Champion, für den sie gilt: links dein Team, rechts der Gegner. Der Balken schlägt von der Mitte zur führenden Seite aus; die halbe Breite sind 10 Punkte Abstand zu einem ausgeglichenen Duell." />
+                                   ToolTip="Die Lanes des fertigen Drafts. Jede Zahl steht neben dem Champ, für den sie gilt: links dein Team, rechts der Gegner. Der Balken schlägt von der Mitte zur führenden Seite aus; die halbe Breite sind 10 Punkte Abstand zu einem ausgeglichenen Matchup." />
                         <!--
                             Shared size scope so the total's number lands in the same column as the
                             lanes' numbers instead of drifting to the panel edge.
@@ -1226,7 +1226,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="GEGNER" Style="{StaticResource Caption}" />
+                <TextBlock Text="ENEMY" Style="{StaticResource Caption}" />
                 <Border Grid.Column="1" Height="1" Background="{StaticResource LineSoft}" VerticalAlignment="Center" />
 
                 <!-- Their side of the same estimate; the two always add up to 100 %. Never
@@ -1620,7 +1620,7 @@
                                Text="{Binding DraftFetchText}"
                                TextTrimming="CharacterEllipsis"
                                Visibility="{Binding ShowDraftFetchStatus, Converter={StaticResource BoolToVisibility}}"
-                               ToolTip="Sobald ein Champion aufgedeckt wird, holt DirkDraft dessen aktuelle Counter-Zahlen von OP.GG — und nach deinem eigenen Pick den passenden Build.">
+                               ToolTip="Sobald ein Champ aufgedeckt wird, holt DirkDraft dessen aktuelle Counter-Zahlen von OP.GG — und nach deinem eigenen Pick den passenden Build.">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
                                 <Style.Triggers>
@@ -1760,7 +1760,7 @@
                                         <Border Grid.Column="4" CornerRadius="9" Padding="10,4"
                                                 VerticalAlignment="Center"
                                                 Visibility="{Binding HasMatchupFigure, Converter={StaticResource BoolToVisibility}}"
-                                                ToolTip="Siegquote dieses Duells nach OP.GG-Daten. 50 % wäre ausgeglichen.">
+                                                ToolTip="Winrate dieses Matchups nach OP.GG-Daten. 50 % wäre ausgeglichen.">
                                             <Border.Style>
                                                 <Style TargetType="Border">
                                                     <Setter Property="Background" Value="{StaticResource SurfaceHi}" />
@@ -1829,18 +1829,18 @@
                                                     HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <Border Width="9" Height="9" CornerRadius="2"
                                                     Background="{StaticResource Warn}" VerticalAlignment="Center" />
-                                            <TextBlock Text="physisch" Style="{StaticResource Small}"
+                                            <TextBlock Text="AD" Style="{StaticResource Small}"
                                                        Foreground="{StaticResource Faint}" Margin="5,0,12,0" />
                                             <Border Width="9" Height="9" CornerRadius="2"
                                                     Background="{StaticResource Accent}" VerticalAlignment="Center" />
-                                            <TextBlock Text="magisch" Style="{StaticResource Small}"
+                                            <TextBlock Text="AP" Style="{StaticResource Small}"
                                                        Foreground="{StaticResource Faint}" Margin="5,0,0,0" />
                                         </StackPanel>
                                     </Grid>
 
                                     <ContentControl Content="{Binding AllyDamage}" Margin="0,10,0,0"
                                                     ContentTemplate="{StaticResource DamageMix}"
-                                                    ToolTip="Anteil der Schadensarten in deinem Team, gezählt über die aufgedeckten Champions. Gemischte Champions zählen zur Hälfte auf jeder Seite. Wovon der Gegner mehr abbekommt, entscheidet, ob er Rüstung oder Magieresistenz kauft." />
+                                                    ToolTip="Anteil der Schadensarten in deinem Team, gezählt über die aufgedeckten Champions. Gemischte Champions zählen zur Hälfte auf jeder Seite. Wovon der Gegner mehr abbekommt, entscheidet, ob er Armor oder MR kauft." />
                                     <ContentControl Content="{Binding EnemyDamage}" Margin="0,7,0,0"
                                                     ContentTemplate="{StaticResource DamageMix}"
                                                     ToolTip="Dasselbe für das gegnerische Team. Überwiegt hier eine Seite deutlich, steht die passende Abwehr in deinem Build als Hinweis-Chip." />
@@ -1860,7 +1860,7 @@
                                         <TextBlock Text="TEAMFIGHT" Style="{StaticResource Caption}" />
                                         <TextBlock Grid.Column="1" Text="DEIN TEAM" Style="{StaticResource Caption}"
                                                    HorizontalAlignment="Right" MinWidth="86" />
-                                        <TextBlock Grid.Column="2" Text="GEGNER" Style="{StaticResource Caption}"
+                                        <TextBlock Grid.Column="2" Text="ENEMY" Style="{StaticResource Caption}"
                                                    HorizontalAlignment="Right" MinWidth="86" />
                                     </Grid>
 
@@ -2081,7 +2081,7 @@
                                                                 <Grid Margin="0,2" Background="Transparent"
                                                                       ToolTip="{Binding Hint}">
                                                                     <Grid.ColumnDefinitions>
-                                                                        <ColumnDefinition Width="98" />
+                                                                        <ColumnDefinition Width="118" />
                                                                         <ColumnDefinition Width="70" />
                                                                         <ColumnDefinition Width="*" />
                                                                         <ColumnDefinition Width="Auto" />
@@ -2153,7 +2153,7 @@
                                                     <Border Height="1" Background="{StaticResource Line}"
                                                             Margin="0,7,0,6" />
 
-                                                    <Grid ToolTip="Alle Kriterien zusammengerechnet: die geschätzte Siegquote dieser Aufstellung. 50 % wäre ausgeglichen.">
+                                                    <Grid ToolTip="Alle Kriterien zusammengerechnet: die geschätzte Winrate dieser Comp. 50 % wäre ausgeglichen.">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="Auto" />
                                                             <ColumnDefinition Width="*" />

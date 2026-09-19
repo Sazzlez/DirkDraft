@@ -1,7 +1,7 @@
 # DirkDraft
 
 Pick- und Ban-Assistent für League of Legends. Liest den Champ Select live mit, schätzt die Lanes
-des Gegners und schlägt Picks und Bans vor — für dich und für jeden Mitspieler, der am Zug ist.
+des Gegners und schlägt Picks und Bans vor — für dich und für jeden Teammate, der am Zug ist.
 
 ## Bauen und starten
 
@@ -94,45 +94,45 @@ wieder herunterzuladen.
   die übrigen Slots werden sofort neu zugeordnet.
 - **Dein Team**: klickbar. Die Empfehlungsliste folgt normalerweise dem Spieler am Zug; ein Klick
   schaltet auf einen anderen Slot, das Pin-Symbol oben hält sie dort fest.
-- **Empfehlungen**: Der Score ist eine **geschätzte Siegquote** — Lane-Stärke, Matchups, Synergien
+- **Empfehlungen**: Der Score ist eine **geschätzte Winrate** — Lane-Stärke, Matchups, Synergien
   und Team-Bedarf werden als Log-Odds-Verschiebungen addiert und zurück in Prozent übersetzt
   (`ScoreModel.cs` dokumentiert jede Konstante). Alles darin ist eine gemessene Quote mit
   Stichprobe; OP.GGs Tier steht als Hinweis daneben und zählt nicht mit, weil es zur Hälfte
-  dieselbe Siegquote und zur Hälfte Beliebtheit ist. 50 % ist ausgeglichen; Unterschiede unter einem
+  dieselbe Winrate und zur Hälfte Pickrate ist. 50 % ist ausgeglichen; Unterschiede unter einem
   halben Punkt sind Rauschen, und liegen die Spitzenkandidaten gleichauf, sagt die Kopfzeile das.
   Jeder Chip erklärt sich beim Überfahren mit der Maus; der Pfeil rechts klappt die Aufschlüsselung
   auf — pro Kriterium ein Urteil in Worten, ein Balken und der Beitrag in Prozentpunkten. Kriterien
   ohne Datengrundlage stehen dort als *keine Daten*, nicht als Null. Unter jeder Zahl steht ihre
-  Einordnung — *beste Wahl der Liste*, *gleichauf mit Platz 1*, *knapp dahinter*, *deutlich
+  Einordnung — *bester Pick der Liste*, *gleichauf mit Platz 1*, *knapp dahinter*, *deutlich
   dahinter* —, und eine Akzentkante links markiert jede Zeile, die von Platz 1 statistisch nicht zu
   trennen ist. Beides misst den Abstand zu Platz 1 derselben Liste, nicht den zu 50 %: auf einer
   starken Lane liegt jede Zeile über 50 %, und das sagt nichts darüber, welche man nehmen sollte.
-  Die Aufstellung beider Seiten zählt mit: was dem eigenen Team fehlt, und was der Pick gegen das
+  Die Comp beider Seiten zählt mit: was dem eigenen Team fehlt, und was der Pick gegen das
   ausrichtet, was der Gegner mitgebracht hat — offene Backline, Engage ohne Antwort, ein Team, das
   erst spät gefährlich wird. Diese Regeln sind der einzige Teil des Scores ohne Winrate-Grundlage
   und deshalb gedeckelt.
   Solange auf deiner Lane niemand aufgedeckt ist, trägt jede Zeile zusätzlich **„N offene
-  Konter"**: Champions, die noch frei sind und gegen diesen Pick besser abschneiden als seine
+  Counter"**: Champions, die noch frei sind und gegen diesen Pick besser abschneiden als seine
   Gegner üblicherweise. Das ist die Frage, die ein früher Pick wirklich hat — und sie zählt
   bewusst *nicht* in die Prozentzahl hinein, denn ob der Gegner sie nimmt, sagen die Daten nicht.
-  Der Tooltip nennt die Namen mit Siegquote und Spielzahl. Gezählt wird, was OP.GG als auffällige
+  Der Tooltip nennt die Namen mit Winrate und Anzahl Games. Gezählt wird, was OP.GG als auffällige
   Gegner kennt; kein Chip heißt „keiner fällt auf", nicht „es gibt keinen". Bans rechnen dieselbe
   Einheit aus Gegnersicht: Stärke mal Wahrscheinlichkeit, dass der Champion überhaupt genommen wird.
-- **Dein Build**: nach deinem Pick Runen, Shards, Startitems, Schuhe und Kern-Items für genau dieses
-  Matchup, plus Hinweise zur gegnerischen Aufstellung. Unter Start/Schuhen und unter dem Kern steht
-  „auch gespielt": die übrigen Sätze, die OP.GG zu dieser Paarung mitliefert, mit Siegquote und
-  Spielzahl. Nichts davon wird vorgezogen oder hervorgehoben — oben steht die häufigste Wahl, und
-  welche davon richtig ist, entscheidet das Spiel. Unter 50 Spielen steht statt einer Prozentzahl
+- **Dein Build**: nach deinem Pick Runen, Shards, Startitems, Boots und Core-Items für genau dieses
+  Matchup, plus Hinweise zur gegnerischen Comp. Unter Start/Boots und unter dem Core steht
+  „auch gespielt": die übrigen Sätze, die OP.GG zu dieser Paarung mitliefert, mit Winrate und
+  Anzahl Games. Nichts davon wird vorgezogen oder hervorgehoben — oben steht die häufigste Wahl, und
+  welche davon richtig ist, entscheidet das Spiel. Unter 50 Games steht statt einer Prozentzahl
   „dünne Datenlage": dort ist ein Standardfehler rund sieben Punkte breit.
   **Runen übertragen** legt die Seite als „DirkRunen · …" im Client an und wählt sie aus — der
   einzige Schreibzugriff des Tools, nur auf Klick, und gelöscht wird nur die eigene Seite (eine
   fremde erst nach Nachfrage mit Namen).
 - **In ARAM** gibt es keine Lanes, also auch keine Lane-Empfehlungen: die Vorschlagsliste bleibt
-  weg, Lane-Beschriftungen und Duell-Prozente ebenso. Was bleibt, ist der **ARAM-Build** für deinen
+  weg, Lane-Beschriftungen und Matchup-Prozente ebenso. Was bleibt, ist der **ARAM-Build** für deinen
   zugeteilten Champion (OP.GGs eigene ARAM-Zahlen, ein Abruf) und der Vergleich beider
-  Aufstellungen, der dort genauso gilt.
+  Comps, der dort genauso gilt.
 - **Im Spiel**: sobald das Spiel startet, zeigt das Fenster den Build groß — Item-Bilder in
-  Kaufreihenfolge (Start → Schuhe → Kern → Spät), Beschwörerzauber und die Skill-Tabelle für
+  Kaufreihenfolge (Start → Boots → Core → Late), Summoner Spells und die Skill-Tabelle für
   Stufe 1–18. Die Stufen 16–18 liefert die Quelle nicht; sie sind abgeleitet und blasser
   dargestellt. Das Fenster ist „immer oben", also im randlosen Fenstermodus über dem Spiel sichtbar;
   im exklusiven Vollbild versteckt Windows fremde Fenster prinzipbedingt.
@@ -214,7 +214,7 @@ matschig, und 16 px ist die Größe, in der ein Icon tatsächlich angeschaut wir
   Klick. Er nutzt dieselbe inoffizielle Client-Schnittstelle wie Blitz, Porofessor oder U.GG —
   Riot kann sie jederzeit ändern, dann scheitert der Import sichtbar statt still.
 - **Keine Namen fremder Spieler.** Riots Richtlinie verlangt das im Champ Select, und das Tool
-  braucht sie ohnehin nicht — es zeigt `Mitspieler 3` und `Gegner 2`.
+  braucht sie ohnehin nicht — es zeigt `Teammate 3` und `Gegner 2`.
 - **Keine Cooldown- oder Ult-Timer.** Ebenfalls Richtlinie.
 - **Keine Gewichtung nach deinem Champion-Pool.** Mastery und persönliche Winrate werden nicht
   abgefragt. Bewertet wird die Draft-Situation, nicht deine Gewohnheit. Nur Champions, die du nicht
@@ -235,7 +235,7 @@ dotnet run --project src\DraftPilot.Tools -- settings tier gold
 
 Möglich sind `iron`, `bronze`, `silver`, `gold`, `platinum`, `emerald`, `diamond`, `master`,
 die Sammel-Brackets `emerald_plus`, `platinum_plus`, `diamond_plus` — oder `all` für alle Ränge
-zusammen. Ein benanntes Bracket gilt für Lane-Zahlen, Duelle und Tier; Synergien und der
+zusammen. Ein benanntes Bracket gilt für Lane-Zahlen, Matchups und Tier; Synergien und der
 Matchup-Build kennen bei OP.GG keinen Rangfilter und kommen weiter aus dem Standard-Bracket.
 Dasselbe gilt für die Warteschlange: Solo/Duo gegen Flex unterscheidet nur die Champion-Analyse.
 Die Fußzeile nennt im Langtext, was wofür gilt, und der Wechsel wird mit dem nächsten
@@ -251,8 +251,8 @@ Das solltest du wissen, bevor du den Empfehlungen zu viel zutraust:
 
 - **Tierlist und Lane-Verteilung sind solide.** Die Rollen-Anteile, aus denen die Lane-Vorhersage
   rechnet, sind Verhältnisse großer Zahlen und entsprechend belastbar.
-- **Die Abdeckung ist der harte Deckel.** Von den möglichen Lane-Duellen kennt der Vorrat je nach
-  Lane nur 14 bis 23 %. Für das konkrete Duell, um das es geht, liegt also meistens nichts vor —
+- **Die Abdeckung ist der harte Deckel.** Von den möglichen Lane-Matchups kennt der Vorrat je nach
+  Lane nur 14 bis 23 %. Für das konkrete Matchup, um das es geht, liegt also meistens nichts vor —
   dafür gibt es die Draft-Abrufe, und wo auch die nichts liefern, steht „keine Daten".
 - **Die Reihenfolge der Liste ist oft Rauschen.** Zieht man denselben Draft wiederholt aus seinen
   Stichproben (`Tools -- noise`), bleibt Platz 1 je nach Datenlage nur in 49 bis 92 % der Ziehungen
@@ -262,7 +262,7 @@ Das solltest du wissen, bevor du den Empfehlungen zu viel zutraust:
   auffälligsten drei Gegner — keine vollständige Matrix. Genau dafür gibt es die automatischen
   Draft-Abrufe: für die fünf real aufgedeckten Gegner kommen dichte, aktuelle Zahlen nach. Wo
   trotzdem nichts vorliegt, sagt die Aufschlüsselung „keine Daten" statt zu raten.
-- **Kleine Stichproben werden gedämpft.** Ein Duo mit 78 % Winrate über 32 Spiele ist Rauschen. Jede
+- **Kleine Stichproben werden gedämpft.** Ein Duo mit 78 % Winrate über 32 Games ist Rauschen. Jede
   Rate läuft durch eine Bayes-Glättung, bevor daraus ein Score wird. Deshalb sehen die angezeigten
   Winrates flacher aus als auf einer Statistikseite — sie sind dafür belastbarer.
 - **Vier Konstanten des Scores sind Schätzungen.** Wie stark Gegner außerhalb der eigenen Lane,

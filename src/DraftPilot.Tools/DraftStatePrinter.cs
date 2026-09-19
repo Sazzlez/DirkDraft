@@ -39,7 +39,7 @@ internal static class DraftStatePrinter
     private static string DescribeSlot(DraftSlot slot, DraftState state, bool isAlly)
     {
         var label = isAlly
-            ? slot.CellId == state.LocalCellId ? "DU          " : $"Mitspieler {slot.Index + 1}"
+            ? slot.CellId == state.LocalCellId ? "DU          " : $"Teammate {slot.Index + 1}"
             : $"Gegner {slot.Index + 1}    ";
 
         var champion = slot.LockedChampionId != 0
@@ -59,7 +59,7 @@ internal static class DraftStatePrinter
         if (state.Turn is not { } turn)
             return "niemand";
 
-        var who = turn.IsLocalPlayer ? "DU" : turn.IsAlly ? $"Mitspieler cell={turn.CellId}" : $"Gegner cell={turn.CellId}";
+        var who = turn.IsLocalPlayer ? "DU" : turn.IsAlly ? $"Teammate cell={turn.CellId}" : $"Gegner cell={turn.CellId}";
         return $"{who} / {turn.Action}";
     }
 

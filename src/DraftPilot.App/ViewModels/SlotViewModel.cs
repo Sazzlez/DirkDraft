@@ -10,7 +10,7 @@ namespace DraftPilot.App.ViewModels;
 public sealed class SlotViewModel : ObservableObject
 {
     /// <summary>Dropdown entries; the last one clears a manual override.</summary>
-    private static readonly string[] LaneChoices = ["Top", "Jungle", "Mid", "Bot", "Support", "automatisch"];
+    private static readonly string[] LaneChoices = ["Toplane", "Jungle", "Midlane", "Botlane", "Support", "automatisch"];
 
     private long _cellId = -1;
     private string _label = string.Empty;
@@ -134,7 +134,7 @@ public sealed class SlotViewModel : ObservableObject
     /// <summary>
     /// The seat's own name, but only where it says something: for the local player, and for a seat
     /// that has revealed nothing yet. Once a champion is on a seat, the champion IS the name of it
-    /// — ten rows reading "Mitspieler 3" under "Ahri" were ten lines of the panel spent repeating
+    /// — ten rows reading "Teammate 3" under "Ahri" were ten lines of the panel spent repeating
     /// the row order.
     /// </summary>
     public string SeatNote => !_hasChampion || _isLocalPlayer ? _label : string.Empty;

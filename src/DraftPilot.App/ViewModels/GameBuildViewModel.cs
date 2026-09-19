@@ -193,7 +193,7 @@ public sealed class GameBuildViewModel : ObservableObject
         set => Set(ref _shardText, value);
     }
 
-    /// <summary>Win rate and sample of the top core, e.g. <c>44 % · 11 Spiele</c>.</summary>
+    /// <summary>Win rate and sample of the top core, e.g. <c>44 % · 11 Games</c>.</summary>
     public string CoreStats
     {
         get => _coreStats;
@@ -378,9 +378,9 @@ public sealed class GameBuildViewModel : ObservableObject
 
     /// <summary>Win rate and sample, or just the sample when the sample cannot carry a rate.</summary>
     private static string Sample(double winRate, int play) => play >= MinimumPlayForRate
-        ? $"{winRate:P0} WR · {play:N0} Spiele"
+        ? $"{winRate:P0} WR · {play:N0} Games"
         : play > 0
-            ? $"dünne Datenlage · {play:N0} Spiele"
+            ? $"dünne Datenlage · {play:N0} Games"
             : string.Empty;
 
     /// <summary>
@@ -412,8 +412,8 @@ public sealed class GameBuildViewModel : ObservableObject
             target[i].Label = label;
             target[i].Figure = set.Play >= MinimumPlayForRate
                 ? $"{set.WinRate:P0} · {set.Play:N0}"
-                : $"{set.Play:N0} Spiele";
-            target[i].Hint = $"{label} — {set.WinRate:P0} Siegquote aus {set.Play:N0} Spielen, "
+                : $"{set.Play:N0} Games";
+            target[i].Hint = $"{label} — {set.WinRate:P0} Winrate aus {set.Play:N0} Games, "
                 + $"gewählt in {set.PickRate:P0} der Fälle. Oben steht die häufigste Wahl, nicht die beste; "
                 + "welche hier richtig ist, entscheidet das Spiel.";
             target[i].IsHighlighted = false;
@@ -462,7 +462,7 @@ public sealed class GameBuildViewModel : ObservableObject
 
             target[i].Icon = icons.GetItem(entry.Id);
             target[i].Label = name;
-            target[i].Hint = $"{name} — {entry.WinRate:P0} WR aus {entry.Play} Spielen mit diesem Kauf.";
+            target[i].Hint = $"{name} — {entry.WinRate:P0} WR aus {entry.Play} Games mit diesem Kauf.";
             target[i].IsHighlighted = false;
         }
     }

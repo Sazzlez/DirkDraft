@@ -25,7 +25,7 @@ public sealed class IconDownloader(HttpClient http)
     {
         if (string.IsNullOrEmpty(patch))
         {
-            warnings.Add("Ohne Patch-Version keine Champion-Icons.");
+            warnings.Add("Ohne Patch-Version keine Champ-Icons.");
             return 0;
         }
 
@@ -68,7 +68,7 @@ public sealed class IconDownloader(HttpClient http)
         })).ConfigureAwait(false);
 
         if (failed > 0)
-            warnings.Add($"{failed} Champion-Icons konnten nicht geladen werden.");
+            warnings.Add($"{failed} Champ-Icons konnten nicht geladen werden.");
 
         return added;
     }

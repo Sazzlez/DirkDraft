@@ -93,7 +93,7 @@ internal static class NoiseCommand
             }
         }
 
-        Console.WriteLine("Champion         Score   analytisch   gemessen   Rang oe   fuehrt in");
+        Console.WriteLine("Champ         Score   analytisch   gemessen   Rang oe   fuehrt in");
         Console.WriteLine(new string('-', 74));
 
         foreach (var item in reference.Take(8))
@@ -115,7 +115,7 @@ internal static class NoiseCommand
             : "Der erste Platz ist laut analytischem Fehler eindeutig.");
 
         var topStability = leaderCount.GetValueOrDefault(reference[0].ChampionId) / (double)rounds;
-        Console.WriteLine($"Platz 1 bleibt in {topStability:P0} der Ziehungen derselbe Champion.");
+        Console.WriteLine($"Platz 1 bleibt in {topStability:P0} der Ziehungen derselbe Champ.");
         Console.WriteLine();
         Console.WriteLine("Stimmen die Spalten analytisch und gemessen ueberein, beschreibt der Fehlerbalken");
         Console.WriteLine("der Oberflaeche das Rauschen richtig. Weichen sie ab, ist die Naeherung falsch.");

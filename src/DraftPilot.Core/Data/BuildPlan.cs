@@ -147,15 +147,15 @@ public static class StatShards
 {
     public static string NameOf(int id) => id switch
     {
-        5001 => "Leben (skalierend)",
-        5002 => "Rüstung",
-        5003 => "Magieresistenz",
-        5005 => "Angriffstempo",
-        5007 => "Fähigkeitstempo",
-        5008 => "Adaptive Stärke",
-        5010 => "Bewegungstempo",
-        5011 => "Leben",
-        5013 => "Zähigkeit",
+        5001 => "Health (scaling)",
+        5002 => "Armor",
+        5003 => "MR",
+        5005 => "Attack Speed",
+        5007 => "Ability Haste",
+        5008 => "Adaptive Force",
+        5010 => "Movement Speed",
+        5011 => "Health",
+        5013 => "Tenacity",
         _ => $"Shard {id}",
     };
 }

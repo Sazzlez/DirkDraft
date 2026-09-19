@@ -308,8 +308,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // Seed the labels so the rows are never nameless, even before the first session arrives.
         for (var i = 0; i < 5; i++)
         {
-            Allies[i].Label = $"Mitspieler {i + 1}";
-            Enemies[i].Label = $"Gegner {i + 1}";
+            Allies[i].Label = $"Teammate {i + 1}";
+            Enemies[i].Label = $"Enemy {i + 1}";
         }
 
         SelectSlotCommand = new RelayCommand(parameter =>
@@ -919,7 +919,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public TeamDamageViewModel AllyDamage { get; } = new() { Side = "Dein Team" };
 
     /// <summary>Theirs, read the same way.</summary>
-    public TeamDamageViewModel EnemyDamage { get; } = new() { Side = "Gegner" };
+    public TeamDamageViewModel EnemyDamage { get; } = new() { Side = "Enemy" };
 
     /// <summary>At least one champion is revealed, so the comparison has something to compare.</summary>
     public bool HasDraftPreview
@@ -2072,8 +2072,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // Below fifty games one standard error is about seven points, so a percentage there
             // would be a number without a meaning — the sample says more than the rate.
             : runes.Play >= 50
-                ? $"Runen: {runes.WinRate:P0} Winrate über {runes.Play:N0} Spiele · Patch {plan.Patch}"
-                : $"Runen: dünne Datenlage, {runes.Play:N0} Spiele · Patch {plan.Patch}";
+                ? $"Runen: {runes.WinRate:P0} Winrate über {runes.Play:N0} Games · Patch {plan.Patch}"
+                : $"Runen: dünne Datenlage, {runes.Play:N0} Games · Patch {plan.Patch}";
 
         // The tiles themselves — runes, purchase order, spells, skills — all live in GameBuild;
         // the draft column and the in-game view render the same content at different sizes.
@@ -2167,8 +2167,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // the tool had missed them.
             BalanceHint = balance.RatedChampions > 0
                 ? "Solange kein gegnerischer Pick aufgedeckt ist, gibt es nichts zu vergleichen — "
-                    + "die Siegquote eines Drafts ergibt sich aus dem Unterschied beider Teams."
-                : "Sobald Champions aufgedeckt sind, steht hier die geschätzte Siegquote des Drafts.";
+                    + "die Winrate eines Drafts ergibt sich aus dem Unterschied beider Teams."
+                : "Sobald Champs aufgedeckt sind, steht hier die geschätzte Winrate des Drafts.";
             return;
         }
 
@@ -2188,13 +2188,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         var duels = balance.ContestedLanes switch
         {
-            0 => "noch kein direktes Lane-Duell in den Daten",
-            1 => "1 direktes Lane-Duell",
-            _ => $"{balance.ContestedLanes} direkte Lane-Duelle",
+            0 => "noch kein direktes Lane-Matchup in den Daten",
+            1 => "1 direktes Lane-Matchup",
+            _ => $"{balance.ContestedLanes} direkte Lane-Matchups",
         };
 
-        BalanceHint = $"Geschätzte Siegquote dieses Drafts aus {balance.RatedChampions} aufgedeckten "
-            + $"Champions und {duels}: gerechnet werden die Lane-Siegquoten beider Teams und die "
+        BalanceHint = $"Geschätzte Winrate dieses Drafts aus {balance.RatedChampions} aufgedeckten "
+            + $"Champs und {duels}: gerechnet werden die Lane-Winrates beider Teams und die "
             + "Matchups dort, wo sich zwei Picks direkt gegenüberstehen.\n\n"
             + "50 % ist ausgeglichen, Unterschiede unter einem Punkt sind Rauschen. Noch verdeckte "
             + "Picks zählen nicht mit — die Zahl bewegt sich also mit jedem weiteren Pick.";
@@ -2274,7 +2274,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
                 (view.AllyRest, view.AllyAdvance, view.EnemyAdvance, view.EnemyRest) = BarParts(rate);
 
-                view.Note = $"{row.Play.ToString("N0", culture)} Spiele in diesem Duell"
+                view.Note = $"{row.Play.ToString("N0", culture)} Games in diesem Matchup"
                     + (row.IsInferred ? " · aus der Gegenrichtung abgeleitet" : string.Empty);
             }
             else
@@ -2288,7 +2288,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 (view.AllyRest, view.AllyAdvance, view.EnemyAdvance, view.EnemyRest) = BarParts(0.5);
                 view.Note = row.AllyId == 0 || row.EnemyId == 0
                     ? "Auf dieser Lane ist nur eine Seite aufgedeckt."
-                    : "Für dieses Duell hat OP.GG keine Statistik.";
+                    : "Für dieses Matchup hat OP.GG keine Statistik.";
             }
         }
 
@@ -2312,9 +2312,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // Its own text rather than a copy of BalanceHint: that one is written further down in this
         // very method, so reading it here would always show the previous render's wording.
         GameMatchupsTotalHint = balance.HasData
-            ? $"Geschätzte Siegquote deines Teams aus {balance.RatedChampions} aufgedeckten "
-                + $"Champions und {balance.ContestedLanes} direkten Lane-Duellen. Gerechnet werden "
-                + "die Lane-Siegquoten beider Teams und die Duelle dort, wo sich zwei Picks "
+            ? $"Geschätzte Winrate deines Teams aus {balance.RatedChampions} aufgedeckten "
+                + $"Champs und {balance.ContestedLanes} direkten Lane-Matchups. Gerechnet werden "
+                + "die Lane-Winrates beider Teams und die Matchups dort, wo sich zwei Picks "
                 + "gegenüberstehen. 50 % ist ausgeglichen, Unterschiede unter einem Punkt sind "
                 + "Rauschen."
             : string.Empty;
@@ -2352,31 +2352,31 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         (string Label, string Ally, string Enemy, string Hint)[] rows =
         [
             ("Frontline", OutOf(ally.FrontlineCount, ally.Count), OutOf(enemy.FrontlineCount, enemy.Count),
-                "Champions, die im Teamfight vorne stehen und Schaden abfangen können — Tank-Klasse "
+                "Champs, die im Teamfight vorne stehen und Schaden abfangen können — Tank-Klasse "
                 + "oder hoher Verteidigungswert aus den Riot-Daten. Ohne Frontline trifft alles "
-                + "direkt die Schadensausteiler."),
+                + "direkt die Carrys."),
 
-            ("Kontrolle", Control(ally), Control(enemy),
-                "Betäubungen, Verwurzeln, Hochwerfen: je Champion 0 bis 3 Punkte aus den gepflegten "
-                + "Angaben, aufsummiert. Die zweite Zahl ist das Maximum für die Champions, die "
+            ("CC", Control(ally), Control(enemy),
+                "Hard CC, Roots, Knockups: je Champ 0 bis 3 Punkte aus den gepflegten "
+                + "Angaben, aufsummiert. Die zweite Zahl ist das Maximum für die Champs, die "
                 + "gezählt werden konnten — so lassen sich auch unterschiedlich weit aufgedeckte "
-                + "Teams vergleichen. Etwa ein Punkt je zwei Champions ist die Untergrenze für "
+                + "Teams vergleichen. Etwa ein Punkt je zwei Champs ist die Untergrenze für "
                 + "einen spielbaren Teamfight."),
 
-            ("Eröffnen", Engage(ally), Engage(enemy),
-                "Mindestens ein Champion kann einen Teamfight von sich aus starten. Fehlt das, "
+            ("Engage", Engage(ally), Engage(enemy),
+                "Mindestens ein Champ kann einen Teamfight von sich aus starten. Fehlt das, "
                 + "bestimmt immer die andere Seite, wann gekämpft wird."),
 
             ("Peel", Peel(ally), Peel(enemy),
-                "Mindestens ein Champion kann Gegner von den eigenen Carrys wegdrängen. Fehlt das, "
+                "Mindestens ein Champ kann Gegner von den eigenen Carrys wegdrängen. Fehlt das, "
                 + "kommt ein Assassine ungestört durch."),
 
-            ("Auf Distanz", OutOf(ally.RangedCount, ally.Count), OutOf(enemy.RangedCount, enemy.Count),
-                "Fernkämpfer nach Angriffsreichweite. Ein Team aus lauter Nahkämpfern muss sich "
-                + "jeden Kampf erarbeiten, gegen Reichweite noch mehr."),
+            ("Ranged", OutOf(ally.RangedCount, ally.Count), OutOf(enemy.RangedCount, enemy.Count),
+                "Ranged Champs nach Angriffsreichweite. Ein Team aus lauter Melees muss sich "
+                + "jeden Kampf erarbeiten, gegen Range noch mehr."),
 
-            ("Spätes Spiel", OutOf(ally.LateScalingCount, ally.Count), OutOf(enemy.LateScalingCount, enemy.Count),
-                "Champions, die spät im Spiel stärker werden. Die Seite mit mehr davon gewinnt "
+            ("Scaling", OutOf(ally.LateScalingCount, ally.Count), OutOf(enemy.LateScalingCount, enemy.Count),
+                "Champs, die spät im Spiel stärker werden. Die Seite mit mehr davon gewinnt "
                 + "durch Zeit — die andere muss das Spiel früh entscheiden."),
         ];
 
@@ -2397,9 +2397,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             ? "noch kein aufgedeckter Gegner"
             : $"{enemy.Count} aufgedeckte gegnerische";
 
-        DraftPreviewNote = $"Grundlage: {ally.Count} eigene und {enemyPart} Champions."
+        DraftPreviewNote = $"Grundlage: {ally.Count} eigene und {enemyPart} Champs."
             + (ally.TraitCoverage < 1 || enemy.TraitCoverage < 1
-                ? " Für einzelne Champions fehlen gepflegte Angaben — Kontrolle, Eröffnen und Peel "
+                ? " Für einzelne Champs fehlen gepflegte Angaben — Kontrolle, Eröffnen und Peel "
                     + "zählen sie nicht mit."
                 : string.Empty);
 
@@ -2414,8 +2414,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // Whole percent: the share comes from at most five champions, so a decimal would
             // dress up "three of five" as a measurement.
             view.Text = profile.HasDamageMix
-                ? $"{profile.PhysicalShare.ToString("P0", culture)} physisch · "
-                    + $"{profile.MagicShare.ToString("P0", culture)} magisch"
+                ? $"{profile.PhysicalShare.ToString("P0", culture)} AD · "
+                    + $"{profile.MagicShare.ToString("P0", culture)} AP"
                 : profile.Count == 0
                     ? "noch nichts aufgedeckt"
                     : "Schadensart unbekannt";
@@ -2453,7 +2453,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// </para>
     /// </summary>
     /// <summary>
-    /// The advised seat when it is not our own: "Mitspieler N", numbered the way the team column
+    /// The advised seat when it is not our own: "Teammate N", numbered the way the team column
     /// shows them. <see langword="null"/> for our own seat.
     /// <para>
     /// Every text that addresses the user directly hangs off this distinction. A click on a
@@ -2470,7 +2470,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             return null;
 
         var index = _state.Allies.ToList().FindIndex(slot => slot.CellId == seat.CellId);
-        return index < 0 ? null : $"Mitspieler {index + 1}";
+        return index < 0 ? null : $"Teammate {index + 1}";
     }
 
     private void RenderMatchupPanel()
@@ -2504,8 +2504,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 MatchupFigure = string.Empty;
                 HasMatchupFigure = false;
                 MatchupTone = ScoreTone.Weak;
-                MatchupNote = "Kein Lane-Duell in diesem Modus — was unten steht, beschreibt beide "
-                    + "Aufstellungen, und der Build links gilt für genau diesen Modus.";
+                MatchupNote = "Kein Lane-Matchup in diesem Modus — was unten steht, beschreibt beide "
+                    + "Comps, und der Build links gilt für genau diesen Modus.";
             }
 
             return;
@@ -2556,10 +2556,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             MatchupFigure = string.Empty;
             HasMatchupFigure = false;
             MatchupTone = ScoreTone.Weak;
-            // "kennt dieses Duell nicht" stood directly above a build card for that same pairing
+            // "kennt dieses Matchup nicht" stood directly above a build card for that same pairing
             // and read as a contradiction. Only the duel STATISTIC is missing; the build comes
             // from a different OP.GG endpoint and is unaffected — said only when one is on screen.
-            MatchupNote = $"Für dieses Duell hat OP.GG keine Statistik — von den möglichen "
+            MatchupNote = $"Für dieses Matchup hat OP.GG keine Statistik — von den möglichen "
                 + $"Paarungen auf {(lanePart.Length > 0 ? lanePart : "einer Lane")} ist nur etwa "
                 + "ein Fünftel erfasst."
                 + (HasBuild ? " Der Build links stammt aus einem eigenen Abruf." : string.Empty);
@@ -2568,7 +2568,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         var culture = CultureInfo.CurrentCulture;
 
-        // The absolute rate, not the centred term: "wie steht mein Duell" is answered by the rate
+        // The absolute rate, not the centred term: "wie steht mein Matchup" is answered by the rate
         // as it would be read out loud, and the breakdown next door carries the shift.
         MatchupFigure = $"{duel.WinRate.ToString($"P{ScoreError.Decimals(ScoreError.LogitVariance(duel.WinRate, duel.Play, Shrinkage.MatchupPrior))}", culture)} WR";
         HasMatchupFigure = true;
@@ -2580,16 +2580,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _ => ScoreTone.Weak,
         };
 
-        var sample = duel.Play > 0 ? $" · {duel.Play.ToString("N0", culture)} Spiele" : string.Empty;
+        var sample = duel.Play > 0 ? $" · {duel.Play.ToString("N0", culture)} Games" : string.Empty;
         MatchupSubline = $"{lanePart}{sample}";
 
         MatchupNote = (duel.WinRateDelta, teammate) switch
         {
-            ( > 0.02, null) => "Das Duell läuft für dich. 50 % wäre ausgeglichen.",
-            ( > 0.02, _) => $"Das Duell läuft für {teammate}. 50 % wäre ausgeglichen.",
-            ( > -0.02, _) => "Ein ausgeglichenes Duell — es entscheidet sich im Spiel, nicht im Draft.",
-            (_, null) => "Das Duell läuft gegen dich. Vorsichtig spielen und auf Hilfe des Junglers setzen.",
-            _ => $"Das Duell läuft gegen {teammate} — dort ist Hilfe des Junglers am meisten wert.",
+            ( > 0.02, null) => "Das Matchup läuft für dich. 50 % wäre ausgeglichen.",
+            ( > 0.02, _) => $"Das Matchup läuft für {teammate}. 50 % wäre ausgeglichen.",
+            ( > -0.02, _) => "Ein ausgeglichenes Matchup — es entscheidet sich im Spiel, nicht im Draft.",
+            (_, null) => "Das Matchup läuft gegen dich. Vorsichtig spielen und auf Hilfe des Junglers setzen.",
+            _ => $"Das Matchup läuft gegen {teammate} — dort ist Hilfe des Junglers am meisten wert.",
         };
     }
 
@@ -2610,16 +2610,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         {
             hints.Add(Reason.Neutral(
                 $"Gegner unbekannt — Build gegen {standIn.OpponentName}",
-                $"Diese Warteschlange deckt die gegnerischen Picks nie auf, und OP.GG liefert keinen "
+                $"Diese Queue deckt die gegnerischen Picks nie auf, und OP.GG liefert keinen "
                 + $"Build ohne Gegner. Gezeigt wird deshalb das Matchup gegen {standIn.OpponentName} — "
-                + $"den am häufigsten gespielten Champion auf {standIn.Lane.Display()}. Runen, Spells und "
+                + $"den am häufigsten gespielten Champ auf {standIn.Lane.Display()}. Runen, Spells und "
                 + "Skill-Reihenfolge hängen kaum am Gegenspieler und passen so; die Kern-Items sind "
                 + "nur eine Richtung."));
         }
 
         if (_enemyComp.Count >= 3)
         {
-            // "der Gegner macht 67 % physischen Schaden" was a claim about damage dealt, and this
+            // "der Gegner macht 67 % AD-Schaden" was a claim about damage dealt, and this
             // number is not that: it counts champions by their prevailing damage type (a hybrid
             // counts half) and divides by the ones whose type is known. With five enemies only
             // multiples of ten can come out — the percentage was describing something nobody
@@ -2627,29 +2627,29 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             if (_enemyComp.PhysicalShare >= 0.65)
             {
                 hints.Add(Reason.Neutral(
-                    $"{_enemyComp.PhysicalShare:P0} der Gegner-Champions sind physisch → Rüstung zuerst",
+                    $"{_enemyComp.PhysicalShare:P0} der Enemy-Champs sind AD → Armor zuerst",
                     "Gezählt wird je aufgedecktem Gegner die vorwiegende Schadensart aus den "
                     + "Riot-Daten (Mischtypen zählen halb) — nicht der Schaden, den sie im Spiel "
-                    + "tatsächlich anrichten. Bei diesem Übergewicht wirkt Rüstung stärker als "
-                    + "Magieresistenz."));
+                    + "tatsächlich anrichten. Bei diesem Übergewicht wirkt Armor stärker als "
+                    + "MR."));
             }
 
             if (_enemyComp.MagicShare >= 0.65)
             {
                 hints.Add(Reason.Neutral(
-                    $"{_enemyComp.MagicShare:P0} der Gegner-Champions sind magisch → Magieresistenz zuerst",
+                    $"{_enemyComp.MagicShare:P0} der Enemy-Champs sind AP → MR zuerst",
                     "Gezählt wird je aufgedecktem Gegner die vorwiegende Schadensart aus den "
                     + "Riot-Daten (Mischtypen zählen halb) — nicht der Schaden, den sie im Spiel "
-                    + "tatsächlich anrichten. Bei diesem Übergewicht wirkt Magieresistenz stärker "
-                    + "als Rüstung."));
+                    + "tatsächlich anrichten. Bei diesem Übergewicht wirkt MR stärker "
+                    + "als Armor."));
             }
 
             if (_enemyComp.TotalCrowdControl >= 6)
             {
                 hints.Add(Reason.Neutral(
-                    "viele Betäubungen im Gegnerteam → Zähigkeit einplanen",
-                    "Das gegnerische Team hat auffällig viele Effekte, die dich bewegungsunfähig "
-                    + "machen. Zähigkeit (z. B. Merkurstiefel) verkürzt deren Dauer."));
+                    "viele Hard CC im Enemy-Team → Tenacity einplanen",
+                    "Das Enemy-Team hat auffällig viele Effekte, die dich bewegungsunfähig "
+                    + "machen. Tenacity (z. B. Mercs) verkürzt deren Dauer."));
             }
         }
 
@@ -2762,7 +2762,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             {
                 (true, _) => string.Empty,
                 (false, { } ctx) when _buildFailedFor == ctx => "Build konnte nicht geladen werden — versuche es weiter.",
-                (false, { } ctx) when _buildFetched.Contains(ctx) => "OP.GG hat zu diesem Duell keinen Build.",
+                (false, { } ctx) when _buildFetched.Contains(ctx) => "OP.GG hat zu diesem Matchup keinen Build.",
                 (false, { } ctx) => $"Build für {_meta.ChampionName(ctx.Champion)} gegen {_meta.ChampionName(ctx.Opponent)} wird geladen…",
                 _ => string.Empty,
             };
@@ -2808,7 +2808,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
             row.CellId = slot.CellId;
             row.IsLocalPlayer = isAlly && slot.CellId == _state.LocalCellId;
-            row.Label = row.IsLocalPlayer ? "DU" : isAlly ? $"Mitspieler {i + 1}" : $"Gegner {i + 1}";
+            row.Label = row.IsLocalPlayer ? "DU" : isAlly ? $"Teammate {i + 1}" : $"Enemy {i + 1}";
 
             row.IsLocked = slot.IsLocked;
             row.HasHover = !slot.IsLocked && slot.HoverChampionId != 0;
@@ -2884,7 +2884,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             row.HasWinRate = false;
             row.WinRateTone = ScoreTone.Fair;
             row.WinRateHint = $"{_meta.ChampionName(duel.AllyId)} gegen {_meta.ChampionName(duel.EnemyId)} "
-                + $"auf {duel.Lane.Display()}: für dieses Duell hat OP.GG keine Statistik.";
+                + $"auf {duel.Lane.Display()}: für dieses Matchup hat OP.GG keine Statistik.";
             return;
         }
 
@@ -2909,10 +2909,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _ => ScoreTone.Weak,
         };
 
-        row.WinRateHint = $"Lane-Duell auf {duel.Lane.Display()}: "
+        row.WinRateHint = $"Lane-Matchup auf {duel.Lane.Display()}: "
             + $"{_meta.ChampionName(duel.AllyId)} {allyRate.ToString($"P{decimals}", culture)} gegen "
             + $"{_meta.ChampionName(duel.EnemyId)} {(1 - allyRate).ToString($"P{decimals}", culture)}, "
-            + $"aus {duel.Play.ToString("N0", culture)} Spielen"
+            + $"aus {duel.Play.ToString("N0", culture)} Games"
             + (duel.IsInferred ? " · aus der Gegenrichtung abgeleitet." : ".");
     }
 
@@ -3007,7 +3007,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // point: a thin duo statistic makes four champions equivalent, while 40.000-game lane data
         // separates them at a tenth of that distance.
         var tied = isBan ? 0 : ScoreError.CountLeadingTies(set.Items);
-        var tiePart = tied >= 2 ? $" — Top {tied} nahezu gleich" : string.Empty;
+        var tiePart = tied >= 2 ? $" — die ersten {tied} gleichauf" : string.Empty;
 
         ListHeader = $"{mode} für {who}{lanePart}{suffix}{tiePart}";
 
@@ -3113,11 +3113,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         if (!turn.IsAlly)
         {
             var enemyIndex = _state.Enemies.ToList().FindIndex(slot => slot.CellId == turn.CellId);
-            return enemyIndex >= 0 ? $"Gegner {enemyIndex + 1} {action}" : $"Gegner {action}";
+            return enemyIndex >= 0 ? $"Enemy {enemyIndex + 1} {action}" : $"Enemy {action}";
         }
 
         var index = _state.Allies.ToList().FindIndex(slot => slot.CellId == turn.CellId);
-        return index >= 0 ? $"Mitspieler {index + 1} {action}" : $"Mitspieler {action}";
+        return index >= 0 ? $"Teammate {index + 1} {action}" : $"Teammate {action}";
     }
 
     private static string DescribePhase(DraftPhase phase) => phase switch
@@ -3279,12 +3279,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         if (RankBracketName(tier) is { Length: > 0 } bracket)
         {
             yield return $"Bracket {bracket}: gilt für die Lane-Zahlen, die Counter und den "
-                + "Champion-Build. Duos und der Matchup-Build kennen bei OP.GG kein Bracket und "
+                + "Champ-Build. Duos und der Matchup-Build kennen bei OP.GG kein Bracket und "
                 + "stammen weiter aus allen Rängen.";
         }
 
         if (QueueName(mode) is { Length: > 0 } queue)
-            yield return $"Abgerufen für {queue}. Duos und Tierlist kennen bei OP.GG keine Warteschlange.";
+            yield return $"Abgerufen für {queue}. Duos und Tierlist kennen bei OP.GG keine Queue.";
 
         if (tier.Length > 0 && !tier.Equals(_settings.Tier, StringComparison.OrdinalIgnoreCase))
         {
@@ -3297,7 +3297,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         {
             var other = QueueName(_settings.GameMode);
             yield return $"Die Einstellung steht auf {(other.Length > 0 ? other : _settings.GameMode)}, "
-                + "die Datei wurde für eine andere Warteschlange geholt.";
+                + "die Datei wurde für eine andere Queue geholt.";
         }
     }
 
@@ -3382,7 +3382,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 _reloadDeferred = true;
                 UpdateSnapshotText();
                 UpdateStatus = $"Aktualisiert in {updateClock.Elapsed:m\\:ss}: "
-                    + $"{snapshot.Champions.Count} Champions, {snapshot.Matchups.Count} Matchups "
+                    + $"{snapshot.Champions.Count} Champs, {snapshot.Matchups.Count} Matchups "
                     + "— aktiv ab dem nächsten Draft, der laufende behält seine geholten Zahlen";
                 return;
             }
@@ -3406,7 +3406,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
             UpdateSnapshotText();
             UpdateStatus = $"Aktualisiert in {updateClock.Elapsed:m\\:ss}: "
-                + $"{snapshot.Champions.Count} Champions, {snapshot.Matchups.Count} Matchups";
+                + $"{snapshot.Champions.Count} Champs, {snapshot.Matchups.Count} Matchups";
             Refresh();
         }
         catch (OperationCanceledException)

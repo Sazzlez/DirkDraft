@@ -89,7 +89,7 @@ public static class StartupReport
             .AppendLine()
             .AppendLine("--- Mitgelieferte Daten ---")
             .AppendLine($"Ordner           {AppPaths.BundledDataDirectory}")
-            .AppendLine($"champion_traits  {traits.Count} Champions")
+            .AppendLine($"champion_traits  {traits.Count} Champs")
             .AppendLine($"pick_order       {(File.Exists(AppPaths.Bundled("pick_order_priors.json")) ? "vorhanden" : "FEHLT")}")
             .AppendLine()
             .AppendLine("--- Erzeugte Daten ---")
@@ -103,7 +103,7 @@ public static class StartupReport
             text.AppendLine($"Patch            {snapshot.Patch}")
                 .AppendLine($"OP.GG-Patch      {(snapshot.DataPatch.Length > 0 ? snapshot.DataPatch : "unbekannt (älterer Snapshot)")}")
                 .AppendLine($"Zahlenstand      {snapshot.DataAsOfUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "unbekannt (älterer Snapshot)"}")
-                .AppendLine($"Champions        {snapshot.Champions.Count}")
+                .AppendLine($"Champs        {snapshot.Champions.Count}")
                 .AppendLine($"Lane-Einträge    {snapshot.LaneStats.Count}")
                 .AppendLine($"Matchups         {snapshot.Matchups.Count}")
                 .AppendLine($"Synergien        {snapshot.Synergies.Count}");
@@ -124,7 +124,7 @@ public static class StartupReport
 
         var summary = snapshot is null
             ? $"Kein lesbarer Snapshot · {iconCount} Icons · Traits {traits.Count}"
-            : $"{snapshot.Champions.Count} Champions · {iconCount} Icons · Traits {traits.Count} · Details: {Path}";
+            : $"{snapshot.Champions.Count} Champs · {iconCount} Icons · Traits {traits.Count} · Details: {Path}";
 
         return (summary, text.ToString());
     }

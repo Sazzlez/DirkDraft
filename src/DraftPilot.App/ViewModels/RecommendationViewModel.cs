@@ -148,7 +148,7 @@ public sealed class RecommendationViewModel : ObservableObject
             // 2,5 from the days when the OP.GG tier was still added into the ban value — it hung
             // twice there, and taking it out moved the whole scale down without moving them.
             // Measured over the top eight of five drafts on the stored snapshot (40 rows): maximum
-            // 4,4 — so "wichtiger Bann" had become unreachable — 10 % above 3,6, a quarter above
+            // 4,4 — so "wichtiger Ban" had become unreachable — 10 % above 3,6, a quarter above
             // 2,9, median 2,6. The bar for "important" now sits at the top tenth of what is shown,
             // and the bar for "worth it" at the middle of it.
             Score = string.Format(culture, "{0:+0.0;-0.0;0.0} Pkt", recommendation.Score);
@@ -163,14 +163,14 @@ public sealed class RecommendationViewModel : ObservableObject
             // line per row saying so — the number and its tooltip are right there.
             ScoreVerdict = recommendation.Score switch
             {
-                > 3.5 => "wichtiger Bann",
-                > 2.5 => "sinnvoller Bann",
+                > 3.5 => "wichtiger Ban",
+                > 2.5 => "sinnvoller Ban",
                 _ => string.Empty,
             };
-            ScoreHint = "So viele Prozentpunkte Siegquote würde dieser Champion dem Gegner voraussichtlich "
+            ScoreHint = "So viele Prozentpunkte Winrate würde dieser Champ dem Gegner voraussichtlich "
                 + "bringen — Stärke mal Wahrscheinlichkeit, dass er überhaupt genommen wird. "
                 + "Der Pfeil rechts zeigt, woraus sich die Zahl zusammensetzt.";
-            TotalLabel = "Wert des Banns";
+            TotalLabel = "Wert des Bans";
         }
         else
         {
@@ -200,18 +200,18 @@ public sealed class RecommendationViewModel : ObservableObject
             ScoreVerdict = (hasError, rank, standing) switch
             {
                 (false, _, _) => "Datenlage zu dünn",
-                (_, 1, _) => "beste Wahl der Liste",
+                (_, 1, _) => "bester Pick der Liste",
                 (_, _, ScoreStanding.Tied) => "gleichauf mit Platz 1",
                 (_, _, ScoreStanding.Ahead) => "knapp dahinter",
                 _ => "deutlich dahinter",
             };
 
-            ScoreHint = "Geschätzte Siegquote dieser Aufstellung nach OP.GG-Daten — nicht deine persönliche. "
+            ScoreHint = "Geschätzte Winrate dieser Comp nach OP.GG-Daten — nicht deine persönliche. "
                 + "50 % ist ausgeglichen. Aus den Stichprobengrößen hinter den Kriterien folgt ein "
                 + $"Streubereich von ±{margin.ToString("N1", culture)} Punkten; Unterschiede darunter "
                 + "bedeuten nichts. Die Einordnung darunter vergleicht mit Platz 1 der Liste, nicht "
                 + "mit 50 %. Der Pfeil rechts zeigt, woraus sich die Zahl zusammensetzt.";
-            TotalLabel = "Geschätzte Siegquote";
+            TotalLabel = "Geschätzte Winrate";
         }
 
         Reasons.ReplaceAll(recommendation.Reasons);
@@ -324,7 +324,7 @@ public sealed class TermViewModel : ObservableObject
             BarPositive = term.HasData ? Math.Min(BarMax, term.Gate * BarMax) : 0;
             BarNegative = 0;
             Hint = term.HasData
-                ? $"{term.Hint}\n\nDer Wert des Banns wird mit diesem Faktor multipliziert."
+                ? $"{term.Hint}\n\nDer Wert des Bans wird mit diesem Faktor multipliziert."
                 : $"{term.Hint}\n\nDazu liegen keine Daten vor.";
             return;
         }
@@ -361,7 +361,7 @@ public sealed class TermViewModel : ObservableObject
         Hint = term.HasData
             ? string.Format(
                 culture,
-                "{0}\n\nVerschiebt die geschätzte Siegquote um {1:+0.0;-0.0;0.0} Prozentpunkte.",
+                "{0}\n\nVerschiebt die geschätzte Winrate um {1:+0.0;-0.0;0.0} Prozentpunkte.",
                 term.Hint,
                 points)
             : $"{term.Hint}\n\nDazu liegen keine Daten vor — dieser Punkt zählt hier nicht mit.";

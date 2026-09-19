@@ -243,7 +243,7 @@ public sealed class AssetDownloader(HttpClient http)
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
         {
-            warnings.Add("Beschwörerzauber-Daten konnten nicht geladen werden.");
+            warnings.Add("Summoner-Spell-Daten konnten nicht geladen werden.");
         }
 
         try

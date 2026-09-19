@@ -54,13 +54,16 @@ public static class Lanes
         _ => "none",
     };
 
-    /// <summary>Short label for the UI.</summary>
+    /// <summary>
+    /// The lane as it is called in game, not as an API spells it: Botlane, not "Bot" or "ADC".
+    /// All five are seven letters or fewer, so nothing in the narrow seat columns grew.
+    /// </summary>
     public static string Display(this Lane lane) => lane switch
     {
-        Lane.Top => "Top",
+        Lane.Top => "Toplane",
         Lane.Jungle => "Jungle",
-        Lane.Mid => "Mid",
-        Lane.Adc => "Bot",
+        Lane.Mid => "Midlane",
+        Lane.Adc => "Botlane",
         Lane.Support => "Support",
         _ => "?",
     };

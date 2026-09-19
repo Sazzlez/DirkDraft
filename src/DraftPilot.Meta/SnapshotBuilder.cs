@@ -169,7 +169,7 @@ public sealed class SnapshotBuilder : IDisposable
         progress?.Report(new BuildProgress("Patch", 0, 0));
         snapshot.Patch = await ReadPatchAsync(snapshot.Warnings, ct).ConfigureAwait(false);
 
-        progress?.Report(new BuildProgress("Champions", 0, 0));
+        progress?.Report(new BuildProgress("Champs", 0, 0));
         var champions = await LoadChampionsAsync(ct).ConfigureAwait(false);
         await ApplyStaticDataAsync(champions, snapshot.Patch, snapshot.Warnings, ct).ConfigureAwait(false);
         snapshot.Champions.AddRange(champions.Values.OrderBy(entry => entry.Id));
@@ -193,7 +193,7 @@ public sealed class SnapshotBuilder : IDisposable
                 .ConfigureAwait(false);
 
             if (added > 0)
-                snapshot.Warnings.Add($"{added} Champion-Icons neu geladen.");
+                snapshot.Warnings.Add($"{added} Champ-Icons neu geladen.");
 
             // Rune/spell icons and localised names for the in-game build view. ~85 small files
             // once per install, then only what a new patch renames.
@@ -281,7 +281,7 @@ public sealed class SnapshotBuilder : IDisposable
     {
         if (string.IsNullOrEmpty(patch))
         {
-            warnings.Add("Ohne Patch-Version keine Champion-Klassendaten — Comp-Regeln laufen eingeschränkt.");
+            warnings.Add("Ohne Patch-Version keine Champ-Klassendaten — Comp-Regeln laufen eingeschränkt.");
             return;
         }
 
@@ -337,11 +337,11 @@ public sealed class SnapshotBuilder : IDisposable
             }
 
             if (matched < champions.Count)
-                warnings.Add($"Klassendaten für {champions.Count - matched} Champions nicht gefunden.");
+                warnings.Add($"Klassendaten für {champions.Count - matched} Champs nicht gefunden.");
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
         {
-            warnings.Add("Champion-Klassendaten konnten nicht geladen werden — Comp-Regeln laufen eingeschränkt.");
+            warnings.Add("Champ-Klassendaten konnten nicht geladen werden — Comp-Regeln laufen eingeschränkt.");
         }
     }
 
@@ -548,7 +548,7 @@ public sealed class SnapshotBuilder : IDisposable
         }
 
         if (failures.Count > 0)
-            snapshot.Warnings.Add($"Analyse: {failures.Count} Champions ohne Daten ({string.Join(", ", failures.Take(5))}).");
+            snapshot.Warnings.Add($"Analyse: {failures.Count} Champs ohne Daten ({string.Join(", ", failures.Take(5))}).");
     }
 
     /// <summary>
@@ -1094,14 +1094,14 @@ public sealed class SnapshotBuilder : IDisposable
         var total = snapshot.Champions.Count;
 
         snapshot.Warnings.Add(
-            $"Matchup-Daten: {snapshot.Matchups.Count} Kanten für {withMatchups} von {total} Champions. " +
-            "OP.GG liefert pro Champion nur die auffälligsten Gegner, keine vollständige Matrix.");
+            $"Matchup-Daten: {snapshot.Matchups.Count} Kanten für {withMatchups} von {total} Champs. " +
+            "OP.GG liefert pro Champ nur die auffälligsten Gegner, keine vollständige Matrix.");
 
         var thin = snapshot.Matchups.Count(stat => stat.Play < 50);
         if (thin > 0)
         {
-            snapshot.Warnings.Add($"{thin} Matchups mit unter 50 Spielen — sie zählen fast nur noch als das, "
-                + "was die beiden Lane-Siegquoten ohnehin sagen.");
+            snapshot.Warnings.Add($"{thin} Matchups mit unter 50 Games — sie zählen fast nur noch als das, "
+                + "was die beiden Lane-Winrates ohnehin sagen.");
         }
 
         // Which population the numbers describe, per source — the one thing about this file that
@@ -1110,7 +1110,7 @@ public sealed class SnapshotBuilder : IDisposable
         var rankFiltered = bracket.Length > 0 && !bracket.Equals("all", StringComparison.OrdinalIgnoreCase);
 
         snapshot.Warnings.Add(rankFiltered
-            ? $"Synergien: {snapshot.Synergies.Count} Paare. Lane-Zahlen, Duelle und Tier stammen aus dem "
+            ? $"Synergien: {snapshot.Synergies.Count} Paare. Lane-Zahlen, Matchups und Tier stammen aus dem "
                 + $"Bracket '{snapshot.Tier}'; Synergien kennen keinen Rangfilter und stammen aus OP.GGs "
                 + "Standard-Bracket (Emerald und höher)."
             : $"Synergien: {snapshot.Synergies.Count} Paare. Tierlist stammt aus OP.GGs Standard-Bracket "
@@ -1123,7 +1123,7 @@ public sealed class SnapshotBuilder : IDisposable
         if (withoutPlay * 10 >= snapshot.LaneStats.Count && withoutPlay > 0)
         {
             snapshot.Warnings.Add(
-                $"Tierlist: {withoutPlay} von {snapshot.LaneStats.Count} Lane-Zeilen ohne Spielzahl — " +
+                $"Tierlist: {withoutPlay} von {snapshot.LaneStats.Count} Lane-Zeilen ohne Anzahl Games — " +
                 "vermutlich haben sich die OP.GG-Feldnamen geändert.");
         }
 

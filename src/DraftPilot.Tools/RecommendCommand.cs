@@ -39,9 +39,9 @@ internal static class RecommendCommand
         var allies = Resolve(meta, args.Length > 3 ? args[3] : string.Empty, out var unknownAllies);
 
         foreach (var name in unknownEnemies.Concat(unknownAllies))
-            Console.Error.WriteLine($"Unbekannter Champion: {name}");
+            Console.Error.WriteLine($"Unbekannter Champ: {name}");
 
-        Console.WriteLine($"Snapshot Patch {snapshot.Patch}, kuratierte Traits für {traits.Count} Champions.");
+        Console.WriteLine($"Snapshot Patch {snapshot.Patch}, kuratierte Traits für {traits.Count} Champs.");
         Console.WriteLine($"Lane: {lane.Display()}   Gegner: {Names(meta, enemies)}   Team: {Names(meta, allies)}");
         Console.WriteLine();
 
@@ -83,7 +83,7 @@ internal static class RecommendCommand
         Console.WriteLine();
         Console.WriteLine(balance.HasData
             ? $"Draft-Balance: {balance.AllyWinRate:P1} zu {balance.EnemyWinRate:P1} "
-                + $"({balance.RatedChampions} bewertete Champions, {balance.ContestedLanes} umkämpfte Lanes)"
+                + $"({balance.RatedChampions} bewertete Champs, {balance.ContestedLanes} umkämpfte Lanes)"
             : "Draft-Balance: — (eine Seite ist nicht aufgedeckt)");
     }
 
@@ -203,7 +203,7 @@ internal static class RecommendCommand
             ? string.Join(", ", profile.Findings.Select(finding => finding.Text))
             : "keine Lücken";
 
-        return $"{profile.Count} Champions, AD {profile.PhysicalShare:P0} / AP {profile.MagicShare:P0}, "
+        return $"{profile.Count} Champs, AD {profile.PhysicalShare:P0} / AP {profile.MagicShare:P0}, "
             + $"Frontline {profile.FrontlineCount}, CC {profile.TotalCrowdControl}, "
             + $"Traits {profile.TraitCoverage:P0}  ->  {findings}";
     }
