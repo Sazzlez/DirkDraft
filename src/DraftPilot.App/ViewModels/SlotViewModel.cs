@@ -44,7 +44,11 @@ public sealed class SlotViewModel : ObservableObject
     public string Label
     {
         get => _label;
-        set => Set(ref _label, value);
+        set
+        {
+            if (Set(ref _label, value))
+                Raise(nameof(SeatNote));
+        }
     }
 
     public string Champion
@@ -83,7 +87,11 @@ public sealed class SlotViewModel : ObservableObject
     public bool IsLocalPlayer
     {
         get => _isLocalPlayer;
-        set => Set(ref _isLocalPlayer, value);
+        set
+        {
+            if (Set(ref _isLocalPlayer, value))
+                Raise(nameof(SeatNote));
+        }
     }
 
     /// <summary>This is the seat the recommendation list is currently advising.</summary>
@@ -116,8 +124,20 @@ public sealed class SlotViewModel : ObservableObject
     public bool HasChampion
     {
         get => _hasChampion;
-        set => Set(ref _hasChampion, value);
+        set
+        {
+            if (Set(ref _hasChampion, value))
+                Raise(nameof(SeatNote));
+        }
     }
+
+    /// <summary>
+    /// The seat's own name, but only where it says something: for the local player, and for a seat
+    /// that has revealed nothing yet. Once a champion is on a seat, the champion IS the name of it
+    /// — ten rows reading "Mitspieler 3" under "Ahri" were ten lines of the panel spent repeating
+    /// the row order.
+    /// </summary>
+    public string SeatNote => !_hasChampion || _isLocalPlayer ? _label : string.Empty;
 
     /// <summary>Something worth flagging, e.g. an ally hovering a champion that is already banned.</summary>
     public string? Warning

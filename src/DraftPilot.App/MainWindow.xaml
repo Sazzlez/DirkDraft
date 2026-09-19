@@ -435,12 +435,11 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="{StaticResource AccentSoft}" CornerRadius="9"
-                                            Padding="8,2" Margin="0,0,5,4"
-                                            ToolTip="{Binding Hint}">
-                                        <TextBlock Text="{Binding Text}" FontSize="11" TextWrapping="Wrap"
-                                                   Foreground="{StaticResource Accent}" />
-                                    </Border>
+                                    <!-- Same chip language as the recommendation list: the tone is
+                                         the text's colour, not a slab behind it. -->
+                                    <TextBlock Text="{Binding Text}" FontSize="11" TextWrapping="Wrap"
+                                               Margin="0,1,14,2" ToolTip="{Binding Hint}"
+                                               Foreground="{StaticResource Accent}" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -515,15 +514,16 @@
                 </Button>
             </Grid>
 
-            <!-- ===================== Turn card (only while a draft runs) ===================== -->
+            <!-- ===================== Turn line (only while a draft runs) ===================== -->
             <!--
                 No highlight frame on your own turn. The rotating brand gradient that used to run
-                around this card is gone by request; the card now carries the same quiet border as
-                every other surface, and the turn is called out by the headline's colour alone.
+                around this card is gone by request; the turn is called out by the headline's colour
+                alone. The card around it went the same way: it was a border, a fill and a corner
+                radius drawn around two words, eighty pixels tall, above a list that wanted the
+                room. A heading does not need a box to be a heading.
             -->
-            <Border Grid.Row="1" Background="{StaticResource Surface}"
-                    BorderBrush="{StaticResource LineSoft}"
-                    BorderThickness="1" CornerRadius="10" Padding="13,9" Margin="0,3,0,0"
+            <Border Grid.Row="1" Background="Transparent" BorderThickness="0"
+                    Padding="2,9,2,3" Margin="0,2,0,0"
                     Visibility="{Binding IsDraftActive, Converter={StaticResource BoolToVisibility}}">
                 <!--
                     The status IS the headline. There used to be a countdown here plus a phase
@@ -543,7 +543,7 @@
                          own turn, which together with the card's accent border is the one moment
                          this panel is allowed to shout. -->
                     <TextBlock Text="{Binding TurnText}" VerticalAlignment="Center"
-                               FontFamily="{StaticResource UiFont}" FontSize="23" FontWeight="SemiBold"
+                               FontFamily="{StaticResource UiFont}" FontSize="21" FontWeight="SemiBold"
                                TextTrimming="CharacterEllipsis">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
@@ -558,12 +558,11 @@
                     </TextBlock>
 
                     <!-- Where in the draft we are, as quiet context beside the headline rather
-                         than a second line under it: it must not compete for the first glance. -->
-                    <Border Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0"
-                            Background="{StaticResource SurfaceHi}" CornerRadius="10" Padding="10,4">
-                        <TextBlock Text="{Binding PhaseText}" Style="{StaticResource Caption}"
-                                   Margin="0" Foreground="{StaticResource Muted}" />
-                    </Border>
+                         than a second line under it: it must not compete for the first glance. Set
+                         as plain text — a pill around a phase name reads as something to click. -->
+                    <TextBlock Grid.Column="1" Text="{Binding PhaseText}" Style="{StaticResource Caption}"
+                               Margin="14,0,2,0" Foreground="{StaticResource Faint}"
+                               VerticalAlignment="Center" />
                 </Grid>
             </Border>
 
@@ -1178,12 +1177,9 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="{StaticResource AccentSoft}" CornerRadius="9"
-                                        Padding="8,2" Margin="0,0,5,4"
-                                        ToolTip="{Binding Hint}">
-                                    <TextBlock Text="{Binding Text}" FontSize="11" TextWrapping="Wrap"
-                                               Foreground="{StaticResource Accent}" />
-                                </Border>
+                                <TextBlock Text="{Binding Text}" FontSize="11" TextWrapping="Wrap"
+                                           Margin="0,1,14,2" ToolTip="{Binding Hint}"
+                                           Foreground="{StaticResource Accent}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -1296,9 +1292,20 @@
 
                             <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
                                         Orientation="Horizontal" Margin="8,4,0,0">
-                                <TextBlock Text="{Binding Label}" Style="{StaticResource Small}"
+                                <TextBlock Text="{Binding SeatNote}"
                                            Foreground="{StaticResource Faint}" FontSize="11"
-                                           VerticalAlignment="Center" Margin="0,0,7,0" />
+                                           VerticalAlignment="Center" Margin="0,0,7,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
+                                            <Style.Triggers>
+                                                <!-- Empty once a champion names the seat. -->
+                                                <DataTrigger Binding="{Binding SeatNote}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
 
                                 <!--
                                     Lane override. Shows the lane in effect, predicted or overridden,
@@ -1314,11 +1321,11 @@
                                           SelectedIndex="{Binding LaneIndex, Mode=OneWay}"
                                           SelectionChanged="LaneOverride_SelectionChanged"
                                           Tag="{Binding}"
-                                          VerticalAlignment="Center" Height="24" Width="104"
+                                          VerticalAlignment="Center" Height="22" Width="98"
                                           Visibility="{Binding HasChampion, Converter={StaticResource BoolToVisibility}}"
                                           ToolTip="Lane manuell festlegen. „automatisch“ gibt sie an die Vorhersage zurück.">
                                     <ComboBox.Style>
-                                        <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+                                        <Style TargetType="ComboBox" BasedOn="{StaticResource LanePicker}">
                                             <Style.Triggers>
                                                 <!-- The prediction's confidence used to stand next to
                                                      the champion as a percentage, which read like a
@@ -1487,7 +1494,7 @@
                                         <!-- Which seat this is. Your own row says so in accent and
                                              bold — the accent BAR on the left means something else
                                              (the seat the list is advising), and the two can differ. -->
-                                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" FontSize="11">
+                                        <TextBlock Text="{Binding SeatNote}" VerticalAlignment="Center" FontSize="11">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
                                                     <Setter Property="Foreground" Value="{StaticResource Faint}" />
@@ -1495,6 +1502,10 @@
                                                         <DataTrigger Binding="{Binding IsLocalPlayer}" Value="True">
                                                             <Setter Property="Foreground" Value="{StaticResource Accent}" />
                                                             <Setter Property="FontWeight" Value="Bold" />
+                                                        </DataTrigger>
+                                                        <!-- Empty once a champion names the seat. -->
+                                                        <DataTrigger Binding="{Binding SeatNote}" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -1896,119 +1907,157 @@
                         <ItemsControl ItemsSource="{Binding Recommendations}" Margin="0,0,10,0">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type vm:RecommendationViewModel}">
-                                    <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
-                                            BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,0,0,6">
+                                    <!--
+                                        A row, not a card. Eight bordered boxes stacked on a page
+                                        put eight frames around the one thing being compared; the
+                                        hairline does the same job with a pixel. The accent edge on
+                                        the left marks every row the error bars cannot separate from
+                                        the leader — the list must be printed in SOME order, and
+                                        that order reads as a verdict, so this is where the verdict
+                                        actually stops.
+                                    -->
+                                    <Border Padding="2,9,2,9" BorderThickness="0,0,0,1"
+                                            BorderBrush="{StaticResource Hairline}"
+                                            Background="Transparent">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+
                                         <StackPanel>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="20" />
-                                                    <ColumnDefinition Width="40" />
+                                                    <ColumnDefinition Width="3" />
+                                                    <ColumnDefinition Width="24" />
+                                                    <ColumnDefinition Width="44" />
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="26" />
+                                                    <ColumnDefinition Width="24" />
                                                 </Grid.ColumnDefinitions>
 
-                                                <TextBlock Text="{Binding Rank}" Style="{StaticResource Small}"
-                                                           Foreground="{StaticResource Faint}"
-                                                           FontFamily="{StaticResource NumFont}"
-                                                           VerticalAlignment="Center" />
+                                                <Rectangle Width="3" RadiusX="1.5" RadiusY="1.5"
+                                                           Margin="0,1,0,1" Fill="{StaticResource Accent}"
+                                                           HorizontalAlignment="Left"
+                                                           Visibility="{Binding IsTopGroup, Converter={StaticResource BoolToVisibility}}"
+                                                           ToolTip="Von Platz 1 statistisch nicht zu unterscheiden — die Stichproben geben den Unterschied nicht her." />
 
-                                                <Border Grid.Column="1" Width="32" Height="32" CornerRadius="7"
+                                                <TextBlock Grid.Column="1" Text="{Binding Rank}"
+                                                           FontFamily="{StaticResource NumFont}" FontSize="12"
+                                                           Foreground="{StaticResource Faint}"
+                                                           VerticalAlignment="Top" Margin="0,4,0,0" />
+
+                                                <Border Grid.Column="2" Width="36" Height="36" CornerRadius="8"
                                                         Background="{StaticResource SurfaceAlt}"
-                                                        HorizontalAlignment="Left" ClipToBounds="True">
+                                                        HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                        ClipToBounds="True">
                                                     <Image Source="{Binding Icon}" Stretch="UniformToFill"
                                                            RenderOptions.BitmapScalingMode="HighQuality" />
                                                 </Border>
 
-                                                <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="15"
-                                                           FontWeight="SemiBold" VerticalAlignment="Center"
-                                                           Margin="2,0,8,0" />
+                                                <StackPanel Grid.Column="3" Margin="2,0,12,0">
+                                                    <TextBlock Text="{Binding Name}" FontSize="16"
+                                                               FontWeight="SemiBold" Margin="0,-1,0,2" />
 
-                                                <!-- Score pill, tinted by how strong the pick is. -->
-                                                <Border Grid.Column="3" CornerRadius="7" Padding="9,3"
-                                                        VerticalAlignment="Center"
-                                                        ToolTip="{Binding ScoreHint}">
-                                                    <Border.Style>
-                                                        <Style TargetType="Border">
-                                                            <Setter Property="Background" Value="{StaticResource SurfaceHi}" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding Tone}" Value="Strong">
-                                                                    <Setter Property="Background" Value="{StaticResource GoodSoft}" />
-                                                                </DataTrigger>
-                                                                <DataTrigger Binding="{Binding Tone}" Value="Fair">
-                                                                    <Setter Property="Background" Value="{StaticResource AccentSoft}" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Border.Style>
-                                                    <TextBlock Text="{Binding Score}" FontFamily="{StaticResource NumFont}"
-                                                               FontSize="13" FontWeight="SemiBold">
+                                                    <!--
+                                                        Chips without their boxes. The tone alone
+                                                        carries for or against, which is what the
+                                                        filled pill was there for — and eight rows
+                                                        of filled pills turned the page into a wall
+                                                        of green. The tooltip stays on each one.
+                                                    -->
+                                                    <ItemsControl ItemsSource="{Binding Reasons}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <TextBlock Text="{Binding Text}" FontSize="12"
+                                                                           Margin="0,1,14,1" TextWrapping="Wrap"
+                                                                           TextTrimming="None"
+                                                                           ToolTip="{Binding Hint}">
+                                                                    <!--
+                                                                        Brightness, not hue. Almost
+                                                                        every chip argues FOR its
+                                                                        row — that is what put them
+                                                                        there — so painting them
+                                                                        green colours the rule and
+                                                                        leaves nothing for the
+                                                                        exception. Bright reads as
+                                                                        evidence, dim as context,
+                                                                        and red is the only colour
+                                                                        left, which is why it is
+                                                                        seen.
+                                                                    -->
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Foreground" Value="{StaticResource Faint}" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding Tone}" Value="Pro">
+                                                                                    <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                                                                </DataTrigger>
+                                                                                <DataTrigger Binding="{Binding Tone}" Value="Contra">
+                                                                                    <Setter Property="Foreground" Value="{StaticResource Bad}" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+
+                                                <!--
+                                                    The number and, under it, what it is worth
+                                                    against the rest of the list. The verdict used
+                                                    to live inside the collapsed breakdown: the one
+                                                    line that says whether the order means anything
+                                                    took a click per row to read.
+                                                -->
+                                                <StackPanel Grid.Column="4" VerticalAlignment="Top"
+                                                            Margin="0,-2,6,0" ToolTip="{Binding ScoreHint}">
+                                                    <!--
+                                                        The UI face, not the monospace one: the
+                                                        column is right-aligned, so nothing needs
+                                                        fixed-width digits, and Consolas at 18 px
+                                                        beside Segoe UI looked like a terminal that
+                                                        had wandered in.
+                                                    -->
+                                                    <TextBlock Text="{Binding Score}"
+                                                               FontSize="19" FontWeight="SemiBold"
+                                                               TextAlignment="Right">
                                                         <TextBlock.Style>
                                                             <Style TargetType="TextBlock">
                                                                 <Setter Property="Foreground" Value="{StaticResource Muted}" />
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding Tone}" Value="Strong">
-                                                                        <Setter Property="Foreground" Value="{StaticResource Good}" />
+                                                                        <Setter Property="Foreground" Value="{StaticResource Text}" />
                                                                     </DataTrigger>
                                                                     <DataTrigger Binding="{Binding Tone}" Value="Fair">
-                                                                        <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                                                        <Setter Property="Foreground" Value="{StaticResource Muted}" />
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </TextBlock.Style>
                                                     </TextBlock>
-                                                </Border>
 
-                                                <ToggleButton Grid.Column="4" Style="{StaticResource Chevron}"
+                                                    <TextBlock Text="{Binding ScoreVerdict}" FontSize="11"
+                                                               TextAlignment="Right" Margin="0,1,0,0"
+                                                               Foreground="{StaticResource Faint}" />
+                                                </StackPanel>
+
+                                                <ToggleButton Grid.Column="5" VerticalAlignment="Top"
+                                                              Style="{StaticResource Chevron}"
                                                               IsChecked="{Binding IsExpanded, Mode=TwoWay}"
-                                                              ToolTip="Zeigt, was für und gegen diesen Pick spricht" />
+                                                              ToolTip="Zeigt, woraus sich die Zahl zusammensetzt" />
                                             </Grid>
-
-                                            <!-- Reason chips, coloured by whether they argue for or against. -->
-                                            <ItemsControl ItemsSource="{Binding Reasons}" Margin="62,6,0,0">
-                                                <ItemsControl.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <WrapPanel />
-                                                    </ItemsPanelTemplate>
-                                                </ItemsControl.ItemsPanel>
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <!-- Hover explains where the number comes from; null Hint simply shows none. -->
-                                                        <Border CornerRadius="9" Padding="8,2" Margin="0,0,5,4"
-                                                                ToolTip="{Binding Hint}">
-                                                            <Border.Style>
-                                                                <Style TargetType="Border">
-                                                                    <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding Tone}" Value="Pro">
-                                                                            <Setter Property="Background" Value="{StaticResource GoodSoft}" />
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding Tone}" Value="Contra">
-                                                                            <Setter Property="Background" Value="{StaticResource BadSoft}" />
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Border.Style>
-                                                            <TextBlock Text="{Binding Text}" FontSize="11"
-                                                                       TextWrapping="Wrap">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Foreground" Value="{StaticResource Muted}" />
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding Tone}" Value="Pro">
-                                                                                <Setter Property="Foreground" Value="{StaticResource Good}" />
-                                                                            </DataTrigger>
-                                                                            <DataTrigger Binding="{Binding Tone}" Value="Contra">
-                                                                                <Setter Property="Foreground" Value="{StaticResource Bad}" />
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                        </Border>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
 
                                             <!--
                                                 Breakdown. Every line names the criterion, says in
@@ -2016,7 +2065,7 @@
                                                 score - the bare arithmetic that used to stand here
                                                 was unreadable. The raw numbers live in the tooltip.
                                             -->
-                                            <Border Margin="62,5,0,0" Padding="10,8" CornerRadius="7"
+                                            <Border Margin="71,8,26,2" Padding="11,9" CornerRadius="8"
                                                     Background="{StaticResource Bg}"
                                                     Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
                                                 <StackPanel>
@@ -2163,9 +2212,14 @@
                                    TextTrimming="CharacterEllipsis" />
                     </StackPanel>
 
+                    <!--
+                        Ghost, not filled. It is pressed every few days and it was the loudest
+                        thing on a screen whose job is a list of champions; an accent slab in the
+                        corner drew the eye away from the one place a decision is made.
+                    -->
                     <Button Grid.Column="1" Command="{Binding UpdateDataCommand}" Margin="8,0,0,0">
                         <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource Primary}">
+                            <Style TargetType="Button" BasedOn="{StaticResource Ghost}">
                                 <Setter Property="Content" Value="Daten aktualisieren" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsUpdating}" Value="True">

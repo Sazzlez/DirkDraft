@@ -26,6 +26,7 @@ public sealed class RecommendationViewModel : ObservableObject
     private string _totalLabel = string.Empty;
     private ScoreTone _tone;
     private bool _isExpanded;
+    private bool _isTopGroup;
     private ImageSource? _icon;
 
     /// <summary>Reason chips. A collection rather than one joined string so they render as chips.</summary>
@@ -91,6 +92,22 @@ public sealed class RecommendationViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Whether the error bars fail to separate this row from the leader — rank 1 and everyone tied
+    /// with it. The list has to be printed in some order and that order reads as a verdict; this is
+    /// what lets the window draw where the verdict actually stops, instead of leaving it in a
+    /// sentence behind the chevron.
+    /// <para>
+    /// Always false for bans: their score is denied win-rate points, carries no error bar, and a
+    /// mark meaning "statistically tied" would claim a statistic that was never computed.
+    /// </para>
+    /// </summary>
+    public bool IsTopGroup
+    {
+        get => _isTopGroup;
+        set => Set(ref _isTopGroup, value);
+    }
+
+    /// <summary>
     /// Applies a new recommendation. Collapses the breakdown when the champion changed, so an
     /// expanded row does not silently start showing a different champion's numbers.
     /// </summary>
@@ -119,23 +136,36 @@ public sealed class RecommendationViewModel : ObservableObject
         Rank = rank;
         Name = recommendation.Name;
         Icon = icon;
+        IsTopGroup = !isBan
+            && recommendation.Uncertainty > 0
+            && (rank == 1 || standing == ScoreStanding.Tied);
 
         var culture = CultureInfo.CurrentCulture;
 
         if (isBan)
         {
+            // Recalibrated against what the scale actually produces. The thresholds were 4,5 and
+            // 2,5 from the days when the OP.GG tier was still added into the ban value — it hung
+            // twice there, and taking it out moved the whole scale down without moving them.
+            // Measured over the top eight of five drafts on the stored snapshot (40 rows): maximum
+            // 4,4 — so "wichtiger Bann" had become unreachable — 10 % above 3,6, a quarter above
+            // 2,9, median 2,6. The bar for "important" now sits at the top tenth of what is shown,
+            // and the bar for "worth it" at the middle of it.
             Score = string.Format(culture, "{0:+0.0;-0.0;0.0} Pkt", recommendation.Score);
             Tone = recommendation.Score switch
             {
-                > 4.5 => ScoreTone.Strong,
+                > 3.5 => ScoreTone.Strong,
                 > 2.5 => ScoreTone.Fair,
                 _ => ScoreTone.Weak,
             };
+            // Nothing at all below the second bar, rather than eight rows of "optional". A draft
+            // where no ban is urgent is a real answer, and silence gives it without spending a
+            // line per row saying so — the number and its tooltip are right there.
             ScoreVerdict = recommendation.Score switch
             {
-                > 4.5 => "wichtiger Bann",
+                > 3.5 => "wichtiger Bann",
                 > 2.5 => "sinnvoller Bann",
-                _ => "optional",
+                _ => string.Empty,
             };
             ScoreHint = "So viele Prozentpunkte Siegquote würde dieser Champion dem Gegner voraussichtlich "
                 + "bringen — Stärke mal Wahrscheinlichkeit, dass er überhaupt genommen wird. "

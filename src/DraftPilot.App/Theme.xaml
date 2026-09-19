@@ -13,6 +13,13 @@
     <SolidColorBrush x:Key="Line" Color="#2C333F" />
     <SolidColorBrush x:Key="LineSoft" Color="#232935" />
 
+    <!--
+        The quietest rule in the set: a separator between rows of one list, where a border around
+        each row would frame the very things being compared. Just visible against Bg, invisible
+        against a hovered row.
+    -->
+    <SolidColorBrush x:Key="Hairline" Color="#1E242E" />
+
     <SolidColorBrush x:Key="Text" Color="#EEF1F6" />
     <SolidColorBrush x:Key="Muted" Color="#9BA5B7" />
     <SolidColorBrush x:Key="Faint" Color="#6B7486" />
@@ -295,9 +302,12 @@
                                       IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
                             <ToggleButton.Template>
                                 <ControlTemplate TargetType="ToggleButton">
+                                    <!-- Bound through to the ComboBox, not hard-coded, so a derived
+                                         style can strip the box off: the lane pickers in the seat
+                                         columns are captions you may change, not form fields. -->
                                     <Border x:Name="Box"
-                                            Background="{StaticResource SurfaceAlt}"
-                                            BorderBrush="{StaticResource Line}"
+                                            Background="{Binding Background, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                            BorderBrush="{Binding BorderBrush, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                             BorderThickness="1"
                                             CornerRadius="7">
                                         <Grid>
@@ -356,6 +366,18 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!--
+        The lane override in the seat columns. It is read far more often than it is used, so it
+        reads as text with a chevron and grows its box only under the pointer.
+    -->
+    <Style x:Key="LanePicker" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource Muted}" />
+        <Setter Property="Height" Value="22" />
+        <Setter Property="FontSize" Value="12" />
     </Style>
 
     <!-- ============================ Misc ============================ -->
