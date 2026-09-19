@@ -2736,11 +2736,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // content there is the champion's name plus "no lane matchup in this mode" — which the
             // bench list says better, with a number next to it. Rendering both put one on top of
             // the other. RenderBench has already run this pass, so HasRecommendations is current.
-            ShowMatchupPanel = seat is not null && !HasRecommendations;
+            // A local, not the property, and the null check stays in the condition below: reading
+            // the decision back out of a property that raises PropertyChanged loses the compiler's
+            // proof that the seat is there, and CS8602 said so.
+            var showPanel = seat is not null && !HasRecommendations;
+
+            ShowMatchupPanel = showPanel;
             ShowMatchupStrip = false;
             ShowEmptyHint = seat is null && !HasRecommendations;
 
-            if (ShowMatchupPanel)
+            if (seat is not null && showPanel)
             {
                 MatchupOwnIcon = _icons.Get(seat.LockedChampionId);
                 MatchupOpponentIcon = null;

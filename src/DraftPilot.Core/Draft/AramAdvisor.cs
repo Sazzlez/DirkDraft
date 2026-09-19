@@ -85,7 +85,11 @@ public static class AramAdvisor
             var shrunk = Shrinkage.Apply(stat.WinRate, stat.Play, Prior);
 
             // Two sources of error, both real: the sample, and the rounding of the reported rate.
-            var variance = ScoreError.LogitVariance(stat.WinRate, stat.Play, Prior, 0.5)
+            // LogitVariance wants the SHRUNK rate — it recovers the raw proportion from it, so
+            // handing it the raw one un-shrinks something that was never shrunk and inflates the
+            // bar. It is also the sanitised value, which is what keeps an unreadable rate from
+            // travelling into the error bar.
+            var variance = ScoreError.LogitVariance(shrunk, stat.Play, Prior, 0.5)
                 + LogitRoundingVariance(shrunk);
 
             rows.Add(new Recommendation(

@@ -319,9 +319,13 @@ public sealed class MetaLookup
 
             _laneStats[slot] = new LaneView(
                 WinRate: Shrinkage.Apply(stat.WinRate, stat.Play, Shrinkage.LanePrior, LaneTarget),
-                PickRate: stat.PickRate,
-                BanRate: stat.BanRate,
-                RoleRate: stat.RoleRate,
+                // Sanitised here, at the one place the snapshot becomes a view, rather than at each
+                // of the readers. The win rate is protected by Shrinkage; these two were not, and
+                // the ban gate multiplies them: Math.Clamp(NaN, 0, 1) is NaN, so a single unreadable
+                // pick rate turned the whole ban list into NaN scores in an arbitrary order.
+                PickRate: Rate(stat.PickRate),
+                BanRate: Rate(stat.BanRate),
+                RoleRate: Rate(stat.RoleRate),
                 // Tier 0 means two different things depending on where the row came from: OP.GG's
                 // OP tier in the tier list, and "no tier at all" in the fallback rows the analysis
                 // writes for lanes the tier list never listed. Those fallbacks carry no games, so
@@ -330,13 +334,21 @@ public sealed class MetaLookup
                 Tier: stat.Play > 0 ? stat.Tier : -1,
                 Play: stat.Play);
 
-            _rolePriors[slot] = Math.Max(0, stat.RoleRate);
+            _rolePriors[slot] = Rate(stat.RoleRate);
 
             // A duplicated entry would otherwise scale that champion's weight in every sweep.
             if (!_laneRosters[(int)stat.Lane].Contains(stat.ChampionId))
                 _laneRosters[(int)stat.Lane].Add(stat.ChampionId);
         }
     }
+
+    /// <summary>
+    /// A share of games, or zero. Not a number, negative, or above one are all the same thing here
+    /// — a field the snapshot could not fill — and zero is what "we do not know this" means for a
+    /// rate that only ever scales something else.
+    /// </summary>
+    private static double Rate(double value)
+        => double.IsFinite(value) ? Math.Clamp(value, 0, 1) : 0;
 
     /// <summary>
     /// OP.GG reports each lane's role share independently, so a champion's five values need not sum

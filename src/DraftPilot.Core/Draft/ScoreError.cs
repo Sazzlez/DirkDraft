@@ -66,7 +66,17 @@ public static class ScoreError
         if (!double.IsFinite(priorRate) || priorRate is <= 0 or >= 1)
             priorRate = 0.5;
 
-        var factor = (double)play / (play + prior);
+        // Widened before the addition: as ints, play + prior overflows near int.MaxValue and the
+        // shrinkage factor comes back negative — see Shrinkage.Apply, same trap.
+        double games = play;
+        var factor = games / (games + prior);
+
+        // A rate that is not a number carries no information, so neither does its variance. Without
+        // this the NaN travels into the error bar, and an error bar of NaN makes every comparison
+        // against it false — the tie grouping then silently reports "not tied" for everything.
+        if (!double.IsFinite(shrunkRate))
+            return 0;
+
         var raw = Math.Clamp(priorRate + ((shrunkRate - priorRate) / factor), 0, 1);
         var shrunk = Math.Clamp(shrunkRate, 0.01, 0.99);
 

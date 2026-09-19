@@ -59,7 +59,14 @@ public static class Shrinkage
             return priorRate;
 
         var clamped = Math.Clamp(observedRate, 0, 1);
-        return ((clamped * play) + (priorRate * priorWeight)) / (play + priorWeight);
+
+        // The weights are widened before they are added. As ints, play + priorWeight overflows for
+        // a play count near int.MaxValue and comes back NEGATIVE, which turns a 52 % rate into
+        // −0,52 — a score below zero that then sorts above everything. No snapshot carries such a
+        // count today; a corrupt or hostile one can, and the failure is silent.
+        double weight = play;
+
+        return ((clamped * weight) + (priorRate * priorWeight)) / (weight + priorWeight);
     }
 
     /// <summary>
