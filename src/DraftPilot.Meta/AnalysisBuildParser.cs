@@ -13,9 +13,10 @@ namespace DraftPilot.Meta;
 /// (docs/opgg-schnittstelle.md).
 /// </para>
 /// <para>
-/// Unlike the guide, this endpoint reports exactly ONE set per slot rather than a ranked list — so
-/// there are no alternatives to show, and the build card's "auch gespielt" row stays empty by
-/// itself.
+/// Unlike the guide, this endpoint reports exactly ONE set per slot rather than a ranked list — the
+/// one it reports is the most played, over samples in the thousands. So there are no alternatives
+/// to show, and the build card's "auch gespielt" row stays empty by itself. Only
+/// <c>last_items</c> arrives as a list, and that one is ranked by <see cref="BuildChoice"/>.
 /// </para>
 /// </summary>
 public static class AnalysisBuildParser
@@ -81,7 +82,10 @@ public static class AnalysisBuildParser
         plan.Starters = Single(data["starter_items"]);
         plan.Boots = Single(data["boots"]);
         plan.CoreItems = Single(data["core_items"]);
-        plan.LateItems = [.. data["last_items"].Items.Select(ReadSet).Where(set => set is not null).Take(3)!];
+        // The one slot this endpoint answers with a list rather than a single set — so the one
+        // slot where there is a choice to make, and it is made by record rather than by order.
+        plan.LateItems = BuildChoice.ByWinRate(
+            data["last_items"].Items.Select(ReadSet).OfType<ItemSet>(), take: 3);
         plan.SummonerSpells = Single(data["summoner_spells"]);
         plan.SkillOrder = [.. data["skills"]["order"].Items.Select(entry => entry.AsText() ?? string.Empty).Where(step => step.Length > 0)];
         plan.SkillPriority = string.Join(" > ", data["skill_masteries"]["ids"].Items

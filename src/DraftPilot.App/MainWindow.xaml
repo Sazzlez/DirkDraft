@@ -559,12 +559,34 @@
                         </TextBlock.Style>
                     </TextBlock>
 
-                    <!-- Where in the draft we are, as quiet context beside the headline rather
-                         than a second line under it: it must not compete for the first glance. Set
-                         as plain text — a pill around a phase name reads as something to click. -->
-                    <TextBlock Grid.Column="1" Text="{Binding PhaseText}" Style="{StaticResource Caption}"
-                               Margin="14,0,2,0" Foreground="{StaticResource Faint}"
-                               VerticalAlignment="Center" />
+                    <!-- Mode and phase, as quiet context beside the headline rather than a second
+                         line under it: they must not compete for the first glance. Plain text — a
+                         pill around a mode name reads as something to click.
+                         The mode leads because it is the premise of everything below: the same
+                         champion is a different champion in Flex, and on the Abyss the list does
+                         not apply at all. It carries a tooltip only when the mode costs something
+                         (Mayhem borrows ARAM's numbers). -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                                Margin="14,0,2,0">
+                        <TextBlock Text="{Binding ModeText}" Style="{StaticResource Caption}"
+                                   Foreground="{StaticResource Muted}" VerticalAlignment="Center"
+                                   ToolTip="{Binding ModeNote}"
+                                   Visibility="{Binding HasModeText, Converter={StaticResource BoolToVisibility}}" />
+
+                        <!-- The asterisk of a borrowed data source, next to the name it qualifies.
+                             Cheaper than a second line and impossible to miss once you know it. -->
+                        <TextBlock Text="*" Style="{StaticResource Caption}" Margin="1,0,0,0"
+                                   Foreground="{StaticResource Warn}" VerticalAlignment="Center"
+                                   ToolTip="{Binding ModeNote}"
+                                   Visibility="{Binding HasModeNote, Converter={StaticResource BoolToVisibility}}" />
+
+                        <TextBlock Text="·" Style="{StaticResource Caption}" Margin="6,0"
+                                   Foreground="{StaticResource Faint}" VerticalAlignment="Center"
+                                   Visibility="{Binding HasModeText, Converter={StaticResource BoolToVisibility}}" />
+
+                        <TextBlock Text="{Binding PhaseText}" Style="{StaticResource Caption}"
+                                   Foreground="{StaticResource Faint}" VerticalAlignment="Center" />
+                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -689,12 +711,22 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="{Binding GameBuild.Title}" Style="{StaticResource Title}" />
-                        <TextBlock Grid.Column="1" Text="{Binding GameBuild.Subtitle}"
+
+                        <!-- The mode survives champion select in the view model, so the running
+                             game can still say which queue its numbers describe. On the Abyss the
+                             title already carries it; this is what the Rift modes were missing. -->
+                        <TextBlock Grid.Column="1" Text="{Binding ModeText}" Style="{StaticResource Small}"
+                                   Foreground="{StaticResource Muted}" VerticalAlignment="Center"
+                                   Margin="0,0,10,0" ToolTip="{Binding ModeNote}"
+                                   Visibility="{Binding HasModeText, Converter={StaticResource BoolToVisibility}}" />
+
+                        <TextBlock Grid.Column="2" Text="{Binding GameBuild.Subtitle}"
                                    Style="{StaticResource Small}" Foreground="{StaticResource Faint}"
                                    VerticalAlignment="Center" Margin="0,0,10,0" />
-                        <Button Grid.Column="2" Style="{StaticResource IconButton}"
+                        <Button Grid.Column="3" Style="{StaticResource IconButton}"
                                 Command="{Binding CloseBuildCommand}"
                                 ToolTip="Build-Ansicht schließen">
                             <Path Data="M 0 0 L 9 9 M 9 0 L 0 9" Stroke="{StaticResource Muted}"

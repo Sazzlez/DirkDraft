@@ -156,6 +156,13 @@ public static class MatchupGuideParser
                 set.PickRate /= 100;
         }
 
+        // Most played, deliberately, and NOT the best win rate — the rule BuildChoice applies to the
+        // opponent-free build does not belong here. This endpoint's samples are an order of
+        // magnitude too thin for it: in the captured Darius-vs-Jax guide the starters run 113 games
+        // at 48,7 % against 13 games at 61,5 %, and every win-rate rule that is willing to promote
+        // the second one is also willing to promote noise. Ranking the boots that way is how the
+        // situational boot choice came back through the side door, and that one was taken out on
+        // purpose. Once the opponent is known, "what most people buy into him" is the answer.
         return [.. result.OrderByDescending(set => set.Play).Take(take)];
     }
 
@@ -278,6 +285,11 @@ public static class MatchupGuideParser
 /// counter lists for the enemies actually being faced. Runs automatically as picks are revealed —
 /// at most one call per enemy champion and one per matchup for the whole draft, cached on disk.
 /// </summary>
+/// <param name="gameMode">
+/// OP.GG's name for the queue being played, from <see cref="QueueKinds.OpGgMode"/> — Solo/Duo, Flex
+/// and ARAM are three separate populations behind this one parameter. It follows the queue the
+/// client reports, not a setting: a setting can say Flex while the game on screen is Solo/Duo.
+/// </param>
 /// <param name="tier">
 /// The rank bracket the stored snapshot was built for. The live counters have to come from the same
 /// one — a duel from a different population than the lane rate it is compared against is not a
@@ -287,11 +299,24 @@ public sealed class LiveDraftFetcher(
     OpGgMcpClient client, string gameMode, string tier = "all", Action<string>? diagnostic = null)
 {
     /// <summary>
-    /// The build for a champion in a mode that has no lane opponent to speak of — ARAM above all,
-    /// where the matchup guide has nothing to answer about. One call, no opponent, no stand-in.
+    /// The champion's own build, with no opponent in it: the one OP.GG has the most games behind.
+    /// <para>
+    /// Used wherever the lane opponent is not known — ARAM, where there is none, and every Rift
+    /// draft up to the moment the opposing pick is revealed. It is the better answer than a build
+    /// against a guessed opponent, and by a wide margin: measured on 2026-09-18, Darius Top's boots
+    /// here rest on 49.535 games, while the most played core of the Darius-vs-Jax matchup guide
+    /// rests on 11.
+    /// </para>
     /// </summary>
-    public async Task<BuildPlan?> FetchModeBuildAsync(
+    /// <param name="lane">
+    /// Where the champion is being played. Passed through as the position, because a Top build and
+    /// a Support build of the same champion are not the same build. <see cref="Lane.Unknown"/> is
+    /// the ARAM case, where the parameter is required by the schema and ignored by the data —
+    /// measured: mid, adc and top answer with identical numbers.
+    /// </param>
+    public async Task<BuildPlan?> FetchChampionBuildAsync(
         ChampionEntry me,
+        Lane lane,
         string mode,
         string patch,
         CancellationToken ct)
@@ -302,9 +327,11 @@ public sealed class LiveDraftFetcher(
             {
                 ["game_mode"] = mode,
                 ["champion"] = name,
-                // Required by the schema and ignored for ARAM — measured: mid, adc and top answer
-                // with identical numbers.
-                ["position"] = "mid",
+                ["position"] = lane == Lane.Unknown ? "mid" : lane.ToOpGg(),
+                // The same bracket as the counters and the stored lane numbers. Without it this one
+                // call would describe emerald_plus while everything beside it describes the
+                // player's own rank.
+                ["tier"] = tier,
                 ["desired_output_fields"] = OpGgMcpClient.Fields(AnalysisBuildParser.Fields),
             };
 
@@ -313,7 +340,13 @@ public sealed class LiveDraftFetcher(
                 var response = await client.CallToolAsync("lol_get_champion_analysis", arguments, ct)
                     .ConfigureAwait(false);
 
-                var plan = AnalysisBuildParser.Parse(response, me, Lane.Unknown, mode, patch);
+                // The mode is stamped into the plan only where it IS the plan's subject: on the
+                // Abyss, where there is no lane and no opponent to name it by. A Rift plan keeps an
+                // empty Mode — that is what tells everything downstream it is a lane build, and
+                // "ranked" in that field would make the card head itself with a queue name.
+                var plan = AnalysisBuildParser.Parse(
+                    response, me, lane, lane == Lane.Unknown ? mode : string.Empty, patch);
+
                 return plan.IsEmpty ? null : plan;
             }
             catch (OpGgApiException ex) when (ex.Status is null)

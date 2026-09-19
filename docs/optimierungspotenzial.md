@@ -50,12 +50,18 @@ gedrückt wird, ist ein schlechter Tausch.
 
 **Zusätzlich, nicht aus dieser Analyse:** Blind-Pick-Rückfall. Der Live-Test zeigte, dass
 Warteschlangen ohne Gegner-Reveal strukturell *keinen* Build und *keine* Runen bekommen — die
-Bedingung dafür verlangt einen aufgedeckten Lane-Gegner, und OP.GG hat nachweislich keinen Build
-ohne Gegner (29 Werkzeuge, keins davon generisch). Gelöst über einen benannten Ersatzgegner: den
-meistgespielten Champion der eigenen Lane, sichtbar als solcher gekennzeichnet. Greift nur, wenn
-gar kein Gegner aufgedeckt ist — ein Draft, der sie zeigt, ist die paar Sekunden Wartezeit wert.
-Das Scoring bleibt unangetastet: einen Gegner in die Bewertung zu erfinden würde jeden Kandidaten
-unterschiedlich verzerren.
+Bedingung dafür verlangt einen aufgedeckten Lane-Gegner. Zunächst gelöst über einen benannten
+Ersatzgegner: den meistgespielten Champion der eigenen Lane, sichtbar als solcher gekennzeichnet.
+
+> **Überholt am 19.09.2026.** Die Prämisse war falsch: OP.GG hat sehr wohl einen Build ohne
+> Gegner — `lol_get_champion_analysis` liefert Runen, Items, Spells und Skill-Reihenfolge für
+> Champion plus Position, über Stichproben, die den Matchup-Guide um drei Größenordnungen
+> schlagen (Darius Top: 8.800–40.000 Games je nach Bracket gegen 11 im Matchup gegen Jax). Der
+> Ersatzgegner ist gelöscht, `StandInOpponent` samt Tests entfernt. Es wird nichts mehr geraten:
+> Gegner bekannt → Matchup-Build, Gegner unbekannt → bester Build der Lane.
+
+Das Scoring bleibt in beiden Fassungen unangetastet: einen Gegner in die Bewertung zu erfinden
+würde jeden Kandidaten unterschiedlich verzerren.
 
 ### Was Maßnahme 6 ergeben hat
 

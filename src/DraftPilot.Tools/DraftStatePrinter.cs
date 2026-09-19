@@ -21,6 +21,7 @@ internal static class DraftStatePrinter
 
         var text = new StringBuilder();
         text.AppendLine($"[{Timestamp()}] {state.Phase}  ({Describe(status)})");
+        text.AppendLine($"  Modus:  {DescribeQueue(state.Queue)}");
         text.AppendLine($"  Am Zug: {DescribeTurn(state)}");
         text.AppendLine($"  Ziel:   {DescribeTarget(target)}");
         text.AppendLine($"  Bans    wir: {Join(state.AllyBans)}   sie: {Join(state.EnemyBans)}");
@@ -52,6 +53,22 @@ internal static class DraftStatePrinter
         var onClock = state.Turn?.CellId == slot.CellId ? " <<<" : string.Empty;
 
         return $"{label} cell={slot.CellId,-2} {lane,-8} {champion}{onClock}";
+    }
+
+    /// <summary>
+    /// The detected queue, with the two things that follow from it: which OP.GG population the live
+    /// calls will ask for, and whether the lane model applies at all. The window shows the same
+    /// fact in its header — this is the line that makes a recording verifiable without it.
+    /// </summary>
+    private static string DescribeQueue(QueueKind queue)
+    {
+        var name = queue.Display() is { Length: > 0 } display ? display : "unbekannt";
+        var source = queue.OpGgMode() is { Length: > 0 } mode ? mode : "keine Quelle";
+        var lanes = queue.UsesLanes() ? "Lanes" : "ohne Lanes";
+
+        return queue.ModeCaveat() is { Length: > 0 } caveat
+            ? $"{name}  [{source}, {lanes}]  — {caveat}"
+            : $"{name}  [{source}, {lanes}]";
     }
 
     private static string DescribeTurn(DraftState state)

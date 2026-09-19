@@ -118,19 +118,36 @@ wieder herunterzuladen.
   Der Tooltip nennt die Namen mit Winrate und Anzahl Games. Gezählt wird, was OP.GG als auffällige
   Gegner kennt; kein Chip heißt „keiner fällt auf", nicht „es gibt keinen". Bans rechnen dieselbe
   Einheit aus Gegnersicht: Stärke mal Wahrscheinlichkeit, dass der Champion überhaupt genommen wird.
-- **Dein Build**: nach deinem Pick Runen, Shards, Startitems, Boots und Core-Items für genau dieses
-  Matchup, plus Hinweise zur gegnerischen Comp. Unter Start/Boots und unter dem Core steht
-  „auch gespielt": die übrigen Sätze, die OP.GG zu dieser Paarung mitliefert, mit Winrate und
-  Anzahl Games. Nichts davon wird vorgezogen oder hervorgehoben — oben steht die häufigste Wahl, und
-  welche davon richtig ist, entscheidet das Spiel. Unter 50 Games steht statt einer Prozentzahl
-  „dünne Datenlage": dort ist ein Standardfehler rund sieben Punkte breit.
+- **Dein Build**: nach deinem Pick Runen, Shards, Startitems, Boots und Core-Items, plus Hinweise
+  zur gegnerischen Comp. Welche Quelle das ist, entscheidet eine Frage — **steht der Lane-Gegner?**
+  - **Ja:** der Build für genau dieses Matchup. Unter Start/Boots und unter dem Core steht
+    „auch gespielt": die übrigen Sätze, die OP.GG zu dieser Paarung mitliefert, mit Winrate und
+    Anzahl Games. Nichts davon wird vorgezogen oder hervorgehoben — oben steht die häufigste Wahl
+    dieses Matchups, und welche davon richtig ist, entscheidet das Spiel.
+  - **Nein** — Blind Pick, Swiftplay, oder einfach die Minute, bevor der Gegner aufgedeckt ist:
+    dann steht dort der Build, den dein Champion **auf dieser Lane insgesamt am besten fährt**.
+    Kein geratener Ersatzgegner mehr. Der Unterschied ist die Stichprobe: gemessen an Darius Top
+    trägt der Matchup-Kern gegen Jax 11 Games, der Lane-Build derselben Quelle je nach Bracket
+    8.800 bis 40.000. Ein Chip sagt „Kein Matchup bekannt — bester Build der Lane"; sobald der
+    Gegner steht, wird auf den Matchup-Build umgestellt.
+
+  Unter 50 Games steht statt einer Prozentzahl „dünne Datenlage": dort ist ein Standardfehler rund
+  sieben Punkte breit.
   **Runen übertragen** legt die Seite als „DirkRunen · …" im Client an und wählt sie aus — der
   einzige Schreibzugriff des Tools, nur auf Klick, und gelöscht wird nur die eigene Seite (eine
   fremde erst nach Nachfrage mit Namen).
-- **In ARAM** gibt es keine Lanes, also auch keine Lane-Empfehlungen: die Vorschlagsliste bleibt
-  weg, Lane-Beschriftungen und Matchup-Prozente ebenso. Was bleibt, ist der **ARAM-Build** für deinen
-  zugeteilten Champion (OP.GGs eigene ARAM-Zahlen, ein Abruf) und der Vergleich beider
-  Comps, der dort genauso gilt.
+- **Der Spielmodus** steht oben rechts, direkt neben der Phase, und wird aus der Queue-ID des
+  Clients erkannt — Ranked Solo/Duo, Ranked Flex, ARAM, ARAM Mayhem und die übrigen. Er ist nicht
+  Deko, sondern die Voraussetzung für alles darunter: Solo/Duo, Flex und ARAM sind bei OP.GG drei
+  getrennte Datenbestände, und die Counter- und Build-Abrufe folgen dem erkannten Modus, nicht einer
+  Einstellung. Wenn die gespeicherte Tierlist für eine andere Queue geholt wurde, sagt das Fenster
+  das als Chip.
+- **In ARAM und ARAM Mayhem** gibt es keine Lanes, also auch keine Lane-Empfehlungen: die
+  Vorschlagsliste bleibt weg, Lane-Beschriftungen und Matchup-Prozente ebenso. Was bleibt, ist der
+  **ARAM-Build** für deinen zugeteilten Champion (OP.GGs eigene ARAM-Zahlen, ein Abruf) und der
+  Vergleich beider Comps, der dort genauso gilt. Für **Mayhem** führt OP.GG keine eigenen Zahlen —
+  Build und Runen kommen aus dem normalen ARAM auf derselben Karte, und ein Stern hinter dem
+  Modusnamen sagt genau das.
 - **Im Spiel**: sobald das Spiel startet, zeigt das Fenster den Build groß — Item-Bilder in
   Kaufreihenfolge (Start → Boots → Core → Late), Summoner Spells und die Skill-Tabelle für
   Stufe 1–18. Die Stufen 16–18 liefert die Quelle nicht; sie sind abgeleitet und blasser
@@ -247,6 +264,17 @@ Matchup-Build kennen bei OP.GG keinen Rangfilter und kommen weiter aus dem Stand
 Dasselbe gilt für die Warteschlange: Solo/Duo gegen Flex unterscheidet nur die Champion-Analyse.
 Die Fußzeile nennt im Langtext, was wofür gilt, und der Wechsel wird mit dem nächsten
 **Daten aktualisieren** wirksam — bis dahin sagt die Fußzeile auch das.
+
+Für welche Queue die gespeicherte Datei gebaut wird, steht daneben:
+
+```powershell
+dotnet run --project src\DraftPilot.Tools -- settings gamemode flex
+```
+
+Möglich sind `ranked`, `flex` und `aram`. Diese Einstellung betrifft **nur** den großen Datenabruf —
+er passiert, bevor irgendwer weiß, was gequeued wird. Im Draft selbst zählt die Queue, die der
+Client meldet: Counter- und Build-Abrufe folgen ihr, egal was hier steht. Weicht die gespeicherte
+Tierlist von der gespielten Queue ab, sagt das Fenster das während des Drafts als Chip.
 
 Regionale Daten (EUW, NA …) gibt es über diese Schnittstelle nicht: der Region-Parameter existiert
 nur bei den Werkzeugen, die einen Spielernamen abfragen, und die bleiben hier ungenutzt. Details

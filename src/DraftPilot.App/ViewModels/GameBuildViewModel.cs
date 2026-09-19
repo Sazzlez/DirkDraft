@@ -228,30 +228,44 @@ public sealed class GameBuildViewModel : ObservableObject
     }
 
     /// <summary>Fills the view from a plan, translating names and resolving icons where present.</summary>
-    /// <param name="isStandIn">
-    /// The opponent in <paramref name="plan"/> is a stand-in, because the queue never revealed the
-    /// real one. Naming it as such matters: the runes and the skill order carry over, the item core
-    /// is the part that was chosen against somebody else.
+    /// <param name="modeLabel">
+    /// What to call the mode this plan is for — "ARAM", "ARAM Mayhem". Empty for a lane build,
+    /// where the lane and the opponent name it instead. Passed in rather than read off the plan
+    /// because only the caller knows the queue, and Mayhem's plan is stamped "aram".
+    /// </param>
+    /// <param name="modeCaveat">
+    /// What the mode costs, when it costs anything. Mayhem's numbers are plain ARAM's, and a card
+    /// that shows them without a word claims a precision it does not have.
     /// </param>
     public void Apply(
         BuildPlan plan,
         AssetNames names,
         IconCache icons,
-        bool isStandIn = false)
+        string modeLabel = "",
+        string modeCaveat = "")
     {
         MissingNote = string.Empty;
 
-        // A mode build answers for the champion, not for a pairing — naming an opponent it was
-        // never measured against would be the one thing this card must not do.
-        Title = (BuildModes.Display(plan.Mode), isStandIn) switch
+        var mode = modeLabel.Length > 0 ? modeLabel : BuildModes.Display(plan.Mode);
+
+        // A build without an opponent answers for the champion, not for a pairing — naming an
+        // opponent it was never measured against would be the one thing this card must not do.
+        Title = (mode, plan.OpponentId) switch
         {
-            ({ Length: > 0 } mode, _) => $"{plan.ChampionName} · {mode}",
-            (_, true) => $"{plan.ChampionName} · {plan.Lane.Display()} — gegen den üblichen Gegner ({plan.OpponentName})",
+            ({ Length: > 0 }, _) => $"{plan.ChampionName} · {mode}",
+            (_, 0) => $"{plan.ChampionName} · {plan.Lane.Display()}",
             _ => $"{plan.ChampionName} vs {plan.OpponentName} · {plan.Lane.Display()}",
         };
 
         var runes = plan.Runes;
-        var caveat = isStandIn ? " · Gegner unbekannt, Items nur als Richtung" : string.Empty;
+
+        var notes = new List<string>();
+        if (mode.Length == 0 && plan.OpponentId == 0)
+            notes.Add("kein Matchup bekannt, bester Build der Lane");
+        if (modeCaveat.Length > 0)
+            notes.Add(modeCaveat);
+
+        var caveat = notes.Count == 0 ? string.Empty : " · " + string.Join(" · ", notes);
         Subtitle = runes is null
             ? $"Patch {plan.Patch}{caveat}"
             : $"Runen: {Sample(runes.WinRate, runes.Play)} · Patch {plan.Patch}{caveat}";
@@ -265,9 +279,11 @@ public sealed class GameBuildViewModel : ObservableObject
         FillRunes(PrimaryRunes, runes?.PrimaryRuneIds ?? [], runes?.PrimaryRunes ?? [], names, icons, keystoneFirst: true);
         FillRunes(SecondaryRunes, runes?.SecondaryRuneIds ?? [], runes?.SecondaryRunes ?? [], names, icons, keystoneFirst: false);
 
-        // The shown build stays the most-played set, like every other slot: what it says is what
-        // the data ranked first. A swap driven by our own composition read looked like a
-        // recommendation the numbers never made. The runners-up go into their own row instead.
+        // First entry per slot, always: what the card shows is what the DATA ranked first. In a
+        // matchup plan that is the most played set of this pairing; in an opponent-free plan the
+        // source reports one set per slot anyway. A swap driven by our own composition read looked
+        // like a recommendation the numbers never made, and that stays out. The runners-up go into
+        // their own row instead, with their figures.
         FillItems(StartItems, plan.Starters.FirstOrDefault(), names, icons);
         FillItems(BootItems, plan.Boots.FirstOrDefault(), names, icons);
         FillItems(CoreItems, plan.CoreItems.FirstOrDefault(), names, icons);

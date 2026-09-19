@@ -191,6 +191,31 @@ public sealed class MetaLookup
     public IReadOnlyList<int> Roster(Lane lane)
         => lane == Lane.Unknown ? [] : _laneRosters[(int)lane];
 
+    /// <summary>
+    /// The lane this champion is actually played on most, or <see cref="Lane.Unknown"/> when the
+    /// snapshot lists it nowhere. By games, not by win rate: the question is where it belongs, and
+    /// the lane it wins most on can be one it is played on forty times.
+    /// </summary>
+    public Lane MainLane(int championId)
+    {
+        var best = Lane.Unknown;
+
+        // -1, not 0: a fallback row carries Play = 0, and a champion whose only rows are fallbacks
+        // should still be placed somewhere rather than nowhere.
+        var mostPlayed = -1;
+
+        foreach (var lane in Lanes.All)
+        {
+            if (LaneStat(championId, lane) is not { } stat || stat.Play <= mostPlayed)
+                continue;
+
+            mostPlayed = stat.Play;
+            best = lane;
+        }
+
+        return best;
+    }
+
     public LaneView? LaneStat(int championId, Lane lane)
     {
         if (lane == Lane.Unknown || !_indexById.TryGetValue(championId, out var index))

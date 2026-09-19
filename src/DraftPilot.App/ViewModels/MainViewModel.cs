@@ -87,10 +87,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private int _fetchFailures;
 
     /// <summary>
-    /// The build on screen was fetched against a stand-in opponent, because the queue never reveals
-    /// the real one. Everything the card says about it has to carry that caveat.
+    /// The queue the current draft belongs to, kept past the end of champion select the way
+    /// <see cref="_gameSeat"/> is: the in-game view still has to name the mode it is advising for,
+    /// and by then <see cref="_state"/> is empty again.
     /// </summary>
-    private bool _buildIsStandIn;
+    private QueueKind _queue = QueueKind.Unknown;
 
     /// <summary>The matchup whose build could not be fetched, so the card can say so.</summary>
     private (int Champion, Lane Lane, int Opponent)? _buildFailedFor;
@@ -185,12 +186,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// </summary>
     private string _clientPatch = string.Empty;
 
-    /// <summary>
-    /// OP.GG game mode for a build that needs no opponent, e.g. <c>aram</c>; empty when the normal
-    /// matchup guide applies. Lives beside <see cref="_buildContext"/> because the queue decides
-    /// it, not the seat.
-    /// </summary>
-    private string _buildMode = string.Empty;
     private DraftTracker _tracker;
 
     private MetaLookup _meta;
@@ -213,6 +208,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     private string _statusText = "Starte…";
     private string _phaseText = string.Empty;
+    private string _modeText = string.Empty;
+    private string _modeNote = string.Empty;
     private ConnectionTone _statusTone = ConnectionTone.Off;
     private string _emptyHint = "Warte auf den League-Client.";
     private string _turnText = string.Empty;
@@ -541,9 +538,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         _build = null;
         _gameSeat = 0;
+        _queue = QueueKind.Unknown;
         HasBuild = false;
         _buildCardClosed = false;
-        _buildIsStandIn = false;
+        ModeText = string.Empty;
+        ModeNote = string.Empty;
         BuildTitle = string.Empty;
         BuildSubtitle = string.Empty;
         RuneImportText = string.Empty;
@@ -568,9 +567,22 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// <summary>Set once <see cref="GameActiveChanged"/> announced the running game.</summary>
     private bool _gameActiveAnnounced;
 
-    /// <summary>Renders the build tiles exactly as the fetched plan ranks them.</summary>
+    /// <summary>
+    /// Renders the build tiles exactly as the fetched plan ranks them. The queue travels along:
+    /// it is what lets the card head itself "ARAM Mayhem" rather than "ARAM", and what knows that
+    /// Mayhem's numbers are borrowed.
+    /// </summary>
     private void ApplyGameBuild(BuildPlan plan)
-        => GameBuild.Apply(plan, _names, _icons, _buildIsStandIn);
+        => GameBuild.Apply(plan, _names, _icons, ModeLabelFor(plan), _queue.ModeCaveat());
+
+    /// <summary>
+    /// How to head a plan that is not a lane matchup: the queue's own name when we know it, the
+    /// plan's stored mode otherwise — a cached plan outlives the draft that fetched it.
+    /// </summary>
+    private string ModeLabelFor(BuildPlan plan)
+        => plan.Mode.Length == 0 ? string.Empty
+            : _queue.Display() is { Length: > 0 } named && _queue.IsAram() ? named
+            : BuildModes.Display(plan.Mode);
 
     /// <summary>
     /// Fires the auto-show event when a game runs and there is something to show. Called from the
@@ -601,6 +613,40 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         get => _phaseText;
         private set => Set(ref _phaseText, value);
     }
+
+    /// <summary>
+    /// The queue the client says this is — "Ranked Solo/Duo", "ARAM Mayhem", … Shown because it is
+    /// the premise of every other number on screen: the same champion has a different build, a
+    /// different win rate and a different set of counters in Solo/Duo than in Flex or on the Abyss,
+    /// and a reader who cannot see which of the three is meant cannot judge any of it.
+    /// </summary>
+    public string ModeText
+    {
+        get => _modeText;
+        private set
+        {
+            if (Set(ref _modeText, value))
+                Raise(nameof(HasModeText));
+        }
+    }
+
+    public bool HasModeText => _modeText.Length > 0;
+
+    /// <summary>
+    /// What the mode costs in accuracy, when it costs anything — today only ARAM Mayhem, whose
+    /// numbers are borrowed from plain ARAM because OP.GG keeps none of its own.
+    /// </summary>
+    public string ModeNote
+    {
+        get => _modeNote;
+        private set
+        {
+            if (Set(ref _modeNote, value))
+                Raise(nameof(HasModeNote));
+        }
+    }
+
+    public bool HasModeNote => _modeNote.Length > 0;
 
     /// <summary>Estimated win rate of the own team, over its column.</summary>
     public string AllyWinRateText
@@ -1453,6 +1499,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var enemyPredictions = _predictor.Predict(_state.Enemies, _manualLanes);
         var allyPredictions = _predictor.Predict(_state.Allies, _manualLanes);
 
+        // The mode first: it is the one fact that decides what everything below it means, and the
+        // window says so out loud instead of leaving the reader to infer it from the seat rows.
+        // Kept in a field because it has to survive champion select for the in-game view.
+        _queue = _state.Queue;
+        ModeText = _queue.Display();
+        ModeNote = _queue.ModeCaveat();
+
         PhaseText = DescribePhase(_state.Phase);
 
         TurnText = DescribeTurn();
@@ -1508,20 +1561,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         if (_state.LocalSlot is { IsLocked: true } seat && seat.LockedChampionId != 0)
             _gameSeat = seat.LockedChampionId;
 
-        _buildIsStandIn = false;
-        _buildMode = string.Empty;
-
         // A mode without lanes has no lane opponent to build against — and OP.GG answers for the
-        // champion alone there, so the honest build is the mode's own. ARAM is the one this tool
-        // sees; Arena and the rotating modes have no OP.GG mode to ask for, and get no build rather
-        // than a Rift one.
+        // champion alone there, so the honest build is the mode's own. Both Abyss queues are that
+        // case; Arena and the rotating modes have no OP.GG mode at all and get no build rather than
+        // a Rift one.
         if (!_state.Queue.UsesLanes())
         {
-            if (_state.Queue == QueueKind.Aram
+            if (_state.Queue.OpGgMode().Length > 0
                 && _state.LocalSlot is { IsLocked: true } aramSeat
                 && aramSeat.LockedChampionId != 0)
             {
-                _buildMode = "aram";
                 _buildContext = (aramSeat.LockedChampionId, Lane.Unknown, 0);
             }
 
@@ -1538,19 +1587,19 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 ? mine.AssignedLane
                 : allyPredictions.ForCell(mine.CellId)?.Lane ?? Lane.Unknown;
 
+            // Still no lane after the prediction — blind pick, a custom lobby, a queue that assigns
+            // nothing. The champion's own main lane is the last answer that is still measured
+            // rather than guessed, and without it there is no position to ask OP.GG for at all.
+            if (myLane == Lane.Unknown)
+                myLane = _meta.MainLane(mine.LockedChampionId);
+
             var opponent = myLane == Lane.Unknown ? 0 : enemyPredictions.ChampionOnLane(myLane);
 
-            // Blind pick never reveals the enemy team, and OP.GG has no build that works without an
-            // opponent — so without a stand-in these queues get no build and no rune import for the
-            // whole game. Only when NOTHING is revealed; a draft that will show the real opponent in
-            // a few seconds is worth waiting for.
-            if (opponent == 0 && myLane != Lane.Unknown && StandInOpponent.EnemiesAreHidden(_state))
-            {
-                opponent = StandInOpponent.For(_meta, myLane, _state.Unavailable, mine.LockedChampionId);
-                _buildIsStandIn = opponent != 0;
-            }
-
-            if (myLane != Lane.Unknown && opponent != 0)
+            // Opponent 0 is not "no build" any more. It is the champion's own build for this lane —
+            // the one OP.GG has the most games behind, with no opponent invented to reach it. The
+            // matchup build replaces it the moment the lane opponent is actually revealed, and in a
+            // queue that never reveals one it stays, which is the correct answer there.
+            if (myLane != Lane.Unknown)
                 _buildContext = (mine.LockedChampionId, myLane, opponent);
         }
 
@@ -1752,12 +1801,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // blocked the retry that might have made it in time. A healthy call answers in two to
             // four seconds; ten leaves room for a slow one and still two attempts in one phase.
             _opGg ??= new OpGgMcpClient(timeout: TimeSpan.FromSeconds(10));
-            // The bracket of the file we are comparing against, not the setting: after changing the
-            // setting the snapshot still describes the old one until the next update, and mixing the
-            // two would be worse than being a bracket behind.
+            // Two parameters, two different rules, and the difference matters.
+            // The QUEUE comes from the client, not from the setting: Solo/Duo, Flex and ARAM are
+            // three separate populations behind that one parameter, and the setting was made before
+            // anybody knew what would be queued. The setting is only the fallback for a queue this
+            // build cannot name.
+            // The BRACKET comes from the file we are comparing against, not from the setting:
+            // after changing the setting the snapshot still describes the old one until the next
+            // update, and mixing the two would be worse than being a bracket behind.
             var fetcher = new LiveDraftFetcher(
                 _opGg,
-                _settings.GameMode,
+                _state.Queue.OpGgMode() is { Length: > 0 } queueMode ? queueMode : _settings.GameMode,
                 _meta.Tier is { Length: > 0 } tier ? tier : _settings.Tier,
                 message => CrashLog.Note("Draft-Abruf", message));
 
@@ -1949,8 +2003,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // that kept flipping produced a new guide request per flip with nothing to stop it.
             _liveCallsThisDraft++;
 
+            // Two sources, one rule: the matchup guide once the lane opponent is known, the
+            // champion's own build until then. The second one is not a fallback to something worse
+            // — it is the build with the record behind it, measured over thousands of games where
+            // a matchup guide answers with eleven.
             var plan = opponent is null
-                ? await fetcher.FetchModeBuildAsync(me, _buildMode, _meta.Patch, token).ConfigureAwait(true)
+                ? await fetcher.FetchChampionBuildAsync(me, context.Lane, _queue.OpGgMode(), _meta.Patch, token)
+                    .ConfigureAwait(true)
                 : await fetcher.FetchBuildAsync(me, opponent, context.Lane, _meta.Patch, token)
                     .ConfigureAwait(true);
 
@@ -1974,7 +2033,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
         catch (Exception ex) when (IsRecoverable(ex, token))
         {
-            var against = opponent is null ? _buildMode : $"vs {opponent.Name}";
+            var against = opponent is null ? $"({_queue.OpGgMode()})" : $"vs {opponent.Name}";
             CrashLog.Note("Draft-Abruf", $"Build {me.Name} {against}: {ex.Message}");
 
             // Three attempts, then stop asking: a matchup OP.GG cannot answer would otherwise keep
@@ -2057,12 +2116,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // if they had been transferred.
         RuneImportText = string.Empty;
 
-        // No opponent in the title for a stand-in: the 280 px column truncates it and the caveat is
-        // exactly the half that gets cut off. It becomes a chip below instead, where it wraps.
-        BuildTitle = (BuildModes.Display(plan.Mode), _buildIsStandIn) switch
+        // A build without an opponent does not name one in the title: the 280 px column truncates
+        // it and the caveat is exactly the half that gets cut off. It becomes a chip below instead,
+        // where it wraps.
+        BuildTitle = (ModeLabelFor(plan), plan.OpponentId) switch
         {
             ({ Length: > 0 } mode, _) => $"{plan.ChampionName} · {mode}",
-            (_, true) => $"{plan.ChampionName} · {plan.Lane.Display()}",
+            (_, 0) => $"{plan.ChampionName} · {plan.Lane.Display()}",
             _ => $"{plan.ChampionName} vs {plan.OpponentName} · {plan.Lane.Display()}",
         };
 
@@ -2594,6 +2654,42 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
 
     /// <summary>
+    /// What the detected queue means for the data on screen, if anything.
+    /// <para>
+    /// Two things can be owed. The mode may borrow its numbers — Mayhem runs on ARAM's, because
+    /// OP.GG keeps none of its own. And the stored file may have been built for a different queue
+    /// than the one being played: the live counters and the build follow the client, but the tier
+    /// list and the duo table inside the snapshot are whatever the last update fetched, and those
+    /// are the numbers the whole recommendation list rests on.
+    /// </para>
+    /// </summary>
+    private IEnumerable<string> QueueDataNotes()
+    {
+        if (_state.Queue.ModeCaveat() is { Length: > 0 } borrowed)
+            yield return borrowed;
+
+        // Only where the stored file is actually read for advice. Without lanes there is no pick
+        // list and no tier list in play, so the mismatch would be a warning about nothing — and it
+        // would stand next to the Mayhem caveat saying almost the same words.
+        if (!_state.Queue.UsesLanes())
+            yield break;
+
+        var playing = _state.Queue.OpGgMode();
+        var stored = _meta.GameMode;
+
+        if (playing.Length == 0 || stored.Length == 0
+            || playing.Equals(stored, StringComparison.OrdinalIgnoreCase))
+        {
+            yield break;
+        }
+
+        var storedName = QueueName(stored) is { Length: > 0 } named ? named : stored;
+
+        yield return $"Tierlist im Datenfile ist {storedName}, gespielt wird "
+            + $"{_state.Queue.Display()}. Counter und Build kommen live aus der richtigen Queue.";
+    }
+
+    /// <summary>
     /// Situational pointers from the enemy composition, shown as chips next to the build. They
     /// are advice for the person playing, not an edit to the build.
     /// </summary>
@@ -2606,16 +2702,20 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // it. Deciding the boots slot from them made the same buy appear in nearly every draft.
 
         // Named first, because everything below it is advice about an opponent we do not have.
-        if (_buildIsStandIn && _build is { } standIn)
+        if (_build is { OpponentId: 0, Mode.Length: 0 } open)
         {
             hints.Add(Reason.Neutral(
-                $"Gegner unbekannt — Build gegen {standIn.OpponentName}",
-                $"Diese Queue deckt die gegnerischen Picks nie auf, und OP.GG liefert keinen "
-                + $"Build ohne Gegner. Gezeigt wird deshalb das Matchup gegen {standIn.OpponentName} — "
-                + $"den am häufigsten gespielten Champ auf {standIn.Lane.Display()}. Runen, Spells und "
-                + "Skill-Reihenfolge hängen kaum am Gegenspieler und passen so; die Kern-Items sind "
-                + "nur eine Richtung."));
+                "Kein Matchup bekannt — bester Build der Lane",
+                $"Der Lane-Gegner ist (noch) nicht aufgedeckt. Statt gegen einen geratenen Gegner "
+                + $"zu bauen, steht hier der Build, den {open.ChampionName} auf {open.Lane.Display()} "
+                + "insgesamt am besten fährt — dieselbe Quelle, nur ohne Matchup-Filter und mit "
+                + "entsprechend vielen Games dahinter. Sobald der Gegner steht, wird auf den "
+                + "Matchup-Build umgestellt."));
         }
+
+        // The mode's own caveat is NOT repeated here. It rides in the warning row above the build
+        // (QueueDataNotes), where it is prominent, and in the in-game card's subtitle — saying it a
+        // third time right next to those two would read as three different problems.
 
         if (_enemyComp.Count >= 3)
         {
@@ -2957,7 +3057,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             ListHeader = _state.Queue.Display() is { Length: > 0 } queue ? queue : "Ohne Lanes";
             EmptyHint = _state.Queue.LaneCaveat();
 
-            var modeFindings = new List<string>();
+            var modeFindings = new List<string>(QueueDataNotes());
             var modeComp = _comp.Analyze([.. _state.Allies.Select(slot => slot.EffectiveChampionId)]);
             modeFindings.AddRange(modeComp.Findings.Select(finding => finding.Text));
             Warnings.ReplaceAll(modeFindings);
@@ -2985,6 +3085,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         if (_state.Queue.LaneCaveat() is { Length: > 0 } caveat)
             findings.Add(caveat);
 
+        findings.AddRange(QueueDataNotes());
         findings.AddRange(set.AllyComp.Findings.Select(finding => finding.Text));
         Warnings.ReplaceAll(findings);
 

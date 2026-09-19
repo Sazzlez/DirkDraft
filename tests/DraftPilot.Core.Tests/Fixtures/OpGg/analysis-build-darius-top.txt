@@ -1,0 +1,10 @@
+class LolGetChampionAnalysis: data
+class Data: summary,core_items,boots,starter_items,last_items,summoner_spells,runes,skills,skill_masteries
+class Summary: average_stats
+class AverageStats: play,win_rate
+class CoreItems: ids,ids_names,play,win
+class Runes: primary_page_id,primary_page_name,primary_rune_ids,primary_rune_names,secondary_page_id,secondary_page_name,secondary_rune_ids,secondary_rune_names,stat_mod_ids,play,win
+class Skills: order
+class SkillMasteries: ids
+
+LolGetChampionAnalysis(Data(Summary(AverageStats(570560,0.49)),CoreItems([3142,3742,6333],["Youmuu's Ghostblade","Dead Man's Plate","Death's Dance"],40553,23408),CoreItems([3047],["Plated Steelcaps"],276295,135024),CoreItems([1055,2003],["Doran's Blade","Health Potion"],350153,172036),[CoreItems([3742],["Dead Man's Plate"],251388,134109),CoreItems([3142],["Youmuu's Ghostblade"],250507,125757),CoreItems([6631],["Stridebreaker"],172496,84560)],CoreItems([4,6],[4,6],352416,172578),Runes(8000,"Precision",[8010,9111,9104,8299],["Conqueror","Triumph","Legend: Alacrity","Last Stand"],8200,"Sorcery",[8224,8234],["Axiom Arcanist","Celerity"],[5005,5008,5001],154130,75170),Skills(["W","Q","E","Q","Q","R","Q","E","Q","E","R","E","E","W","W"]),SkillMasteries(["Q","E","W"])))

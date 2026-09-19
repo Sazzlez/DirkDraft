@@ -3,6 +3,42 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
+## Unveröffentlicht
+
+- **Der Spielmodus wird erkannt und steht oben rechts.** Ranked Solo/Duo, Ranked Flex, ARAM und
+  ARAM Mayhem, dazu Swiftplay, Clash und die übrigen — aus der Queue-ID, die der Client ohnehin
+  mitschickt. Die IDs sind nicht geraten, sondern aus dem Client selbst gelesen
+  (`/lol-game-queues/v1/queues`, alle 88 Queues mit Modus und Karte): Mayhem heißt dort
+  „ARAM: Chaos", läuft unter 2400 (plus 2410 Turnier und 2450 „fast klassisch") und auf derselben
+  Karte wie ARAM. Nebenbei korrigiert: 480 ist Swiftplay, Arena läuft heute unter 1750.
+- **Der Modus entscheidet jetzt, welche Zahlen geholt werden.** Solo/Duo, Flex und ARAM sind bei
+  OP.GG drei getrennte Datenbestände hinter einem Parameter — bisher schickte das Tool dort immer
+  das, was in den Einstellungen stand, also im Zweifel die Zahlen einer Queue, die gar nicht
+  gespielt wurde. Counter- und Build-Abrufe folgen jetzt der erkannten Queue. Die Einstellung
+  bleibt für den großen Datenabruf zuständig (der passiert, bevor irgendwer weiß, was gequeued
+  wird) und kennt jetzt auch `aram`; weicht die gespeicherte Tierlist von der gespielten Queue ab,
+  sagt das Fenster das als Chip.
+- **Für ARAM Mayhem führt OP.GG keine eigenen Zahlen.** Nachgeprüft am Schema: der `game_mode` ist
+  ein Enum aus fünf Werten, Mayhem ist keiner davon. Das Tool nimmt deshalb die ARAM-Daten
+  derselben Karte — und sagt es: ein Stern hinter dem Modusnamen, ein Chip neben dem Build. Erfinden
+  ist keine Option, schweigen auch nicht.
+- **Der Build folgt dem Matchup — und wenn es keins gibt, der besten Winrate.** Der geratene
+  Ersatzgegner ist gelöscht. Bisher galt: kein aufgedeckter Lane-Gegner → Build gegen den auf dieser
+  Lane häufigsten Champion, mit dem Hinweis, dass das nur eine Richtung ist. Jetzt kommt in genau
+  dieser Lage der Build, den der eigene Champion auf dieser Lane insgesamt am besten fährt. Der
+  Unterschied ist die Stichprobe: bei Darius Top trägt der Matchup-Kern gegen Jax **11 Games**, der
+  Lane-Build je nach Bracket **8.800 bis 40.000**. Zwei Folgen, beide erwünscht: der Build steht
+  jetzt schon direkt nach dem eigenen Lock statt erst nach dem gegnerischen Pick (und damit auch der
+  Runen-Knopf), und in Blind Pick und Swiftplay ist er zum ersten Mal echt.
+- Wo OP.GG mehrere Varianten eines Build-Slots mit Winrate liefert **und** die Stichproben es
+  hergeben, wird nach Winrate sortiert — über die Wilson-Untergrenze, nicht über die rohe Zahl. Der
+  Unterschied ist nicht akademisch: in den Matchup-Daten stehen 13 Games mit 61,5 % neben 113 Games
+  mit 48,7 %, und jede Regel, die das erste nach oben schiebt, schiebt Rauschen nach oben. Der
+  Matchup-Build bleibt deshalb bei „meistgespielt" — dort sind alle Stichproben zu dünn. Die
+  situative Schuhwahl kommt darüber ausdrücklich **nicht** zurück.
+- `Tools -- watch` und `replay` zeigen den erkannten Modus in derselben Zeile wie das Fenster:
+  Name, welche OP.GG-Quelle daraus folgt, ob Lanes gelten, und den Mayhem-Vorbehalt.
+
 ## 1.2.1 — 2026-09-19
 
 - **An der App ändert sich nichts.** Diese Version ist verhaltensgleich zu 1.2.0; sie existiert, um

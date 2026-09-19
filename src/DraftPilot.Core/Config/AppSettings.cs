@@ -52,7 +52,15 @@ public sealed class AppSettings
     /// <summary>Overrides lockfile discovery for non-standard installs.</summary>
     public string? LockfilePath { get; set; }
 
-    /// <summary>OP.GG game mode for updates: <c>ranked</c> or <c>flex</c>.</summary>
+    /// <summary>
+    /// OP.GG game mode the stored snapshot is built for: <c>ranked</c>, <c>flex</c> or <c>aram</c>.
+    /// <para>
+    /// Only the update button reads this. Everything that happens during a draft — the live counter
+    /// calls and the build — follows the queue the client reports, because that is a fact and this
+    /// is a guess made before anybody knew what would be queued. The window says so when the two
+    /// disagree.
+    /// </para>
+    /// </summary>
     public string GameMode { get; set; } = "ranked";
 
     /// <summary>

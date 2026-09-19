@@ -21,7 +21,12 @@ internal static class SettingsCommand
         "master", "grandmaster", "challenger", "platinum_plus", "emerald_plus", "diamond_plus",
     ];
 
-    private static readonly string[] GameModes = ["ranked", "flex"];
+    /// <summary>
+    /// OP.GG's <c>game_mode</c> enum, minus the two rotating modes this tool has no path for. Only
+    /// the stored snapshot listens to this — during a draft the queue comes from the client, and
+    /// the live counters and the build follow that, not the setting.
+    /// </summary>
+    private static readonly string[] GameModes = ["ranked", "flex", "aram"];
 
     public static int Run(string[] args)
     {

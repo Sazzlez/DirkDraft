@@ -49,9 +49,14 @@ Kein einziges Meta-Werkzeug hat einen `region`-Parameter. `region` gibt es nur b
 abgefragt wird, was dieses Tool bewusst nicht tut. **EUW-spezifische Meta-Daten sind über diese
 Schnittstelle nicht zu haben.**
 
-### 3. ARAM: geht, samt Builds
+### 3. ARAM: geht, samt Builds — Mayhem nicht
 
-`game_mode` ist ein Enum: `ranked`, `flex`, `urf`, **`aram`**, `nexus_blitz`. Gemessen für Darius,
+`game_mode` ist ein Enum: `ranked`, `flex`, `urf`, **`aram`**, `nexus_blitz`. Nachgeprüft am
+19.09.2026, unverändert. **Für ARAM Mayhem gibt es darin keinen Wert** — die Zahlen dieses Modus
+sind bei OP.GG nicht zu haben, weder als eigener `game_mode` noch als eigenes Werkzeug. Das Tool
+holt dort ARAM-Daten (dieselbe Karte, derselbe Champion) und sagt das im Fenster dazu.
+
+Gemessen für Darius,
 `game_mode=aram` (der `position`-Parameter wird verlangt, aber ignoriert — mid/adc/top liefern
 identische Zahlen):
 
@@ -80,9 +85,10 @@ Gemessen für Darius Top, `tier=platinum`:
 Zum Vergleich: der **matchup-genaue** Build aus `lol_get_lane_matchup_guide` (Darius vs Jax, das
 Fixture im Test) nennt als meistgespielten Kern ein Set mit **11 Spielen**.
 
-Damit fällt eine Annahme, auf der der Blind-Pick-Pfad beruht: „OP.GG hat keinen Build ohne Gegner"
-stimmt nicht. Der Ersatzgegner (`StandInOpponent`) ist nicht nötig, um überhaupt einen Build zu
-zeigen — und für dünne Matchups gibt es jetzt eine belastbare Vergleichszahl.
+Damit fiel die Annahme, auf der der Blind-Pick-Pfad beruhte: „OP.GG hat keinen Build ohne Gegner"
+stimmt nicht. **Umgesetzt am 19.09.2026** — der Ersatzgegner (`StandInOpponent`) ist ersatzlos
+gelöscht. Ist der Lane-Gegner bekannt, kommt der Build aus dem Matchup-Guide; ist er es nicht, aus
+diesem Abruf hier, mit der Stichprobe, die oben in der Tabelle steht. Geraten wird nichts mehr.
 
 ## Welcher Abruf welchen Filter kennt (nachgemessen am 19.09.2026)
 
@@ -114,6 +120,36 @@ Tierlist **49,80 %** (46.105 / 92.578). Abweichung 0,10 Punkte — ein Zehntel d
 Rundung des Feldes kostet.
 
 Ebenfalls gerundet, in beiden Quellen: `pick_rate`, `ban_rate`, `role_rate` (zwei Nachkommastellen).
+
+## Woher die Queue-IDs kommen (gemessen am 19.09.2026)
+
+Nicht von OP.GG, sondern vom League-Client selbst: `/lol-game-queues/v1/queues` listet alle 88
+Queues mit ID, Spielmodus und Karte. Deshalb steht in `QueueKinds.FromId` keine geratene Zahl. Die
+vier Modi, um die es geht:
+
+| Modus | Queue-ID | `gameMode` | Karte | OP.GG-`game_mode` |
+|---|---:|---|---:|---|
+| Ranked Solo/Duo | 420 | CLASSIC | 11 | `ranked` |
+| Ranked Flex | 440 | CLASSIC | 11 | `flex` |
+| ARAM | 450 | ARAM | 12 | `aram` |
+| **ARAM Mayhem** | **2400** | **KIWI** | 12 | *keiner* → `aram` |
+
+Mayhem heißt im deutschen Client „ARAM: Chaos" und hat drei IDs: 2400 (normal), 2410 (Turnier),
+2450 („fast klassisch", `KIWI_JADE`). Alle drei werden gleich behandelt — dieselbe Karte, dieselbe
+Datenquelle. Nebenbei aufgefallen und mitkorrigiert: 480 ist **Swiftplay** und aktiv, 490
+(Quickplay) und 430 (Normal Blind) sind auf EUW abgeschaltet, und Arena läuft heute unter 1750
+(„Arena 3x6").
+
+Nachprüfen, solange der Client läuft (`curl.exe`, weil `Invoke-RestMethod` unter Windows
+PowerShell 5.1 kein `-SkipCertificateCheck` kennt und das Zertifikat hier selbstsigniert ist):
+
+```powershell
+$lock = (Get-Content "C:\Riot Games\League of Legends\lockfile") -split ':'
+curl.exe -sk -u "riot:$($lock[3])" "https://127.0.0.1:$($lock[2])/lol-game-queues/v1/queues" |
+    ConvertFrom-Json |
+    Where-Object { $_.mapId -eq 12 -and $_.category -eq 'PvP' } |
+    Select-Object id, gameMode, name, queueAvailability
+```
 
 ## Werkzeuge, die wir nicht nutzen und die etwas könnten
 
