@@ -307,8 +307,19 @@ internal static class InGameCommand
         foreach (var (path, _) in paths)
         {
             // Only the ones that need no argument; a templated path would just 404 on every sweep.
-            if (path.StartsWith('/') && !path.Contains('{'))
+            if (path.Contains('{'))
+                continue;
+
+            // And only the ones that plainly read. The game's schema is not a list of queries: it
+            // also documents /Exit, /Cancel, /Subscribe and /AsyncDelete, and this sweep repeats
+            // every 45 seconds inside somebody's live match. A probe built to observe a game must
+            // not be able to act on it, so the rule is an allow-list of read surfaces rather than a
+            // list of names to avoid — the next patch can add a verb I never thought of.
+            if (path.StartsWith("/liveclientdata/", StringComparison.Ordinal)
+                || path.StartsWith("/swagger/", StringComparison.Ordinal))
+            {
                 found.Add(path);
+            }
         }
 
         return found;
