@@ -3,7 +3,7 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
-## 1.2.0 — unveröffentlicht
+## 1.2.0 — 2026-09-19
 
 - **Das Fenster spricht jetzt League.** Die Texte standen in Lehrbuch-Deutsch da, während im Client
   daneben und im Voice-Chat andere Wörter fallen: aus „Siegquote" wird **Winrate**, aus „Duell"
