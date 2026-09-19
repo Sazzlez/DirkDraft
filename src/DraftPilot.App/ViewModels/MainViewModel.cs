@@ -3277,6 +3277,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     private void RenderRecommendations(LanePredictionResult enemyPredictions, LanePredictionResult allyPredictions)
     {
+        // Off by default, switched on only by RenderBench. Set here rather than in each branch
+        // because the client can jump straight from one draft into the next without an inactive
+        // frame between them — Clear() never runs then, and an ARAM draft followed by a Rift draft
+        // would have left the composition card sitting under the lane pick list.
+        ShowPreviewUnderList = false;
+
         if (_target is null)
         {
             Recommendations.Clear();
