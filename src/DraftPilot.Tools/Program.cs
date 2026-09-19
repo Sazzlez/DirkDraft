@@ -133,9 +133,15 @@ static void PrintUsage()
                                  Persoenliche Daten aus einer Aufzeichnung entfernen
           icons                  Fehlende Champion-Icons nachladen
           inspect                Den gespeicherten Snapshot zusammenfassen
-          recommend <lane> [gegner] [team]
-                                 Empfehlungen fuer einen erfundenen Draft rechnen,
+          recommend <lane> [gegner] [team] [--terms]
+                                 Empfehlungen fuer einen erfundenen Draft rechnen, mit
+                                 Fehlerbalken und der Marke = fuer alles, was von Platz 1
+                                 statistisch nicht zu trennen ist; --terms zeigt zusaetzlich
+                                 jedes Kriterium einzeln. Ein - steht fuer "niemand" --
+                                 "" verschluckt die Shell, und die Liste rutscht dann eine
+                                 Stelle nach vorn.
                                  z. B. recommend mid Jax,Elise,Syndra Aatrox,LeeSin
+                                       recommend top - Ahri,Thresh --terms
           noise <lane> [gegner] [team] [ziehungen]
                                  Denselben Draft wiederholt aus den Stichproben ziehen und
                                  pruefen, ob die Reihenfolge ueberhaupt etwas bedeutet

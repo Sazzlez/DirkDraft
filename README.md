@@ -161,6 +161,13 @@ dotnet run --project src\DraftPilot.Tools -- opgg try lol_get_champion_analysis 
 `record` und `replay` sind der Grund, warum die Logik ohne laufenden Client entwickelt und getestet
 werden kann.
 
+`recommend` druckt dieselbe Liste wie das Fenster, einschließlich Fehlerbalken und der Marke `=`
+für jede Zeile, die von Platz 1 statistisch nicht zu trennen ist — eine Score-Änderung muss hier
+lesbar sein, bevor jemand die Oberfläche aufmacht. `--terms` hängt jedem Eintrag seine Kriterien
+einzeln an, dieselben Zahlen wie hinter dem Pfeil im Fenster. Ein `-` steht für „niemand": ein
+leeres `""` verschluckt PowerShell, und die nächste Liste rutscht dann in den Gegner-Platz, ohne
+dass es jemand merkt — `recommend top - "Ahri,Thresh"` meint Blind Pick mit zwei eigenen Picks.
+
 `probe` prüft die Verbindung schichtweise — Installation, Lockfile, Zertifikatskette, HTTP, Socket.
 Von außen sehen alle fünf Schichten gleich aus („nicht verbunden"), und genau das hat schon einmal
 Zeit gekostet. `events` schreibt jedes Client-Event roh mit, wenn man wissen muss, *warum* das
