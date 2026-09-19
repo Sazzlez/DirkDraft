@@ -1590,10 +1590,18 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // Still no lane after the prediction — blind pick, a custom lobby, a queue that assigns
             // nothing. The champion's own main lane is the last answer that is still measured
             // rather than guessed, and without it there is no position to ask OP.GG for at all.
-            if (myLane == Lane.Unknown)
+            var laneIsAssumed = myLane == Lane.Unknown;
+            if (laneIsAssumed)
                 myLane = _meta.MainLane(mine.LockedChampionId);
 
-            var opponent = myLane == Lane.Unknown ? 0 : enemyPredictions.ChampionOnLane(myLane);
+            // An assumed lane may name the position of a build; it may NOT name an opponent. The
+            // champion build is still right when the assumption is off by a lane — it is that
+            // champion's build either way. A matchup build against "whoever the prediction put on
+            // the lane I am assumed to be on" compounds two guesses into a concrete claim about a
+            // duel, which is precisely the kind of invention the stand-in opponent was removed for.
+            var opponent = myLane == Lane.Unknown || laneIsAssumed
+                ? 0
+                : enemyPredictions.ChampionOnLane(myLane);
 
             // Opponent 0 is not "no build" any more. It is the champion's own build for this lane —
             // the one OP.GG has the most games behind, with no opponent invented to reach it. The
@@ -1764,10 +1772,38 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         _buildProbe = context;
 
-        var cached = _buildCache.Load(_meta.Patch, context.Champion, context.Lane, context.Opponent);
+        var cached = _buildCache.Load(
+            _meta.Patch, context.Champion, context.Lane, context.Opponent, BuildVariant(context.Opponent));
+
         if (cached is not null && !cached.IsEmpty)
             ApplyBuild(cached);
     }
+
+    /// <summary>
+    /// The cache variant for the build this draft wants: empty for a matchup plan, whose source
+    /// takes neither a queue nor a bracket, and queue-plus-bracket for the opponent-free one, whose
+    /// source takes both. Must match what the fetch stamps into the plan, or every draft refetches
+    /// a build it already has on disk.
+    /// </summary>
+    private string BuildVariant(int opponentId)
+        => opponentId != 0 ? string.Empty : BuildCache.VariantFor(LiveMode(), LiveTier());
+
+    /// <summary>
+    /// The OP.GG population every live call of this draft describes: the queue the client reports,
+    /// and only where this build cannot name it, the setting. One place, because the fetch, the
+    /// cache key and the cache lookup have to agree on it exactly — disagree and the cache never
+    /// hits, or worse, hits the wrong file.
+    /// </summary>
+    private string LiveMode()
+        => _queue.OpGgMode() is { Length: > 0 } mode ? mode : _settings.GameMode;
+
+    /// <summary>
+    /// The bracket of the file we are comparing against, not the setting: after changing the
+    /// setting the snapshot still describes the old one until the next update, and mixing the two
+    /// would be worse than being a bracket behind.
+    /// </summary>
+    private string LiveTier()
+        => _meta.Tier is { Length: > 0 } tier ? tier : _settings.Tier;
 
     /// <summary>
     /// Fetches what this draft is missing: the matchup guide for the locked pick first, then fresh
@@ -1801,18 +1837,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // blocked the retry that might have made it in time. A healthy call answers in two to
             // four seconds; ten leaves room for a slow one and still two attempts in one phase.
             _opGg ??= new OpGgMcpClient(timeout: TimeSpan.FromSeconds(10));
-            // Two parameters, two different rules, and the difference matters.
-            // The QUEUE comes from the client, not from the setting: Solo/Duo, Flex and ARAM are
-            // three separate populations behind that one parameter, and the setting was made before
-            // anybody knew what would be queued. The setting is only the fallback for a queue this
-            // build cannot name.
-            // The BRACKET comes from the file we are comparing against, not from the setting:
-            // after changing the setting the snapshot still describes the old one until the next
-            // update, and mixing the two would be worse than being a bracket behind.
+            // Queue from the client, bracket from the stored file — see LiveMode and LiveTier. Both
+            // go through those two so that the request, the cache key and the cache lookup cannot
+            // drift apart.
             var fetcher = new LiveDraftFetcher(
                 _opGg,
-                _state.Queue.OpGgMode() is { Length: > 0 } queueMode ? queueMode : _settings.GameMode,
-                _meta.Tier is { Length: > 0 } tier ? tier : _settings.Tier,
+                LiveMode(),
+                LiveTier(),
                 message => CrashLog.Note("Draft-Abruf", message));
 
             // The build goes first. It is the only result of this whole round the user can act on —
@@ -1820,9 +1851,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // arrived after the draft had already ended. Nothing the enemy calls fetch can change
             // which build is wanted: _buildContext comes from lane predictions and the locked pick,
             // and the predictor does not read matchups.
-            // Opponent 0 is the mode build (ARAM): there is nobody to build against, and asking the
-            // matchup guide for a pairing that does not exist would answer nothing.
-            if (_buildContext is { } context && !BuildMatchesContext
+            // Opponent 0 means no opponent to build against: ARAM, and the stretch before the lane
+            // opponent is revealed. Asking the matchup guide for a pairing that does not exist
+            // would answer nothing, so that case goes to the champion build instead.
+            // The ceiling applies here too. It used to apply only to the counters, and a build
+            // request is bounded by nothing but the number of distinct (champion, lane, opponent)
+            // triples a draft can produce — a lane prediction that keeps flipping while enemies
+            // are revealed can produce a great many, and every one of them is a call to somebody
+            // else's server.
+            if (_liveCallsThisDraft < MaxLiveCallsPerDraft
+                && _buildContext is { } context && !BuildMatchesContext
                 && !_buildFetched.Contains(context)
                 && _meta.Champion(context.Champion) is { } me
                 && (context.Opponent == 0 || _meta.Champion(context.Opponent) is not null))
@@ -2008,7 +2046,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             // — it is the build with the record behind it, measured over thousands of games where
             // a matchup guide answers with eleven.
             var plan = opponent is null
-                ? await fetcher.FetchChampionBuildAsync(me, context.Lane, _queue.OpGgMode(), _meta.Patch, token)
+                ? await fetcher.FetchChampionBuildAsync(me, context.Lane, LiveMode(), _meta.Patch, token)
                     .ConfigureAwait(true)
                 : await fetcher.FetchBuildAsync(me, opponent, context.Lane, _meta.Patch, token)
                     .ConfigureAwait(true);
@@ -2033,7 +2071,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
         catch (Exception ex) when (IsRecoverable(ex, token))
         {
-            var against = opponent is null ? $"({_queue.OpGgMode()})" : $"vs {opponent.Name}";
+            var against = opponent is null ? $"({LiveMode()})" : $"vs {opponent.Name}";
             CrashLog.Note("Draft-Abruf", $"Build {me.Name} {against}: {ex.Message}");
 
             // Three attempts, then stop asking: a matchup OP.GG cannot answer would otherwise keep
@@ -3138,7 +3176,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 ? ScoreStanding.Tied
                 : ScoreError.Standing(leader.Score, leader.Uncertainty, item.Score, item.Uncertainty);
 
-            Recommendations[i].Apply(i + 1, item, _icons.Get(item.ChampionId), isBan, precision, standing);
+            // The same tie count the header above is built from, so the accent bars and the sentence
+            // "die ersten N gleichauf" can never disagree about where the tie group ends.
+            Recommendations[i].Apply(i + 1, item, _icons.Get(item.ChampionId), isBan, precision, standing, tied);
         }
     }
 

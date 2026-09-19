@@ -345,7 +345,12 @@ public sealed class LiveDraftFetcher(
                 // empty Mode — that is what tells everything downstream it is a lane build, and
                 // "ranked" in that field would make the card head itself with a queue name.
                 var plan = AnalysisBuildParser.Parse(
-                    response, me, lane, lane == Lane.Unknown ? mode : string.Empty, patch);
+                    response,
+                    me,
+                    lane,
+                    lane == Lane.Unknown ? mode : string.Empty,
+                    patch,
+                    BuildCache.VariantFor(mode, tier));
 
                 return plan.IsEmpty ? null : plan;
             }

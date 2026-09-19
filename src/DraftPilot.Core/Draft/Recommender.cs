@@ -575,31 +575,21 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
     /// noisy estimates: with five draws to choose from, the winner tends to be the luckiest sample
     /// rather than the best lane, and the chip could name a lane the champion plays in 3 % of its
     /// games. It also left the codebase answering one question three ways — <see cref="BanLane"/>
-    /// by role rate, <c>MetaLookup.MainLaneWinRate</c> by play count, this one by win rate. Role
-    /// rate and play count are the same ordering for a single champion (the rate is that count over
-    /// the champion's own total), so two of the three always agreed; this one is now the third.
+    /// by role rate, a lookup helper by play count, this one by win rate. Role rate and play count
+    /// are the same ordering for a single champion (the rate is that count over the champion's own
+    /// total), so two of the three always agreed; the third is gone, and what remains is the one
+    /// implementation in <see cref="MetaLookup.MainLane"/>.
     /// </para>
     /// </summary>
     private double? MainLaneLogOdds(int championId, Lane seatLane, ICollection<Reason> reasons, ErrorBudget budget)
     {
-        LaneView? mainStat = null;
-        var mainLane = Lane.Unknown;
+        // One implementation of "where does this champion belong", in MetaLookup, because the build
+        // fetch needs the same answer to ask OP.GG for a position. Two loops that agree today are
+        // two loops that can stop agreeing, and the disagreement would be invisible: the score
+        // would describe one lane while the build describes another.
+        var mainLane = _meta.MainLane(championId);
 
-        // -1, not 0: a fallback row carries Play = 0, and a champion whose only rows are fallbacks
-        // should still be answered with its rate rather than with "no data".
-        var mostPlayed = -1;
-
-        foreach (var lane in Lanes.All)
-        {
-            if (_meta.LaneStat(championId, lane) is not { } stat || stat.Play <= mostPlayed)
-                continue;
-
-            mostPlayed = stat.Play;
-            mainLane = lane;
-            mainStat = stat;
-        }
-
-        if (mainStat is not { } main)
+        if (mainLane == Lane.Unknown || _meta.LaneStat(championId, mainLane) is not { } main)
             return null;
 
         budget.Add(ScoreError.LogitVariance(main.WinRate, main.Play, Shrinkage.LanePrior, _meta.LaneTarget));

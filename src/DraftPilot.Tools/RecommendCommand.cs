@@ -218,6 +218,9 @@ internal static class RecommendCommand
                 ? $"{item.Score,5:+0.0;-0.0} Pkt"
                 : $"{item.Score.ToString($"P{decimals}"),7} ±{ScoreError.AsPoints(item.Uncertainty),4:0.0}";
 
+            // CountLeadingTies answers 0 unless there is a real group, so this is the same bar the
+            // header uses. A leader nobody ties with used to carry a lone "=", which reads as a tie
+            // group where there is none.
             var mark = !isBan && i < tied ? '=' : ' ';
 
             Console.WriteLine($" {mark}{score}  {item.Name,-14} {reasons}");

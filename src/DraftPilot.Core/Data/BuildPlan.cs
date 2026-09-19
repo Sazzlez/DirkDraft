@@ -83,7 +83,10 @@ public sealed class BuildPlan
     /// </summary>
     // 3: boots now carry four alternatives so the situational choice (Mercs vs Steelcaps) has
     // data to pick from; older cached plans hold only two and are refetched.
-    public const int CurrentSchemaVersion = 3;
+    // 4: a plan without an opponent is now fetched per queue and per rank bracket, which the file
+    // name did not distinguish. Version-3 files were written before that and cannot say which
+    // population they describe, so they are discarded rather than shown under a wrong label.
+    public const int CurrentSchemaVersion = 4;
 
     /// <summary>
     /// Defaults to 0, NOT to the current version: a default would also apply while deserialising
@@ -107,6 +110,14 @@ public sealed class BuildPlan
     /// Empty for the normal case, where <see cref="OpponentName"/> carries the answer instead.
     /// </summary>
     public string Mode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// What besides patch, champion, lane and opponent this plan depends on — the queue and the
+    /// rank bracket it was fetched for, or empty for a matchup plan, whose source takes neither.
+    /// Persisted and part of the file name, so two populations cannot share one cache entry; see
+    /// <see cref="BuildCache.PathFor"/>.
+    /// </summary>
+    public string Variant { get; set; } = string.Empty;
 
     public string Patch { get; set; } = string.Empty;
 
@@ -168,14 +179,39 @@ public sealed class BuildCache(string? directory = null)
 {
     private readonly string _directory = directory ?? Path.Combine(AppPaths.DataDirectory, "builds");
 
-    public string PathFor(string patch, int championId, Lane lane, int opponentId)
-        => Path.Combine(_directory, $"{Sanitize(patch)}-{championId}-{lane.ToOpGg()}-{opponentId}.json");
+    /// <summary>
+    /// The variant string for a build fetched without an opponent: the queue it was fetched for and
+    /// the rank bracket. Both callers — the fetch that writes the plan and the lookup that reads it
+    /// back — go through here, because two spellings of the same variant means a cache that never
+    /// hits and a champion build refetched in every draft.
+    /// </summary>
+    /// <param name="gameMode">OP.GG's queue name; empty means Summoner's Rift without a mode of its own.</param>
+    public static string VariantFor(string gameMode, string tier)
+        => $"{(gameMode.Length == 0 ? "sr" : gameMode)}-{(tier.Length == 0 ? "all" : tier)}";
 
-    public BuildPlan? Load(string patch, int championId, Lane lane, int opponentId)
+    /// <summary>
+    /// The file a plan lives in. The four identifying facts of a matchup plan — patch, champion,
+    /// lane, opponent — plus <paramref name="variant"/>.
+    /// <para>
+    /// The variant exists because the opponent-free build is not identified by those four. It is
+    /// fetched per queue and per rank bracket, so Solo/Duo and Flex answer differently for the same
+    /// champion on the same lane, as do Gold and Platinum. Without it the two share one file and
+    /// whichever draft happened to run first decides what the other one sees — silently, because a
+    /// build never says which population it came from. The matchup guide takes neither parameter,
+    /// so those plans pass an empty variant and keep the old names.
+    /// </para>
+    /// </summary>
+    public string PathFor(string patch, int championId, Lane lane, int opponentId, string variant = "")
+    {
+        var suffix = variant.Length == 0 ? string.Empty : "-" + Sanitize(variant);
+        return Path.Combine(_directory, $"{Sanitize(patch)}-{championId}-{lane.ToOpGg()}-{opponentId}{suffix}.json");
+    }
+
+    public BuildPlan? Load(string patch, int championId, Lane lane, int opponentId, string variant = "")
     {
         try
         {
-            var path = PathFor(patch, championId, lane, opponentId);
+            var path = PathFor(patch, championId, lane, opponentId, variant);
             if (!File.Exists(path))
                 return null;
 
@@ -198,7 +234,7 @@ public sealed class BuildCache(string? directory = null)
         try
         {
             Directory.CreateDirectory(_directory);
-            var path = PathFor(plan.Patch, plan.ChampionId, plan.Lane, plan.OpponentId);
+            var path = PathFor(plan.Patch, plan.ChampionId, plan.Lane, plan.OpponentId, plan.Variant);
             var temporary = path + ".tmp";
 
             using (var stream = File.Create(temporary))

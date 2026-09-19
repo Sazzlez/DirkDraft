@@ -125,4 +125,50 @@ public class AnalysisBuildParserTests
                 Directory.Delete(directory, recursive: true);
         }
     }
+
+    /// <summary>
+    /// The trap this endpoint sets and the matchup guide does not: its answer depends on the queue
+    /// and on the rank bracket. Four facts — patch, champion, lane, opponent — do not identify it,
+    /// and a cache keyed on those four alone serves a Flex build in a Solo/Duo draft without a word
+    /// about it. Both populations have to survive side by side.
+    /// </summary>
+    [Fact]
+    public void TwoQueuesOrBrackets_DoNotShareOneCacheEntry()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "dirkdraft-tests", Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var cache = new BuildCache(directory);
+
+            var solo = AnalysisBuildParser.Parse(
+                Response, Darius, Lane.Top, string.Empty, "16.18.1", BuildCache.VariantFor("ranked", "gold"));
+            var flex = AnalysisBuildParser.Parse(
+                Response, Darius, Lane.Top, string.Empty, "16.18.1", BuildCache.VariantFor("flex", "gold"));
+            var platinum = AnalysisBuildParser.Parse(
+                Response, Darius, Lane.Top, string.Empty, "16.18.1", BuildCache.VariantFor("ranked", "platinum"));
+
+            Assert.Equal(3, new[] { solo, flex, platinum }
+                .Select(plan => cache.PathFor(plan.Patch, plan.ChampionId, plan.Lane, plan.OpponentId, plan.Variant))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count());
+
+            cache.Save(solo);
+
+            // Saved as Solo/Duo Gold, so that is the only lookup that may answer.
+            Assert.NotNull(cache.Load("16.18.1", 122, Lane.Top, 0, BuildCache.VariantFor("ranked", "gold")));
+            Assert.Null(cache.Load("16.18.1", 122, Lane.Top, 0, BuildCache.VariantFor("flex", "gold")));
+            Assert.Null(cache.Load("16.18.1", 122, Lane.Top, 0, BuildCache.VariantFor("ranked", "platinum")));
+
+            // And a matchup plan, whose source takes neither parameter, keeps its plain name.
+            Assert.Equal(
+                cache.PathFor("16.18.1", 122, Lane.Top, 24),
+                cache.PathFor("16.18.1", 122, Lane.Top, 24, string.Empty));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
 }

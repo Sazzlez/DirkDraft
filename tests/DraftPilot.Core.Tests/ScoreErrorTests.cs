@@ -127,6 +127,11 @@ public class ScoreErrorTests
         Assert.Equal(4, ScoreError.CountLeadingTies(items));
     }
 
+    /// <summary>
+    /// Zero, not one. The count is what both surfaces mark a tie group with, and a leader nobody
+    /// ties with is not a group: returning 1 let the window's header stay silent while the row
+    /// still carried the accent bar that means "indistinguishable from the leader".
+    /// </summary>
     [Fact]
     public void OnThickDataTheSameGapIsNoTie()
     {
@@ -137,7 +142,18 @@ public class ScoreErrorTests
             Item("B", 0.569, 0.004),
         ];
 
-        Assert.Equal(1, ScoreError.CountLeadingTies(items));
+        Assert.Equal(0, ScoreError.CountLeadingTies(items));
+    }
+
+    /// <summary>A count that is never 1: either there is a group of at least two, or there is none.</summary>
+    [Fact]
+    public void TheCountIsNeverExactlyOne()
+    {
+        List<Recommendation> separated = [Item("A", 0.60, 0.004), Item("B", 0.50, 0.004), Item("C", 0.40, 0.004)];
+        List<Recommendation> tied = [Item("A", 0.572, 0.05), Item("B", 0.569, 0.05), Item("C", 0.40, 0.004)];
+
+        Assert.Equal(0, ScoreError.CountLeadingTies(separated));
+        Assert.Equal(2, ScoreError.CountLeadingTies(tied));
     }
 
     [Fact]

@@ -97,6 +97,13 @@ public sealed class RecommendationViewModel : ObservableObject
     /// what lets the window draw where the verdict actually stops, instead of leaving it in a
     /// sentence behind the chevron.
     /// <para>
+    /// Only when the group has at least TWO members. A leader nobody ties with used to get the mark
+    /// as well, which is true in the trivial sense and false in the one that matters: the mark means
+    /// "these are indistinguishable", and a group of one is not a group. The header says "die ersten
+    /// N gleichauf" under exactly the same condition, so the two can no longer contradict each other
+    /// on screen.
+    /// </para>
+    /// <para>
     /// Always false for bans: their score is denied win-rate points, carries no error bar, and a
     /// mark meaning "statistically tied" would claim a statistic that was never computed.
     /// </para>
@@ -125,7 +132,8 @@ public sealed class RecommendationViewModel : ObservableObject
         ImageSource? icon,
         bool isBan,
         int precision = 1,
-        ScoreStanding standing = ScoreStanding.Tied)
+        ScoreStanding standing = ScoreStanding.Tied,
+        int tieGroup = 0)
     {
         if (_championId != recommendation.ChampionId)
         {
@@ -138,7 +146,8 @@ public sealed class RecommendationViewModel : ObservableObject
         Icon = icon;
         IsTopGroup = !isBan
             && recommendation.Uncertainty > 0
-            && (rank == 1 || standing == ScoreStanding.Tied);
+            && tieGroup >= 2
+            && rank <= tieGroup;
 
         var culture = CultureInfo.CurrentCulture;
 

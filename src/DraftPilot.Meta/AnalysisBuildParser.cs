@@ -61,7 +61,14 @@ public static class AnalysisBuildParser
         "data.skill_masteries.ids",
     ];
 
-    public static BuildPlan Parse(OpGgNode response, ChampionEntry champion, Lane lane, string mode, string patch)
+    /// <param name="variant">
+    /// Which queue and bracket this answer describes — see <see cref="BuildCache.VariantFor"/>.
+    /// It goes into the plan and into its file name: unlike the matchup guide, this endpoint gives
+    /// a different answer per queue and per bracket, and a cache that cannot tell them apart serves
+    /// Flex numbers in a Solo/Duo draft without a word.
+    /// </param>
+    public static BuildPlan Parse(
+        OpGgNode response, ChampionEntry champion, Lane lane, string mode, string patch, string variant = "")
     {
         var data = response["data"];
 
@@ -74,6 +81,7 @@ public static class AnalysisBuildParser
             OpponentName = string.Empty,
             Lane = lane,
             Mode = mode,
+            Variant = variant,
             Patch = patch,
             FetchedAtUtc = DateTimeOffset.UtcNow,
         };

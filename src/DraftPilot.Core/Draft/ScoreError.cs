@@ -128,10 +128,17 @@ public static class ScoreError
     }
 
     /// <summary>
-    /// How many entries at the top of the list are indistinguishable from the leader. Replaces a
-    /// fixed 0.3-point threshold that had no relation to the data behind the numbers: on a thin
-    /// synergy it marked nothing when everything was tied, and on 40.000-game lane data it would
-    /// have marked ties that were real differences.
+    /// How many entries at the top of the list are indistinguishable from the leader, or <c>0</c>
+    /// when the leader stands alone. Replaces a fixed 0.3-point threshold that had no relation to
+    /// the data behind the numbers: on a thin synergy it marked nothing when everything was tied,
+    /// and on 40.000-game lane data it would have marked ties that were real differences.
+    /// <para>
+    /// Zero rather than one for a leader nobody ties with, because every caller asks this the same
+    /// way — "is there a tie group, and how big" — and a group of one is not a group. Returning 1
+    /// let each caller invent its own "… and only if it is at least two", which the window and the
+    /// command line then answered differently: the header stayed silent while the row still carried
+    /// the mark that means "indistinguishable from the leader".
+    /// </para>
     /// </summary>
     public static int CountLeadingTies(IReadOnlyList<Recommendation> items)
     {
@@ -147,7 +154,7 @@ public static class ScoreError
             tied++;
         }
 
-        return tied;
+        return tied >= 2 ? tied : 0;
     }
 }
 
