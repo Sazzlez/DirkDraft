@@ -15,6 +15,27 @@ Kopien melden sie beim nächsten Start.
   Pantheon und Yone kommen in die ersten acht, Teemo, Kayle und Ornn fallen heraus, Quinn gewinnt
   1,2 Punkte. Die gemessenen Duelle an der Spitze bleiben unverändert — die Regeln teilen sich die
   Deckelung des vorhandenen Terms, der Anteil ohne Winrate-Grundlage wächst also nicht.
+- **Die Einordnung steht jetzt in der Liste, nicht hinter einem Pfeil.** „beste Wahl der Liste",
+  „gleichauf mit Platz 1", „knapp dahinter", „deutlich dahinter" wurde die ganze Zeit berechnet und
+  nur *innerhalb* der aufgeklappten Aufschlüsselung gezeigt — die eine Zeile, die sagt, ob die
+  Reihenfolge überhaupt etwas bedeutet, kostete einen Klick pro Zeile. Sie steht jetzt unter der
+  Zahl, und eine Akzentkante markiert jede Zeile, die von Platz 1 statistisch nicht zu trennen ist.
+- **Die Liste ist eine Liste, keine Kartensammlung.** Acht gerahmte Kästen ziehen acht Rahmen um
+  genau die Dinge, die man vergleichen will. Jetzt trennt eine Haarlinie, der Zeiger hebt die Zeile
+  hervor, und die Chips haben ihre gefüllten Pillen verloren: fast jeder Chip spricht *für* seine
+  Zeile, grün färbt also die Regel und lässt nichts für die Ausnahme. Helligkeit trägt jetzt die
+  Unterscheidung, Rot bleibt als einzige Farbe übrig — und wird deshalb gesehen, etwa bei den
+  offenen Kontern im Blind-Pick.
+- Dazu aufgeräumt: die Zug-Karte ist eine Zeile statt eines 80 Pixel hohen Kastens um zwei Wörter,
+  Sitzplatz-Nummern stehen nur noch dort, wo kein Champion sie schon benennt, die Lane-Auswahl
+  liest sich als Text mit Pfeil statt als Formularfeld, leere Sitzplätze zeichnen keine grauen
+  Kacheln mehr, und „Daten aktualisieren" ist ein ruhiger Knopf statt des lautesten Elements im
+  Fenster.
+- **Das Ban-Urteil war unerreichbar geworden.** Die Schwellen 4,5 und 2,5 Punkte stammen aus der
+  Zeit, als OP.GGs Tier noch in den Ban-Wert einging. Gemessen über die ersten acht Bans aus fünf
+  Drafts (40 Zeilen): Maximum 4,4 — „wichtiger Bann" konnte gar nicht mehr vorkommen, und die
+  halbe Liste trug „optional". Jetzt liegt die Schwelle beim obersten Zehntel (3,5) und beim
+  Median (2,5); darunter steht gar nichts, statt achtmal dasselbe Wort.
 - Ohne Lane — eigene Spiele, Blind Pick ohne Zuweisung — nahm die Grundstärke bisher die **beste**
   der fünf Lane-Zeilen. Ein Maximum über fünf verrauschte Schätzungen wählt aber die glücklichste
   Stichprobe, nicht die beste Lane, und der Chip konnte eine Lane nennen, auf der der Champion

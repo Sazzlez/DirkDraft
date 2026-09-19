@@ -102,9 +102,15 @@ wieder herunterzuladen.
   halben Punkt sind Rauschen, und liegen die Spitzenkandidaten gleichauf, sagt die Kopfzeile das.
   Jeder Chip erklärt sich beim Überfahren mit der Maus; der Pfeil rechts klappt die Aufschlüsselung
   auf — pro Kriterium ein Urteil in Worten, ein Balken und der Beitrag in Prozentpunkten. Kriterien
-  ohne Datengrundlage stehen dort als *keine Daten*, nicht als Null. Die Farbe einer Zeile misst
-  den Abstand zu Platz 1 derselben Liste, nicht den zu 50 % — auf einer starken Lane liegt jede
-  Zeile über 50 %, und das sagt nichts darüber, welche man nehmen sollte.
+  ohne Datengrundlage stehen dort als *keine Daten*, nicht als Null. Unter jeder Zahl steht ihre
+  Einordnung — *beste Wahl der Liste*, *gleichauf mit Platz 1*, *knapp dahinter*, *deutlich
+  dahinter* —, und eine Akzentkante links markiert jede Zeile, die von Platz 1 statistisch nicht zu
+  trennen ist. Beides misst den Abstand zu Platz 1 derselben Liste, nicht den zu 50 %: auf einer
+  starken Lane liegt jede Zeile über 50 %, und das sagt nichts darüber, welche man nehmen sollte.
+  Die Aufstellung beider Seiten zählt mit: was dem eigenen Team fehlt, und was der Pick gegen das
+  ausrichtet, was der Gegner mitgebracht hat — offene Backline, Engage ohne Antwort, ein Team, das
+  erst spät gefährlich wird. Diese Regeln sind der einzige Teil des Scores ohne Winrate-Grundlage
+  und deshalb gedeckelt.
   Solange auf deiner Lane niemand aufgedeckt ist, trägt jede Zeile zusätzlich **„N offene
   Konter"**: Champions, die noch frei sind und gegen diesen Pick besser abschneiden als seine
   Gegner üblicherweise. Das ist die Frage, die ein früher Pick wirklich hat — und sie zählt
@@ -250,8 +256,8 @@ Das solltest du wissen, bevor du den Empfehlungen zu viel zutraust:
   dafür gibt es die Draft-Abrufe, und wo auch die nichts liefern, steht „keine Daten".
 - **Die Reihenfolge der Liste ist oft Rauschen.** Zieht man denselben Draft wiederholt aus seinen
   Stichproben (`Tools -- noise`), bleibt Platz 1 je nach Datenlage nur in 49 bis 92 % der Ziehungen
-  derselbe Champion. Deshalb sagt die Kopfzeile, wie viele Zeilen gleichauf liegen, und die Farbe
-  jeder Zeile misst den Abstand zu Platz 1 — nicht den zu 50 %.
+  derselbe Champion. Deshalb sagt die Kopfzeile, wie viele Zeilen gleichauf liegen, jede Zeile
+  nennt ihren Abstand zu Platz 1 in Worten, und die gleichauf liegenden tragen dieselbe Kante.
 - **Die Vorrats-Counter-Matrix ist dünn.** Die Quelle liefert pro Champion und Lane nur die
   auffälligsten drei Gegner — keine vollständige Matrix. Genau dafür gibt es die automatischen
   Draft-Abrufe: für die fünf real aufgedeckten Gegner kommen dichte, aktuelle Zahlen nach. Wo

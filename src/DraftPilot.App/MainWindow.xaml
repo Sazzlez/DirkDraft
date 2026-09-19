@@ -21,8 +21,10 @@
             <Setter Property="HorizontalAlignment" Value="Left" />
             <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
             <Style.Triggers>
+                <!-- Nothing at all, not a darker square. In a blind pick ten grey tiles stood for
+                     ten seats that had revealed nothing; the dash beside them already says it. -->
                 <DataTrigger Binding="{Binding HasChampion}" Value="False">
-                    <Setter Property="Background" Value="#171A20" />
+                    <Setter Property="Background" Value="Transparent" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -292,7 +294,7 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Start" Style="{StaticResource Small}" FontSize="10"
+                                <TextBlock Text="Start" Style="{StaticResource Small}" FontSize="11"
                                            Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                            Margin="0,6,7,3" MinWidth="34" />
                                 <!--
@@ -306,7 +308,7 @@
                                                   ItemTemplate="{StaticResource IconChipSmall}"
                                                   ItemsPanel="{StaticResource ChipRow}" />
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Schuhe" Style="{StaticResource Small}" FontSize="10"
+                                        <TextBlock Text="Schuhe" Style="{StaticResource Small}" FontSize="11"
                                                    Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                                    Margin="10,6,7,3" />
                                         <ItemsControl ItemsSource="{Binding GameBuild.BootItems}"
@@ -314,7 +316,7 @@
                                                       ItemsPanel="{StaticResource ChipRow}" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Spells" Style="{StaticResource Small}" FontSize="10"
+                                        <TextBlock Text="Spells" Style="{StaticResource Small}" FontSize="11"
                                                    Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                                    Margin="10,6,7,3" />
                                         <ItemsControl ItemsSource="{Binding GameBuild.Spells}"
@@ -343,7 +345,7 @@
                                         </Style.Triggers>
                                     </Style>
                                 </Grid.Style>
-                                <TextBlock Text="auch" Style="{StaticResource Small}" FontSize="10"
+                                <TextBlock Text="auch" Style="{StaticResource Small}" FontSize="11"
                                            Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                            Margin="0,3,7,3" MinWidth="34"
                                            ToolTip="Was sonst noch gekauft wurde, mit Siegquote und Spielzahl. Oben steht die häufigste Wahl — nicht zwingend die beste." />
@@ -362,7 +364,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Kern" Style="{StaticResource Small}" FontSize="10"
+                                <TextBlock Text="Kern" Style="{StaticResource Small}" FontSize="11"
                                            Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                            Margin="0,6,7,3" MinWidth="34"
                                            ToolTip="Die meistgespielte Dreierkombination dieses Matchups. OP.GG liefert sie als Kombination; ob die Reihenfolge so gemeint ist, sagt die Quelle nicht." />
@@ -391,7 +393,7 @@
                                         </Style.Triggers>
                                     </Style>
                                 </Grid.Style>
-                                <TextBlock Text="auch" Style="{StaticResource Small}" FontSize="10"
+                                <TextBlock Text="auch" Style="{StaticResource Small}" FontSize="11"
                                            Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                            Margin="0,3,7,3" MinWidth="34"
                                            ToolTip="Andere Dreierkombinationen dieses Matchups. Das Symbol steht für die ganze Kombination — die Namen stehen im Tooltip." />
@@ -404,7 +406,7 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Spät" Style="{StaticResource Small}" FontSize="10"
+                                <TextBlock Text="Spät" Style="{StaticResource Small}" FontSize="11"
                                            Foreground="{StaticResource Faint}" VerticalAlignment="Top"
                                            Margin="0,6,7,3" MinWidth="34"
                                            ToolTip="Häufige Käufe für die letzten Slots — Optionen, keine feste Reihenfolge." />
