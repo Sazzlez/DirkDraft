@@ -3,7 +3,7 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
-## Unveröffentlicht
+## 1.3.0 — 2026-09-19
 
 - **Der Spielmodus wird erkannt und steht oben rechts.** Ranked Solo/Duo, Ranked Flex, ARAM und
   ARAM Mayhem, dazu Swiftplay, Clash und die übrigen — aus der Queue-ID, die der Client ohnehin
