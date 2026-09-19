@@ -13,8 +13,10 @@ Kopien melden sie beim nächsten Start.
   Mayhem-Queues ergänzt: 3270 und 3280, beide aus dem laufenden Client gelesen.
 - **`Tools -- ingame`**: schreibt mit, was die API des *laufenden Spiels* (Port 2999) hergibt —
   jedes Feld und jedes Event beim ersten Auftreten, dazu die Endpunkte aus dem Schema des Spiels.
-  Spielernamen werden vor dem Schreiben ersetzt. Damit gemessen: das Spiel meldet **keine**
-  Augments (siehe `docs/augments.md`).
+  Spielernamen werden vor dem Schreiben ersetzt. Damit gemessen: einen Augment-**Endpunkt** gibt es
+  nicht, weder im Client noch im Spiel. Ob ein Augment-**Feld** auftaucht, ist noch offen — der
+  erste Durchlauf lief in einer Custom-Lobby, die gar keine Augments vergab (siehe
+  `docs/augments.md`).
 
 ## 1.3.0 — 2026-09-19
 

@@ -65,16 +65,44 @@ verschachteltes Feld, ein neuer Event-Name, und dass kein echter Name in die Dat
 | Selbstdokumentation des Spiels | 26.883 Zeichen, 13 `liveclientdata`-Endpunkte |
 | **Vorkommen von „augment" — Endpunkt, Feld, Event, Schema** | **0** |
 
-Entscheidend für die Beweiskraft: Der Spieler **hat** in diesem Spiel eine Augment-Auswahl
-angeboten bekommen und wählen müssen. Die Auswahl stand also auf dem Bildschirm, während die Sonde
-73 Mal fragte — und die API erwähnte sie mit keinem Feld. Das ist kein „noch nicht gesehen",
-sondern ein Negativbefund mit Gegenprobe.
-
-**Folgerung: Die Variante „die drei Optionen im Moment der Wahl" ist technisch unmöglich**, nicht
-bloß unentschieden. Ohne diese Messung wäre sie als Produktentscheidung behandelt worden.
-
 Die Augment-Endpunkte, die es *nicht* gibt (alle 404): `/liveclientdata/activeplayeraugments`,
 `/liveclientdata/playeraugments`, `/liveclientdata/augments`.
+
+### Was dieser Durchlauf beweist — und was nicht
+
+**Bewiesen, unabhängig vom einzelnen Spiel:** Es gibt keinen Augment-Endpunkt. Das Schema des
+Spiels ist seine vollständige Selbstauskunft, und „augment" kommt darin null Mal vor.
+
+**Nicht bewiesen: dass kein Augment-Feld in `allgamedata` auftaucht.** Das beobachtete Spiel war
+eine **Custom-Lobby (Queue 3270), und die hatte überhaupt keine Augments** — die Nachspiel-Statistik
+des Clients führt für sie `playerAugment1..6` durchgehend auf `0`. Ein Negativbefund aus einem
+Spiel ohne Augments sagt über Augments nichts. Zwei weitere Einschränkungen desselben Durchlaufs:
+
+- Die Sonde musste mitten im Spiel neu gestartet werden (Positivlisten-Fix), wodurch die Spielzeit
+  **112 s bis 172 s** unbeobachtet blieb.
+- Die Formbeobachtung meldet ein Feld beim ersten Auftreten. Ein Feld, das nur während des
+  Auswahlfensters existiert und danach verschwindet, wäre nur zu sehen, wenn eine Abfrage genau
+  hineinfällt.
+
+**Offen bleibt daher die eigentliche Frage.** Sie ist mit einem Durchlauf in einem echten,
+gematchten ARAM: Chaos (Queue **2400**) zu schließen, ohne Neustart-Lücke. Der Gegencheck dafür ist
+billig und eindeutig: Die Nachspiel-Statistik muss danach `playerAugment1..6 != 0` zeigen, sonst
+war auch dieser Durchlauf leer.
+
+### Gegenprobe: Augments gibt es in diesem Modus wirklich
+
+Aus der Match-Historie des Clients, gemessen am selben Tag für ein echtes Mayhem-Spiel
+(Queue 2400, 916 s):
+
+| `playerAugment` | ID | `nameTRA` | `rarity` |
+|---|---:|---|---|
+| 1 | 1129 | Magierschütze | kGold |
+| 2 | 1156 | Wooglets Hexenhaube | kPrismatic |
+| 3 | 2132 | Hexer-Safttüte | kGold |
+| 4 | 1308 | FeuerFuchs | kSilver |
+
+Das belegt dreierlei: Der Modus vergibt Augments, der Client **speichert** sie (nach dem Spiel), und
+die ID-Tabelle aus Punkt 4 löst sie vollständig auf — Name und Seltenheit ohne Netzzugriff.
 
 ### Zwei Nebenbefunde
 
@@ -125,8 +153,9 @@ Gemessen dazu:
 
 - **Nicht gebaut**, in keinem Modus und keinem Bildschirm: 0 Treffer für `augment` in `src/` und
   `tests/` (ausgenommen die Sonde, die nur misst).
-- **„Die drei im Moment der Wahl": ausgeschlossen.** Punkt 2 ist negativ, mit Gegenprobe. Nicht
-  „noch nicht gebaut", sondern nicht baubar.
+- **„Die drei im Moment der Wahl": noch offen.** Ein eigener Endpunkt ist ausgeschlossen; ein Feld
+  in `allgamedata` ist es nicht, weil das Messspiel keine Augments hatte. Ein Durchlauf in
+  Queue 2400 entscheidet es.
 - **„Nachschlagen vorab" bleibt möglich**, aber nur als Liste ohne Urteil. Voraussetzung für ein
   Urteil wäre eine Stichprobe zu `performance` (Punkt 3), und die liefert OP.GG nicht. Solange sie
   fehlt, wäre jede Rangfolge eine erfundene Genauigkeit — dieselbe Regel wie überall sonst hier.
