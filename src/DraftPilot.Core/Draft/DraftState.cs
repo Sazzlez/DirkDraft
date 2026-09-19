@@ -95,6 +95,19 @@ public sealed class DraftState
     /// </summary>
     public QueueKind Queue { get; private init; } = QueueKind.Unknown;
 
+    /// <summary>
+    /// Champions on the shared bench, in the order the client lists them. Empty outside the modes
+    /// that have one. This is the only decision an ARAM player actually makes, and until it was
+    /// read the panel had nothing to say there.
+    /// </summary>
+    public IReadOnlyList<int> Bench { get; private init; } = [];
+
+    /// <summary>True when this mode has a bench, even while it happens to be empty.</summary>
+    public bool BenchEnabled { get; private init; }
+
+    /// <summary>Rerolls the local player has left. Reported, never used — the tool does not click.</summary>
+    public int RerollsRemaining { get; private init; }
+
     public DraftSlot? LocalSlot => Allies.FirstOrDefault(slot => slot.CellId == LocalCellId);
 
     public DraftSlot? FindSlot(long cellId)
@@ -133,6 +146,14 @@ public sealed class DraftState
             Phase = ParsePhase(session.Timer.Phase),
             Turn = FindActiveTurn(session),
             Unavailable = unavailable,
+            BenchEnabled = session.BenchEnabled,
+            // Zero ids and duplicates dropped: the client repeats an entry while a swap is in
+            // flight, and a bench listing the same champion twice would rank it twice.
+            Bench = [.. session.BenchChampions
+                .Where(entry => entry is { ChampionId: not 0 })
+                .Select(entry => entry.ChampionId)
+                .Distinct()],
+            RerollsRemaining = Math.Max(0, session.RerollsRemaining),
         };
     }
 

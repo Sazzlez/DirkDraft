@@ -68,6 +68,21 @@ Dazu `lol_list_aram_augments` (Augment-Statistik je Champion, ab Tier 3) und `lo
 `map`-Filter. Eine ARAM-Tierlist über alle Champions auf einen Schlag gibt es **nicht** — die
 ARAM-Zahlen müssten je Champion einzeln geholt werden (173 Aufrufe, wie die Analyse heute schon).
 
+**Für die Bank reicht das trotzdem** (umgesetzt am 19.09.2026): gefragt sind nur der eigene Champion
+und die paar auf der Bank, also eine Handvoll Aufrufe je Draft statt 173. Was dabei zurückkommt, ist
+allerdings dünner als auf der Kluft — gemessen für Darius, `game_mode=aram`, `tier=gold`:
+
+```
+LolGetChampionAnalysis(Data(Summary(AverageStats(3730,0.51),null), …))
+```
+
+`average_stats` liefert `play` und `win_rate`, **`positions` ist null**. Damit fällt die
+Rekonstruktion über `positions[].roles[].stats.{play,win}` weg, die auf der Kluft die Rundung
+umgeht: die ARAM-Winrate ist nur auf zwei Nachkommastellen zu haben. Eine Rundungsstufe von 0,01
+trägt eine Standardabweichung von 0,01/√12 ≈ 0,3 Punkten — `AramAdvisor` rechnet sie als eigenen
+Fehleranteil mit ein. Unterschiede unterhalb eines Prozentpunkts sind damit ehrlich „gleichauf",
+ein voller Punkt bleibt unterscheidbar. Bei der ARAM-Spannweite von rund 45 % bis 56 % reicht das.
+
 ## Der vierte Befund: es gibt einen Build ohne Gegner
 
 `lol_get_champion_analysis` liefert nicht nur Statistik, sondern den kompletten Build:

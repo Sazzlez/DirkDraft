@@ -447,6 +447,104 @@
                         </ItemsControl>
             </StackPanel>
         </DataTemplate>
+        <!--
+            The "both compositions" card. A template rather than markup in one place because it
+            appears in two: under the matchup panel once the draft is settled, and under the bench
+            list on the Abyss, where that list occupies the column instead. Copying the eighty
+            lines into both spots is how two cards drift apart.
+        -->
+        <DataTemplate x:Key="DraftPreviewCard">
+                            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
+                                    BorderThickness="1" CornerRadius="10" Padding="14,11" Margin="0,11,0,0"
+                                    Grid.IsSharedSizeScope="True"
+                                    Visibility="{Binding HasDraftPreview, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Text="SCHADEN" Style="{StaticResource Caption}"
+                                                   VerticalAlignment="Center" />
+
+                                        <!-- Legend, because the bar itself carries no labels. -->
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                    HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <Border Width="9" Height="9" CornerRadius="2"
+                                                    Background="{StaticResource Warn}" VerticalAlignment="Center" />
+                                            <TextBlock Text="AD" Style="{StaticResource Small}"
+                                                       Foreground="{StaticResource Faint}" Margin="5,0,12,0" />
+                                            <Border Width="9" Height="9" CornerRadius="2"
+                                                    Background="{StaticResource Accent}" VerticalAlignment="Center" />
+                                            <TextBlock Text="AP" Style="{StaticResource Small}"
+                                                       Foreground="{StaticResource Faint}" Margin="5,0,0,0" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <ContentControl Content="{Binding AllyDamage}" Margin="0,10,0,0"
+                                                    ContentTemplate="{StaticResource DamageMix}"
+                                                    ToolTip="Anteil der Schadensarten in deinem Team, gezählt über die aufgedeckten Champions. Gemischte Champions zählen zur Hälfte auf jeder Seite. Wovon der Gegner mehr abbekommt, entscheidet, ob er Armor oder MR kauft." />
+                                    <ContentControl Content="{Binding EnemyDamage}" Margin="0,7,0,0"
+                                                    ContentTemplate="{StaticResource DamageMix}"
+                                                    ToolTip="Dasselbe für das gegnerische Team. Überwiegt hier eine Seite deutlich, steht die passende Abwehr in deinem Build als Hinweis-Chip." />
+
+                                    <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,12,0,0" />
+
+                                    <!-- Column header for the lines below; the two value columns
+                                         keep their width through the shared size groups, so the
+                                         header sits over its own numbers. -->
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="StatAlly" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="StatEnemy" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Text="TEAMFIGHT" Style="{StaticResource Caption}" />
+                                        <TextBlock Grid.Column="1" Text="DEIN TEAM" Style="{StaticResource Caption}"
+                                                   HorizontalAlignment="Right" MinWidth="86" />
+                                        <TextBlock Grid.Column="2" Text="ENEMY" Style="{StaticResource Caption}"
+                                                   HorizontalAlignment="Right" MinWidth="86" />
+                                    </Grid>
+
+                                    <ItemsControl ItemsSource="{Binding DraftStats}" Margin="0,6,0,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type vm:TeamStatViewModel}">
+                                                <!-- Transparent so the whole line carries its
+                                                     tooltip, not only the glyphs on it. -->
+                                                <Grid Background="Transparent" Margin="0,0,0,5"
+                                                      ToolTip="{Binding Hint}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" SharedSizeGroup="StatAlly" />
+                                                        <ColumnDefinition Width="Auto" SharedSizeGroup="StatEnemy" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <TextBlock Text="{Binding Label}" Style="{StaticResource Small}"
+                                                               Foreground="{StaticResource Muted}"
+                                                               VerticalAlignment="Center" />
+
+                                                    <TextBlock Grid.Column="1" Text="{Binding Ally}"
+                                                               Style="{StaticResource Small}"
+                                                               Foreground="{StaticResource Text}"
+                                                               HorizontalAlignment="Right" MinWidth="86" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding Enemy}"
+                                                               Style="{StaticResource Small}"
+                                                               Foreground="{StaticResource Muted}"
+                                                               HorizontalAlignment="Right" MinWidth="86" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <TextBlock Text="{Binding DraftPreviewNote}" Style="{StaticResource Small}"
+                                               Foreground="{StaticResource Faint}" TextWrapping="Wrap"
+                                               Margin="0,5,0,0" />
+                                </StackPanel>
+                            </Border>
+        </DataTemplate>
+
     </Window.Resources>
 
     <Border Background="{StaticResource Bg}" BorderBrush="{StaticResource Line}"
@@ -1842,103 +1940,16 @@
                                 Which team is ahead is answered by the one number over the team
                                 columns, and it is a different question from this one.
                             -->
-                            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
-                                    BorderThickness="1" CornerRadius="10" Padding="14,11" Margin="0,11,0,0"
-                                    Grid.IsSharedSizeScope="True"
-                                    Visibility="{Binding HasDraftPreview, Converter={StaticResource BoolToVisibility}}">
-                                <StackPanel>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-
-                                        <TextBlock Text="SCHADEN" Style="{StaticResource Caption}"
-                                                   VerticalAlignment="Center" />
-
-                                        <!-- Legend, because the bar itself carries no labels. -->
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                                    HorizontalAlignment="Right" VerticalAlignment="Center">
-                                            <Border Width="9" Height="9" CornerRadius="2"
-                                                    Background="{StaticResource Warn}" VerticalAlignment="Center" />
-                                            <TextBlock Text="AD" Style="{StaticResource Small}"
-                                                       Foreground="{StaticResource Faint}" Margin="5,0,12,0" />
-                                            <Border Width="9" Height="9" CornerRadius="2"
-                                                    Background="{StaticResource Accent}" VerticalAlignment="Center" />
-                                            <TextBlock Text="AP" Style="{StaticResource Small}"
-                                                       Foreground="{StaticResource Faint}" Margin="5,0,0,0" />
-                                        </StackPanel>
-                                    </Grid>
-
-                                    <ContentControl Content="{Binding AllyDamage}" Margin="0,10,0,0"
-                                                    ContentTemplate="{StaticResource DamageMix}"
-                                                    ToolTip="Anteil der Schadensarten in deinem Team, gezählt über die aufgedeckten Champions. Gemischte Champions zählen zur Hälfte auf jeder Seite. Wovon der Gegner mehr abbekommt, entscheidet, ob er Armor oder MR kauft." />
-                                    <ContentControl Content="{Binding EnemyDamage}" Margin="0,7,0,0"
-                                                    ContentTemplate="{StaticResource DamageMix}"
-                                                    ToolTip="Dasselbe für das gegnerische Team. Überwiegt hier eine Seite deutlich, steht die passende Abwehr in deinem Build als Hinweis-Chip." />
-
-                                    <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,12,0,0" />
-
-                                    <!-- Column header for the lines below; the two value columns
-                                         keep their width through the shared size groups, so the
-                                         header sits over its own numbers. -->
-                                    <Grid Margin="0,10,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" SharedSizeGroup="StatAlly" />
-                                            <ColumnDefinition Width="Auto" SharedSizeGroup="StatEnemy" />
-                                        </Grid.ColumnDefinitions>
-
-                                        <TextBlock Text="TEAMFIGHT" Style="{StaticResource Caption}" />
-                                        <TextBlock Grid.Column="1" Text="DEIN TEAM" Style="{StaticResource Caption}"
-                                                   HorizontalAlignment="Right" MinWidth="86" />
-                                        <TextBlock Grid.Column="2" Text="ENEMY" Style="{StaticResource Caption}"
-                                                   HorizontalAlignment="Right" MinWidth="86" />
-                                    </Grid>
-
-                                    <ItemsControl ItemsSource="{Binding DraftStats}" Margin="0,6,0,0">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate DataType="{x:Type vm:TeamStatViewModel}">
-                                                <!-- Transparent so the whole line carries its
-                                                     tooltip, not only the glyphs on it. -->
-                                                <Grid Background="Transparent" Margin="0,0,0,5"
-                                                      ToolTip="{Binding Hint}">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" SharedSizeGroup="StatAlly" />
-                                                        <ColumnDefinition Width="Auto" SharedSizeGroup="StatEnemy" />
-                                                    </Grid.ColumnDefinitions>
-
-                                                    <TextBlock Text="{Binding Label}" Style="{StaticResource Small}"
-                                                               Foreground="{StaticResource Muted}"
-                                                               VerticalAlignment="Center" />
-
-                                                    <TextBlock Grid.Column="1" Text="{Binding Ally}"
-                                                               Style="{StaticResource Small}"
-                                                               Foreground="{StaticResource Text}"
-                                                               HorizontalAlignment="Right" MinWidth="86" />
-                                                    <TextBlock Grid.Column="2" Text="{Binding Enemy}"
-                                                               Style="{StaticResource Small}"
-                                                               Foreground="{StaticResource Muted}"
-                                                               HorizontalAlignment="Right" MinWidth="86" />
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-
-                                    <TextBlock Text="{Binding DraftPreviewNote}" Style="{StaticResource Small}"
-                                               Foreground="{StaticResource Faint}" TextWrapping="Wrap"
-                                               Margin="0,5,0,0" />
-                                </StackPanel>
-                            </Border>
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource DraftPreviewCard}" />
 
                         </StackPanel>
                     </ScrollViewer>
 
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                                   Visibility="{Binding HasRecommendations, Converter={StaticResource BoolToVisibility}}">
-                        <!-- Right margin keeps the scrollbar clear of the cards instead of over them. -->
-                        <ItemsControl ItemsSource="{Binding Recommendations}" Margin="0,0,10,0">
+                        <StackPanel Margin="0,0,10,0">
+                            <!-- Right margin keeps the scrollbar clear of the cards instead of over them. -->
+                            <ItemsControl ItemsSource="{Binding Recommendations}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type vm:RecommendationViewModel}">
                                     <!--
@@ -2208,7 +2219,16 @@
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                            </ItemsControl>
+
+                            <!--
+                                On the Abyss the bench list owns this column, so the composition card
+                                rides underneath it instead of under the matchup panel — same card, one
+                                template, shown in whichever of the two places is actually on screen.
+                            -->
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource DraftPreviewCard}"
+                                            Visibility="{Binding ShowPreviewUnderList, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
                     </ScrollViewer>
                 </Grid>
             </DockPanel>

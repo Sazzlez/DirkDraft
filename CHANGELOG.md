@@ -39,6 +39,20 @@ Kopien melden sie beim nächsten Start.
 - `Tools -- watch` und `replay` zeigen den erkannten Modus in derselben Zeile wie das Fenster:
   Name, welche OP.GG-Quelle daraus folgt, ob Lanes gelten, und den Mayhem-Vorbehalt.
 
+- **ARAM und Mayhem bekommen endlich eine Empfehlung: die Bank.** Das Tool zeigte dort Build und
+  Comps und schwieg zu der einzigen Entscheidung, die es auf der Heulenden Schlucht überhaupt gibt —
+  behalten oder tauschen. Jetzt stehen dein Champion und alle auf der Bank in einer Liste, nach
+  ARAM-Winrate sortiert, jeder mit seiner Stichprobe, dein eigener als solcher markiert. Dieselben
+  Zeilen, dieselben Fehlerbalken und dieselbe Gleichauf-Markierung wie auf der Kluft.
+  Die Feldnamen der Bank stammen aus dem Schema des Clients selbst (`/help?format=Full`, Typ
+  `BenchChampion`) und nicht aus einer Vermutung über das Payload.
+  Die Zahlen sind gröber als überall sonst und die Liste sagt es: OP.GG liefert für ARAM nur eine
+  auf zwei Nachkommastellen gerundete Winrate, und `positions` — die Quelle, aus der sich die
+  Rift-Zahlen exakt rekonstruieren lassen — kommt dort leer zurück (gemessen 19.09.2026). Die
+  Rundung ist als eigener Fehleranteil eingerechnet, damit sub-Prozentpunkt-Unterschiede ehrlich
+  als „gleichauf" erscheinen. Ein voller Prozentpunkt bleibt unterscheidbar.
+  Getauscht wird nichts automatisch; die verbleibenden Rerolls stehen in der Kopfzeile.
+
 ### Behoben
 
 - **Der Build-Cache konnte Solo/Duo und Flex nicht auseinanderhalten.** Seit es den Build ohne

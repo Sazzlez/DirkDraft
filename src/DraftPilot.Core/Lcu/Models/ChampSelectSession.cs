@@ -59,6 +59,40 @@ public sealed class ChampSelectSession
     }
 
     public bool IsSpectating { get; set; }
+
+    /// <summary>
+    /// Whether this mode has a champion bench at all. Read rather than inferred from the list being
+    /// empty: a bench that happens to be empty right now is still a bench, and the panel should say
+    /// "nothing on the bench" instead of falling back to "this mode has none".
+    /// </summary>
+    public bool BenchEnabled { get; set; }
+
+    /// <summary>
+    /// The champions on the shared bench — the ARAM swap pool. Field names taken from the client's
+    /// own schema (<c>/help?format=Full</c>, type <c>BenchChampion</c>), not guessed.
+    /// </summary>
+    public List<BenchChampion> BenchChampions
+    {
+        get => _benchChampions;
+        set => _benchChampions = value ?? [];
+    }
+
+    /// <summary>How many rerolls the player still has. Shown, never spent — the tool does not click.</summary>
+    public int RerollsRemaining { get; set; }
+
+    private List<BenchChampion> _benchChampions = [];
+}
+
+/// <summary>
+/// One champion on the bench. <c>isPriority</c> exists in the client's schema and is deliberately
+/// not interpreted anywhere: what it means is undocumented, and a guessed meaning on screen would
+/// be worse than a field nobody reads.
+/// </summary>
+public sealed class BenchChampion
+{
+    public int ChampionId { get; set; }
+
+    public bool IsPriority { get; set; }
 }
 
 public sealed class ChampSelectPlayer

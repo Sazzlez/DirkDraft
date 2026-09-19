@@ -142,12 +142,21 @@ wieder herunterzuladen.
   getrennte Datenbestände, und die Counter- und Build-Abrufe folgen dem erkannten Modus, nicht einer
   Einstellung. Wenn die gespeicherte Tierlist für eine andere Queue geholt wurde, sagt das Fenster
   das als Chip.
-- **In ARAM und ARAM Mayhem** gibt es keine Lanes, also auch keine Lane-Empfehlungen: die
-  Vorschlagsliste bleibt weg, Lane-Beschriftungen und Matchup-Prozente ebenso. Was bleibt, ist der
-  **ARAM-Build** für deinen zugeteilten Champion (OP.GGs eigene ARAM-Zahlen, ein Abruf) und der
-  Vergleich beider Comps, der dort genauso gilt. Für **Mayhem** führt OP.GG keine eigenen Zahlen —
-  Build und Runen kommen aus dem normalen ARAM auf derselben Karte, und ein Stern hinter dem
-  Modusnamen sagt genau das.
+- **In ARAM und ARAM Mayhem** gibt es keine Lanes, also auch keine Lane-Empfehlungen:
+  Lane-Beschriftungen und Matchup-Prozente bleiben weg. Stattdessen beantwortet die breite Spalte
+  die Frage, die es dort wirklich gibt — **behalten oder tauschen?** Dein Champion steht zusammen
+  mit allen auf der Bank in einer Liste, nach ARAM-Winrate sortiert, jeder mit seiner Stichprobe;
+  darunter der Vergleich beider Comps. Dazu der **ARAM-Build** für den Champion, den du gerade
+  hast.
+
+  Die ARAM-Zahlen sind gröber als alles andere im Tool, und die Liste sagt es: OP.GG liefert für
+  ARAM nur eine auf zwei Nachkommastellen gerundete Winrate — einen Prozentpunkt Auflösung — und
+  der `positions`-Block, aus dem sich die Rift-Zahlen exakt rekonstruieren lassen, kommt dort leer
+  zurück. Die Rundung steckt im Fehlerbalken, deshalb stehen fein getrennte Champions ehrlich als
+  „gleichauf" da. Getauscht wird nichts automatisch; die Reroll-Anzahl steht in der Kopfzeile.
+
+  Für **Mayhem** führt OP.GG keine eigenen Zahlen — Build, Runen und Bank-Winrates kommen aus dem
+  normalen ARAM auf derselben Karte, und ein Stern hinter dem Modusnamen sagt genau das.
 - **Im Spiel**: sobald das Spiel startet, zeigt das Fenster den Build groß — Item-Bilder in
   Kaufreihenfolge (Start → Boots → Core → Late), Summoner Spells und die Skill-Tabelle für
   Stufe 1–18. Die Stufen 16–18 liefert die Quelle nicht; sie sind abgeleitet und blasser

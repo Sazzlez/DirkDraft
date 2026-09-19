@@ -364,6 +364,64 @@ public sealed class LiveDraftFetcher(
         return null;
     }
 
+    /// <summary>
+    /// One champion's ARAM record: win rate and games. Null when OP.GG has nothing for the name.
+    /// <para>
+    /// The whole ARAM answer is this one block. Measured on 2026-09-19: for
+    /// <c>game_mode=aram</c> the response carries <c>summary.average_stats</c> and nothing else —
+    /// <c>positions</c> comes back null, so the exact win counts that let the Rift numbers be
+    /// reconstructed do not exist here. The rate arrives rounded to two decimals and the advisor
+    /// books that rounding as error rather than pretending it away.
+    /// </para>
+    /// </summary>
+    public async Task<AramStat?> FetchAramStatAsync(ChampionEntry champion, CancellationToken ct)
+    {
+        foreach (var name in ChampionResolver.ApiNames(champion))
+        {
+            var arguments = new JsonObject
+            {
+                ["game_mode"] = BuildModes.Aram,
+                ["champion"] = name,
+                // Required by the schema and ignored on the Abyss — measured: mid, adc and top
+                // answer with identical numbers.
+                ["position"] = "mid",
+                ["tier"] = tier,
+                ["desired_output_fields"] = OpGgMcpClient.Fields(
+                    "data.summary.average_stats.play",
+                    "data.summary.average_stats.win_rate"),
+            };
+
+            try
+            {
+                var node = await client.CallToolAsync("lol_get_champion_analysis", arguments, ct)
+                    .ConfigureAwait(false);
+
+                var stats = node["data"]["summary"]["average_stats"];
+                var play = stats["play"].AsInt();
+                var winRate = stats["win_rate"].AsNumber();
+
+                // A rate of zero over real games is not a measurement, it is a missing field. Never
+                // rank a champion 0 % because a name came back half-answered.
+                if (play <= 0 || winRate <= 0)
+                    return null;
+
+                return new AramStat(champion.Id, winRate, play);
+            }
+            catch (OpGgApiException ex) when (ex.Status is null)
+            {
+                // A rejected spelling; try the next one.
+                diagnostic?.Invoke($"{champion.Name} (ARAM): {ex.Message}");
+            }
+            catch (OpGgParseException ex)
+            {
+                diagnostic?.Invoke($"ARAM-Antwort unlesbar für {name}: {ex.Message}");
+                return null;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>Build, runes and spells for one concrete matchup, or null if OP.GG has nothing.</summary>
     public async Task<BuildPlan?> FetchBuildAsync(
         ChampionEntry me,

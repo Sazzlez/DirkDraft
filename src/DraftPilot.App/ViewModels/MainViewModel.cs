@@ -71,6 +71,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly Dictionary<(int Champion, Lane Lane), int> _enemyFailures = [];
 
     /// <summary>
+    /// ARAM records for the champion in hand and everyone on the bench, gathered as the bench
+    /// changes. One call each, kept for the draft — the bench shuffles, and refetching a champion
+    /// that came back from a swap would spend the budget on an answer already in memory.
+    /// </summary>
+    private readonly Dictionary<int, AramStat> _aramStats = [];
+
+    /// <summary>Champions already asked about in ARAM, answered or not; nothing is asked twice.</summary>
+    private readonly HashSet<int> _aramAsked = [];
+
+    /// <summary>
     /// OP.GG calls made this draft — counters AND build guides. A prediction that keeps flipping
     /// would otherwise buy a new request on every flip, and the build was not counted at all, so a
     /// wobbling lane could quietly outspend the whole budget on guides.
@@ -210,6 +220,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private string _phaseText = string.Empty;
     private string _modeText = string.Empty;
     private string _modeNote = string.Empty;
+    private bool _showPreviewUnderList;
     private ConnectionTone _statusTone = ConnectionTone.Off;
     private string _emptyHint = "Warte auf den League-Client.";
     private string _turnText = string.Empty;
@@ -647,6 +658,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
 
     public bool HasModeNote => _modeNote.Length > 0;
+
+    /// <summary>
+    /// Whether the composition card rides under the recommendation list instead of under the
+    /// matchup panel. True on the Abyss, where the bench list owns the column and the matchup panel
+    /// — whose whole content there would be "no lane matchup in this mode" — steps aside for it.
+    /// </summary>
+    public bool ShowPreviewUnderList
+    {
+        get => _showPreviewUnderList;
+        private set => Set(ref _showPreviewUnderList, value);
+    }
 
     /// <summary>Estimated win rate of the own team, over its column.</summary>
     public string AllyWinRateText
@@ -1364,6 +1386,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _meta.ClearLiveMatchups();
             _liveFetched.Clear();
             _enemyFailures.Clear();
+            _aramStats.Clear();
+            _aramAsked.Clear();
             _buildFetched.Clear();
             _liveCallsThisDraft = 0;
             _fetchFailures = 0;
@@ -1405,6 +1429,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _meta.ClearLiveMatchups();
             _liveFetched.Clear();
             _enemyFailures.Clear();
+            _aramStats.Clear();
+            _aramAsked.Clear();
             _buildFetched.Clear();
             _liveCallsThisDraft = 0;
             _fetchFailures = 0;
@@ -1671,7 +1697,51 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             && !BuildMatchesContext
             && !_buildFetched.Contains(context);
 
-        return (_pendingEnemyCount, buildPending, _pendingEnemyCount + (buildPending ? 1 : 0));
+        var pending = _pendingEnemyCount + PendingAram().Count;
+
+        return (_pendingEnemyCount, buildPending, pending + (buildPending ? 1 : 0));
+    }
+
+    /// <summary>
+    /// The champions whose ARAM record is still missing: the one in hand and everyone on the bench.
+    /// Empty outside the Abyss, and empty once everything has been asked — answered or not.
+    /// <para>
+    /// This is where the budget freed by not fetching counters in ARAM goes. A bench holds a
+    /// handful of champions, each worth exactly one call, and the same ceiling applies.
+    /// </para>
+    /// </summary>
+    private List<int> PendingAram(bool ignoreBudget = false)
+    {
+        var pending = new List<int>();
+
+        if (!_state.Queue.IsAram())
+            return pending;
+
+        if (!ignoreBudget && _liveCallsThisDraft >= MaxLiveCallsPerDraft)
+            return pending;
+
+        foreach (var champion in OwnAndBench())
+        {
+            if (_aramAsked.Contains(champion) || pending.Contains(champion))
+                continue;
+
+            if (_meta.Champion(champion) is null)
+                continue;
+
+            pending.Add(champion);
+        }
+
+        return pending;
+    }
+
+    /// <summary>The champion in hand first, then the bench — the order the ranking is built from.</summary>
+    private IEnumerable<int> OwnAndBench()
+    {
+        if (_state.LocalSlot?.EffectiveChampionId is { } own and not 0)
+            yield return own;
+
+        foreach (var champion in _state.Bench)
+            yield return champion;
     }
 
     /// <summary>
@@ -1884,6 +1954,28 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             if (token.IsCancellationRequested)
                 return;
 
+            // The Abyss asks a different question, so it fetches different data: no counters (there
+            // are none on that map), but one record per champion on the bench plus the one in hand.
+            // Serial and small — a bench is a handful of champions, and this runs while the build
+            // call above has already answered.
+            foreach (var champion in PendingAram())
+            {
+                if (token.IsCancellationRequested)
+                    return;
+
+                if (_meta.Champion(champion) is not { } entry)
+                    continue;
+
+                attempted++;
+                ReportFetch($"lädt ARAM-Zahlen zu {entry.Name}…");
+
+                if (!await FetchAramStatAsync(fetcher, entry, token).ConfigureAwait(true))
+                    failed++;
+            }
+
+            if (token.IsCancellationRequested)
+                return;
+
             var pending = PendingEnemies();
             if (pending.Count > 0)
             {
@@ -2030,6 +2122,50 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             if (failures >= 3)
                 _liveFetched.Add(key);
 
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// One champion's ARAM record, with the same per-call error handling as everything else in this
+    /// round. Marked as asked whatever the answer: a champion OP.GG has nothing for must not be
+    /// asked again on every client event for the rest of the draft.
+    /// </summary>
+    private async Task<bool> FetchAramStatAsync(LiveDraftFetcher fetcher, ChampionEntry champion, CancellationToken token)
+    {
+        try
+        {
+            _liveCallsThisDraft++;
+
+            var stat = await fetcher.FetchAramStatAsync(champion, token).ConfigureAwait(true);
+
+            if (token.IsCancellationRequested)
+                return true;
+
+            _aramAsked.Add(champion.Id);
+
+            if (stat is { } value)
+            {
+                _aramStats[champion.Id] = value;
+
+                // Show each row as it lands rather than after the last one; a bench of six would
+                // otherwise stay empty for the better part of the select.
+                _refreshingFromFetch = true;
+                try
+                {
+                    Refresh();
+                }
+                finally
+                {
+                    _refreshingFromFetch = false;
+                }
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (IsRecoverable(ex, token))
+        {
+            CrashLog.Note("Draft-Abruf", $"ARAM {champion.Name}: {ex.Message}");
             return false;
         }
     }
@@ -2596,11 +2732,15 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // to name. The strip above the list goes away with it.
         if (!_state.Queue.UsesLanes())
         {
-            ShowMatchupPanel = seat is not null;
+            // …unless the bench list is up. The two share this column, and the panel's whole
+            // content there is the champion's name plus "no lane matchup in this mode" — which the
+            // bench list says better, with a number next to it. Rendering both put one on top of
+            // the other. RenderBench has already run this pass, so HasRecommendations is current.
+            ShowMatchupPanel = seat is not null && !HasRecommendations;
             ShowMatchupStrip = false;
-            ShowEmptyHint = seat is null;
+            ShowEmptyHint = seat is null && !HasRecommendations;
 
-            if (seat is not null)
+            if (ShowMatchupPanel)
             {
                 MatchupOwnIcon = _icons.Get(seat.LockedChampionId);
                 MatchupOpponentIcon = null;
@@ -2696,6 +2836,65 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             (_, null) => "Das Matchup läuft gegen dich. Vorsichtig spielen und auf Hilfe des Junglers setzen.",
             _ => $"Das Matchup läuft gegen {teammate} — dort ist Hilfe des Junglers am meisten wert.",
         };
+    }
+
+    /// <summary>
+    /// The Abyss list: the champion in hand and the bench, ranked by their ARAM record. Uses the
+    /// same rows, the same error bars and the same tie marks as the lane list — the numbers are
+    /// win rates either way, so nothing about the display has to be reinvented or re-explained.
+    /// <para>
+    /// Every state is spelled out rather than left as an empty column: a mode without a bench, a
+    /// bench that is empty right now, and the seconds before the first numbers land all look
+    /// identical otherwise.
+    /// </para>
+    /// </summary>
+    private void RenderBench()
+    {
+        ListHeader = _state.Queue.Display() is { Length: > 0 } queue ? queue : "Ohne Lanes";
+
+        if (!_state.Queue.IsAram() || !_state.BenchEnabled)
+        {
+            Recommendations.Clear();
+            HasRecommendations = false;
+            ShowPreviewUnderList = false;
+            EmptyHint = _state.Queue.LaneCaveat();
+            return;
+        }
+
+        var own = _state.LocalSlot?.EffectiveChampionId ?? 0;
+        var rows = AramAdvisor.Rank(own, _state.Bench, _aramStats, _meta.ChampionName);
+
+        Recommendations.Resize(rows.Count, () => new RecommendationViewModel());
+        HasRecommendations = rows.Count > 0;
+        ShowPreviewUnderList = rows.Count > 0;
+
+        if (rows.Count == 0)
+        {
+            EmptyHint = _state.Bench.Count == 0
+                ? "Nichts auf der Bank. Sobald jemand rerollt, steht hier, ob sich ein Tausch lohnt."
+                : PendingAram(ignoreBudget: true).Count > 0
+                    ? "ARAM-Zahlen werden geholt…"
+                    : "Für diese Champions hat OP.GG keine ARAM-Zahlen.";
+
+            return;
+        }
+
+        var rerolls = _state.RerollsRemaining > 0 ? $" · {_state.RerollsRemaining} Reroll(s)" : string.Empty;
+        var tied = ScoreError.CountLeadingTies(rows);
+        var tiePart = tied >= 2 ? $" — die ersten {tied} gleichauf" : string.Empty;
+
+        ListHeader = $"Bank · tauschen?{rerolls}{tiePart}";
+
+        var precision = ScoreError.Decimals(rows);
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var leader = rows[0];
+            var standing = ScoreError.Standing(leader.Score, leader.Uncertainty, rows[i].Score, rows[i].Uncertainty);
+
+            Recommendations[i].Apply(
+                i + 1, rows[i], _icons.Get(rows[i].ChampionId), isBan: false, precision, standing, tied);
+        }
     }
 
     /// <summary>
@@ -3091,21 +3290,18 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             return;
         }
 
-        // A mode without lanes gets no pick list at all. Every number in it would be a Summoner's
-        // Rift lane statistic about a game that has no lanes — and in ARAM there is nothing to act
-        // on either, because the champion is assigned. What still holds is the composition reading
-        // and the build below, so those stay.
+        // A mode without lanes gets no LANE pick list: every number in one would be a Summoner's
+        // Rift statistic about a game that has no lanes. On the Abyss there is still a decision to
+        // advise, and it is the only one there — keep the champion you were handed, or take one off
+        // the bench. That list is built from ARAM numbers and nothing else.
         if (!_state.Queue.UsesLanes())
         {
-            Recommendations.Clear();
-            HasRecommendations = false;
-            ListHeader = _state.Queue.Display() is { Length: > 0 } queue ? queue : "Ohne Lanes";
-            EmptyHint = _state.Queue.LaneCaveat();
-
             var modeFindings = new List<string>(QueueDataNotes());
             var modeComp = _comp.Analyze([.. _state.Allies.Select(slot => slot.EffectiveChampionId)]);
             modeFindings.AddRange(modeComp.Findings.Select(finding => finding.Text));
             Warnings.ReplaceAll(modeFindings);
+
+            RenderBench();
             return;
         }
 
@@ -3200,6 +3396,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _enemyComp = CompProfile.Empty;
         HasRecommendations = false;
         HasDraftPreview = false;
+        ShowPreviewUnderList = false;
         DraftPreviewNote = string.Empty;
         ShowMatchupPanel = false;
         ShowEmptyHint = false;
