@@ -25,7 +25,7 @@ Was es an `augment` gibt, gehört nicht hierher:
 Damit ist der Client als Live-Quelle erledigt. Nicht bewiesen ist, dass es gar keine Quelle gibt —
 der Client ist nur eine von zweien.
 
-## 2. Die API des laufenden Spiels (Port 2999): offen, Messung vorbereitet
+## 2. Die API des laufenden Spiels (Port 2999): nein, gemessen im Spiel
 
 Das Spiel bedient eine zweite, völlig eigene Schnittstelle, mit der die App bisher **nie** gesprochen
 hat (`grep -rn "2999\|liveclientdata"` über `src/` → 0 Treffer). Der Spielbildschirm lebt heute allein
@@ -54,6 +54,40 @@ Vorab gegen einen Stellvertreter-Server geprüft (`DIRKDRAFT_INGAME_ORIGIN`), we
 Spiel neu antwortender Endpunkt, ein aus dem Schema ergänzter Pfad, ein neu auftauchendes
 verschachteltes Feld, ein neuer Event-Name, und dass kein echter Name in die Datei gelangt.
 
+### Das Ergebnis (ARAM: Chaos, 2026-09-19)
+
+| Messung | Wert |
+|---|---:|
+| Abfragen während des Spiels | 73 |
+| Verschiedene Feldpfade gesehen | 128 |
+| Events | 5 (`GameStart`, `MinionsSpawning`, `FirstBrick`, `TurretKilled`, `ChampionKill`) |
+| Endpunkte, die je antworteten | 11 von 18 |
+| Selbstdokumentation des Spiels | 26.883 Zeichen, 13 `liveclientdata`-Endpunkte |
+| **Vorkommen von „augment" — Endpunkt, Feld, Event, Schema** | **0** |
+
+Entscheidend für die Beweiskraft: Der Spieler **hat** in diesem Spiel eine Augment-Auswahl
+angeboten bekommen und wählen müssen. Die Auswahl stand also auf dem Bildschirm, während die Sonde
+73 Mal fragte — und die API erwähnte sie mit keinem Feld. Das ist kein „noch nicht gesehen",
+sondern ein Negativbefund mit Gegenprobe.
+
+**Folgerung: Die Variante „die drei Optionen im Moment der Wahl" ist technisch unmöglich**, nicht
+bloß unentschieden. Ohne diese Messung wäre sie als Produktentscheidung behandelt worden.
+
+Die Augment-Endpunkte, die es *nicht* gibt (alle 404): `/liveclientdata/activeplayeraugments`,
+`/liveclientdata/playeraugments`, `/liveclientdata/augments`.
+
+### Zwei Nebenbefunde
+
+**Der Modus heißt im Spiel `KIWI`.** `gameData.gameMode` meldet für ARAM: Chaos nicht „ARAM" oder
+„MAYHEM", sondern Riots internen Codenamen — wie `CHERRY` für Arena. Die Queue-Tabelle des Clients
+bestätigt das für alle fünf Chaos-Queues.
+
+**Die Sonde durfte anfangs zu viel.** Das Schema des Spiels listet nicht nur Abfragen, sondern auch
+`/Exit`, `/Cancel`, `/Subscribe` und `/AsyncDelete` — und die Endpunkt-Abfrage rief sie auf, in
+einem laufenden Spiel, alle 45 Sekunden. Folgenlos geblieben, aber nicht durch Entwurf. Seitdem
+gilt eine Positivliste (`/liveclientdata/`, `/swagger/`) statt einer Verbotsliste: Eine Verbotsliste
+müsste jedes Verb kennen, das Riot im nächsten Patch ergänzt.
+
 ## 3. Die Zahlen: vorhanden, aber ohne Stichprobe
 
 `lol_list_aram_augments` (OP.GG) liefert echte, lokalisierte Daten: `id`, `name`, `tier`,
@@ -71,11 +105,28 @@ es sich weder glätten (`Shrinkage`) noch mit einem Fehlerbalken versehen (`Scor
 andere Zahl im Tool trägt einen. Dazu nimmt das Werkzeug nur `champion_id` und `lang`, **kein**
 `game_mode`: Es könnte ARAM und Mayhem gar nicht auseinanderhalten.
 
+## 4. Die Namenstabelle: vollständig vorhanden, lokal
+
+Der Client serviert unter `/lol-game-data/assets/v1/cherry-augments.json` (118 KB) **552 Augments**
+mit `id`, `augmentNameId`, `nameTRA` (lokalisierter Name), `rarity` und Icon-Pfad. Kein Netz nötig,
+keine dritte Verbindung: Der Client läuft ohnehin.
+
+Gemessen dazu:
+
+- Alle drei Augments aus der OP.GG-Messung stehen **wortgleich** in der Tabelle. Ein Join über den
+  Anzeigenamen funktioniert also.
+- Aber 116 von 436 Namen sind doppelt vergeben — meist eine Arena- und eine ARAM-Variante desselben
+  Augments (`QuantumComputing` 66 und `ARAM_QuantumComputing` 1066). Bei **genau einem** Paar
+  weichen die Daten ab: „Henker" ist als `ARAM_Executioner` Gold, als `Executioner` Silber.
+- Das Präfix `ARAM_` taugt **nicht** als Filter für den ARAM-Pool: „Hexer-Safttüte" heißt
+  `WarlockJuicebox` ohne Präfix und wird von OP.GG trotzdem für ARAM geführt.
+
 ## Stand der Entscheidung
 
-- **Nicht gebaut**, in keinem Modus und keinem Bildschirm (1.3.0): 0 Treffer für `augment` in
-  `src/` und `tests/`.
-- **Voraussetzung für "die drei im Moment der Wahl"**: Punkt 2 muss positiv ausfallen. Fällt er
-  negativ aus, ist die Variante technisch unmöglich und nicht bloß unentschieden.
-- **Voraussetzung für ein Urteil statt einer Liste**: eine Stichprobe zu `performance`. Solange die
+- **Nicht gebaut**, in keinem Modus und keinem Bildschirm: 0 Treffer für `augment` in `src/` und
+  `tests/` (ausgenommen die Sonde, die nur misst).
+- **„Die drei im Moment der Wahl": ausgeschlossen.** Punkt 2 ist negativ, mit Gegenprobe. Nicht
+  „noch nicht gebaut", sondern nicht baubar.
+- **„Nachschlagen vorab" bleibt möglich**, aber nur als Liste ohne Urteil. Voraussetzung für ein
+  Urteil wäre eine Stichprobe zu `performance` (Punkt 3), und die liefert OP.GG nicht. Solange sie
   fehlt, wäre jede Rangfolge eine erfundene Genauigkeit — dieselbe Regel wie überall sonst hier.

@@ -38,15 +38,34 @@ public class QueueKindsTests
         => Assert.Equal(expected, QueueKinds.FromId(id).Display());
 
     /// <summary>
-    /// Mayhem ships as three queues — the normal one, its tournament variant and the near-classic
-    /// one. All three are the same game as far as anything downstream is concerned.
+    /// Mayhem ships as five queues — the normal one, its tournament variant, the two "fast
+    /// klassisch" ones, and a custom lobby. All five are the same game as far as anything
+    /// downstream is concerned: same map, no lanes, same data source.
     /// </summary>
     [Theory]
     [InlineData(2400)]
     [InlineData(2410)]
     [InlineData(2450)]
+    [InlineData(3270)]
+    [InlineData(3280)]
     public void EveryMayhemVariant_IsTheSameMode(int id)
         => Assert.Equal(QueueKind.AramMayhem, QueueKinds.FromId(id));
+
+    /// <summary>
+    /// Measured during a live match on 2026-09-19: a custom ARAM Chaos lobby is queue 3270 and
+    /// reports itself as a custom game. Answering "Custom" to that was wrong where it counts —
+    /// a custom lobby uses lanes, so the Howling Abyss was handed Summoner's Rift advice. The id
+    /// knows better than the flag, so the id is asked first.
+    /// </summary>
+    [Fact]
+    public void ACustomLobbyOfARealMode_KeepsThatMode()
+    {
+        var kind = QueueKinds.FromId(3270, isCustomGame: true);
+
+        Assert.Equal(QueueKind.AramMayhem, kind);
+        Assert.False(kind.UsesLanes());
+        Assert.True(kind.IsAram());
+    }
 
     /// <summary>
     /// An id this build has never seen is treated as a normal lane game on purpose: a wrong warning

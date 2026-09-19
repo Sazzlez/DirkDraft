@@ -3,6 +3,19 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
+## Unveröffentlicht
+
+- **Custom-Spiele behalten ihren Modus.** Ein ARAM-Chaos-Spiel aus einer eigenen Lobby wurde als
+  „Custom Game" geführt und damit wie ein Kluft-Spiel behandelt — mit Lane-Empfehlungen für die
+  Heulende Schlucht. Ursache: Die Modus-Erkennung fragte die Custom-Kennzeichnung vor der
+  Queue-ID, obwohl eine Custom-Lobby die ID ihres echten Modus mitschickt. Jetzt entscheidet die
+  ID, und die Kennzeichnung nur noch dort, wo gar keine ID kommt. Dazu zwei in 1.3.0 fehlende
+  Mayhem-Queues ergänzt: 3270 und 3280, beide aus dem laufenden Client gelesen.
+- **`Tools -- ingame`**: schreibt mit, was die API des *laufenden Spiels* (Port 2999) hergibt —
+  jedes Feld und jedes Event beim ersten Auftreten, dazu die Endpunkte aus dem Schema des Spiels.
+  Spielernamen werden vor dem Schreiben ersetzt. Damit gemessen: das Spiel meldet **keine**
+  Augments (siehe `docs/augments.md`).
+
 ## 1.3.0 — 2026-09-19
 
 - **Der Spielmodus wird erkannt und steht oben rechts.** Ranked Solo/Duo, Ranked Flex, ARAM und

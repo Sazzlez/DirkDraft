@@ -54,16 +54,32 @@ public static class QueueKinds
     /// a wrong warning in ranked would cost more than a missing one in a rotating mode.
     /// <para>
     /// Every id below was read out of the running client on 2026-09-19 rather than looked up:
-    /// <c>/lol-game-queues/v1/queues</c> lists all 88 queues with their id, game mode and map. That
-    /// is where ARAM Mayhem's 2400 comes from — it appears there as "ARAM: Chaos", game mode
-    /// <c>KIWI</c>, map 12, alongside its tournament (2410) and near-classic (2450) variants.
+    /// <c>/lol-game-queues/v1/queues</c> lists all 88 queues with their id, game mode and map. ARAM
+    /// Mayhem appears there as "ARAM: Chaos" across five entries, re-read from the client during a
+    /// live match: 2400 (<c>KIWI</c>, PvP), 2410 (<c>KIWI</c>, tournament), 3270 (<c>KIWI</c>,
+    /// custom lobby), and the "fast klassisch" variants 2450 and 3280, which are a different
+    /// mutator set (<c>KIWI_JADE</c>) but the same map and the same absence of lanes.
     /// </para>
     /// </summary>
+    /// <param name="isCustomGame">
+    /// Only decides the answer when the id does not. A custom lobby of a real mode still sends that
+    /// mode's queue id — ARAM Chaos as a custom game is 3270 — and answering "Custom" to it was
+    /// wrong in the way that matters: <see cref="UsesLanes"/> is true for a custom lobby, so a
+    /// measured Howling Abyss game was handed Summoner's Rift lane advice. The flag now only
+    /// catches the case it was written for: a lobby with no queue id at all.
+    /// </param>
     public static QueueKind FromId(int queueId, bool isCustomGame = false)
     {
-        if (isCustomGame)
-            return QueueKind.Custom;
+        var kind = FromKnownId(queueId);
 
+        if (kind != QueueKind.Unknown)
+            return kind;
+
+        return isCustomGame ? QueueKind.Custom : QueueKind.Unknown;
+    }
+
+    private static QueueKind FromKnownId(int queueId)
+    {
         return queueId switch
         {
             420 => QueueKind.RankedSolo,
@@ -75,7 +91,7 @@ public static class QueueKinds
             700 or 720 => QueueKind.Clash,
             830 or 840 or 850 or 870 or 880 or 890 => QueueKind.Bots,
             450 => QueueKind.Aram,
-            2400 or 2410 or 2450 => QueueKind.AramMayhem,
+            2400 or 2410 or 2450 or 3270 or 3280 => QueueKind.AramMayhem,
             1700 or 1710 or 1750 => QueueKind.Arena,
             900 or 1900 or 1020 or 1300 or 1400 => QueueKind.Rotating,
             _ => QueueKind.Unknown,
