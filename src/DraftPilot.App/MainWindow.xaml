@@ -909,7 +909,7 @@
                                     <StackPanel Margin="0,0,7,0">
                                         <TextBlock Text="{Binding Level}" FontSize="10" TextAlignment="Center"
                                                    Foreground="{StaticResource Faint}"
-                                                   FontFamily="{StaticResource NumFont}" />
+                                                   />
                                         <Border Width="24" Height="24" CornerRadius="5" Margin="0,2,0,0">
                                             <Border.Style>
                                                 <Style TargetType="Border">
@@ -1013,7 +1013,7 @@
                                                 gap does not have to be interpreted.
                                             -->
                                             <TextBlock Grid.Column="3" Text="{Binding Figure}"
-                                                       FontFamily="{StaticResource NumFont}" FontSize="12"
+                                                       FontSize="12"
                                                        VerticalAlignment="Center" Margin="0,0,10,0"
                                                        HorizontalAlignment="Right">
                                                 <TextBlock.Style>
@@ -1077,7 +1077,7 @@
 
                                             <!-- Their half of the same duel, next to their champion. -->
                                             <TextBlock Grid.Column="5" Text="{Binding EnemyFigure}"
-                                                       FontFamily="{StaticResource NumFont}" FontSize="12"
+                                                       FontSize="12"
                                                        Foreground="{StaticResource Muted}"
                                                        VerticalAlignment="Center" Margin="0,0,10,0"
                                                        HorizontalAlignment="Left" />
@@ -1121,7 +1121,7 @@
                                            Foreground="{StaticResource Muted}" VerticalAlignment="Center" />
 
                                 <TextBlock Grid.Column="3" Text="{Binding GameMatchupsTotal}"
-                                           FontFamily="{StaticResource NumFont}" FontSize="13"
+                                           FontSize="13"
                                            FontWeight="SemiBold" VerticalAlignment="Center"
                                            Margin="0,0,10,0" HorizontalAlignment="Right">
                                     <TextBlock.Style>
@@ -1163,7 +1163,7 @@
                                 </Grid>
 
                                 <TextBlock Grid.Column="5" Text="{Binding GameMatchupsEnemyTotal}"
-                                           FontFamily="{StaticResource NumFont}" FontSize="12"
+                                           FontSize="12"
                                            Foreground="{StaticResource Muted}"
                                            VerticalAlignment="Center" HorizontalAlignment="Left" />
                             </Grid>
@@ -1232,7 +1232,7 @@
                 <!-- Their side of the same estimate; the two always add up to 100 %. Never
                      coloured — green on the enemy number would read as good news. -->
                 <TextBlock Grid.Column="2" Text="{Binding EnemyWinRateText}" Margin="10,0,0,0"
-                           VerticalAlignment="Center" FontFamily="{StaticResource NumFont}"
+                           VerticalAlignment="Center"
                            FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Muted}"
                            ToolTip="{Binding BalanceHint}" />
             </Grid>
@@ -1274,7 +1274,7 @@
                                 this column is not — green on their number reads as good news.
                             -->
                             <TextBlock Grid.Column="2" Text="{Binding WinRate}"
-                                       FontFamily="{StaticResource NumFont}" FontSize="12"
+                                       FontSize="12"
                                        VerticalAlignment="Center" HorizontalAlignment="Right"
                                        ToolTip="{Binding WinRateHint}"
                                        Visibility="{Binding HasDuel, Converter={StaticResource BoolToVisibility}}">
@@ -1376,7 +1376,7 @@
                 <!-- Draft balance for our side. Coloured only beyond a point either way, because
                      inside that band the underlying samples cannot tell the teams apart. -->
                 <TextBlock Grid.Column="2" Text="{Binding AllyWinRateText}" Margin="10,0,0,0"
-                           VerticalAlignment="Center" FontFamily="{StaticResource NumFont}"
+                           VerticalAlignment="Center"
                            FontSize="14" FontWeight="SemiBold"
                            ToolTip="{Binding BalanceHint}">
                     <TextBlock.Style>
@@ -1465,7 +1465,7 @@
                                         way being noise.
                                     -->
                                     <TextBlock Grid.Column="4" Text="{Binding WinRate}"
-                                               FontFamily="{StaticResource NumFont}" FontSize="12"
+                                               FontSize="12"
                                                HorizontalAlignment="Right" VerticalAlignment="Center"
                                                Margin="0,0,4,0"
                                                ToolTip="{Binding WinRateHint}"
@@ -1673,7 +1673,7 @@
                         </TextBlock>
 
                         <TextBlock Grid.Column="5" Text="{Binding MatchupFigure}"
-                                   FontFamily="{StaticResource NumFont}" FontSize="13"
+                                   FontSize="13"
                                    FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0"
                                    Visibility="{Binding HasMatchupFigure, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock.Style>
@@ -1774,7 +1774,7 @@
                                                     </Style.Triggers>
                                                 </Style>
                                             </Border.Style>
-                                            <TextBlock Text="{Binding MatchupFigure}" FontFamily="{StaticResource NumFont}"
+                                            <TextBlock Text="{Binding MatchupFigure}"
                                                        FontSize="15" FontWeight="SemiBold">
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock">
@@ -1949,7 +1949,7 @@
                                                            ToolTip="Von Platz 1 statistisch nicht zu unterscheiden — die Stichproben geben den Unterschied nicht her." />
 
                                                 <TextBlock Grid.Column="1" Text="{Binding Rank}"
-                                                           FontFamily="{StaticResource NumFont}" FontSize="12"
+                                                           FontSize="12"
                                                            Foreground="{StaticResource Faint}"
                                                            VerticalAlignment="Top" Margin="0,4,0,0" />
 

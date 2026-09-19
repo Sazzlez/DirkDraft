@@ -109,6 +109,12 @@
 
     <!-- Typography. Everything moved up a few points; the old 10-12 px was unreadable at a glance. -->
     <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
+    <!--
+        Fixed-width digits, for the ONE place that needs them: the breakdown's value column, where
+        a dozen contributions are read down a column and must line up. Everywhere else the numbers
+        are read as text, right-aligned where it matters, and a terminal face beside Segoe UI
+        looked like something that had wandered in from another program.
+    -->
     <FontFamily x:Key="NumFont">Consolas, Cascadia Mono</FontFamily>
 
     <Style TargetType="TextBlock">
