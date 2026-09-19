@@ -70,6 +70,9 @@ try
         case "probe":
             return await ProbeCommand.RunAsync(lifetime.Token);
 
+        case "ingame":
+            return await InGameCommand.RunAsync(args.Length > 1 ? args[1] : null, lifetime.Token);
+
         case "icons":
             return await SnapshotCommand.DownloadIconsAsync(lifetime.Token);
 
@@ -129,6 +132,9 @@ static void PrintUsage()
           update                 Meta-Daten von OP.GG holen und lokal speichern
           probe                  Verbindung zum Client schichtweise pruefen
           events                 Alle Client-Events roh mitschreiben
+          ingame [datei.jsonl]   Die API des LAUFENDEN Spiels (Port 2999) mitschreiben und
+                                 melden, welche Felder und Events sie kennt. Wartet, bis ein
+                                 Spiel laeuft. Spielernamen werden ersetzt.
           scrub <datei.jsonl> [ziel]
                                  Persoenliche Daten aus einer Aufzeichnung entfernen
           icons                  Fehlende Champion-Icons nachladen
