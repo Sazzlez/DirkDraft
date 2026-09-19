@@ -5,6 +5,21 @@ Kopien melden sie beim nächsten Start.
 
 ## Unveröffentlicht
 
+- **Augmente im Spielbildschirm**, für ARAM Chaos. Acht Zeilen mit OP.GGs Tier und OP.GGs Wert,
+  sortiert nach dem Wert. Bewusst **ohne** Siegquote und ohne Fehlerbalken: Der Wert sieht aus wie
+  eine Siegquote mal 170 — bei `popular = 0` ist er exakt 170 × 1/1, 2/3, 1/4 und so fort — ist
+  aber keine. Über sieben Champions geprüft, traf die Umrechnung bei einem und lag bei den anderen
+  2,5 bis 9,2 Punkte daneben. Eine Stichprobe gibt es auch nicht: `popular` müsste sich auf
+  höchstens sechs summieren, Lee Sins Werte summieren sich auf 9,09. Gefiltert wird trotzdem, und
+  aus den Daten heraus — Zeilen, deren Wert sich exakt als Bruch über höchstens 40 Beobachtungen
+  darstellen lässt, fliegen raus (ihre mittlere Beliebtheit ist 0,001 gegen 0,127 bei den übrigen),
+  und von den verbliebenen bleibt, was mindestens die Median-Beliebtheit dieses Champions erreicht.
+  Ohne diese zwei Regeln stünden bei Seraphine neun Augmente auf makellosen 170 ganz oben, die
+  niemand je gespielt hat.
+- **Die Kopfzeile im Spielbildschirm nannte den Modus doppelt** und schnitt den Titel nicht ab, was
+  sich zu „Darius · ARAM M" überlappte. Das Label erscheint jetzt nur noch, wenn der Titel den
+  Modus nicht schon trägt.
+
 - **Custom-Spiele behalten ihren Modus.** Ein ARAM-Chaos-Spiel aus einer eigenen Lobby wurde als
   „Custom Game" geführt und damit wie ein Kluft-Spiel behandelt — mit Lane-Empfehlungen für die
   Heulende Schlucht. Ursache: Die Modus-Erkennung fragte die Custom-Kennzeichnung vor der

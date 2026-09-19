@@ -422,6 +422,77 @@ public sealed class LiveDraftFetcher(
         return null;
     }
 
+    /// <summary>
+    /// Every augment OP.GG has numbers for on one champion, together with the pool those numbers
+    /// are shares of. Null when the champion has no augment data or the pool cannot be read —
+    /// shares without their denominator are not worth caching.
+    /// </summary>
+    /// <param name="language">
+    /// Which localisation to ask for. The augment names are the only part of a build the player
+    /// reads as prose, and an English name beside a German interface is the kind of seam that makes
+    /// people distrust the rest of the numbers.
+    /// </param>
+    public async Task<IReadOnlyList<AugmentOption>?> FetchAugmentsAsync(
+        ChampionEntry champion,
+        string language,
+        CancellationToken ct)
+    {
+        var arguments = new JsonObject
+        {
+            ["champion_id"] = champion.Id,
+            ["lang"] = string.IsNullOrWhiteSpace(language) ? "de_DE" : language,
+            ["desired_output_fields"] = OpGgMcpClient.Fields(
+                "data.augments[].id",
+                "data.augments[].name",
+                "data.augments[].tier",
+                "data.augments[].performance",
+                "data.augments[].popular"),
+        };
+
+        var options = new List<AugmentOption>();
+
+        try
+        {
+            var response = await client.CallToolAsync("lol_list_aram_augments", arguments, ct)
+                .ConfigureAwait(false);
+
+            foreach (var entry in response["data"]["augments"].Items)
+            {
+                var id = entry["id"].AsInt();
+                var name = entry["name"].AsText();
+
+                // An entry without a name cannot be shown and an entry without an id cannot be
+                // matched to anything; either way there is nothing here to keep.
+                if (id <= 0 || string.IsNullOrWhiteSpace(name))
+                    continue;
+
+                options.Add(new AugmentOption
+                {
+                    Id = id,
+                    Name = name,
+                    Tier = entry["tier"].AsInt(),
+                    Performance = entry["performance"].AsNumber(),
+                    PickRate = entry["popular"].AsNumber(),
+                });
+            }
+        }
+        catch (OpGgApiException ex)
+        {
+            diagnostic?.Invoke($"Augmente für {champion.Name}: {ex.Message}");
+            return null;
+        }
+        catch (OpGgParseException ex)
+        {
+            diagnostic?.Invoke($"Augment-Antwort unlesbar für {champion.Name}: {ex.Message}");
+            return null;
+        }
+
+        if (options.Count == 0)
+            return null;
+
+        return options;
+    }
+
     /// <summary>Build, runes and spells for one concrete matchup, or null if OP.GG has nothing.</summary>
     public async Task<BuildPlan?> FetchBuildAsync(
         ChampionEntry me,

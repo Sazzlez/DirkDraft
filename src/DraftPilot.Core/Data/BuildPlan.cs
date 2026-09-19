@@ -72,6 +72,38 @@ public sealed class ItemSet
 }
 
 /// <summary>
+/// One augment OP.GG has numbers for on this champion, stored exactly as the source reports it.
+/// <para>
+/// Both figures are kept raw, and that is a decision rather than laziness: neither could be
+/// converted into anything the rest of this project speaks. Two readings were tried and both were
+/// measured wrong — see <see cref="Draft.AugmentAdvisor"/>. A cache of raw values can be
+/// reinterpreted the day the scales are understood; a cache of converted ones is a cache of quiet
+/// errors.
+/// </para>
+/// </summary>
+public sealed class AugmentOption
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>OP.GG's own tier rank. Only 3 and above are returned at all.</summary>
+    public int Tier { get; set; }
+
+    /// <summary>
+    /// OP.GG's <c>performance</c>, untouched. Its scale is not documented and not decoded: it looks
+    /// like a win rate times 170 and, tested across seven champions, is not one.
+    /// </summary>
+    public double Performance { get; set; }
+
+    /// <summary>
+    /// OP.GG's <c>popular</c>, untouched. Not a share of the champion's games — those values would
+    /// have to sum to at most the six augments a game hands out, and Lee Sin's sum to 9.09.
+    /// </summary>
+    public double PickRate { get; set; }
+}
+
+/// <summary>
 /// What to take into the game: runes, shards, item path and spells for one matchup, straight from
 /// observed games. Cached per patch so a repeat of the same matchup costs no network at all.
 /// </summary>
@@ -86,7 +118,9 @@ public sealed class BuildPlan
     // 4: a plan without an opponent is now fetched per queue and per rank bracket, which the file
     // name did not distinguish. Version-3 files were written before that and cannot say which
     // population they describe, so they are discarded rather than shown under a wrong label.
-    public const int CurrentSchemaVersion = 4;
+    // 5: ARAM Chaos plans carry augments. Older files simply have none, which would be
+    // indistinguishable from "this champion has no augment data" — a refetch says which it is.
+    public const int CurrentSchemaVersion = 5;
 
     /// <summary>
     /// Defaults to 0, NOT to the current version: a default would also apply while deserialising
@@ -145,6 +179,12 @@ public sealed class BuildPlan
     /// matchup. OP.GG reports only 15 entries; 16-18 are derived on display and marked as such.
     /// </summary>
     public List<string> SkillOrder { get; set; } = [];
+
+    /// <summary>
+    /// Augments OP.GG has numbers for on this champion, unranked and unfiltered. Only filled for
+    /// ARAM Chaos; every other mode leaves it empty because no other mode hands them out.
+    /// </summary>
+    public List<AugmentOption> Augments { get; set; } = [];
 
     public bool IsEmpty => Runes is null && CoreItems.Count == 0 && Starters.Count == 0;
 }

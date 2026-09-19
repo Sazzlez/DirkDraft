@@ -116,22 +116,61 @@ einem laufenden Spiel, alle 45 Sekunden. Folgenlos geblieben, aber nicht durch E
 gilt eine Positivliste (`/liveclientdata/`, `/swagger/`) statt einer Verbotsliste: Eine Verbotsliste
 müsste jedes Verb kennen, das Riot im nächsten Patch ergänzt.
 
-## 3. Die Zahlen: vorhanden, aber ohne Stichprobe
+## 3. Die Zahlen: zwei Werte, beide undekodiert — und trotzdem brauchbar
 
-`lol_list_aram_augments` (OP.GG) liefert echte, lokalisierte Daten: `id`, `name`, `tier`,
-`performance`, `popular`. Was fehlt, ist die **Stichprobengröße**, und `performance` hat keine
-dokumentierte Skala. Für Darius gemessen:
+`lol_list_aram_augments` liefert `id`, `name`, `desc`, `tier`, `performance`, `popular`, nur für
+Tier 3 und höher, und nimmt **kein** `game_mode` (könnte ARAM und Mayhem also nicht trennen) und
+**keinen** `tier`-Rang.
 
-| Augment | Tier | performance | popular |
+### Was nach einer Dekodierung aussah
+
+Bei `popular = 0` ist `performance` **quantisiert**: 170, 141,67, 127,5, 113,33, 85, 56,67, 48,57,
+42,5 und 0 — das ist 170 × 1/1, 5/6, 3/4, 2/3, 1/2, 1/3, 2/7, 1/4, 0. Der Wert ist also ein
+Verhältnis auf einer 170er-Skala, und diese Zeilen ruhen auf **ein bis sieben Beobachtungen**.
+
+### Warum es doch keine ist
+
+Wenn `performance = 170 × Siegquote` gilt, muss der mit `popular` gewichtete Mittelwert die
+Gesamtsiegquote des Champions treffen. Über sieben Champions geprüft:
+
+| Champion | echte WR | gewichtet | Differenz |
 |---|---:|---:|---:|
-| Brennen aufwerten | 3 | 84,38 | 0,22 |
-| Quantenberechnung | 5 | 124,67 | **0,00** |
-| Hexer-Safttüte | 5 | 46,36 | **0,00** |
+| Seraphine | 0,51 | 0,506 | −0,004 |
+| Ahri | 0,52 | 0,495 | −0,025 |
+| Lee Sin | 0,44 | 0,405 | −0,035 |
+| Darius | 0,50 | 0,464 | −0,036 |
+| Jinx | 0,53 | 0,490 | −0,040 |
+| Lux | 0,53 | 0,463 | −0,067 |
+| Garen | 0,52 | 0,428 | −0,092 |
 
-Die Extremwerte sitzen genau dort, wo `popular` null ist — das ist Rauschen. Ohne Stichprobe lässt
-es sich weder glätten (`Shrinkage`) noch mit einem Fehlerbalken versehen (`ScoreError`), und jede
-andere Zahl im Tool trägt einen. Dazu nimmt das Werkzeug nur `champion_id` und `lang`, **kein**
-`game_mode`: Es könnte ARAM und Mayhem gar nicht auseinanderhalten.
+Ein Treffer von sieben ist Zufall, keine Dekodierung. **Die Zahl wird nicht in eine Siegquote
+umgerechnet.**
+
+### Und keine Stichprobe
+
+Wäre `popular` der Anteil der Spiele des Champions, müssten die Werte sich auf höchstens sechs
+summieren — so viele Augmente vergibt ein Spiel. Seraphine: **4,05** (das ließ die Idee richtig
+aussehen). Lee Sin: **9,09**. Damit gibt es keinen Nenner, nichts zu glätten und keinen
+Fehlerbalken.
+
+### Was bleibt: zwei Filter, beide aus den Daten gelesen
+
+Ohne sie ist die Liste schlechter als nutzlos — nach dem Rohwert sortiert stehen bei Seraphine neun
+Augmente auf makellosen 170, alle mit `popular = 0`, und bei Darius vier Zeilen mit Beliebtheit
+0,01–0,04 ganz oben.
+
+1. **Grobkörnigkeits-Filter.** Lässt sich der Wert exakt als 170 × w/n mit n ≤ 40 darstellen,
+   stammt er aus höchstens 40 Beobachtungen und fliegt raus. Gegenprobe an Darius: Die so
+   erkannten Zeilen haben eine mittlere Beliebtheit von **0,001**, die übrigen **0,127** — Finger-
+   abdruck und Beliebtheit sind sich einig, welche Zeilen dünn sind. Die Grenze liegt bei 40, weil
+   die Zahl der Brüche mit Nenner ≤ n wie 3n²/π² wächst: bei 40 werden ~3 % beliebiger Werte
+   zufällig getroffen, bei 100 schon ~18 %, bei 150 ~40 %.
+2. **Median-Beliebtheit des Champions.** Von den verbliebenen Zeilen bleibt, was mindestens so oft
+   genommen wird wie die Hälfte der Augmente dieses Champions. Die Verteilung des Champions setzt
+   die Hürde, nicht eine erfundene Konstante.
+
+Ergebnis für vier geprüfte Champions: durchweg Zeilen mit Beliebtheit 0,12–0,32, sortiert nach
+OP.GGs Wert.
 
 ## 4. Die Namenstabelle: vollständig vorhanden, lokal
 
@@ -151,11 +190,12 @@ Gemessen dazu:
 
 ## Stand der Entscheidung
 
-- **Nicht gebaut**, in keinem Modus und keinem Bildschirm: 0 Treffer für `augment` in `src/` und
-  `tests/` (ausgenommen die Sonde, die nur misst).
+- **Gebaut: die Augment-Liste im Spielbildschirm**, nur für ARAM Chaos. Acht Zeilen, zweispaltig,
+  mit OP.GGs Tier und OP.GGs Wert, sortiert nach dem Wert, gefiltert nach den zwei Regeln aus
+  Punkt 3. Geholt wird sie im Champ Select zusammen mit dem Build (ein Aufruf, gegen dasselbe
+  Budget), weil der Spielbildschirm keinen eigenen Netzweg hat.
+- **Nicht gebaut: eine Siegquote, eine Glättung, ein Fehlerbalken.** Punkt 3 sagt, warum. Die
+  gezeigte Zahl ist OP.GGs, als solche beschriftet, und die Fußzeile der Liste sagt es noch einmal.
 - **„Die drei im Moment der Wahl": noch offen.** Ein eigener Endpunkt ist ausgeschlossen; ein Feld
   in `allgamedata` ist es nicht, weil das Messspiel keine Augments hatte. Ein Durchlauf in
   Queue 2400 entscheidet es.
-- **„Nachschlagen vorab" bleibt möglich**, aber nur als Liste ohne Urteil. Voraussetzung für ein
-  Urteil wäre eine Stichprobe zu `performance` (Punkt 3), und die liefert OP.GG nicht. Solange sie
-  fehlt, wäre jede Rangfolge eine erfundene Genauigkeit — dieselbe Regel wie überall sonst hier.

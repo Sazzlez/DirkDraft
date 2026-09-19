@@ -88,6 +88,41 @@ public sealed class SkillCellViewModel : ObservableObject
     }
 }
 
+/// <summary>One augment in the in-game list: its name, OP.GG's tier and OP.GG's two figures.</summary>
+public sealed class AugmentRowViewModel : ObservableObject
+{
+    private string _name = string.Empty;
+    private string _tier = string.Empty;
+    private string _figure = string.Empty;
+    private string? _hint;
+
+    public string Name
+    {
+        get => _name;
+        set => Set(ref _name, value);
+    }
+
+    /// <summary>OP.GG's own tier badge, as text. Their judgement, labelled as theirs.</summary>
+    public string Tier
+    {
+        get => _tier;
+        set => Set(ref _tier, value);
+    }
+
+    /// <summary>OP.GG's two figures, passed through: its score and its popularity.</summary>
+    public string Figure
+    {
+        get => _figure;
+        set => Set(ref _figure, value);
+    }
+
+    public string? Hint
+    {
+        get => _hint;
+        set => Set(ref _hint, value);
+    }
+}
+
 /// <summary>
 /// The in-game build view: runes, purchase order with item icons, and the level-by-level skill
 /// table, all for the matchup that was just drafted. Shown while the game runs, so the answer to
@@ -106,6 +141,9 @@ public sealed class GameBuildViewModel : ObservableObject
     private bool _hasSkillOrder;
     private bool _hasEarlyAlternatives;
     private bool _hasCoreAlternatives;
+    private bool _hasAugments;
+    private string _augmentNote = string.Empty;
+    private bool _showModeChip = true;
 
     public ObservableCollection<IconChipViewModel> PrimaryRunes { get; } = [];
 
@@ -140,6 +178,15 @@ public sealed class GameBuildViewModel : ObservableObject
 
     public ObservableCollection<SkillCellViewModel> SkillCells { get; } = [];
 
+    /// <summary>
+    /// The augments worth naming for this champion, best first. Only ARAM Chaos fills this; no
+    /// other mode hands them out.
+    /// </summary>
+    public ObservableCollection<AugmentRowViewModel> Augments { get; } = [];
+
+    /// <summary>How many rows the card has room for without turning into a lookup table.</summary>
+    private const int AugmentCount = 8;
+
     public string Title
     {
         get => _title;
@@ -168,6 +215,9 @@ public sealed class GameBuildViewModel : ObservableObject
     {
         Title = championName is { Length: > 0 } ? championName : "Im Spiel";
         Subtitle = string.Empty;
+
+        // No build means no mode in the title, so the window may say it.
+        ShowModeChip = true;
 
         MissingNote = hasLaneOverview
             ? "Für dieses Spiel liegt kein Build vor — unten stehen die Lanes des Drafts."
@@ -213,6 +263,30 @@ public sealed class GameBuildViewModel : ObservableObject
         set => Set(ref _hasEarlyAlternatives, value);
     }
 
+    /// <summary>
+    /// Whether the window should print the queue name beside this card. False when the title
+    /// already carries it, which on the Abyss it does — showing both put "ARAM Mayhem" twice in one
+    /// line, and since nothing clipped the title the two overlapped into "Darius · ARAM M".
+    /// </summary>
+    public bool ShowModeChip
+    {
+        get => _showModeChip;
+        private set => Set(ref _showModeChip, value);
+    }
+
+    public bool HasAugments
+    {
+        get => _hasAugments;
+        set => Set(ref _hasAugments, value);
+    }
+
+    /// <summary>What the augment figures do and do not say. Never empty while rows are shown.</summary>
+    public string AugmentNote
+    {
+        get => _augmentNote;
+        set => Set(ref _augmentNote, value);
+    }
+
     public bool HasCoreAlternatives
     {
         get => _hasCoreAlternatives;
@@ -247,6 +321,9 @@ public sealed class GameBuildViewModel : ObservableObject
         MissingNote = string.Empty;
 
         var mode = modeLabel.Length > 0 ? modeLabel : BuildModes.Display(plan.Mode);
+
+        // The chip beside the card would repeat what the title says.
+        ShowModeChip = mode.Length == 0;
 
         // A build without an opponent answers for the champion, not for a pairing — naming an
         // opponent it was never measured against would be the one thing this card must not do.
@@ -316,6 +393,8 @@ public sealed class GameBuildViewModel : ObservableObject
             Spells[i].Hint = name.Length > 0 ? name : null;
             Spells[i].IsHighlighted = false;
         }
+
+        FillAugments(plan);
 
         SkillText = string.IsNullOrEmpty(plan.SkillPriority) ? string.Empty : $"Skills: {plan.SkillPriority}";
 
@@ -393,6 +472,43 @@ public sealed class GameBuildViewModel : ObservableObject
     private const int MinimumPlayForRate = 50;
 
     /// <summary>Win rate and sample, or just the sample when the sample cannot carry a rate.</summary>
+    /// <summary>
+    /// The augment rows, ranked here rather than at fetch time so a cached plan keeps the raw
+    /// numbers and picks up a corrected ranking rule without being refetched.
+    /// </summary>
+    private void FillAugments(BuildPlan plan)
+    {
+        var ranked = AugmentAdvisor.Rank(plan.Augments, AugmentCount);
+
+        Augments.Resize(ranked.Count, () => new AugmentRowViewModel());
+
+        for (var i = 0; i < ranked.Count; i++)
+        {
+            var row = ranked[i];
+
+            Augments[i].Name = row.Name;
+            Augments[i].Tier = row.Tier > 0 ? $"T{row.Tier}" : string.Empty;
+
+            // OP.GG's score alone. Its popularity did the filtering and belongs in the tooltip:
+            // printed next to the score it reads like a second rating, and it is not one.
+            Augments[i].Figure = $"{row.Performance:0.#}";
+            Augments[i].Hint =
+                $"OP.GG-Wert {row.Performance:0.##}, Beliebtheit {row.PickRate:0.00}, Tier {row.Tier}. "
+                + "Beide Zahlen stammen unverändert von OP.GG — die Skala des Werts ist nicht "
+                + "dokumentiert, und die Beliebtheit ist kein Anteil an Spielen. Die Reihenfolge "
+                + "folgt dem Wert; kleine Abstände bedeuten entsprechend wenig.";
+        }
+
+        HasAugments = ranked.Count > 0;
+
+        // Never shown without this line. The order is OP.GG's own judgement, not one this tool can
+        // check, and two kinds of row are missing on purpose — a reader who knows neither will read
+        // the list as more decided than it is.
+        AugmentNote = ranked.Count == 0
+            ? string.Empty
+            : "OP.GG-Wert · nur häufig genommene Augmente · alle Ränge";
+    }
+
     private static string Sample(double winRate, int play) => play >= MinimumPlayForRate
         ? $"{winRate:P0} WR · {play:N0} Games"
         : play > 0

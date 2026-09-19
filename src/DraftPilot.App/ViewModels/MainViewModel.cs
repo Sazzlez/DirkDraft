@@ -2206,6 +2206,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
             if (plan is not null && !plan.IsEmpty)
             {
+                await AttachAugmentsAsync(fetcher, plan, me, token).ConfigureAwait(true);
+
                 _buildCache.Save(plan);
                 ApplyBuild(plan);
             }
@@ -2226,6 +2228,50 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 _buildFetched.Add(context);
 
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Adds the champion's augments to a freshly fetched plan, for the one mode that hands them
+    /// out. Fetched here rather than in the game view because the game view has no network path of
+    /// its own — by the time the player can see this card, champion select is long over.
+    /// <para>
+    /// A failure here never costs the build. The two calls are an extra on top of a plan that has
+    /// already arrived, and letting them mark the build as failed would trade something the player
+    /// needs for something nice to have.
+    /// </para>
+    /// </summary>
+    private async Task AttachAugmentsAsync(
+        LiveDraftFetcher fetcher,
+        BuildPlan plan,
+        ChampionEntry me,
+        CancellationToken token)
+    {
+        // ARAM Chaos only. Plain ARAM was measured NOT to hand out augments — the client's own
+        // match history records playerAugment1..6 as zero for it — and asking anyway would fill
+        // the card with numbers from a mode the player is not in.
+        if (_queue != QueueKind.AramMayhem)
+            return;
+
+        // Counted before the call, like every other live request.
+        if (_liveCallsThisDraft >= MaxLiveCallsPerDraft)
+            return;
+
+        _liveCallsThisDraft++;
+
+        try
+        {
+            var augments = await fetcher.FetchAugmentsAsync(me, Settings.DataLanguage, token)
+                .ConfigureAwait(true);
+
+            if (augments is null || token.IsCancellationRequested)
+                return;
+
+            plan.Augments = [.. augments];
+        }
+        catch (Exception ex) when (IsRecoverable(ex, token))
+        {
+            CrashLog.Note("Draft-Abruf", $"Augmente {me.Name}: {ex.Message}");
         }
     }
 

@@ -811,15 +811,32 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding GameBuild.Title}" Style="{StaticResource Title}" />
+                        <!-- Trimmed: a Grid does not clip its children, so a long title ran
+                             straight through the columns beside it instead of ending. -->
+                        <TextBlock Text="{Binding GameBuild.Title}" Style="{StaticResource Title}"
+                                   TextTrimming="CharacterEllipsis" />
 
                         <!-- The mode survives champion select in the view model, so the running
                              game can still say which queue its numbers describe. On the Abyss the
-                             title already carries it; this is what the Rift modes were missing. -->
-                        <TextBlock Grid.Column="1" Text="{Binding ModeText}" Style="{StaticResource Small}"
+                             title already carries it and this stays hidden; this is what the Rift
+                             modes were missing. -->
+                        <TextBlock Grid.Column="1" Text="{Binding ModeText}"
                                    Foreground="{StaticResource Muted}" VerticalAlignment="Center"
-                                   Margin="0,0,10,0" ToolTip="{Binding ModeNote}"
-                                   Visibility="{Binding HasModeText, Converter={StaticResource BoolToVisibility}}" />
+                                   Margin="0,0,10,0" ToolTip="{Binding ModeNote}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasModeText}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding GameBuild.ShowModeChip}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
 
                         <TextBlock Grid.Column="2" Text="{Binding GameBuild.Subtitle}"
                                    Style="{StaticResource Small}" Foreground="{StaticResource Faint}"
@@ -1072,6 +1089,57 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                    </Grid>
+
+                    <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,10,0,10"
+                            Visibility="{Binding GameBuild.HasAugments, Converter={StaticResource BoolToVisibility}}" />
+
+                    <!-- Augments. Only ARAM Chaos hands them out, so this whole block is absent
+                         in every other mode rather than showing an empty heading. -->
+                    <Grid Visibility="{Binding GameBuild.HasAugments, Converter={StaticResource BoolToVisibility}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="AUGMENTE" Style="{StaticResource Caption}" VerticalAlignment="Top"
+                                   Margin="0,2,14,0"
+                                   ToolTip="Die Augmente, die auf diesem Champion am besten abgeschnitten haben. Sortiert nach Siegquote, geglättet über die Stichprobe. Augmente, die niemand gespielt hat, stehen nicht in der Liste — ihre Quoten stammen aus ein bis sieben Spielen und wären sonst die obersten Zeilen." />
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="{Binding GameBuild.AugmentNote}" Style="{StaticResource Small}"
+                                       FontSize="11" Foreground="{StaticResource Faint}" Margin="0,0,0,6"
+                                       ToolTip="OP.GG liefert für Augmente keinen Rang-Filter, die Zahlen gelten also für alle Ränge. Die Spielzahl ist aus dem gemeldeten Anteil zurückgerechnet und auf die vorsichtige Seite gerundet." />
+                            <ItemsControl ItemsSource="{Binding GameBuild.Augments}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="2" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:AugmentRowViewModel}">
+                                        <Grid Margin="0,0,18,4" ToolTip="{Binding Hint}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Grid.Column="0" Text="{Binding Tier}" FontSize="10"
+                                                       Foreground="{StaticResource Faint}" MinWidth="20"
+                                                       VerticalAlignment="Center" Margin="0,0,6,0" />
+
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12"
+                                                       Foreground="{StaticResource Text}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center" Margin="0,0,8,0" />
+
+                                            <TextBlock Grid.Column="2" Text="{Binding Figure}" FontSize="11"
+                                                       Foreground="{StaticResource Faint}"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </Grid>
 
                     <Border Height="1" Background="{StaticResource LineSoft}" Margin="0,10,0,10"
