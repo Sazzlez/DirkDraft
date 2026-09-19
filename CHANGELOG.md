@@ -39,6 +39,33 @@ Kopien melden sie beim nächsten Start.
 - `Tools -- watch` und `replay` zeigen den erkannten Modus in derselben Zeile wie das Fenster:
   Name, welche OP.GG-Quelle daraus folgt, ob Lanes gelten, und den Mayhem-Vorbehalt.
 
+### Behoben
+
+- **Der Build-Cache konnte Solo/Duo und Flex nicht auseinanderhalten.** Seit es den Build ohne
+  Gegner gibt, hängt der an Queue **und** Rang-Bracket — der Dateiname kannte aber nur Patch,
+  Champion, Lane und Gegner. Ein in Flex geholter Build wurde damit im nächsten Solo/Duo-Draft
+  wortlos weitergereicht. Pläne tragen jetzt eine Variante (`ranked-gold`) im Dateinamen;
+  Matchup-Pläne behalten ihren alten Namen, weil ihre Quelle weder Queue noch Bracket kennt. Alte
+  Cache-Dateien werden verworfen statt falsch beschriftet.
+- **Der Build-Abruf hatte keine Obergrenze.** Gezählt wurde er gegen das Draft-Budget, geprüft
+  nicht — eine flackernde Lane-Vorhersage konnte beliebig viele Anfragen an einen fremden Server
+  erzeugen. Jetzt gilt dieselbe Grenze wie für die Counter.
+- **Eine angenommene eigene Lane durfte einen Gegner auswählen.** Nennt weder Client noch Vorhersage
+  eine Lane, fällt der Build auf die Hauptlane des Champions zurück. Als Position ist das richtig;
+  als Grundlage für „wer steht mir gegenüber" verkettet es zwei Vermutungen zu einer konkreten
+  Behauptung über ein Duell. Dort gibt es jetzt nur noch den gegnerlosen Build.
+- **Kopfzeile und Markierung widersprachen sich bei der Gleichauf-Gruppe.** Lag Platz 1 mit
+  niemandem gleichauf, schwieg die Kopfzeile („erst ab zwei"), die Zeile trug aber trotzdem die
+  Akzentkante bzw. im Testwerkzeug das `=`, das „statistisch nicht zu trennen" bedeutet. Die Regel
+  liegt jetzt in `CountLeadingTies` selbst: entweder eine Gruppe ab zwei, oder keine.
+- **In Modi ohne Lanes wurden Counter geholt, die nirgends angezeigt werden.** ARAM, Mayhem und
+  Arena zeigen weder Vorschlagsliste noch Matchup-Panel noch Duell-Zahlen — die bis zu fünf
+  Counter-Abrufe pro Draft liefen trotzdem, und auf der Heulenden Schlucht antwortet OP.GG darauf
+  ohnehin mit „insufficient matchup sample". Fällt weg; der Build wird dort weiter geholt.
+- Zusammengeführt: `MainLaneLogOdds` und der Build-Pfad beantworteten „auf welcher Lane spielt
+  dieser Champ eigentlich" mit zwei getrennten Schleifen. Der Kommentar an der Stelle warnt genau
+  davor — jetzt gibt es eine Implementierung.
+
 ## 1.2.1 — 2026-09-19
 
 - **An der App ändert sich nichts.** Diese Version ist verhaltensgleich zu 1.2.0; sie existiert, um

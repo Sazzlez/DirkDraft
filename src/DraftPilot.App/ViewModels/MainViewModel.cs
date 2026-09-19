@@ -1688,6 +1688,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         var pending = new List<(int Champion, Lane Lane, string Name)>();
 
+        // Counters are lane statistics, and a mode without lanes shows none of them: no pick list,
+        // no matchup panel, no duel figures in the seat rows. Fetching them there spent up to five
+        // calls per draft on data nobody would ever see — and on the Abyss OP.GG answers them with
+        // "insufficient matchup sample" anyway, so the five calls bought nothing at all.
+        if (!_state.Queue.UsesLanes())
+            return pending;
+
         if (_enemyPredictions is not { } predictions)
             return pending;
 
