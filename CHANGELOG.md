@@ -3,6 +3,21 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
+## 1.2.1 — 2026-09-19
+
+- **An der App ändert sich nichts.** Diese Version ist verhaltensgleich zu 1.2.0; sie existiert, um
+  den reparierten Veröffentlichungsweg einmal echt zu gehen. Repariert wurde das, was 1.2.0 fast
+  zerlegt hätte: Windows PowerShell 5.1 verpackt jede stderr-Zeile eines aufgerufenen Programms in
+  einen Fehler, sobald die Ausgabe des Skripts umgeleitet wird — und Git schreibt dort
+  Routinemeldungen hin („LF will be replaced by CRLF"). Der Lauf brach deshalb ab, nachdem der
+  Installer fertig gepackt war und bevor Commit, Tag und Upload liefen; den Rest musste ich von
+  Hand nachziehen. `release.ps1` und `publish.ps1` bewerten jedes aufgerufene Programm jetzt nur
+  noch an seinem Exitcode, dem Einzigen, was es über seinen Erfolg zusagt.
+- Das Testwerkzeug zeigt dieselbe Liste wie das Fenster: `Tools -- recommend` druckt jetzt
+  Fehlerbalken und markiert mit `=`, was von Platz 1 statistisch nicht zu trennen ist, `--terms`
+  legt jedes Kriterium einzeln offen. Ein `-` steht für „niemand" — ein leeres `""` verschluckt die
+  Shell, und die nächste Liste rutschte dann unbemerkt in den Gegner-Platz.
+
 ## 1.2.0 — 2026-09-19
 
 - **Das Fenster spricht jetzt League.** Die Texte standen in Lehrbuch-Deutsch da, während im Client
