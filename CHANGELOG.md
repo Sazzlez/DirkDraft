@@ -3,7 +3,7 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
-## Unveröffentlicht
+## 1.4.0 — 2026-09-19
 
 - **Augmente im Spielbildschirm**, für ARAM Chaos. Acht Zeilen mit OP.GGs Tier und OP.GGs Wert,
   sortiert nach dem Wert. Bewusst **ohne** Siegquote und ohne Fehlerbalken: Der Wert sieht aus wie
@@ -19,7 +19,6 @@ Kopien melden sie beim nächsten Start.
 - **Die Kopfzeile im Spielbildschirm nannte den Modus doppelt** und schnitt den Titel nicht ab, was
   sich zu „Darius · ARAM M" überlappte. Das Label erscheint jetzt nur noch, wenn der Titel den
   Modus nicht schon trägt.
-
 - **Custom-Spiele behalten ihren Modus.** Ein ARAM-Chaos-Spiel aus einer eigenen Lobby wurde als
   „Custom Game" geführt und damit wie ein Kluft-Spiel behandelt — mit Lane-Empfehlungen für die
   Heulende Schlucht. Ursache: Die Modus-Erkennung fragte die Custom-Kennzeichnung vor der
