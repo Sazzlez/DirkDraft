@@ -72,6 +72,21 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
     /// <summary>Riot's defensive rating from which a champion counts as a frontline body.</summary>
     private const int FrontlineDefense = 6;
 
+    /// <summary>
+    /// Engage rating from which an initiation is reliable enough to plan against. The same bar
+    /// <see cref="ChampionTraits.HasHardEngage"/> uses, applied to a profile's maximum rather than
+    /// to one champion — the two must not drift apart, or "they can engage" and "he can engage"
+    /// would mean different things in the same sentence.
+    /// </summary>
+    private const int HardEngage = 2;
+
+    /// <summary>
+    /// Fewest revealed enemies any enemy-facing rule needs — the two bodies of the frontline rule;
+    /// every other one needs three. Below that the enemy half of <see cref="Fit"/> cannot fire at
+    /// all, and answering with a considered zero would report a judgement nobody made.
+    /// </summary>
+    private const int MinimumEnemiesToJudge = 2;
+
     /// <summary>Rules need a few champions on the board before they say anything useful.</summary>
     private const int MinimumForDamageRules = 3;
 
@@ -198,12 +213,22 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
     /// <summary>
     /// How much a candidate would improve the composition, from -1 to about +1, with the reasons
     /// that produced the number. <see langword="null"/> when there is nothing to judge yet — no
-    /// team-mate has picked, or the champion is unknown — as opposed to a considered zero.
+    /// champion revealed on either side, or the candidate is unknown — as opposed to a considered
+    /// zero.
+    /// <para>
+    /// Both line-ups are read. The rules below the ally block ask the mirror question — not "what
+    /// is missing on our side" but "what does this pick do about what they brought" — and they are
+    /// the only place in the engine where the enemy composition reaches the score at all. Until
+    /// they existed it was computed, drawn in the comparison table, and then dropped: whether the
+    /// enemy could start a fight or had left their backline unguarded made no difference to a
+    /// single recommendation. They share this term's cap, so the rule-based share of the score is
+    /// no larger than it was calibrated for.
+    /// </para>
     /// </summary>
-    public double? Fit(int candidateId, CompProfile profile, ICollection<Reason> reasons)
+    public double? Fit(int candidateId, CompProfile profile, CompProfile enemies, ICollection<Reason> reasons)
     {
         var champion = _meta.Champion(candidateId);
-        if (champion is null || profile.Count == 0)
+        if (champion is null || (profile.Count == 0 && enemies.Count < MinimumEnemiesToJudge))
             return null;
 
         var trait = _traits.For(champion.Key);
@@ -305,10 +330,80 @@ public sealed class CompAnalyzer(MetaLookup meta, TraitTable traits)
                 + "macht es dem Gegner leicht: Er kauft Magieresistenz und ist gegen alles gewappnet."));
         }
 
+        // --- What the pick does about THEIR line-up. -------------------------------------------
+        // Same shape as the rules above: each one names its precondition, stays silent when the
+        // data for it is missing, and the whole block shares the term's cap. Nothing here is a win
+        // rate — if OP.GG has a number for the pairing, it is already in the duel terms, measured.
+        // These say the part no duel does: that a team which cannot be peeled from, or has left
+        // nobody in front, has a shape this pick either answers or walks into.
+
+        if (champion.HasStaticData)
+        {
+            if (enemies.Has(CompIssue.NoFrontline) && champion.IsTagged("Assassin"))
+            {
+                score += 0.3;
+                reasons.Add(Reason.Pro(
+                    "ihre Backline steht frei",
+                    "Im gegnerischen Team steht bisher niemand vorne, der Schaden abfangen kann. "
+                    + "Ein Champion, der gezielt auf die hinteren Reihen geht, kommt dort ohne "
+                    + "Umweg hin."));
+            }
+
+            // The mirror of the rule above, and the reason it may be trusted: the same trait that
+            // is worth something against an open backline is worth less against two bodies in
+            // front of it.
+            if (enemies.FrontlineCount >= 2 && champion.IsTagged("Assassin"))
+            {
+                score -= 0.2;
+                reasons.Add(Reason.Contra(
+                    "kommt schwer an ihre Carrys",
+                    "Der Gegner hat schon zwei Champions, die vorne stehen und Schaden aushalten. "
+                    + "Sie stehen genau zwischen diesem Pick und den Zielen, für die er gebaut ist."));
+            }
+
+            if (enemies.Has(CompIssue.AllMelee) && champion.IsRanged)
+            {
+                score += 0.25;
+                reasons.Add(Reason.Pro(
+                    "Reichweite gegen ein Nahkampf-Team",
+                    "Der Gegner besteht bisher nur aus Nahkämpfern. Wer auf Distanz Schaden macht, "
+                    + "zwingt sie, den Weg zu ihm erst zurückzulegen."));
+            }
+        }
+
+        if (trait.IsKnown)
+        {
+            if (enemies.MaxEngage >= HardEngage && trait.HasPeel)
+            {
+                score += 0.3;
+                reasons.Add(Reason.Pro(
+                    "hält ihr Engage auf",
+                    "Der Gegner hat einen Champion, der einen Teamfight von sich aus starten kann. "
+                    + "Dieser Pick kann die Getroffenen wieder herausholen — sonst entscheidet ihr "
+                    + "Anspiel den Kampf."));
+            }
+
+            // Half the known enemies scaling late is the point where waiting is their plan; a pick
+            // whose own curve is the other way round takes the game before that plan arrives.
+            if (enemies.TraitsKnown >= MinimumForRoleRules
+                && enemies.LateScalingCount * 2 >= enemies.TraitsKnown
+                && trait.Scaling == ScalingCurve.Early)
+            {
+                score += 0.25;
+                reasons.Add(Reason.Pro(
+                    "früh stark gegen ein spätes Team",
+                    "Mindestens die Hälfte der aufgedeckten Gegner wird erst im späten Spiel "
+                    + "gefährlich. Dieser Champion ist umgekehrt früh am stärksten — er kann das "
+                    + "Spiel entscheiden, bevor ihre Kurve greift."));
+            }
+        }
+
         // The documented range is -1..+1 and ScoreModel.CompScale is calibrated for it ("a
         // covered gap ≈ +4 points, never more"). Unclamped, a candidate covering every gap at
         // once stacked up to 2.15 — turning the one term WITHOUT a win-rate basis into the
-        // second-largest in the model.
+        // second-largest in the model. The enemy-facing rules above deliberately share this cap
+        // rather than getting their own: the term answers one question, and it may not grow
+        // louder just because it now looks at both halves of the board.
         return Math.Clamp(score, -1, 1);
     }
 

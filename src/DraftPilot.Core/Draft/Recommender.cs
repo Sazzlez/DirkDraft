@@ -188,7 +188,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
 
         var items = target.Action == TurnAction.Ban
             ? ScoreBans(state, lane, allyChampions, hoveredByOthers, enemyLanes, limit)
-            : ScorePicks(state, lane, allyChampions, hoveredByOthers, enemyLanes, allyComp, selectable, limit);
+            : ScorePicks(state, lane, allyChampions, hoveredByOthers, enemyLanes, allyComp, enemyComp, selectable, limit);
 
         return new RecommendationSet(target.Slot.CellId, lane, target.Action, items, allyComp, enemyComp);
     }
@@ -214,6 +214,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         IReadOnlySet<int> hoveredByOthers,
         LanePredictionResult enemyLanes,
         CompProfile allyComp,
+        CompProfile enemyComp,
         IReadOnlySet<int>? selectable,
         int limit)
     {
@@ -247,10 +248,10 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             // and the list degenerates into an alphabet. Strength on the champion's own best lane
             // is the honest substitute.
             var baseTerm = lane == Lane.Unknown
-                ? BestLaneLogOdds(candidate, lane, reasons, budget)
+                ? MainLaneLogOdds(candidate, lane, reasons, budget)
                 : LaneLogOdds(candidate, lane, reasons, budget);
 
-            var compFit = _comp.Fit(candidate, allyComp, reasons);
+            var compFit = _comp.Fit(candidate, allyComp, enemyComp, reasons);
 
             if (laneIsOpen)
                 AddCounterRisk(candidate, lane, blocked, reasons);
@@ -567,43 +568,54 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
     }
 
     /// <summary>
-    /// Strength on whichever lane suits the champion best; used for bans and unknown lanes. The
-    /// chip names that lane only when it differs from the seat's own.
+    /// Strength on the lane the champion is actually played on; the stand-in for the lane term when
+    /// the seat has no lane at all (custom games, blind pick without an assignment).
+    /// <para>
+    /// This used to take the HIGHEST win rate of the champion's five rows. That is a maximum over
+    /// noisy estimates: with five draws to choose from, the winner tends to be the luckiest sample
+    /// rather than the best lane, and the chip could name a lane the champion plays in 3 % of its
+    /// games. It also left the codebase answering one question three ways — <see cref="BanLane"/>
+    /// by role rate, <c>MetaLookup.MainLaneWinRate</c> by play count, this one by win rate. Role
+    /// rate and play count are the same ordering for a single champion (the rate is that count over
+    /// the champion's own total), so two of the three always agreed; this one is now the third.
+    /// </para>
     /// </summary>
-    private double? BestLaneLogOdds(int championId, Lane seatLane, ICollection<Reason> reasons, ErrorBudget budget)
+    private double? MainLaneLogOdds(int championId, Lane seatLane, ICollection<Reason> reasons, ErrorBudget budget)
     {
-        double? best = null;
-        var bestLane = Lane.Unknown;
-        LaneView bestStat = default;
+        LaneView? mainStat = null;
+        var mainLane = Lane.Unknown;
+
+        // -1, not 0: a fallback row carries Play = 0, and a champion whose only rows are fallbacks
+        // should still be answered with its rate rather than with "no data".
+        var mostPlayed = -1;
 
         foreach (var lane in Lanes.All)
         {
-            if (_meta.LaneStat(championId, lane) is not { } stat)
+            if (_meta.LaneStat(championId, lane) is not { } stat || stat.Play <= mostPlayed)
                 continue;
 
-            var logOdds = ScoreModel.Logit(stat.WinRate);
-
-            if (best is not null && logOdds <= best)
-                continue;
-
-            best = logOdds;
-            bestLane = lane;
-            bestStat = stat;
+            mostPlayed = stat.Play;
+            mainLane = lane;
+            mainStat = stat;
         }
 
-        if (best is not null)
-            budget.Add(ScoreError.LogitVariance(bestStat.WinRate, bestStat.Play, Shrinkage.LanePrior, _meta.LaneTarget));
+        if (mainStat is not { } main)
+            return null;
+
+        budget.Add(ScoreError.LogitVariance(main.WinRate, main.Play, Shrinkage.LanePrior, _meta.LaneTarget));
+
+        var logOdds = ScoreModel.Logit(main.WinRate);
 
         // 0.08 log-odds ≈ +2 percentage points: strong enough to be worth a chip.
-        if (bestLane != Lane.Unknown && bestLane != seatLane && best > 0.08)
+        if (mainLane != seatLane && logOdds > 0.08)
         {
             reasons.Add(Reason.Pro(
-                $"stark auf {bestLane.Display()}",
-                $"Gemessen an der Siegquote ist {bestLane.Display()} die Lane, auf der "
-                + "dieser Champion gerade am gefährlichsten ist."));
+                $"stark auf {mainLane.Display()}",
+                $"{mainLane.Display()} ist die Lane, auf der dieser Champion meistens gespielt wird: "
+                + $"{main.WinRate:P1} Siegquote aus {main.Play:N0} Spielen."));
         }
 
-        return best;
+        return logOdds;
     }
 
     /// <summary>

@@ -204,7 +204,7 @@ public class CompAnalyzerTests
         var profile = analyzer.Analyze([Ad1, Ad2, Ad3]);
         var reasons = new List<Reason>();
 
-        var score = analyzer.Fit(Ap1, profile, reasons);
+        var score = analyzer.Fit(Ap1, profile, CompProfile.Empty, reasons);
 
         Assert.True(score > 0);
         AssertChip(reasons, "magischen Schaden", ReasonTone.Pro);
@@ -217,7 +217,7 @@ public class CompAnalyzerTests
         var profile = analyzer.Analyze([Ad3, Ap1, Ap2]);
         var reasons = new List<Reason>();
 
-        analyzer.Fit(TankTagged, profile, reasons);
+        analyzer.Fit(TankTagged, profile, CompProfile.Empty, reasons);
 
         AssertChip(reasons, "vorne Schaden aus", ReasonTone.Pro);
     }
@@ -230,7 +230,7 @@ public class CompAnalyzerTests
         var profile = analyzer.Analyze([Ad1, Ad2, Ad3]);
         var reasons = new List<Reason>();
 
-        analyzer.Fit(TankTagged, profile, reasons);
+        analyzer.Fit(TankTagged, profile, CompProfile.Empty, reasons);
 
         AssertChip(reasons, "Kämpfe eröffnen", ReasonTone.Pro);
     }
@@ -243,7 +243,7 @@ public class CompAnalyzerTests
         var profile = analyzer.Analyze([Ad1, Ad2, Ad3, Ap1]);
         var reasons = new List<Reason>();
 
-        var score = analyzer.Fit(Ad4, profile, reasons);
+        var score = analyzer.Fit(Ad4, profile, CompProfile.Empty, reasons);
 
         Assert.True(score < 0);
         AssertChip(reasons, "mehr physischer Schaden", ReasonTone.Contra);
@@ -260,7 +260,7 @@ public class CompAnalyzerTests
         var profile = analyzer.Analyze([Ad1, Ad2, Ad3]);
         var reasons = new List<Reason>();
 
-        Assert.Null(analyzer.Fit(Unknown, profile, reasons));
+        Assert.Null(analyzer.Fit(Unknown, profile, CompProfile.Empty, reasons));
         Assert.Empty(reasons);
     }
 
@@ -269,7 +269,7 @@ public class CompAnalyzerTests
     {
         var analyzer = Analyzer();
 
-        Assert.Null(analyzer.Fit(Ap1, CompProfile.Empty, []));
+        Assert.Null(analyzer.Fit(Ap1, CompProfile.Empty, CompProfile.Empty, []));
     }
 
     [Fact]
@@ -343,7 +343,7 @@ public class CompAnalyzerTests
         var profile = analyzer.Analyze([Ad1, Ad2, Ad3]);
 
         // A ranged magic tank with hard engage, peel and CC covers all of them.
-        var fit = analyzer.Fit(TankTagged, profile, []);
+        var fit = analyzer.Fit(TankTagged, profile, CompProfile.Empty, []);
 
         Assert.NotNull(fit);
         Assert.InRange(fit!.Value, -1, 1);
@@ -359,5 +359,122 @@ public class CompAnalyzerTests
         Assert.False(CompProfile.Empty.HasDamageMix);
         Assert.False(Analyzer().Analyze([Unknown]).HasDamageMix);
         Assert.True(Analyzer().Analyze([Unknown, Ad1]).HasDamageMix);
+    }
+
+    // --- What the pick does about the ENEMY line-up. ----------------------------------------
+    // These rules are the mirror of the block above. Each one is pinned in both directions: the
+    // situation it is for, and a situation where it must stay silent — a rule that fires on every
+    // draft is a constant, not a reason.
+
+    private static TraitTable ScalingTraits(params (string Key, ScalingCurve Scaling)[] entries)
+        => TraitTable.FromEntries(entries.Select(entry => new KeyValuePair<string, ChampionTraits>(
+            entry.Key,
+            new ChampionTraits(0, 0, 1, entry.Scaling, 1, true))));
+
+    [Fact]
+    public void Fit_RewardsPeelAgainstAnEnemyThatCanEngage()
+    {
+        var traits = Traits(("TankTag", 2, 2, 3), ("Ad4", 0, 2, 0), ("Ad1", 0, 0, 1), ("Ad2", 0, 0, 1));
+        var analyzer = Analyzer(traits);
+        var enemies = analyzer.Analyze([TankTagged, Ad1, Ad2]);
+        var reasons = new List<Reason>();
+
+        var score = analyzer.Fit(Ad4, CompProfile.Empty, enemies, reasons);
+
+        Assert.True(score > 0);
+        AssertChip(reasons, "Engage auf", ReasonTone.Pro);
+    }
+
+    [Fact]
+    public void Fit_StaysSilentOnPeelWhenTheEnemyCannotEngage()
+    {
+        var traits = Traits(("Ad1", 0, 0, 1), ("Ad2", 0, 1, 1), ("Ad3", 1, 0, 1), ("Ad4", 0, 2, 0));
+        var analyzer = Analyzer(traits);
+        var enemies = analyzer.Analyze([Ad1, Ad2, Ad3]);
+        var reasons = new List<Reason>();
+
+        analyzer.Fit(Ad4, CompProfile.Empty, enemies, reasons);
+
+        Assert.DoesNotContain(reasons, reason => reason.Text.Contains("Engage", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Fit_RewardsAnAssassinAgainstAnOpenBackline()
+    {
+        var analyzer = Analyzer();
+        // Two mages and a marksman: nobody with a tank tag or six defence.
+        var enemies = analyzer.Analyze([Ap1, Ap2, Ad4]);
+        var reasons = new List<Reason>();
+
+        var score = analyzer.Fit(Ad3, CompProfile.Empty, enemies, reasons);
+
+        Assert.True(score > 0);
+        AssertChip(reasons, "Backline steht frei", ReasonTone.Pro);
+    }
+
+    /// <summary>
+    /// The counterweight to the rule above. Without it the term would only ever reward the same
+    /// champions, and "the enemy composition is read" would mean "assassins get a bonus".
+    /// </summary>
+    [Fact]
+    public void Fit_PenalisesAnAssassinAgainstTwoFrontliners()
+    {
+        var analyzer = Analyzer();
+        var enemies = analyzer.Analyze([TankTagged, TankByDefense, Ap1]);
+        var reasons = new List<Reason>();
+
+        var score = analyzer.Fit(Ad3, CompProfile.Empty, enemies, reasons);
+
+        Assert.True(score < 0);
+        AssertChip(reasons, "an ihre Carrys", ReasonTone.Contra);
+    }
+
+    [Fact]
+    public void Fit_RewardsAnEarlyChampionAgainstALateEnemy()
+    {
+        var traits = ScalingTraits(
+            ("Ad1", ScalingCurve.Late), ("Ad2", ScalingCurve.Late), ("Ad3", ScalingCurve.Late),
+            ("Ap1", ScalingCurve.Early));
+
+        var analyzer = Analyzer(traits);
+        var enemies = analyzer.Analyze([Ad1, Ad2, Ad3]);
+        var reasons = new List<Reason>();
+
+        var score = analyzer.Fit(Ap1, CompProfile.Empty, enemies, reasons);
+
+        Assert.True(score > 0);
+        AssertChip(reasons, "früh stark", ReasonTone.Pro);
+    }
+
+    /// <summary>
+    /// First pick of the own team, two enemies already revealed: the old signature had nothing to
+    /// say there, because it only ever looked at team-mates. That is exactly the moment with the
+    /// least other evidence — no duel, no duo, no lane opponent.
+    /// </summary>
+    [Fact]
+    public void Fit_JudgesTheEnemyBeforeTheOwnTeamHasPicked()
+    {
+        var analyzer = Analyzer();
+        var enemies = analyzer.Analyze([Ap1, Ap2, Ad4]);
+
+        Assert.NotNull(analyzer.Fit(Ad3, CompProfile.Empty, enemies, []));
+    }
+
+    /// <summary>
+    /// The enemy rules share the ally rules' cap on purpose: the term answers one question, and
+    /// looking at both halves of the board may make it better informed, not louder.
+    /// </summary>
+    [Fact]
+    public void Fit_StaysClampedWhenBothSidesArgueForThePick()
+    {
+        var traits = Traits(("Ad1", 0, 0, 0), ("Ad2", 0, 0, 0), ("Ad3", 0, 0, 0), ("TankTag", 3, 3, 3));
+        var analyzer = Analyzer(traits);
+        var allies = analyzer.Analyze([Ad1, Ad2, Ad3]);
+        var enemies = analyzer.Analyze([Ad1, Ad2, Ad3]);
+
+        var fit = analyzer.Fit(TankTagged, allies, enemies, []);
+
+        Assert.NotNull(fit);
+        Assert.InRange(fit!.Value, -1, 1);
     }
 }

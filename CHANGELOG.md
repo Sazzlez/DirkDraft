@@ -3,6 +3,24 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
+## 1.2.0 — unveröffentlicht
+
+- **Die gegnerische Aufstellung zählt jetzt mit.** Sie wurde die ganze Zeit berechnet, nach dem
+  Lock in der Vergleichstabelle gezeichnet — und für jede Empfehlung weggeworfen: der
+  Aufstellungs-Term sah ausschließlich Lücken im *eigenen* Team. Vier Regeln stellen die
+  Spiegelfrage, was der Pick gegen das ausrichtet, was sie mitgebracht haben: steht ihre Backline
+  ohne Frontline da, kann jemand von ihnen einen Kampf eröffnen, sind sie alle Nahkämpfer, wird
+  ihr Team erst spät gefährlich. Dazu das Gegengewicht — zwei Frontline-Körper kosten einen
+  Assassinen Punkte. Gemessen an einem Top-Draft gegen Jax/Viego/Syndra (Frontline 0): Tryndamere,
+  Pantheon und Yone kommen in die ersten acht, Teemo, Kayle und Ornn fallen heraus, Quinn gewinnt
+  1,2 Punkte. Die gemessenen Duelle an der Spitze bleiben unverändert — die Regeln teilen sich die
+  Deckelung des vorhandenen Terms, der Anteil ohne Winrate-Grundlage wächst also nicht.
+- Ohne Lane — eigene Spiele, Blind Pick ohne Zuweisung — nahm die Grundstärke bisher die **beste**
+  der fünf Lane-Zeilen. Ein Maximum über fünf verrauschte Schätzungen wählt aber die glücklichste
+  Stichprobe, nicht die beste Lane, und der Chip konnte eine Lane nennen, auf der der Champion
+  3 % seiner Spiele hat. Jetzt zählt die Lane, auf der er tatsächlich gespielt wird. Damit
+  beantworten nicht mehr drei Stellen dieselbe Frage auf drei Arten.
+
 ## 1.1.0 — 2026-09-19
 
 - **OP.GGs Tier zählt nicht mehr in die Prozentzahl.** Es steht weiter neben jeder Zeile, jetzt als

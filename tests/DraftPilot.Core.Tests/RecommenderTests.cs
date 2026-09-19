@@ -1248,4 +1248,67 @@ public class RecommenderTests
 
         Assert.Contains(items, item => item.ChampionId == Strong);
     }
+
+    /// <summary>
+    /// First pick of the own team against three revealed enemies. Until the enemy composition was
+    /// wired into the term, this was the emptiest row of the breakdown — "no ally picked, nothing
+    /// to fit into" — in the one moment with the least other evidence: no duel, no duo, no lane
+    /// opponent. The enemy line-up was analysed all along and only ever drawn in a table.
+    /// </summary>
+    [Fact]
+    public void CompositionTerm_ReadsTheEnemyBeforeAnyAllyHasPicked()
+    {
+        var session = new SessionBuilder()
+            .LocalPlayer(2)
+            .Locked(5, EnemyTop)
+            .Locked(6, Menace)
+            .Locked(7, EnemyMid)
+            .OnClock(2, "pick")
+            .Build();
+
+        var state = DraftState.From(session);
+        var target = new TurnTracker().Resolve(state)!;
+        var lanes = new LanePredictor(Meta()).Predict(state.Enemies);
+
+        var item = Recommender().Recommend(state, target, lanes, limit: 50).Items
+            .Single(entry => entry.ChampionId == CounterPick);
+
+        // Three enemies, none of them a tank or six defence: the assassin's targets stand open.
+        Assert.True(item.Breakdown.Single(term => term.Kind == ScoreTermKind.Composition).HasData);
+        Assert.Contains(item.Reasons, reason => reason.Text.Contains("Backline", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Without a lane the base term falls back to the champion's own lane. It used to fall back to
+    /// the champion's BEST lane: a maximum over five noisy rows, which systematically returns the
+    /// luckiest sample and can name a lane the champion hardly plays.
+    /// </summary>
+    [Fact]
+    public void WithoutALane_TheBaseTermUsesTheLaneTheChampionActuallyPlays()
+    {
+        const int Flex = 111;
+
+        var meta = new MetaBuilder()
+            .Champion(Flex, "Flex", DamageType.Magic, ["Mage"], 550, 3)
+            .InLane(Flex, Lane.Mid, winRate: 0.50, play: 20000)
+            .InLane(Flex, Lane.Top, winRate: 0.58, play: 120)
+            .Build();
+
+        var session = new SessionBuilder()
+            .LocalPlayer(2)
+            .AllyLane(2, null)
+            .OnClock(2, "pick")
+            .Build();
+
+        var state = DraftState.From(session);
+        var target = new TurnTracker().Resolve(state)!;
+
+        var item = new Recommender(meta, TraitTable.Empty)
+            .Recommend(state, target, LanePredictionResult.Empty, limit: 50).Items
+            .Single(entry => entry.ChampionId == Flex);
+
+        // The 20 000-game row, not the 120-game one that happens to read two points higher.
+        Assert.Equal(meta.LaneStat(Flex, Lane.Mid)!.Value.WinRate, item.Score, precision: 6);
+        Assert.DoesNotContain(item.Reasons, reason => reason.Text.Contains("stark auf", StringComparison.Ordinal));
+    }
 }
