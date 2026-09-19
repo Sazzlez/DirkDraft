@@ -47,6 +47,27 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Every call to git, dotnet or vpk goes through here. The reason is a Windows PowerShell 5.1 trap
+# that cost this script a release mid-run: when the script's own output is redirected - ".\release
+# .ps1 2>&1 | ..." in a log pipeline or a build agent - PowerShell routes each stderr LINE of a
+# native program through the pipeline as an ErrorRecord, and with $ErrorActionPreference = 'Stop'
+# the first one becomes a terminating error. Git writes routine notices there ("LF will be replaced
+# by CRLF"), so the run died after the installer was packed but before the tag was pushed, leaving
+# a half-finished release to clean up by hand. Run directly the same script is fine, which is
+# exactly what makes it a trap.
+#
+# A native program promises one thing about success, and that is its exit code; the checks below
+# all read it. So the preference is relaxed for the duration of the call and restored right after -
+# PowerShell's own cmdlets (Remove-Item, Set-Content, ...) keep stopping on error as before.
+function Use-NativeErrors {
+    param([Parameter(Mandatory)][scriptblock]$Body)
+
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $Body } finally { $ErrorActionPreference = $previous }
+}
+
 $root = $PSScriptRoot
 $project = Join-Path $root 'src\DraftPilot.App\DraftPilot.App.csproj'
 $publishDir = Join-Path $root 'build\publish'
@@ -57,7 +78,7 @@ $releaseDir = Join-Path $root 'build\Releases'
 # GitHub tag lands on exactly the commit that was built. That only makes sense when nothing else
 # is lying around uncommitted - otherwise the release commit would drag it along unnoticed.
 if (-not $NoUpload) {
-    $dirty = @(& git -C $root status --porcelain | Where-Object { $_ -and ($_ -notmatch 'DraftPilot\.App\.csproj$') })
+    $dirty = @(Use-NativeErrors { & git -C $root status --porcelain } | Where-Object { $_ -and ($_ -notmatch 'DraftPilot\.App\.csproj$') })
     if ($dirty.Count -gt 0) {
         throw "Arbeitskopie hat uneingecheckte Aenderungen - erst committen, dann Release:`n" + ($dirty -join "`n")
     }
@@ -76,7 +97,7 @@ Write-Host "Version $Version eingetragen."
 # --- 2. Test gate ----------------------------------------------------------------------------
 # $ErrorActionPreference does not react to a native exit code, hence the explicit checks below.
 Write-Host 'Teste'
-& dotnet test (Join-Path $root 'DraftPilot.sln') -m:1 --nologo --verbosity quiet
+Use-NativeErrors { & dotnet test (Join-Path $root 'DraftPilot.sln') -m:1 --nologo --verbosity quiet }
 if ($LASTEXITCODE -ne 0) { throw "dotnet test ist fehlgeschlagen (Exitcode $LASTEXITCODE) - kein Release." }
 
 # --- 3. Self-contained publish ---------------------------------------------------------------
@@ -84,8 +105,10 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet test ist fehlgeschlagen (Exitcode $LAST
 # "it does not start" conversation. A fresh folder, or vpk would package stale files.
 if (Test-Path -LiteralPath $publishDir) { Remove-Item -LiteralPath $publishDir -Recurse -Force }
 Write-Host 'Baue (mit eingebauter Runtime)'
-& dotnet publish $project --configuration Release --runtime win-x64 --self-contained true `
-    --nologo --verbosity quiet --output $publishDir
+Use-NativeErrors {
+    & dotnet publish $project --configuration Release --runtime win-x64 --self-contained true `
+        --nologo --verbosity quiet --output $publishDir
+}
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish ist fehlgeschlagen (Exitcode $LASTEXITCODE)." }
 
 # --- 4. Installer + delta packages -----------------------------------------------------------
@@ -105,7 +128,7 @@ $vpkArgs = @(
 if ($Notes) { $vpkArgs += @('--releaseNotes', $Notes) }
 
 Write-Host 'Packe Installer'
-& vpk @vpkArgs
+Use-NativeErrors { & vpk @vpkArgs }
 if ($LASTEXITCODE -ne 0) { throw "vpk pack ist fehlgeschlagen (Exitcode $LASTEXITCODE)." }
 
 $setup = Join-Path $releaseDir 'DirkDraft-win-Setup.exe'
@@ -133,7 +156,7 @@ if (-not $gh) {
 }
 if (-not $gh) { throw 'GitHub CLI (gh) nicht gefunden. winget install GitHub.cli, dann gh auth login.' }
 
-$token = & $gh.Source auth token 2>$null
+$token = Use-NativeErrors { & $gh.Source auth token 2>$null }
 if ($LASTEXITCODE -ne 0 -or -not $token) { throw 'Nicht bei GitHub angemeldet. Einmal "gh auth login" ausfuehren.' }
 
 # --- 6. Release commit, tag, push ------------------------------------------------------------
@@ -146,25 +169,30 @@ $env:GIT_TERMINAL_PROMPT = '0'
 $gitAuth = @('-c', 'credential.helper=', '-c', 'credential.helper=!gh auth git-credential')
 $tag = "v$Version"
 
-if (& git -C $root tag -l $tag) { throw "Tag $tag existiert schon - Version bereits veroeffentlicht? Sonst: git tag -d $tag" }
+if (Use-NativeErrors { & git -C $root tag -l $tag }) { throw "Tag $tag existiert schon - Version bereits veroeffentlicht? Sonst: git tag -d $tag" }
 
-& git -C $root add -- $project
-& git -C $root diff --cached --quiet
+Use-NativeErrors { & git -C $root add -- $project }
+
+# Exit code 1 here is not a failure: it is git saying the index differs from HEAD, which is the
+# only case in which there is anything to commit.
+Use-NativeErrors { & git -C $root diff --cached --quiet }
 if ($LASTEXITCODE -ne 0) {
-    & git -C $root commit -q -m "Release $Version"
+    Use-NativeErrors { & git -C $root commit -q -m "Release $Version" }
     if ($LASTEXITCODE -ne 0) { throw 'git commit ist fehlgeschlagen.' }
 }
-& git -C $root tag -a $tag -m "DirkDraft $Version"
+Use-NativeErrors { & git -C $root tag -a $tag -m "DirkDraft $Version" }
 if ($LASTEXITCODE -ne 0) { throw "git tag $tag ist fehlgeschlagen." }
 
 Write-Host "Schiebe Release-Commit und Tag $tag"
-& git -C $root @gitAuth push origin HEAD $tag
+Use-NativeErrors { & git -C $root @gitAuth push origin HEAD $tag }
 if ($LASTEXITCODE -ne 0) { throw "git push ist fehlgeschlagen. Tag lokal wieder entfernen: git tag -d $tag" }
 
 # --- 7. Upload to GitHub Releases ------------------------------------------------------------
 Write-Host "Lade nach $Repo hoch"
-& vpk upload github --outputDir $releaseDir --repoUrl $Repo --token $token `
-    --publish true --tag $tag --releaseName "DirkDraft $Version"
+Use-NativeErrors {
+    & vpk upload github --outputDir $releaseDir --repoUrl $Repo --token $token `
+        --publish true --tag $tag --releaseName "DirkDraft $Version"
+}
 if ($LASTEXITCODE -ne 0) { throw "vpk upload ist fehlgeschlagen (Exitcode $LASTEXITCODE)." }
 
 Write-Host ''

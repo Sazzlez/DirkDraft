@@ -30,6 +30,18 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Same guard as release.ps1, for the same Windows PowerShell 5.1 trap: with the script's output
+# redirected (".publish.ps1 2>&1 | ..."), every stderr LINE of a native program arrives as an
+# ErrorRecord and the first one terminates the run - even when the program went on to succeed. The
+# exit code is what a native program actually promises, and the checks below read it.
+function Use-NativeErrors {
+    param([Parameter(Mandatory)][scriptblock]$Body)
+
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $Body } finally { $ErrorActionPreference = $previous }
+}
+
 $root = $PSScriptRoot
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'build\DirkDraft' }
 
@@ -41,7 +53,7 @@ if (-not (Test-Path -LiteralPath $project)) { throw "Projekt nicht gefunden: $pr
 # too. $ErrorActionPreference does not react to a native exit code, hence the explicit check.
 if (-not $SkipTests) {
     Write-Host 'Teste vor dem Bauen'
-    & dotnet test (Join-Path $root 'DraftPilot.sln') -m:1 --nologo --verbosity quiet
+    Use-NativeErrors { & dotnet test (Join-Path $root 'DraftPilot.sln') -m:1 --nologo --verbosity quiet }
     if ($LASTEXITCODE -ne 0) { throw "dotnet test ist fehlgeschlagen (Exitcode $LASTEXITCODE) - es wurde nichts gebaut." }
 }
 
@@ -59,13 +71,15 @@ if ($running) {
 }
 
 Write-Host "Baue nach $OutputDirectory"
-& dotnet publish $project `
-    --configuration Release `
-    --runtime win-x64 `
-    --self-contained false `
-    --nologo `
-    --verbosity quiet `
-    --output $OutputDirectory
+Use-NativeErrors {
+    & dotnet publish $project `
+        --configuration Release `
+        --runtime win-x64 `
+        --self-contained false `
+        --nologo `
+        --verbosity quiet `
+        --output $OutputDirectory
+}
 
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish ist fehlgeschlagen (Exitcode $LASTEXITCODE)." }
 
