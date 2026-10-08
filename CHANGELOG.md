@@ -3,10 +3,38 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
-## Unveröffentlicht
+## 1.5.0 — 2026-10-09
+
+Fenster und Draft:
+
+- **Winrate des gehoverten Champions.** Sobald du im Champ Select einen Champion hoverst, steht
+  über der Liste „DEIN HOVER" mit seiner geschätzten Winrate in diesem Draft und seinem Platz auf
+  deiner Lane, z. B. „Teemo · Platz 11 von 58 auf Toplane · deutlich hinter Platz 1 · 53 % WR".
+  Die Zahl kommt aus derselben Rechnung wie die Liste — gleiche Kriterien, gleiche Nachkommastellen,
+  gemessen am selben Platz 1 —, gilt aber auch für Champions jenseits der ersten acht. Das Hover
+  meldet der Client live: gemessen an einer echten Aufzeichnung wechselt `championPickIntent` mit
+  jedem Klick im Raster (266 → 893 → 266), lange bevor gelockt wird. Ohne OP.GG-Zahlen auf der Lane
+  steht dort „keine OP.GG-Zahlen" statt einer Prozentzahl, bei einem gebannten Champion „gebannt".
+- **Minimieren in die Taskleiste.** Neuer Knopf links neben dem X. Das X legt das Fenster weiter in
+  den Infobereich; der neue Knopf in die Taskleiste. Die automatische Rückholung beim Spielstart
+  (das Spiel minimiert fremde Fenster mit) lässt ein von Hand minimiertes Fenster in Ruhe.
+- **Die Fenstergröße lässt sich an allen Rändern und Ecken ziehen** und wird beim nächsten Start
+  wiederhergestellt — auch über einen Monitorwechsel, dann passend gekürzt. Mindestens 1000 × 640:
+  Darunter schneidet die aufgeklappte Begründung ihre Urteile ab („star…" statt „stark dagegen"),
+  gemessen an Screenshots in 960, 1000, 1040 und 1060 Breite. Was nicht ins Fenster passt — Team
+  und Build links, die Gegner rechts, die Spielansicht —, scrollt jetzt, statt abgeschnitten zu
+  werden. Maximieren bleibt aus: Ein randloses Fenster ragt maximiert über den Bildschirmrand und
+  hätte keinen Knopf zum Zurückholen.
+- **Nicht mehr immer im Vordergrund.** Bisher lag das Fenster fest über allen anderen, ohne
+  Schalter. Jetzt ist das aus, und ein Pin in der Titelleiste schaltet es bei Bedarf ein (er färbt
+  sich, solange es an ist). Die alte Einstellung `alwaysOnTop` stand in jeder gespeicherten Datei
+  auf `true`, ohne dass sie je jemand gewählt hätte — sie heißt deshalb jetzt `keepOnTop` und
+  beginnt bei „aus".
 
 Modellprüfung: Sind die Vorschläge wirklich die besten, und reicht die Datengrundlage? Gemessen
-statt behauptet, alle Zahlen in `docs/modellpruefung.md`.
+statt behauptet, alle Zahlen in `docs/modellpruefung.md`. Nach dem Update einmal **Daten
+aktualisieren**: Erst dann trägt die Datei die Duell-Linie für ihr Rang-Bracket (siehe unten);
+eine ältere Datei läuft weiter, mit der bisherigen Erwartung.
 
 - **Die Empfehlungen haben Matchups und Duos deutlich überschätzt.** Beispiel Top gegen Jax: vorher
   „Singed 60 %", jetzt fünf Champions gleichauf bei 52–53 %. Zwei Ursachen, beide gemessen.
@@ -39,8 +67,8 @@ statt behauptet, alle Zahlen in `docs/modellpruefung.md`.
   Lane-Gegner liest der Kandidat aus der Liste des Gegners, also von der anderen Seite. Der
   Versatz einer Liste gehört aber zu der Richtung, in der OP.GG sie aufgeschrieben hat. Mit
   gleichem Vorzeichen bekam jeder Champion, den die Auswahl-Liste eines Gegners nannte, je nach
-  Datei 0,7 bis 1,5 Punkte geschenkt — ohne jede Aussage über das Duell. Bevorzugt wurden so die besser
-  dokumentierten Picks, nicht die besseren.
+  Datei 0,7 bis 1,5 Punkte geschenkt — ohne jede Aussage über das Duell. Bevorzugt wurden so die
+  besser dokumentierten Picks, nicht die besseren.
 - **Daten eines älteren Patches zählen unsicherer.** Über zwei Patches verschoben sich die
   Lane-Raten jenseits des Rauschens um 0,7 Punkte, und von den fünf stärksten einer Lane blieben im
   Schnitt zwei (`Tools -- patchdrift`). Spielt der Client einen neueren Patch als die Daten, wächst
@@ -72,30 +100,6 @@ Korrekturen an 1.4.0, gefunden bei einer vollständigen Durchsicht aller Änderu
   Spalte über der ganzen Spielansicht und schluckte jeden Klick — Schließen-Knopf, Tooltips und
   Scrollen der Spielansicht wären tot gewesen. Per Treffertest am laufenden Fenster gefunden und
   behoben.
-
-- **Winrate des gehoverten Champions.** Sobald du im Champ Select einen Champion hoverst, steht
-  über der Liste „DEIN HOVER" mit seiner geschätzten Winrate in diesem Draft und seinem Platz auf
-  deiner Lane, z. B. „Teemo · Platz 11 von 58 auf Toplane · deutlich hinter Platz 1 · 53 % WR".
-  Die Zahl kommt aus derselben Rechnung wie die Liste — gleiche Kriterien, gleiche Nachkommastellen,
-  gemessen am selben Platz 1 —, gilt aber auch für Champions jenseits der ersten acht. Das Hover
-  meldet der Client live: gemessen an einer echten Aufzeichnung wechselt `championPickIntent` mit
-  jedem Klick im Raster (266 → 893 → 266), lange bevor gelockt wird. Ohne OP.GG-Zahlen auf der Lane
-  steht dort „keine OP.GG-Zahlen" statt einer Prozentzahl, bei einem gebannten Champion „gebannt".
-- **Minimieren in die Taskleiste.** Neuer Knopf links neben dem X. Das X legt das Fenster weiter in
-  den Infobereich; der neue Knopf in die Taskleiste. Die automatische Rückholung beim Spielstart
-  (das Spiel minimiert fremde Fenster mit) lässt ein von Hand minimiertes Fenster in Ruhe.
-- **Die Fenstergröße lässt sich an allen Rändern und Ecken ziehen** und wird beim nächsten Start
-  wiederhergestellt — auch über einen Monitorwechsel, dann passend gekürzt. Mindestens 1000 × 640:
-  Darunter schneidet die aufgeklappte Begründung ihre Urteile ab („star…" statt „stark dagegen"),
-  gemessen an Screenshots in 960, 1000, 1040 und 1060 Breite. Was nicht ins Fenster passt — Team
-  und Build links, die Gegner rechts, die Spielansicht —, scrollt jetzt, statt abgeschnitten zu
-  werden. Maximieren bleibt aus: Ein randloses Fenster ragt maximiert über den Bildschirmrand und
-  hätte keinen Knopf zum Zurückholen.
-- **Nicht mehr immer im Vordergrund.** Bisher lag das Fenster fest über allen anderen, ohne
-  Schalter. Jetzt ist das aus, und ein Pin in der Titelleiste schaltet es bei Bedarf ein (er färbt
-  sich, solange es an ist). Die alte Einstellung `alwaysOnTop` stand in jeder gespeicherten Datei
-  auf `true`, ohne dass sie je jemand gewählt hätte — sie heißt deshalb jetzt `keepOnTop` und
-  beginnt bei „aus".
 
 ## 1.4.0 — 2026-09-19
 
