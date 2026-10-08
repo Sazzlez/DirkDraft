@@ -208,13 +208,23 @@ public sealed class GameBuildViewModel : ObservableObject
 
     /// <summary>
     /// Heading and note for a game the tool has no build for. It says what is missing and what is
-    /// there instead — and it deliberately leaves every build field untouched, so nothing from an
-    /// earlier game can show through the gaps.
+    /// there instead.
+    /// <para>
+    /// Runes and items are hidden by the window's own "is there a build" flag, so they can stay as
+    /// they are. The skill table and the augments cannot: each is shown by a flag of its own, and
+    /// left standing they put the PREVIOUS game's skill order and augments — another champion's —
+    /// directly under "kein Build". Those two are cleared here.
+    /// </para>
     /// </summary>
     public void ShowWithoutBuild(string championName, bool hasLaneOverview)
     {
         Title = championName is { Length: > 0 } ? championName : "Im Spiel";
         Subtitle = string.Empty;
+
+        HasSkillOrder = false;
+        Augments.Clear();
+        HasAugments = false;
+        AugmentNote = string.Empty;
 
         // No build means no mode in the title, so the window may say it.
         ShowModeChip = true;
@@ -471,7 +481,6 @@ public sealed class GameBuildViewModel : ObservableObject
     /// </summary>
     private const int MinimumPlayForRate = 50;
 
-    /// <summary>Win rate and sample, or just the sample when the sample cannot carry a rate.</summary>
     /// <summary>
     /// The augment rows, ranked here rather than at fetch time so a cached plan keeps the raw
     /// numbers and picks up a corrected ranking rule without being refetched.
@@ -509,6 +518,7 @@ public sealed class GameBuildViewModel : ObservableObject
             : "OP.GG-Wert · nur häufig genommene Augmente · alle Ränge";
     }
 
+    /// <summary>Win rate and sample, or just the sample when the sample cannot carry a rate.</summary>
     private static string Sample(double winRate, int play) => play >= MinimumPlayForRate
         ? $"{winRate:P0} WR · {play:N0} Games"
         : play > 0

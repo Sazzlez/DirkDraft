@@ -120,7 +120,9 @@ public sealed class BuildPlan
     // population they describe, so they are discarded rather than shown under a wrong label.
     // 5: ARAM Chaos plans carry augments. Older files simply have none, which would be
     // indistinguishable from "this champion has no augment data" — a refetch says which it is.
-    public const int CurrentSchemaVersion = 5;
+    // 6: ARAM Chaos plans moved to a cache variant of their own. Version-5 files written in Chaos
+    // sit under the plain-ARAM name with augments in them, and plain ARAM would load them.
+    public const int CurrentSchemaVersion = 6;
 
     /// <summary>
     /// Defaults to 0, NOT to the current version: a default would also apply while deserialising

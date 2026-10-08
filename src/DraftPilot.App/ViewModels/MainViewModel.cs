@@ -1863,11 +1863,19 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// <summary>
     /// The cache variant for the build this draft wants: empty for a matchup plan, whose source
     /// takes neither a queue nor a bracket, and queue-plus-bracket for the opponent-free one, whose
-    /// source takes both. Must match what the fetch stamps into the plan, or every draft refetches
-    /// a build it already has on disk.
+    /// source takes both. The fetch stamps its plan with this same value before saving it, so the
+    /// key a plan is stored under and the key it is looked up by cannot drift apart.
+    /// <para>
+    /// ARAM Chaos gets a variant of its own although OP.GG answers it as plain ARAM: its plan
+    /// carries augments, and a shared file served each mode the other's plan — a champion played in
+    /// ARAM first never got its augments in Chaos for the rest of the patch, and one played in Chaos
+    /// first listed augments in plain ARAM, where there are none.
+    /// </para>
     /// </summary>
     private string BuildVariant(int opponentId)
-        => opponentId != 0 ? string.Empty : BuildCache.VariantFor(LiveMode(), LiveTier());
+        => opponentId != 0 ? string.Empty
+            : BuildCache.VariantFor(LiveMode(), LiveTier())
+                + (_queue == QueueKind.AramMayhem ? "-augments" : string.Empty);
 
     /// <summary>
     /// The OP.GG population every live call of this draft describes: the queue the client reports,
@@ -2210,9 +2218,21 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
             if (plan is not null && !plan.IsEmpty)
             {
-                await AttachAugmentsAsync(fetcher, plan, me, token).ConfigureAwait(true);
+                if (opponent is null)
+                    plan.Variant = BuildVariant(0);
 
-                _buildCache.Save(plan);
+                var complete = await AttachAugmentsAsync(fetcher, plan, me, token).ConfigureAwait(true);
+
+                // Checked again: the augments are a second await, and a round that ended during it
+                // is as void as one that ended during the first.
+                if (token.IsCancellationRequested)
+                    return true;
+
+                // A Chaos plan without its augments is shown but not kept. On disk it would be
+                // served for the rest of the patch, and nothing would ever ask for them again.
+                if (complete)
+                    _buildCache.Save(plan);
+
                 ApplyBuild(plan);
             }
 
@@ -2240,12 +2260,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// out. Fetched here rather than in the game view because the game view has no network path of
     /// its own — by the time the player can see this card, champion select is long over.
     /// <para>
-    /// A failure here never costs the build. The two calls are an extra on top of a plan that has
-    /// already arrived, and letting them mark the build as failed would trade something the player
-    /// needs for something nice to have.
+    /// A failure here never costs the build. The call is an extra on top of a plan that has already
+    /// arrived, and letting it mark the build as failed would trade something the player needs for
+    /// something nice to have.
     /// </para>
     /// </summary>
-    private async Task AttachAugmentsAsync(
+    /// <returns>
+    /// Whether the plan is complete: true outside ARAM Chaos, where it has nothing to add, and in
+    /// Chaos only once the augments are actually on it. The caller does not cache an incomplete one.
+    /// </returns>
+    private async Task<bool> AttachAugmentsAsync(
         LiveDraftFetcher fetcher,
         BuildPlan plan,
         ChampionEntry me,
@@ -2255,11 +2279,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // match history records playerAugment1..6 as zero for it — and asking anyway would fill
         // the card with numbers from a mode the player is not in.
         if (_queue != QueueKind.AramMayhem)
-            return;
+            return true;
 
         // Counted before the call, like every other live request.
         if (_liveCallsThisDraft >= MaxLiveCallsPerDraft)
-            return;
+            return false;
 
         _liveCallsThisDraft++;
 
@@ -2269,13 +2293,15 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 .ConfigureAwait(true);
 
             if (augments is null || token.IsCancellationRequested)
-                return;
+                return false;
 
             plan.Augments = [.. augments];
+            return true;
         }
         catch (Exception ex) when (IsRecoverable(ex, token))
         {
             CrashLog.Note("Draft-Abruf", $"Augmente {me.Name}: {ex.Message}");
+            return false;
         }
     }
 
@@ -2527,6 +2553,19 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         if (!_state.IsActive)
             return;
+
+        // No lanes, no lane overview. The predictor hands out five lanes in every mode because that
+        // is all it can do; the team columns already refuse to print them on the Abyss, and the
+        // in-game card printed them anyway — "Toplane: Darius" under an ARAM Chaos game.
+        if (!_state.Queue.UsesLanes())
+        {
+            GameMatchups.Clear();
+            HasGameMatchups = false;
+            HasGameMatchupsTotal = false;
+            GameMatchupsTotal = string.Empty;
+            GameMatchupsEnemyTotal = string.Empty;
+            return;
+        }
 
         var culture = CultureInfo.CurrentCulture;
 

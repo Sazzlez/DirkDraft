@@ -1159,11 +1159,11 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="AUGMENTE" Style="{StaticResource Caption}" VerticalAlignment="Top"
                                    Margin="0,2,14,0"
-                                   ToolTip="Die Augmente, die auf diesem Champion am besten abgeschnitten haben. Sortiert nach Siegquote, geglättet über die Stichprobe. Augmente, die niemand gespielt hat, stehen nicht in der Liste — ihre Quoten stammen aus ein bis sieben Spielen und wären sonst die obersten Zeilen." />
+                                   ToolTip="Die Augmente mit dem höchsten OP.GG-Wert für diesen Champion, unter denen, die häufiger genommen werden als die Hälfte seiner Augmente. Augmente, deren Wert sich als Bruch aus höchstens 40 Spielen verrät, fehlen — sie stünden sonst mit makellosen Zahlen ganz oben, die kaum jemand gespielt hat. Der Wert ist OP.GGs eigener; seine Skala ist nicht dokumentiert, und eine Siegquote ist er nicht." />
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="{Binding GameBuild.AugmentNote}" Style="{StaticResource Small}"
                                        FontSize="11" Foreground="{StaticResource Faint}" Margin="0,0,0,6"
-                                       ToolTip="OP.GG liefert für Augmente keinen Rang-Filter, die Zahlen gelten also für alle Ränge. Die Spielzahl ist aus dem gemeldeten Anteil zurückgerechnet und auf die vorsichtige Seite gerundet." />
+                                       ToolTip="OP.GG liefert für Augmente keinen Rang-Filter, die Zahlen gelten also für alle Ränge. Wert und Beliebtheit stehen unverändert so da, wie OP.GG sie meldet — eine Spielzahl liefert die Quelle nicht, deshalb gibt es auch keinen Streubereich." />
                             <ItemsControl ItemsSource="{Binding GameBuild.Augments}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
@@ -1618,16 +1618,28 @@
 
                 Team and build scroll as one: five rows plus a full build are taller than a window
                 dragged to its minimum, and the build is the part that would be cut off.
+
+                Collapsed whenever it has nothing to show. After the draft it spans the whole
+                content area, and an empty scroller still takes the mouse: it sat on top of the
+                in-game view, and a hit test on that card's close button landed on the scroller —
+                no close, no tooltips, no scrolling for the length of every game.
             -->
             <ScrollViewer Grid.Row="0" Grid.RowSpan="3" Grid.Column="0"
                           VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <ScrollViewer.Style>
                     <Style TargetType="ScrollViewer">
+                        <Setter Property="Visibility" Value="Collapsed" />
                         <Style.Triggers>
                             <!-- After the draft the teams and the list are gone; the surviving
                                  build card takes the full width instead of one narrow column. -->
                             <DataTrigger Binding="{Binding IsDraftActive}" Value="False">
                                 <Setter Property="Grid.ColumnSpan" Value="5" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsDraftActive}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding ShowBuildSection}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>

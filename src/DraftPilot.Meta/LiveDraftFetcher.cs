@@ -423,9 +423,8 @@ public sealed class LiveDraftFetcher(
     }
 
     /// <summary>
-    /// Every augment OP.GG has numbers for on one champion, together with the pool those numbers
-    /// are shares of. Null when the champion has no augment data or the pool cannot be read —
-    /// shares without their denominator are not worth caching.
+    /// Every augment OP.GG has numbers for on one champion, both figures as the source reports
+    /// them. Null when the champion has no augment data or the answer cannot be read.
     /// </summary>
     /// <param name="language">
     /// Which localisation to ask for. The augment names are the only part of a build the player

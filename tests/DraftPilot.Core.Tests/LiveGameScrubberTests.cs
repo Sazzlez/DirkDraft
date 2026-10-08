@@ -222,4 +222,57 @@ public class LiveGameScrubberTests
         => string.Concat(Enumerable.Repeat("""{"a":""", levels))
             + """{"summonerName":"Crytekx#EUW"}"""
             + new string('}', levels);
+
+    /// <summary>
+    /// /liveclientdata/activeplayername answers with nothing but the player's Riot ID, as a bare
+    /// JSON string. There is no property name to recognise it by, and the probe's sweep asks for
+    /// that endpoint because the game's own schema lists it.
+    /// </summary>
+    [Fact]
+    public void ABareStringPayloadIsTreatedAsAName()
+    {
+        var scrubber = new LiveGameScrubber();
+
+        Assert.True(scrubber.TryScrub("\"Crytekx#EUW\"", out var clean));
+
+        Assert.DoesNotContain("Crytekx", clean, StringComparison.Ordinal);
+        Assert.Equal("Spieler 1", JsonNode.Parse(clean)!.GetValue<string>());
+    }
+
+    /// <summary>The same player keeps the same pseudonym across the bare endpoint and the full payload.</summary>
+    [Fact]
+    public void TheBareNameAndThePayloadAgreeOnThePseudonym()
+    {
+        var scrubber = new LiveGameScrubber();
+
+        scrubber.TryScrub("\"Crytekx#EUW\"", out _);
+        scrubber.TryScrub(Payload, out var clean);
+
+        Assert.Equal("Spieler 1", JsonNode.Parse(clean)!["allPlayers"]![0]!["riotId"]!.GetValue<string>());
+    }
+
+    /// <summary>First blood names its player in a field of its own.</summary>
+    [Fact]
+    public void FirstBloodsRecipientIsReplaced()
+    {
+        const string feed = """
+            { "Events": [ { "EventID": 3, "EventName": "FirstBlood", "EventTime": 92.2, "Recipient": "Crytekx#EUW" } ] }
+            """;
+        var scrubber = new LiveGameScrubber();
+
+        Assert.True(scrubber.TryScrub(feed, out var clean));
+
+        Assert.DoesNotContain("Crytekx", clean, StringComparison.Ordinal);
+        Assert.Contains("FirstBlood", clean, StringComparison.Ordinal);
+    }
+
+    /// <summary>A number or a boolean at the root is not a name and comes back as it was.</summary>
+    [Theory]
+    [InlineData("421.5")]
+    [InlineData("true")]
+    public void ABareNonStringPayloadIsLeftAlone(string payload)
+    {
+        Assert.True(new LiveGameScrubber().TryScrub(payload, out var clean));
+        Assert.Equal(payload, clean);
+    }
 }

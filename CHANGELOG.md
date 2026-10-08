@@ -5,6 +5,28 @@ Kopien melden sie beim nächsten Start.
 
 ## Unveröffentlicht
 
+Korrekturen an 1.4.0, gefunden bei einer vollständigen Durchsicht aller Änderungen seit 1.3.0:
+
+- **Augmente fehlten oder standen im falschen Modus.** ARAM und ARAM Chaos teilten sich eine
+  Cache-Datei pro Champion. Wer einen Champion zuerst in normalem ARAM spielte, bekam ihn in Chaos
+  für den Rest des Patches ohne Augmente; umgekehrt standen Augmente im normalen ARAM, wo es keine
+  gibt. Chaos hat jetzt einen eigenen Cache-Eintrag, und ein Plan, dessen Augment-Abruf scheiterte,
+  wird gar nicht erst gespeichert — sonst käme der Abruf nie wieder. Alte Cache-Dateien werden
+  einmalig neu geholt.
+- **Die Spielansicht ohne Build zeigte Reste des vorigen Spiels**: Skill-Tabelle und Augmente eines
+  anderen Champions direkt unter „Für dieses Spiel liegt kein Build vor".
+- **Keine erfundene Lane-Übersicht mehr in ARAM, ARAM Chaos und Arena.** Die Spielansicht druckte
+  dort „Toplane: Darius" usw., obwohl die Teamspalten Lanes in diesen Modi längst ausblenden.
+- **Die Tooltips am Augment-Block** beschrieben noch das verworfene Modell („sortiert nach
+  Siegquote, geglättet", „Spielzahl zurückgerechnet"). Sie sagen jetzt, was tatsächlich passiert.
+- **`Tools -- ingame` schrieb zwei Namen ungeschützt mit**: den eigenen Riot-Namen aus
+  `/liveclientdata/activeplayername` (der Endpunkt antwortet mit einem nackten String, nicht mit
+  einem Objekt) und den Spieler im `FirstBlood`-Event (Feld `Recipient`). Beides wird jetzt ersetzt.
+- Aus der Fenster-Änderung, nie ausgeliefert: Nach dem Draft lag die leere Scroll-Fläche der linken
+  Spalte über der ganzen Spielansicht und schluckte jeden Klick — Schließen-Knopf, Tooltips und
+  Scrollen der Spielansicht wären tot gewesen. Per Treffertest am laufenden Fenster gefunden und
+  behoben.
+
 - **Winrate des gehoverten Champions.** Sobald du im Champ Select einen Champion hoverst, steht
   über der Liste „DEIN HOVER" mit seiner geschätzten Winrate in diesem Draft und seinem Platz auf
   deiner Lane, z. B. „Teemo · Platz 11 von 58 auf Toplane · deutlich hinter Platz 1 · 53 % WR".

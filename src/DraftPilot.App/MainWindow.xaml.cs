@@ -234,7 +234,11 @@ public partial class MainWindow : Window
     {
         Topmost = !Topmost;
         _model.Settings.KeepOnTop = Topmost;
-        _model.Settings.Save();
+
+        // Same rule as the window bounds: a harness run must not write its copy of the settings
+        // over a live instance's file.
+        if (!DevHarness.SuppressPlacementSave)
+            _model.Settings.Save();
     }
 
     /// <summary>

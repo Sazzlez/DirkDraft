@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace DraftPilot.Core.Lcu;
@@ -25,7 +26,9 @@ public sealed class LiveGameScrubber
     /// <summary>
     /// Properties whose value is a person, wherever they appear. The Live Client Data API names
     /// people in three separate places — the player list, the active player, and the event feed —
-    /// and each does it with its own spelling.
+    /// and each does it with its own spelling. The feed alone has four: the kill events name a
+    /// killer, a victim and assisters, an ace names its <c>Acer</c>, and first blood names its
+    /// <c>Recipient</c>.
     /// </summary>
     private static readonly HashSet<string> NameFields = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -37,6 +40,7 @@ public sealed class LiveGameScrubber
         "VictimName",
         "Assisters",
         "Acer",
+        "Recipient",
     };
 
     /// <summary>
@@ -63,13 +67,23 @@ public sealed class LiveGameScrubber
         {
             root = JsonNode.Parse(json);
         }
-        catch (System.Text.Json.JsonException)
+        catch (JsonException)
         {
             return false;
         }
 
         if (root is null)
             return false;
+
+        // A payload that IS a string has no property name to go by, and the one endpoint known to
+        // answer that way — /liveclientdata/activeplayername — answers with the player's Riot ID.
+        // So a bare string is a name. Passing it through unchanged put the player's own ID into a
+        // recording that calls itself name-free.
+        if (root is JsonValue bare && bare.TryGetValue<string>(out var text))
+        {
+            scrubbed = JsonSerializer.Serialize(Pseudonym(text));
+            return true;
+        }
 
         Walk(root, 0);
         scrubbed = root.ToJsonString();
