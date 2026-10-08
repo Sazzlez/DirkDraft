@@ -3076,6 +3076,18 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         if (!_state.Queue.UsesLanes())
             yield break;
 
+        // Up here, not only in the footer: measured over two patches, of each lane's top five only
+        // one to four were still in the top five (Tools -- patchdrift). A list built on numbers from
+        // a patch that is no longer played gets its order from a game that no longer exists, and
+        // that is worth saying where the list is read. The error bars already widen for it.
+        if (_meta.PatchesBehind > 0)
+        {
+            var dataPatch = _meta.DataPatch.Length > 0 ? _meta.DataPatch : _meta.Patch;
+            yield return $"Daten von Patch {PatchVersion.Line(dataPatch)}, gespielt wird {_clientPatch}. "
+                + "Lane-Stärken verschieben sich mit jedem Patch: über zwei Patches blieben von den "
+                + "Top 5 einer Lane im Schnitt nur zwei dort. Unten „Daten aktualisieren“.";
+        }
+
         var playing = _state.Queue.OpGgMode();
         var stored = _meta.GameMode;
 
@@ -3740,6 +3752,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // week — a two-day-old snapshot in the same patch is perfectly current.
         var stored = _meta.DataPatch.Length > 0 ? _meta.DataPatch : _meta.Patch;
         var patchChanged = _clientPatch.Length > 0 && !PatchVersion.SameLine(stored, _clientPatch);
+
+        // Every path that replaces _meta or learns the client's patch comes through here, so this is
+        // the one place that keeps the lookup's patch distance current. The error bars read it.
+        _meta.PatchesBehind = _clientPatch.Length > 0 ? PatchVersion.PatchesBetween(stored, _clientPatch) : 0;
 
         var nudge = patchChanged
             ? $" · das Spiel läuft auf {_clientPatch} — bitte aktualisieren"

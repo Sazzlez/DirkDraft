@@ -1376,6 +1376,31 @@ public class RecommenderTests
         Assert.Equal(0, SynergyOf(Weak), precision: 3);
     }
 
+    /// <summary>
+    /// Numbers from a patch that is no longer played describe lane strengths that have since moved.
+    /// The score stays the same — nothing newer is known — but its error bar has to widen, so that
+    /// candidates the current patch may well have reordered are reported as tied.
+    /// </summary>
+    [Fact]
+    public void StaleData_WidensTheErrorButNotTheScore()
+    {
+        var (state, target, lanes) = Scenario();
+        var meta = Meta();
+        var recommender = new Recommender(meta, TraitTable.Empty);
+
+        var current = recommender.Recommend(state, target, lanes).Items.Single(item => item.ChampionId == Strong);
+
+        meta.PatchesBehind = 2;
+        var stale = recommender.Recommend(state, target, lanes).Items.Single(item => item.ChampionId == Strong);
+
+        Assert.Equal(current.Score, stale.Score, precision: 12);
+        Assert.True(stale.Uncertainty > current.Uncertainty);
+
+        // Two patches of measured drift on the lane term alone: 0,0272 log-odds, about 0,68 points.
+        var added = Math.Sqrt((stale.Uncertainty * stale.Uncertainty) - (current.Uncertainty * current.Uncertainty));
+        Assert.Equal(Math.Sqrt(2 * ScoreModel.LaneDriftPerPatch), added, precision: 4);
+    }
+
     // ---- Evaluate: the figure shown for a hover ----
 
     /// <summary>The mid seat on the clock, hovering <paramref name="hover"/>.</summary>

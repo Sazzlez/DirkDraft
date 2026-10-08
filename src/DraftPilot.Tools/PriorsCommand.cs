@@ -283,7 +283,9 @@ internal static class PriorsCommand
                 for (var index = 0; index < Grid.Length; index++)
                 {
                     var kappa = Grid[index];
-                    var estimate = kappa == int.MaxValue
+                    // A training half with no games and no prior weight says nothing; the expectation
+                    // stands in rather than 0/0.
+                    var estimate = kappa == int.MaxValue || trainGames + kappa == 0
                         ? row.Expected
                         : (trainWins + (kappa * row.Expected)) / (trainGames + (double)kappa);
 

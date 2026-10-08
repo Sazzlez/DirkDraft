@@ -165,6 +165,12 @@ internal static class SnapshotCommand
             SnapshotBuilder.MeasureMatchupBaseline(snapshot.Matchups, snapshot.LaneStats));
         Baseline("Synergie", snapshot.SynergyBaseline, SnapshotBuilder.MeasureSynergyBaseline(snapshot.Synergies));
 
+        // Not re-measurable from the file: the sample duels it was fitted on are not stored.
+        Console.WriteLine(snapshot.CompleteDuelSample > 0
+            ? $"Duell-Linie (vollständige Listen): Steigung {snapshot.CompleteDuelSlope:N3} ± {snapshot.CompleteDuelSlopeError:N3}, "
+                + $"Versatz {snapshot.CompleteDuelOffset:N4}, aus {snapshot.CompleteDuelSample:N0} Duellen"
+            : "Duell-Linie (vollständige Listen): nicht gemessen — Live-Duelle gegen die Lane-Raten wie gelistet");
+
         var damageKnown = snapshot.Champions.Count(champion => champion.Damage != DamageType.Unknown);
         Console.WriteLine();
         Console.WriteLine($"Schadensart bekannt für {damageKnown} von {snapshot.Champions.Count} Champs.");

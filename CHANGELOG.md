@@ -27,7 +27,29 @@ statt behauptet, alle Zahlen in `docs/modellpruefung.md`.
 - **Ehrliche Zahlen in den Texten.** Wo „aus N Games" steht, steht jetzt der gemessene Wert. Die
   Prozentzahl daneben ist die Schätzung, mit der gerechnet wird, und der Tooltip sagt, warum beide
   sich unterscheiden.
-- **Neue Messwerkzeuge:** `Tools -- priors`, `coverage`, `guidecheck` und `recommend … --live`.
+- **Rang-Abgleich der vollständigen Duell-Listen.** Diese Listen kennen keinen Rangfilter und
+  beschreiben OP.GGs Standard-Bracket (Emerald+). Gegen Gold-Lane-Raten gelesen, folgen ihre Duelle
+  den Stärke-Unterschieden nur etwa 0,7-fach; mit der bisherigen Erwartung (1-fach) las sich jeder in
+  Gold starke Champion gegen jeden aufgedeckten Gegner als schwächer, als er ist. Jedes
+  Aktualisieren holt jetzt 32 solcher Listen (die acht meistgespielten Champions je Lane, ohne
+  Jungle, rund 8 % mehr Abrufe) und misst daran die Linie für das eigene Bracket: in Gold
+  0,66 ± 0,06, über alle Ränge 0,98 ± 0,07, dort also praktisch keine Änderung.
+  `Tools -- inspect` zeigt die gemessene Linie.
+- **Gespiegelte Duelle hatten das falsche Vorzeichen beim Versatz.** Fast jedes Duell gegen den
+  Lane-Gegner liest der Kandidat aus der Liste des Gegners, also von der anderen Seite. Der
+  Versatz einer Liste gehört aber zu der Richtung, in der OP.GG sie aufgeschrieben hat. Mit
+  gleichem Vorzeichen bekam jeder Champion, den die Auswahl-Liste eines Gegners nannte, je nach
+  Datei 0,7 bis 1,5 Punkte geschenkt — ohne jede Aussage über das Duell. Bevorzugt wurden so die besser
+  dokumentierten Picks, nicht die besseren.
+- **Daten eines älteren Patches zählen unsicherer.** Über zwei Patches verschoben sich die
+  Lane-Raten jenseits des Rauschens um 0,7 Punkte, und von den fünf stärksten einer Lane blieben im
+  Schnitt zwei (`Tools -- patchdrift`). Spielt der Client einen neueren Patch als die Daten, wächst
+  der Fehlerbalken jeder Lane-Zahl mit jedem Patch Rückstand — die Kopfzeile meldet dann eher
+  „gleichauf" —, und ein Chip nennt beide Patches.
+- **Datenstand-Stempel:** Wo OP.GG eine Reihe von Datenständen liefert, gilt jetzt der jüngste nach
+  Datum, nicht der letzte Eintrag. Der Matchup-Guide liefert seine Reihe neueste zuerst.
+- **Neue Messwerkzeuge:** `Tools -- priors`, `coverage`, `guidecheck`, `patchdrift` und
+  `recommend … --live`.
 
 Korrekturen an 1.4.0, gefunden bei einer vollständigen Durchsicht aller Änderungen seit 1.3.0:
 

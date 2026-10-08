@@ -196,6 +196,23 @@ public sealed class MetaSnapshot
     /// </summary>
     public double MatchupBaseline { get; set; }
 
+    /// <summary>
+    /// The expectation of a complete-list duel, measured against this file's lane rates:
+    /// <c>CompleteDuelOffset + CompleteDuelSlope × (Logit(mine) − Logit(theirs))</c>. Slope 1 and
+    /// offset 0 — the plain expectation — for files written before it existed or when too few
+    /// sample duels came back. See <c>SnapshotBuilder.MeasureCompleteDuelLine</c>.
+    /// </summary>
+    public double CompleteDuelSlope { get; set; } = 1;
+
+    /// <inheritdoc cref="CompleteDuelSlope"/>
+    public double CompleteDuelOffset { get; set; }
+
+    /// <summary>How many duels the line was fitted on; 0 when it was not measured.</summary>
+    public int CompleteDuelSample { get; set; }
+
+    /// <summary>Standard error of <see cref="CompleteDuelSlope"/>; 0 when unknown. Shown, not used.</summary>
+    public double CompleteDuelSlopeError { get; set; }
+
     public List<ChampionEntry> Champions { get; set; } = [];
 
     public List<LaneStat> LaneStats { get; set; } = [];

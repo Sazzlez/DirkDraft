@@ -42,6 +42,21 @@ public static class ScoreModel
     public const double CompScale = 0.16;
 
     /// <summary>
+    /// How much a lane rate moves per patch beyond sampling noise, as a variance in log-odds. A data
+    /// file older than the client's patch describes lane strengths that have since moved by this
+    /// much per patch, and the error bar has to say so instead of claiming an order the current
+    /// patch may not have.
+    /// <para>
+    /// Measured with <c>Tools -- patchdrift</c> between two Gold files, 16.18 and 16.20: across 268
+    /// lane rows the rates moved by 0,68 points (standard deviation) beyond what their samples
+    /// explain, against a true spread of lane strength of 1,6 points. Of each lane's top five, one
+    /// to four were still in the top five. Taken as a random walk, that is 0,48 points per patch —
+    /// 0,0272 log-odds over two patches, so 3,7e-4 of variance per patch.
+    /// </para>
+    /// </summary>
+    public const double LaneDriftPerPatch = 3.7e-4;
+
+    /// <summary>
     /// For bans: share of a champion's lane strength counted AGAIN when that lane is the seat's
     /// own. Deliberate double counting — a champion you personally have to face is worth more of a
     /// ban than one terrorising some other lane.

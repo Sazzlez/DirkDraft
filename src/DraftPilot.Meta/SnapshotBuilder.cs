@@ -52,6 +52,19 @@ public sealed record SnapshotBuildOptions
     public int MaxConcurrency { get; init; } = 10;
 }
 
+/// <summary>
+/// The expected complete-list duel as a line in the lane-rate difference, with how well the sample
+/// pins its slope. See <see cref="SnapshotBuilder.MeasureCompleteDuelLine"/>.
+/// </summary>
+/// <param name="StandardError">Of the slope, before it was held to its range; NaN when not measured.</param>
+/// <param name="Duels">How many duels it was fitted on; 0 for the plain expectation.</param>
+/// <param name="Lists">How many lists those came from.</param>
+public readonly record struct CompleteDuelLine(double Slope, double Offset, double StandardError, int Duels, int Lists)
+{
+    /// <summary>The expectation without a measurement: the lane-rate difference as it is.</summary>
+    public static CompleteDuelLine Plain => new(1, 0, double.NaN, 0, 0);
+}
+
 public sealed record BuildProgress(string Stage, int Done, int Total)
 {
     public double Fraction => Total <= 0 ? 0 : Math.Clamp((double)Done / Total, 0, 1);
@@ -182,6 +195,21 @@ public sealed class SnapshotBuilder : IDisposable
         var primaryLanes = PrimaryLanes(snapshot);
 
         await LoadAnalysisAsync(snapshot, resolver, primaryLanes, options, progress, ct).ConfigureAwait(false);
+
+        // After the lane rows are final: the line is fitted against them.
+        progress?.Report(new BuildProgress("Duell-Listen", 0, 0));
+        var sample = await LoadSampleDuelsAsync(snapshot, resolver, options, ct).ConfigureAwait(false);
+        var line = MeasureCompleteDuelLine(sample, snapshot.LaneStats);
+        snapshot.CompleteDuelSlope = line.Slope;
+        snapshot.CompleteDuelOffset = line.Offset;
+        snapshot.CompleteDuelSample = line.Duels;
+        snapshot.CompleteDuelSlopeError = double.IsFinite(line.StandardError) ? line.StandardError : 0;
+
+        if (line.Duels == 0)
+        {
+            snapshot.Warnings.Add($"Duell-Erwartung nicht gemessen ({sample.Count} Stichproben-Duelle): "
+                + "Live-Duelle werden ohne Rang-Abgleich gegen die Lane-Stärken gelesen.");
+        }
 
         if (options.IncludeDuoSynergies)
             await LoadDuoSynergiesAsync(snapshot, resolver, primaryLanes, options, progress, ct).ConfigureAwait(false);
@@ -559,22 +587,30 @@ public sealed class SnapshotBuilder : IDisposable
     {
         var trend = node["data"]["trends"]["win"];
 
-        // A trend is a series by name. The endpoint currently answers with a single value, but if it
-        // ever returns the series, the newest entry is the one that describes today's numbers.
+        // A trend is a series by name. The analysis endpoint answers with a single value (checked on
+        // 2026-10-08: "16.20" alone), but the matchup guide answers with the series — NEWEST FIRST.
+        // This used to take the last entry on the assumption that a series ends with today, which
+        // against that order would have stamped a fresh file with a patch from months ago. The
+        // entry with the latest date is today's, whatever the order.
         if (trend.Items.Count > 0)
-            trend = trend.Items[^1];
+        {
+            trend = trend.Items
+                .OrderByDescending(entry => Stamp(entry) ?? DateTimeOffset.MinValue)
+                .First();
+        }
 
         var version = trend["version"].AsText() is { Length: > 0 } text ? text : null;
 
-        var asOf = DateTimeOffset.TryParse(
-            trend["created_at"].AsText(),
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.RoundtripKind,
-            out var parsed)
-            ? parsed
-            : (DateTimeOffset?)null;
+        return (version, Stamp(trend));
 
-        return (version, asOf);
+        static DateTimeOffset? Stamp(OpGgNode entry)
+            => DateTimeOffset.TryParse(
+                entry["created_at"].AsText(),
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind,
+                out var parsed)
+                ? parsed
+                : null;
     }
 
     /// <summary>
@@ -1025,6 +1061,173 @@ public sealed class SnapshotBuilder : IDisposable
     private const int MinimumDuoGamesForBaseline = 100;
 
     /// <summary>
+    /// What a complete-list duel is expected to be, as a line in the two champions' lane-rate
+    /// difference from this file: <c>offset + slope × (Logit(mine) − Logit(theirs))</c>.
+    /// <para>
+    /// Needed because the complete lists (OP.GG's matchup guide) take no rank bracket and describe
+    /// the default one, while this file's lane rates may describe another. Measured with
+    /// <c>Tools -- guidecheck</c> on 2026-10-08: against an all-ranks file the complete duels follow
+    /// the lane-rate difference within each list with slope 0,98, against a Gold file with 0,66 —
+    /// a Gold-strong champion is less strong in Emerald+, and the duel it is measured in is an
+    /// Emerald+ duel. A
+    /// first attempt took the slope from the two brackets' lane rates instead of from duels; it came
+    /// out at 0,55 on the same day, and a proxy that far from the thing it stands in for would have
+    /// tilted the expectation the other way. So the duels themselves are fitted.
+    /// </para>
+    /// </summary>
+    /// <returns><see cref="CompleteDuelLine.Plain"/> when there are too few duels.</returns>
+    public static CompleteDuelLine MeasureCompleteDuelLine(
+        IReadOnlyList<MatchupStat> duels,
+        IReadOnlyList<LaneStat> lanes)
+    {
+        var rates = lanes
+            .Where(stat => stat.Play > 0 && stat.WinRate is > 0 and < 1)
+            .GroupBy(stat => (stat.ChampionId, stat.Lane))
+            .ToDictionary(group => group.Key, group => group.MaxBy(stat => stat.Play)!.WinRate);
+
+        var points = duels
+            .Where(duel => duel.Play > 0 && duel.WinRate is > 0 and < 1)
+            .Where(duel => rates.ContainsKey((duel.ChampionId, duel.Lane)) && rates.ContainsKey((duel.OpponentId, duel.Lane)))
+            .Select(duel => (
+                List: (duel.ChampionId, duel.Lane),
+                X: ScoreModel.Logit(rates[(duel.ChampionId, duel.Lane)]) - ScoreModel.Logit(rates[(duel.OpponentId, duel.Lane)]),
+                Y: ScoreModel.Logit(duel.WinRate),
+                W: (double)duel.Play))
+            .ToList();
+
+        // Below this the slope is mostly noise, and it multiplies every candidate's strength.
+        if (points.Count < MinimumDuelsForLine)
+            return CompleteDuelLine.Plain;
+
+        // The slope WITHIN each list: how a list owner's duels change with the opponent's strength.
+        // That is the one question the draft asks — one revealed enemy, every candidate read from
+        // that enemy's list — and it leaves out how far the owner itself sits from its Gold rate in
+        // the default bracket, which is a constant per list and, with a dozen owners, mostly noise.
+        var lists = points
+            .GroupBy(point => point.List)
+            .Select(list =>
+            {
+                var weight = list.Sum(point => point.W);
+                var meanX = list.Sum(point => point.W * point.X) / weight;
+                var meanY = list.Sum(point => point.W * point.Y) / weight;
+                return list.Select(point => (X: point.X - meanX, Y: point.Y - meanY, point.W)).ToList();
+            })
+            .ToList();
+
+        var centred = lists.SelectMany(list => list).ToList();
+        var sxx = centred.Sum(point => point.W * point.X * point.X);
+        var sxy = centred.Sum(point => point.W * point.X * point.Y);
+
+        if (sxx <= 0)
+            return CompleteDuelLine.Plain;
+
+        var raw = sxy / sxx;
+
+        // Robust (sandwich) error of the slope: what the duels' own scatter around the line allows,
+        // without assuming the play counts describe it.
+        var error = Math.Sqrt(centred.Sum(point => Math.Pow(point.W * point.X * (point.Y - (raw * point.X)), 2))) / sxx;
+
+        var slope = Math.Clamp(raw, 0.3, 1.5);
+
+        // The offset over all of them: what an average owner's duels sit above the line.
+        var offset = points.Sum(point => point.W * (point.Y - (slope * point.X))) / points.Sum(point => point.W);
+        return new CompleteDuelLine(slope, offset, error, points.Count, lists.Count);
+    }
+
+    /// <summary>How many sample duels the line needs before it replaces the plain expectation.</summary>
+    public const int MinimumDuelsForLine = 150;
+
+    /// <summary>Whose complete lists the line is fitted on: the most played champions of each lane.</summary>
+    private const int SampleListsPerLane = 8;
+
+    /// <summary>
+    /// The complete duel lists of the eight most played champions on each lane that has one — 32
+    /// calls, about 1.500 duels. Measured on 2026-10-08, 789 duels from 16 lists pinned the slope to
+    /// ±0,076 and twelve lists to about ±0,09 (0,59 against 0,67 for the 16 on the same day); 32
+    /// lists bring it to about ±0,05, a tenth of a point at the edges of a lane. Jungle answers with
+    /// no list. A failed call just leaves its duels out; too few and the line falls back to the
+    /// plain one.
+    /// </summary>
+    private async Task<List<MatchupStat>> LoadSampleDuelsAsync(
+        MetaSnapshot snapshot, ChampionResolver resolver, SnapshotBuildOptions options, CancellationToken ct)
+    {
+        var byId = snapshot.Champions.ToDictionary(entry => entry.Id);
+        var requests = new List<(ChampionEntry Champion, ChampionEntry AnyOpponent, Lane Lane)>();
+
+        foreach (var lane in new[] { Lane.Top, Lane.Mid, Lane.Adc, Lane.Support })
+        {
+            var regulars = snapshot.LaneStats
+                .Where(stat => stat.Lane == lane && stat.Play > 0 && byId.ContainsKey(stat.ChampionId))
+                .OrderByDescending(stat => stat.Play)
+                .Select(stat => byId[stat.ChampionId])
+                .Take(SampleListsPerLane)
+                .ToList();
+
+            // Each regular's list, asked with another regular as the required opponent — the list
+            // itself does not depend on which.
+            for (var index = 0; regulars.Count >= 2 && index < regulars.Count; index++)
+                requests.Add((regulars[index], regulars[index == 0 ? 1 : 0], lane));
+        }
+
+        var gate = new SemaphoreSlim(options.MaxConcurrency);
+        var lists = await Task.WhenAll(requests.Select(async request =>
+        {
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                return await FetchCompleteDuelsAsync(request.Champion, request.AnyOpponent, request.Lane, resolver, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is OpGgApiException or HttpRequestException or JsonException
+                || (ex is TaskCanceledException && !ct.IsCancellationRequested))
+            {
+                // A missing sample costs precision in the line, nothing else.
+                return [];
+            }
+            finally
+            {
+                gate.Release();
+            }
+        })).ConfigureAwait(false);
+
+        return lists.SelectMany(list => list).ToList();
+    }
+
+    private async Task<List<MatchupStat>> FetchCompleteDuelsAsync(
+        ChampionEntry champion, ChampionEntry anyOpponent, Lane lane, ChampionResolver resolver, CancellationToken ct)
+    {
+        foreach (var mine in ChampionResolver.ApiNames(champion))
+        {
+            foreach (var theirs in ChampionResolver.ApiNames(anyOpponent))
+            {
+                try
+                {
+                    var text = await _client.CallToolRawAsync(
+                        "lol_get_lane_matchup_guide",
+                        new JsonObject { ["my_champion"] = mine, ["opponent_champion"] = theirs, ["position"] = lane.ToOpGg() },
+                        ct).ConfigureAwait(false);
+
+                    return LiveDraftFetcher.ParseCompleteDuels(text, champion.Id, lane, resolver);
+                }
+                catch (OpGgApiException ex) when (ex.Status is null)
+                {
+                    // Another spelling.
+                }
+            }
+        }
+
+        return [];
+    }
+
+    /// <summary>
+    /// Which duels the listing offset is measured over. Fixed at the value the duel prior had when
+    /// the offset was introduced, and on its own for the same reason as
+    /// <see cref="MinimumDuoGamesForBaseline"/>: the prior was re-measured and raised to 1.000, and
+    /// with the filter still tied to it the offset was measured over almost no rows and came out as
+    /// exactly zero on the first file built afterwards.
+    /// </summary>
+    private const int MinimumDuelGamesForBaseline = 150;
+
+    /// <summary>
     /// What an average lane row is worth, in log-odds. Measured at 0.0086 (50,21 %) on the file
     /// this was written for — near enough to even that it barely moves a row with tens of thousands
     /// of games, and the right target for the rare row that has a few hundred.
@@ -1055,7 +1258,7 @@ public sealed class SnapshotBuilder : IDisposable
         }
 
         return MeanLogit(matchups
-            .Where(stat => stat.Play >= Shrinkage.MatchupPrior && stat.Lane != Lane.Unknown)
+            .Where(stat => stat.Play >= MinimumDuelGamesForBaseline && stat.Lane != Lane.Unknown)
             .Where(stat => laneRates.ContainsKey((stat.ChampionId, stat.Lane))
                 && laneRates.ContainsKey((stat.OpponentId, stat.Lane)))
             .Select(stat => ScoreModel.Sigmoid(

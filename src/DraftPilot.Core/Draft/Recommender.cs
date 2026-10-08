@@ -503,7 +503,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
 
         var logOdds = ScoreModel.Logit(stat.WinRate);
 
-        budget.Add(ScoreError.LogitVariance(stat.WinRate, stat.Play, Shrinkage.LanePrior, _meta.LaneTarget));
+        budget.Add(ScoreError.LogitVariance(stat.WinRate, stat.Play, Shrinkage.LanePrior, _meta.LaneTarget) + LaneDrift());
 
         if (stat.WinRateDelta > 0.015)
         {
@@ -525,6 +525,14 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
 
         return logOdds;
     }
+
+    /// <summary>
+    /// The variance a lane rate has gained since the data was fetched, when the client already plays
+    /// a newer patch. Zero for current data. Measured, not assumed: see
+    /// <see cref="ScoreModel.LaneDriftPerPatch"/>.
+    /// </summary>
+    private double LaneDrift() => Math.Max(0, _meta.PatchesBehind) * ScoreModel.LaneDriftPerPatch;
+
     /// <summary>
     /// How strong the candidate is on the lane the enemy would play them. Names that lane in a chip
     /// only when it differs from the advised seat's own — otherwise the threat term below says the
@@ -680,7 +688,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         if (mainLane == Lane.Unknown || _meta.LaneStat(championId, mainLane) is not { } main)
             return null;
 
-        budget.Add(ScoreError.LogitVariance(main.WinRate, main.Play, Shrinkage.LanePrior, _meta.LaneTarget));
+        budget.Add(ScoreError.LogitVariance(main.WinRate, main.Play, Shrinkage.LanePrior, _meta.LaneTarget) + LaneDrift());
 
         var logOdds = ScoreModel.Logit(main.WinRate);
 

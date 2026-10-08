@@ -174,6 +174,46 @@ public class SnapshotBuilderTests
         Assert.Empty(sink);
     }
 
+    /// <summary>
+    /// The analysis endpoint answers the trend with a single value — the newest patch. Checked live
+    /// on 2026-10-08 for Jax Top.
+    /// </summary>
+    [Fact]
+    public void ASingleTrend_IsTheDataStamp()
+    {
+        var (version, asOf) = SnapshotBuilder.ReadDataStamp(OpGgResponseParser.Parse("""
+            class LolGetChampionAnalysis: data
+            class Data: trends
+            class Trends: win
+            class Win: version,created_at
+
+            LolGetChampionAnalysis(Data(Trends(Win("16.20","2026-10-07T23:07:14+09:00"))))
+            """));
+
+        Assert.Equal("16.20", version);
+        Assert.Equal(new DateTimeOffset(2026, 10, 7, 23, 7, 14, TimeSpan.FromHours(9)), asOf);
+    }
+
+    /// <summary>
+    /// The matchup guide answers with the whole series, newest FIRST. Taking the last entry, as the
+    /// code once did, would have stamped a file built today with a patch from months ago.
+    /// </summary>
+    [Fact]
+    public void ATrendSeries_IsStampedWithItsNewestEntry_InAnyOrder()
+    {
+        var (version, asOf) = SnapshotBuilder.ReadDataStamp(OpGgResponseParser.Parse("""
+            class LolGetChampionAnalysis: data
+            class Data: trends
+            class Trends: win
+            class Win: version,created_at
+
+            LolGetChampionAnalysis(Data(Trends([Win("16.20","2026-10-07T23:07:14+09:00"),Win("16.19","2026-10-05T23:08:26+09:00"),Win("16.18","2026-09-17T23:16:20+09:00")])))
+            """));
+
+        Assert.Equal("16.20", version);
+        Assert.Equal(new DateTimeOffset(2026, 10, 7, 23, 7, 14, TimeSpan.FromHours(9)), asOf);
+    }
+
     [Fact]
     public void AResponseWithoutTrends_ReportsNoDataStamp()
     {

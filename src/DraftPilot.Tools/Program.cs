@@ -94,8 +94,11 @@ try
         case "coverage":
             return CoverageCommand.Run();
 
+        case "patchdrift":
+            return PatchDriftCommand.Run(args);
+
         case "guidecheck":
-            return await GuideCheckCommand.RunAsync(lifetime.Token);
+            return await GuideCheckCommand.RunAsync(args, lifetime.Token);
 
         case "runes":
             return await RunesCommand.RunAsync(lifetime.Token);
@@ -167,6 +170,8 @@ static void PrintUsage()
                                  zufaellig halbieren, an der anderen Haelfte pruefen)
           coverage               Wie viele Kandidaten je Lane ueberhaupt eine Duell-Zahl gegen
                                  die meistgespielten Gegner haben
+          patchdrift <alt.json>  Wie stark sich die Lane-Raten seit einem aelteren Snapshot
+                                 verschoben haben, ueber das Stichprobenrauschen hinaus
           runes                  Runenseiten des Accounts anzeigen (nur lesend)
           opgg tools [name]      Werkzeuge der OP.GG-Schnittstelle auflisten, mit Namen das
                                  vollstaendige Argument-Schema eines Werkzeugs

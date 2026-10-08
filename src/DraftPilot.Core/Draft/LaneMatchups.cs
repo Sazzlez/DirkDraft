@@ -14,7 +14,7 @@ namespace DraftPilot.Core.Draft;
 /// <param name="Play">Games behind <paramref name="WinRate"/>; 0 when there is no rate.</param>
 /// <param name="IsInferred">True when the rate is the mirror of the opposite pairing, not measured directly.</param>
 /// <param name="Measured">
-/// The duel as OP.GG measured it over <paramref name="Play"/> games, before shrinkage â€” what a text
+/// The duel as OP.GG measured it over <paramref name="Play"/> games, before shrinkage — what a text
 /// citing those games has to quote. <paramref name="WinRate"/> is the estimate the score uses.
 /// </param>
 public readonly record struct LaneMatchup(

@@ -58,4 +58,15 @@ public class PatchVersionTests
     [InlineData("unbekannt", "16.18")]
     public void AnUnknownOnEitherSide_CountsAsAgreement(string? left, string? right)
         => Assert.True(PatchVersion.SameLine(left, right));
+
+    /// <summary>How far the data lags the client, in the spellings both sides actually use.</summary>
+    [Theory]
+    [InlineData("16.18", "16.20.8175716+branch.releases-16-20.code.public.release", 2)]
+    [InlineData("16.20", "16.20.1", 0)]
+    [InlineData("16.24", "17.1", 1)]   // a season boundary: about 24 patches a year
+    [InlineData("16.20", "16.18", 0)]  // data newer than the client is not "behind"
+    [InlineData("", "16.20", 0)]       // unknown is no distance, never a guess
+    [InlineData("16.18", null, 0)]
+    public void PatchesBetween_CountsHowFarTheDataLags(string? data, string? client, int expected)
+        => Assert.Equal(expected, PatchVersion.PatchesBetween(data, client));
 }

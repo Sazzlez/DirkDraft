@@ -46,6 +46,28 @@ public static class PatchVersion
     }
 
     /// <summary>
+    /// How many patches <paramref name="newer"/> is ahead of <paramref name="older"/>, or 0 when
+    /// either is unreadable or the data is not behind. Across a year boundary Riot restarts the
+    /// minor number; a season has about 24 patches, which is what a major step counts as — exact
+    /// enough for an error bar, and the boundary is crossed once a year.
+    /// </summary>
+    public static int PatchesBetween(string? older, string? newer)
+    {
+        if (!TryParts(Line(older), out var oldMajor, out var oldMinor) || !TryParts(Line(newer), out var newMajor, out var newMinor))
+            return 0;
+
+        var steps = ((newMajor - oldMajor) * 24) + (newMinor - oldMinor);
+        return Math.Max(0, steps);
+
+        static bool TryParts(string line, out int major, out int minor)
+        {
+            major = minor = 0;
+            var parts = line.Split('.');
+            return parts.Length == 2 && int.TryParse(parts[0], out major) && int.TryParse(parts[1], out minor);
+        }
+    }
+
+    /// <summary>
     /// Whether two patch strings describe the same patch. An unknown on either side counts as
     /// agreement: the comparison exists to warn about a REAL difference, and a warning built on a
     /// string nobody could read would be noise.

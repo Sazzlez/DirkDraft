@@ -29,9 +29,13 @@ internal static class GuideCheckCommand
         ("Thresh", Lane.Support), ("Lux", Lane.Support), ("Nami", Lane.Support), ("Leona", Lane.Support),
     ];
 
-    public static async Task<int> RunAsync(CancellationToken ct)
+    public static async Task<int> RunAsync(string[] args, CancellationToken ct)
     {
-        var snapshot = new SnapshotStore().Load();
+        // Optionally another file than the stored one: the bracket decides what the lane rates beside
+        // the guide describe, and the question is how that changes the fit.
+        var snapshot = args.Length > 1 && File.Exists(args[1])
+            ? System.Text.Json.JsonSerializer.Deserialize(File.ReadAllText(args[1]), MetaJson.Default.MetaSnapshot)
+            : new SnapshotStore().Load();
         if (snapshot is null)
         {
             Console.Error.WriteLine("Kein Snapshot vorhanden. Erst 'update' ausführen.");
@@ -51,6 +55,7 @@ internal static class GuideCheckCommand
         var sameDay = new List<(double Counter, double Guide, double Weight)>();
         var sameDayRaw = new List<(double CounterRate, int CounterPlay, double Expected, double GuideDeviation, int GuidePlay)>();
         var completeRows = new List<PriorsCommand.Row>();
+        var completeDuels = new List<MatchupStat>();
         var fetcher = new LiveDraftFetcher(client, "ranked", meta.Tier.Length > 0 ? meta.Tier : "all");
         var resolver = new ChampionResolver(meta.Champions);
 
@@ -111,10 +116,11 @@ internal static class GuideCheckCommand
                     continue;
 
                 var rate = (double)win / play;
-                var expected = meta.MatchupBaseline(champion.Id, opponent, lane) - snapshot.MatchupBaseline;
+                var expected = meta.LaneRateDifference(champion.Id, opponent, lane) ?? 0;
 
                 points.Add((expected, ScoreModel.Logit(rate), play));
                 completeRows.Add(new PriorsCommand.Row(win, play, ScoreModel.Sigmoid(expected)));
+                completeDuels.Add(new MatchupStat { ChampionId = champion.Id, OpponentId = opponent, Lane = lane, WinRate = rate, Play = play, FromCompleteList = true });
                 rows++;
 
                 if (notable.TryGetValue(opponent, out var notableEdge))
@@ -155,6 +161,13 @@ internal static class GuideCheckCommand
         Console.WriteLine($"{points.Count} Guide-Duelle gegen die Gold-Erwartung aus den Lane-Raten:");
         Console.WriteLine($"  mittlere Abweichung {meanResidual:+0.0000;-0.0000} Logit ({ScoreModel.AsPoints(meanResidual):+0.00;-0.00} Punkte)   — 0 hieße: gleiche Population");
         Console.WriteLine($"  Steigung {slope:0.000}                                — 1 hieße: gleiche Spreizung der Stärke");
+
+        // The estimator the update runs on its own sample, here on an independent one: within each
+        // list, which is what a draft reads. Compare with the file's stored line.
+        var line = SnapshotBuilder.MeasureCompleteDuelLine(completeDuels, snapshot.LaneStats);
+        Console.WriteLine($"  innerhalb der Listen (wie beim Aktualisieren): Steigung {line.Slope:0.000} ± {line.StandardError:0.000}, "
+            + $"Versatz {line.Offset:+0.0000;-0.0000}, {line.Duels} Duelle aus {line.Lists} Listen"
+            + $"   — in der Datei: {snapshot.CompleteDuelSlope:0.000}, {snapshot.CompleteDuelOffset:+0.0000;-0.0000}");
 
         if (overlap.Count > 0)
         {

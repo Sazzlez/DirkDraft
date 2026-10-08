@@ -296,8 +296,11 @@ dotnet run --project src\DraftPilot.Tools -- settings tier gold
 
 Möglich sind `iron`, `bronze`, `silver`, `gold`, `platinum`, `emerald`, `diamond`, `master`,
 die Sammel-Brackets `emerald_plus`, `platinum_plus`, `diamond_plus` — oder `all` für alle Ränge
-zusammen. Ein benanntes Bracket gilt für Lane-Zahlen, Matchups und Tier; Synergien und der
-Matchup-Build kennen bei OP.GG keinen Rangfilter und kommen weiter aus dem Standard-Bracket.
+zusammen. Ein benanntes Bracket gilt für Lane-Zahlen, Matchups und Tier; Synergien, der
+Matchup-Build und die vollständigen Duell-Listen im Draft kennen bei OP.GG keinen Rangfilter und
+kommen weiter aus dem Standard-Bracket. Wie stark diese Duelle der Lane-Stärke im gewählten Bracket
+folgen, misst jedes Aktualisieren an 32 Listen nach (in Gold etwa 0,66-fach, über alle Ränge
+praktisch 1-fach) — sonst läse sich ein in Gold starker Champion gegen jeden Gegner als schwächer, als er ist.
 Dasselbe gilt für die Warteschlange: Solo/Duo gegen Flex unterscheidet nur die Champion-Analyse.
 Die Fußzeile nennt im Langtext, was wofür gilt, und der Wechsel wird mit dem nächsten
 **Daten aktualisieren** wirksam — bis dahin sagt die Fußzeile auch das.
@@ -329,8 +332,10 @@ Das solltest du wissen, bevor du den Empfehlungen zu viel zutraust:
   Duell-Zahl (`Tools -- coverage`). Sobald ein Gegner aufgedeckt ist, holt der Draft dessen
   **vollständige** Duell-Liste auf seiner Lane (OP.GGs Matchup-Guide, 39 bis 57 Gegner je Champion)
   — dann hat fast jeder Kandidat eine Zahl gegen ihn. Ausnahme Jungle: dafür liefert OP.GG keine
-  Liste. Die vollständige Liste kennt keinen Rang-Filter; gemessen weicht sie im Mittel 0,36 Punkte
-  von dem ab, was die Gold-Lane-Raten erwarten lassen (`Tools -- guidecheck`).
+  Liste. Die vollständige Liste kennt keinen Rang-Filter und beschreibt OP.GGs Standard-Bracket;
+  gegen Gold-Lane-Raten gelesen, folgt sie deren Unterschieden nur etwa 0,7-fach. Diese Linie misst
+  jedes Aktualisieren für das gewählte Bracket neu (`Tools -- inspect` zeigt sie,
+  `Tools -- guidecheck` prüft sie an 16 anderen Champions gegen).
 - **„Die auffälligsten Gegner" sind eine Auswahl der Extreme.** Am selben Tag für dieselben Paare
   gemessen, weichen die Counter-Listen im Mittel 5,0 Punkte von der Erwartung ab, die vollständigen
   Listen 2,3 — und von einer Counter-Abweichung findet sich in der unabhängigen Messung nur etwa
@@ -343,6 +348,13 @@ Das solltest du wissen, bevor du den Empfehlungen zu viel zutraust:
 - **Duos zählen nur, wo sie mehr sind als zwei starke Champions.** Eine Duo-Winrate enthält etwa
   zu 0,4 die Einzelstärke beider Partner. Gezählt wird nur, was darüber hinausgeht, und geglättet
   mit dem gemessenen Gewicht (`Tools -- priors`: 750, vorher 100 und damit sechsfach zu ernst).
+- **Daten eines älteren Patches werden unsicherer, nicht falsch.** Über zwei Patches verschoben
+  sich die Gold-Lane-Raten jenseits des Stichprobenrauschens um 0,7 Punkte (Standardabweichung),
+  und von den fünf stärksten Champions einer Lane standen danach im Schnitt nur noch zwei dort
+  (`Tools -- patchdrift`). Liegt der gespielte Patch vor dem der Daten, wächst deshalb der
+  Fehlerbalken jeder Lane-Zahl mit jedem Patch Rückstand, und ein Chip sagt es. In den ersten Tagen
+  eines Patches sind die Zahlen dünn (am 08.10., kurz nach 16.20: Median 6.200 Games je Lane-Zeile
+  statt sonst rund 29.000) — dafür beschreiben sie das richtige Spiel.
 - **Die Reihenfolge der Liste ist oft Rauschen.** Zieht man denselben Draft wiederholt aus seinen
   Stichproben (`Tools -- noise`), bleibt Platz 1 je nach Datenlage nur in etwa der Hälfte bis fast
   allen Ziehungen derselbe Champion. Deshalb sagt die Kopfzeile, wie viele Zeilen gleichauf liegen,

@@ -124,6 +124,13 @@ public sealed class MetaLookup
     public string Tier => _snapshot.Tier ?? string.Empty;
 
     /// <summary>
+    /// How many patches the client is ahead of these numbers; 0 when it is not, or when nobody has
+    /// asked the client yet. Set by the app once it knows the client's patch. The lane terms widen
+    /// their error by <see cref="ScoreModel.LaneDriftPerPatch"/> per patch behind.
+    /// </summary>
+    public int PatchesBehind { get; set; }
+
+    /// <summary>
     /// The queue these numbers were fetched for, e.g. <c>ranked</c> or <c>flex</c>. Written since
     /// the first version and read by nobody until now — which meant a file built for one queue
     /// could be used under a setting that said another, without a word anywhere.
@@ -168,8 +175,23 @@ public sealed class MetaLookup
     /// contributes exactly how much it beats what the two lane rates already said.
     /// </para>
     /// </summary>
+    /// <remarks>
+    /// An edge inferred from the opposite direction is read against the exact complement of the
+    /// baseline its source was shrunk towards. Both offsets belong to the direction OP.GG wrote
+    /// down — whose list it was — so the mirror carries them with the opposite sign. With the same
+    /// sign, a thin mirrored edge was worth twice the offset instead of nothing: +0,06 log-odds for
+    /// every champion an enemy's notable list happened to name, and minus twice the measured
+    /// duel-line offset for every candidate read from an enemy's complete list.
+    /// </remarks>
     public double MatchupBaseline(int championId, int opponentId, Lane lane)
-        => PairBaseline(championId, opponentId, lane, listed: Matchup(championId, opponentId, lane) is not { FromCompleteList: true });
+    {
+        var view = Matchup(championId, opponentId, lane);
+        var listed = view is not { FromCompleteList: true };
+
+        return view is { IsInferred: true }
+            ? -PairBaseline(opponentId, championId, lane, listed)
+            : PairBaseline(championId, opponentId, lane, listed);
+    }
 
     /// <param name="listed">
     /// Whether the duel comes from a list of notable opponents, which carries the listing offset. A
@@ -179,21 +201,37 @@ public sealed class MetaLookup
     /// </param>
     private double PairBaseline(int championId, int opponentId, Lane lane, bool listed)
     {
-        var offset = listed ? _snapshot.MatchupBaseline : 0;
+        // A complete list describes OP.GG's default bracket, not necessarily this file's, so its
+        // expectation is the line measured for exactly that pairing when the file was built
+        // (MetaSnapshot.CompleteDuelSlope: 0,98 against an all-ranks file, 0,66 against a Gold one).
+        // A notable-list duel comes from this file's own bracket and carries the listing offset.
+        var lineValid = double.IsFinite(_snapshot.CompleteDuelSlope) && _snapshot.CompleteDuelSlope is > 0 and <= 2
+            && double.IsFinite(_snapshot.CompleteDuelOffset);
 
+        var slope = listed || !lineValid ? 1 : _snapshot.CompleteDuelSlope;
+        var offset = listed ? _snapshot.MatchupBaseline : lineValid ? _snapshot.CompleteDuelOffset : 0;
+
+        // Without both rates there is no pair to reason about; the listing offset alone is still
+        // better than claiming an even duel.
+        return LaneRateDifference(championId, opponentId, lane) is { } difference
+            ? (slope * difference) + offset
+            : offset;
+    }
+
+    /// <summary>
+    /// How much stronger the champion is on this lane than the opponent, in log-odds of their lane
+    /// win rates — the plain duel expectation, before any slope or offset. Null without both rates.
+    /// </summary>
+    public double? LaneRateDifference(int championId, int opponentId, Lane lane)
+    {
         // Falling back to the champion's own main lane matters for the off-lane term, where the
         // edge was recorded on the OPPONENT's lane and our candidate has no row there at all.
         var mine = LaneStat(championId, lane)?.WinRate ?? MainLaneWinRate(championId);
         var theirs = LaneStat(opponentId, lane)?.WinRate ?? MainLaneWinRate(opponentId);
 
-        // Without both rates there is no pair to reason about; the listing offset alone is still
-        // better than claiming an even duel.
-        if (mine is null || theirs is null)
-            return offset;
-
-        return ScoreModel.Logit(mine.Value)
-            - ScoreModel.Logit(theirs.Value)
-            + offset;
+        return mine is null || theirs is null
+            ? null
+            : ScoreModel.Logit(mine.Value) - ScoreModel.Logit(theirs.Value);
     }
 
     /// <summary>The champion's win rate on the lane it is played on most — "how good is it, in

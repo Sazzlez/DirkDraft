@@ -2,7 +2,9 @@
 
 Zwei Fragen, gemessen statt behauptet. Grundlage: der gespeicherte Gold-Snapshot (Patch 16.18,
 173 Champions, 273 Lane-Zeilen, 1.482 Duelle, 2.909 Duos) und Live-Abrufe bei OP.GG am 08.10.2026
-(Patch 16.20). Alle Zahlen sind mit den Werkzeugen in `src\DraftPilot.Tools` reproduzierbar.
+(Patch 16.20); die Messungen 7 bis 9 zusätzlich auf einem am selben Abend frisch gebauten
+Gold-Snapshot von 16.20 und auf der Datei des Nutzers (alle Ränge, 16.20). Alle Zahlen sind mit den
+Werkzeugen in `src\DraftPilot.Tools` reproduzierbar.
 
 ## Kurzantwort
 
@@ -34,7 +36,7 @@ nur 14 bis 23 % der Kandidaten überhaupt eine Zahl gegen ihn.
 | Team-Zusammensetzung (Engage, Peel, Schaden …) | ja, gedeckelt auf ±4 Punkte | Regeln ohne Winrate-Grundlage, kuratierte Traits |
 | Konter-Risiko eines frühen Picks | nur als Hinweis | ob der Gegner kontert, ist nicht messbar |
 | Können und Champion-Erfahrung des Spielers | **nein** | bewusst ausgeschlossen (keine Pool-Gewichtung) |
-| Aktueller Patch | Patchwechsel wird angezeigt | Snapshot muss per Knopf aktualisiert werden |
+| Aktueller Patch | ja: Fehlerbalken wächst je Patch Rückstand, Chip nennt beide Patches | Snapshot muss per Knopf aktualisiert werden |
 
 Eine Grenze bleibt grundsätzlich: OP.GGs Winrates messen Spiele, in denen jemand diesen Champion
 *freiwillig* gewählt hat. Das ist Auswahl nach Spielerwunsch und -können, nicht die kausale Wirkung
@@ -125,6 +127,72 @@ Ja. Der analytische Fehlerbalken und echtes Neuziehen stimmen weiter überein, z
 | Gwen | 0,81 | 0,80 |
 | Taric | 0,82 | 0,90 |
 
+### 7. Wie schnell altern die Daten? (`Tools -- patchdrift`)
+
+Derselbe Gold-Bracket, Patch 16.18 gegen 16.20 (frisch geholt am 08.10.2026). Was sich zwischen den
+beiden Dateien bewegt, ist Stichprobenrauschen plus echte Verschiebung; das Rauschen ist aus den
+Spielzahlen bekannt und wird abgezogen:
+
+- Echte Verschiebung der Lane-Raten: **0,68 Punkte** Standardabweichung über zwei Patches.
+- Von den fünf stärksten Champions einer Lane standen nach zwei Patches im Schnitt nur **zwei**
+  noch dort.
+- Als Irrfahrt gelesen: 3,7·10⁻⁴ Logit² je Patch. Um so viel wächst die Varianz jeder Lane-Zahl
+  pro Patch, den die Daten hinter dem Client liegen (`ScoreModel.LaneDriftPerPatch`). Der Score
+  selbst bleibt unverändert — älter heißt unsicherer, nicht in eine bekannte Richtung falsch.
+
+Dazu, weil es am selben Tag auffiel: In den ersten Tagen eines Patches sind die Zahlen dünn. Die
+Datei des Nutzers (alle Ränge, 16.20, Stand 07.10.) hat im Median 6.176 Games je Lane-Zeile; die
+Gold-Datei von 16.18 nach zwei Wochen Laufzeit 29.000. Das Aktualisieren holt trotzdem immer den
+neuesten Patch — geprüft an Data-Dragon-Version, OP.GG-Datenpatch und Datenstand der Datei.
+
+### 8. Aus welchem Rang stammen die vollständigen Listen? (`Tools -- guidecheck <datei>`)
+
+Der Matchup-Guide nimmt keinen Rang-Parameter an und beschreibt OP.GGs Standard-Bracket. Seine
+Duelle gegen die Lane-Raten derselben Woche gelesen:
+
+| Lane-Raten der Datei | gepoolt | innerhalb der Listen |
+|---|---:|---:|
+| alle Ränge (Datei des Nutzers) | 0,996 | **0,984 ± 0,068** |
+| Gold | 0,757 | **0,670 ± 0,076** |
+
+16 Listen, 789 Duelle. Die 0,79, die eine erste Runde auf der älteren Gold-Datei maß, war also
+kein Modellfehler, sondern der Rang-Unterschied: Ein in Gold starker Champion ist in Emerald+
+weniger stark, und sein Duell wird dort gemessen. Mit Steigung 1 las sich jeder in Gold starke
+Champion gegen jeden aufgedeckten Gegner als schwächer, als er ist.
+
+**Gepoolt oder innerhalb der Listen?** Der Draft liest einen aufgedeckten Gegner und jeden
+Kandidaten aus dessen Liste. Gefragt ist also, wie sich die Duelle **einer** Liste mit der Stärke
+des Kandidaten ändern. Gepoolt geht zusätzlich ein, wie weit der Listen-Besitzer selbst im
+Standard-Bracket neben seiner Gold-Rate liegt — je Liste eine Konstante, bei einem Dutzend
+Besitzern vor allem Rauschen. Deshalb wird innerhalb der Listen gefittet.
+
+Ein erster Versuch nahm die Steigung aus den Lane-Raten beider Brackets statt aus Duellen. Er
+ergab 0,55 und hätte die Erwartung in die andere Richtung verkippt; verworfen. Jetzt holt jedes
+Aktualisieren vollständige Listen und fittet die Linie direkt
+(`SnapshotBuilder.MeasureCompleteDuelLine`). Die Stichprobengröße folgt dem Fehlerbalken: Zwölf
+Listen (drei je Lane) ergaben 0,589 bei rund ±0,09, also nicht genau genug; mit acht je Lane,
+32 Abrufen (rund 8 % mehr beim Aktualisieren):
+
+| Datei | Steigung | Versatz | Duelle |
+|---|---:|---:|---:|
+| Gold 16.20, 32 Listen | **0,663 ± 0,056** | −0,0074 | 1.521 |
+
+Das stimmt mit der unabhängigen Messung an 16 anderen Listen überein (0,670). Ein Fehler von
+±0,056 verschiebt einen Kandidaten am Rand seiner Lane (zwei Standardabweichungen Lane-Stärke) um
+etwa 0,2 Punkte gegen die Mitte, weit innerhalb der Fehlerbalken der Liste.
+
+### 9. Gespiegelte Duelle
+
+Fast jedes Duell gegen den Lane-Gegner liest der Kandidat aus der Liste des **Gegners**, also von
+der anderen Seite. Beide Versätze — der Auswahl-Versatz der Counter-Listen und der der
+Duell-Linie — gehören zu der Richtung, in der OP.GG die Liste aufgeschrieben hat. Die Erwartung der
+Gegenrichtung trug sie mit demselben Vorzeichen statt mit dem umgekehrten. Folge: Ein dünnes Duell,
+das exakt der Erwartung entsprach, war gespiegelt das Doppelte des Versatzes wert — +0,026 Logit
+(0,7 Punkte) auf der aktuellen Gold-Datei, +0,059 (1,5 Punkte) auf der älteren, für jeden Champion,
+den die Auswahl-Liste eines Gegners nannte. Jetzt ist die Erwartung der Gegenrichtung das exakte
+Komplement; ein Test hält fest, dass ein Duell an seiner Erwartung in beiden Richtungen nichts
+beiträgt.
+
 ## Was geändert wurde
 
 1. **Duo-Erwartung je Paar** (`SynergyLine`): Duos werden zur Regressionsgeraden ihrer beiden
@@ -139,6 +207,14 @@ Ja. Der analytische Fehlerbalken und echtes Neuziehen stimmen weiter überein, z
    Auswahl-Versatz in ihrer Erwartung.
 5. **Ehrliche Texte:** Wo „aus N Games" steht, steht jetzt der gemessene Wert. Die Prozentzahl
    daneben ist die Schätzung, und der Tooltip sagt, warum beide sich unterscheiden.
+6. **Patch-Rückstand im Fehlerbalken** (`LaneDriftPerPatch`, Messung 7) und als Chip im Draft.
+7. **Duell-Linie je Datei** (`CompleteDuelSlope`/`CompleteDuelOffset`, Messung 8): 32 Abrufe
+   mehr beim Aktualisieren, rund 8 %. Kommen weniger als 150 Duelle zurück, gilt die einfache
+   Erwartung, und die Datei vermerkt das. `Tools -- inspect` zeigt Steigung, Fehler und Stichprobe.
+8. **Gespiegelte Duelle** lesen ihre Erwartung als exaktes Komplement (Messung 9).
+9. **Der Auswahl-Versatz wurde mit 0 gemessen**, seit das Duell-Gewicht auf 1.000 stand: Sein
+   Filter („nur Kanten mit mindestens so vielen Games wie das Glättungsgewicht") ließ kaum noch eine
+   Kante durch. Er hat jetzt eine eigene Schwelle von 150 Games. Nie ausgeliefert.
 
 ## Was offen bleibt
 
@@ -147,9 +223,9 @@ Ja. Der analytische Fehlerbalken und echtes Neuziehen stimmen weiter überein, z
   läge der Fehler eines Gewichts bei etwa 0,6, man könnte also 0 nicht von 1 unterscheiden.
 - **Jungle-Duelle** bleiben auf den Auswahl-Listen, weil OP.GG für den Jungle keine vollständige
   Liste liefert. Sie sind jetzt aber entsprechend stark geglättet.
-- **Die Erwartung eines Duells** rechnet die Lane-Stärken mit Steigung 1. Gemessen an den
-  vollständigen Listen wären es 0,79. Der Unterschied kann auch von der Rang-Mischung kommen
-  (Standard-Bracket gegen Gold) und ist ohne Gold-Vollständigkeitslisten nicht zu trennen. Er
-  bleibt dokumentiert, nicht umgesetzt.
-- **Der Datenstand altert.** Der hier gemessene Snapshot ist zwei Patches alt. Das Fenster meldet
-  den Patchwechsel. Aktualisieren ist ein Knopfdruck.
+- **Gold-eigene Duelle gibt es nur als Auswahl.** Die vollständigen Listen kommen aus dem
+  Standard-Bracket; die Linie aus Messung 8 rechnet sie auf die Lane-Stärken der Datei um, aber
+  ein Duell, das in Gold anders läuft als in Emerald+, bleibt unsichtbar.
+- **Der Datenstand altert.** Das Fenster meldet den Patchwechsel, und der Fehlerbalken wächst mit
+  ihm. Aktualisieren ist ein Knopfdruck. Am ersten Tag eines Patches sind die Zahlen dünner, aber
+  beschreiben das richtige Spiel.
