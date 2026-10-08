@@ -17,11 +17,41 @@ public static class Shrinkage
     /// </summary>
     public const int LanePrior = 300;
 
-    /// <summary>Prior weight for matchup win rates; samples run 30-170 games.</summary>
-    public const int MatchupPrior = 150;
+    /// <summary>
+    /// Prior weight for matchup win rates. Was 150, and the first measurement seemed to confirm it:
+    /// splitting each stored edge's games in two and predicting one half from the other put the
+    /// optimum at 100 to 170. That test cannot see the one thing wrong with the stored edges — they
+    /// are a SELECTION, the three most notable opponents per list, and both halves of a selected row
+    /// share its selection.
+    /// <para>
+    /// Measured instead against OP.GG's complete duel lists, which select nothing
+    /// (<c>Tools -- guidecheck</c>, 2026-10-08, 16 champions). On the same day and the same 123
+    /// pairs, the notable lists deviate from the lane-rate expectation by 5,0 points on average and
+    /// the complete lists by 2,3; the complete deviation follows the notable one with a slope of
+    /// 0,13. The weight under which a notable duel best predicts the complete one is 1.000 (mean
+    /// squared error 12,4 against 20,5 at 150). And the complete lists' own split-half test, where
+    /// no selection is shared, also bottoms out at 1.000 (flat from 600 to 2.000, 788 duels).
+    /// </para>
+    /// <para>
+    /// What that says about the game: beyond the two champions' lane strength, a duel moves the win
+    /// rate by about 1,6 points (one standard deviation). A few hundred games cannot resolve much of
+    /// that, so a measured duel now counts for about a third of its deviation at 500 games, where it
+    /// used to count for three quarters.
+    /// </para>
+    /// </summary>
+    public const int MatchupPrior = 1000;
 
-    /// <summary>Prior weight for duo win rates; samples run 15-60 games.</summary>
-    public const int SynergyPrior = 100;
+    /// <summary>
+    /// Prior weight for duo win rates. Was 100, set by eye to "samples run 15-60 games" — a guess
+    /// about the sample size, when what decides the weight is how far real duo rates spread around
+    /// their expectation. Measured with <c>Tools -- priors</c> on the Gold file (2.670 pairs, 200
+    /// random half-splits): around each pair's expectation the true spread is 1,8 points, which
+    /// gives 753 by the moment estimate, and the held-out loss is lowest between 600 and 1.000.
+    /// At 100 a 300-game duo kept three quarters of its raw deviation, three times what its sample
+    /// supports — the bootstrap traced a whole tie group at the top of a support list back to a
+    /// single duo of 111 games.
+    /// </summary>
+    public const int SynergyPrior = 750;
 
     /// <summary>
     /// Blends an observed rate with a prior, weighted by sample size. A rate over zero games comes

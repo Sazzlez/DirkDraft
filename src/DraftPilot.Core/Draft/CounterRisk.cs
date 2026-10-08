@@ -8,7 +8,8 @@ namespace DraftPilot.Core.Draft;
 /// candidate does, in log-odds. The reference is the candidate's own lane win rate — the same
 /// centring the duel term uses, and the reason a champion that is merely strong does not qualify.
 /// </param>
-public readonly record struct CounterThreat(int ChampionId, double WinRate, int Play, double Edge);
+/// <param name="Measured">The duel as OP.GG measured it, before shrinkage — for the tooltip that cites the games.</param>
+public readonly record struct CounterThreat(int ChampionId, double WinRate, int Play, double Edge, double Measured = double.NaN);
 
 /// <summary>
 /// What a pick still risks when the lane opponent has not been revealed yet.
@@ -67,7 +68,7 @@ public static class CounterRisk
             if (edge <= MinimumEdge)
                 continue;
 
-            threats.Add(new CounterThreat(candidate, view.WinRate, view.Play, edge));
+            threats.Add(new CounterThreat(candidate, view.WinRate, view.Play, edge, view.Measured));
         }
 
         threats.Sort((left, right) => right.Edge.CompareTo(left.Edge));

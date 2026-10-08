@@ -5,6 +5,30 @@ Kopien melden sie beim nächsten Start.
 
 ## Unveröffentlicht
 
+Modellprüfung: Sind die Vorschläge wirklich die besten, und reicht die Datengrundlage? Gemessen
+statt behauptet, alle Zahlen in `docs/modellpruefung.md`.
+
+- **Die Empfehlungen haben Matchups und Duos deutlich überschätzt.** Beispiel Top gegen Jax: vorher
+  „Singed 60 %", jetzt fünf Champions gleichauf bei 52–53 %. Zwei Ursachen, beide gemessen.
+  - **Duelle aus Auswahl-Listen.** OP.GG nennt pro Champion die drei auffälligsten Gegner. Am
+    selben Tag mit der vollständigen Liste verglichen, weichen diese Werte im Mittel 5,0 statt 2,3
+    Punkte ab, und nur etwa ein Achtel davon findet sich unabhängig wieder.
+  - **Duos mit doppelter Einzelstärke.** Eine Duo-Winrate enthält rund 0,4 der Stärke beider
+    Champions; die wurde zusätzlich zur Lane-Stärke gezählt.
+- **Vollständige Duell-Listen für jeden aufgedeckten Gegner.** Der Draft holt jetzt pro Gegner
+  dessen komplette Duell-Liste auf seiner Lane, 39 bis 57 Gegner statt 3. Gegen den echten
+  Lane-Gegner hat damit fast jeder Kandidat eine Zahl, vorher nur 14 bis 23 %. Bei Doppelungen gilt
+  die vollständige Liste. Jungle ausgenommen, dafür liefert OP.GG keine Liste.
+- **Glättung gemessen statt geschätzt.** Duelle zählen jetzt mit Gewicht 1.000 (vorher 150), Duos
+  mit 750 (vorher 100). Duos werden zur Erwartung aus beiden Lane-Raten gezogen, und nur die
+  Abweichung davon zählt. Folge: Ein einzelnes dünnes Duo oder Duell kann die Spitze nicht mehr
+  allein entscheiden. Im Jungle mit Yasuo bleibt Platz 1 jetzt in 97 % der Neuziehungen derselbe,
+  vorher in 24 %.
+- **Ehrliche Zahlen in den Texten.** Wo „aus N Games" steht, steht jetzt der gemessene Wert. Die
+  Prozentzahl daneben ist die Schätzung, mit der gerechnet wird, und der Tooltip sagt, warum beide
+  sich unterscheiden.
+- **Neue Messwerkzeuge:** `Tools -- priors`, `coverage`, `guidecheck` und `recommend … --live`.
+
 Korrekturen an 1.4.0, gefunden bei einer vollständigen Durchsicht aller Änderungen seit 1.3.0:
 
 - **Augmente fehlten oder standen im falschen Modus.** ARAM und ARAM Chaos teilten sich eine

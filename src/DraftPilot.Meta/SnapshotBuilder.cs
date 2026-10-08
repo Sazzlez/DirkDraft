@@ -1014,8 +1014,15 @@ public sealed class SnapshotBuilder : IDisposable
     /// </summary>
     public static double MeasureSynergyBaseline(IReadOnlyList<SynergyStat> synergies)
         => MeanLogit(synergies
-            .Where(synergy => synergy.Play >= Shrinkage.SynergyPrior)
+            .Where(synergy => synergy.Play >= MinimumDuoGamesForBaseline)
             .Select(synergy => synergy.WinRate));
+
+    /// <summary>
+    /// Which duo rows the baseline is measured over. Fixed at the value the duo prior had when the
+    /// baseline was introduced, and on its own now: the prior was re-measured and raised, and a
+    /// filter that silently moved with it would have changed what "an average listed duo" means.
+    /// </summary>
+    private const int MinimumDuoGamesForBaseline = 100;
 
     /// <summary>
     /// What an average lane row is worth, in log-odds. Measured at 0.0086 (50,21 %) on the file
@@ -1174,6 +1181,7 @@ public sealed class SnapshotBuilder : IDisposable
 public sealed class ChampionResolver
 {
     private readonly Dictionary<string, int> _byNormalisedName = new(StringComparer.Ordinal);
+    private readonly HashSet<int> _ids = [];
 
     public ChampionResolver(IEnumerable<ChampionEntry> champions)
     {
@@ -1181,8 +1189,12 @@ public sealed class ChampionResolver
         {
             _byNormalisedName.TryAdd(Normalise(champion.Name), champion.Id);
             _byNormalisedName.TryAdd(Normalise(champion.Key), champion.Id);
+            _ids.Add(champion.Id);
         }
     }
+
+    /// <summary>Whether an id OP.GG sent is one of the champions this file knows.</summary>
+    public bool Knows(int championId) => _ids.Contains(championId);
 
     public int? Resolve(string? name)
     {

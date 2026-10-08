@@ -13,13 +13,18 @@ namespace DraftPilot.Core.Draft;
 /// </param>
 /// <param name="Play">Games behind <paramref name="WinRate"/>; 0 when there is no rate.</param>
 /// <param name="IsInferred">True when the rate is the mirror of the opposite pairing, not measured directly.</param>
+/// <param name="Measured">
+/// The duel as OP.GG measured it over <paramref name="Play"/> games, before shrinkage â€” what a text
+/// citing those games has to quote. <paramref name="WinRate"/> is the estimate the score uses.
+/// </param>
 public readonly record struct LaneMatchup(
     Lane Lane,
     int AllyId,
     int EnemyId,
     double? WinRate,
     int Play,
-    bool IsInferred)
+    bool IsInferred,
+    double? Measured = null)
 {
     /// <summary>Both sides revealed and a duel statistic exists — the only case that carries a number.</summary>
     public bool HasWinRate => WinRate is not null;
@@ -61,7 +66,8 @@ public static class LaneMatchups
                 enemy,
                 duel?.WinRate,
                 duel?.Play ?? 0,
-                duel?.IsInferred ?? false));
+                duel?.IsInferred ?? false,
+                duel is { Measured: var measured } && double.IsFinite(measured) ? measured : null));
         }
 
         return rows;

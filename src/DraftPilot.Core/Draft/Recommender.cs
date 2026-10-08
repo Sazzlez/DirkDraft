@@ -434,8 +434,9 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         if (threats.Count == 0)
             return;
 
+        // The measured rate beside "aus N Games" — the shrunk one is not what those games showed.
         var named = string.Join(", ", threats.Take(3).Select(threat =>
-            $"{_meta.ChampionName(threat.ChampionId)} {threat.WinRate:P0} aus {threat.Play:N0} Games"));
+            $"{_meta.ChampionName(threat.ChampionId)} {(double.IsFinite(threat.Measured) ? threat.Measured : threat.WinRate):P0} aus {threat.Play:N0} Games"));
 
         var more = threats.Count > 3 ? $" und {threats.Count - 3} weitere" : string.Empty;
 
@@ -797,12 +798,24 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
     /// </summary>
     private static string DescribeMatchup(MatchupView view, string opponent, Lane lane, double probability)
     {
-        var text = $"Von den ausgewerteten Games auf {lane.Display()} gewinnt dieser Champ "
-            + $"{view.WinRate:P1} gegen {opponent}. 50 % wäre ausgeglichen.";
+        // Two numbers, and the text has to keep them apart: what OP.GG measured over these games,
+        // and what the score counts after pulling it towards what both lane rates already imply.
+        // A single duel over a few hundred games is mostly chance — measured, the true effect of a
+        // duel beyond lane strength is about 1,6 points (see Shrinkage.MatchupPrior) — so the two
+        // can differ a lot, and calling the second one "of the games evaluated" would be false.
+        var text = double.IsFinite(view.Measured) && view.Play > 0
+            ? $"Gemessen auf {lane.Display()}: {view.Measured:P1} gegen {opponent} aus {view.Play:N0} Games. "
+                + $"Gezählt wird {view.WinRate:P1} — ein einzelnes Duell über so wenige Games ist zum "
+                + "großen Teil Zufall, deshalb rückt die Zahl zu dem, was die Lane-Stärke beider "
+                + "Champs ohnehin erwarten lässt. 50 % wäre ausgeglichen."
+            : $"Geschätzt {view.WinRate:P1} gegen {opponent} auf {lane.Display()}. 50 % wäre ausgeglichen.";
 
-        text += view.Play > 0
-            ? $"\n\nDatenlage: {view.Play:N0} Games."
-            : "\n\nDatenlage: sehr dünn, entsprechend vorsichtig gewichtet.";
+        if (!view.FromCompleteList && view.Play > 0)
+        {
+            text += "\n\nStammt aus OP.GGs Liste der auffälligsten Gegner. Solche Werte sind eine "
+                + "Auswahl der Extreme und fallen bei neuer Messung erfahrungsgemäß deutlich zur Mitte "
+                + "zurück — auch das steckt in der gezählten Zahl.";
+        }
 
         if (view.IsLive)
             text += " Gerade für diesen Draft von OP.GG geholt.";
@@ -964,16 +977,18 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             // noise, and nothing here can tell which — while it moved the term by up to 0,12
             // log-odds either way.
 
-            // Measured against what an average LISTED duo is worth, not against 50 %: OP.GG lists
-            // the duos worth mentioning, so the mean of the stored rows sits above even (0.0552 on
-            // the file this was measured on, i.e. 51,4 %). Uncentred, merely having a duo row was
-            // worth 0,8 points, the estimate grew as allies locked in rather than with the quality
-            // of the pick, and a candidate without a row was penalised for a gap in OP.GG's
-            // selection. The baseline is zero in older files, which leaves them as they were.
-            var logOdds = ScoreModel.Logit(synergy.WinRate) - _meta.SynergyBaseline;
+            // Measured against what THIS pair was expected to win from the two champions' lane
+            // strength (see SynergyLine), not against one global mean. A duo rate carries about 0,4
+            // of each champion's own strength; against a global mean that share stayed in the term,
+            // so a candidate with a listed duo had its lane strength booked a second time and one
+            // without did not — the matchup term's old double count, arriving through the duo data.
+            // What is left is the part only the pair explains: how much better the two do TOGETHER.
+            // The expectation is the very rate the row was shrunk towards, so a thin duo contributes
+            // nothing and a missing one contributes nothing.
+            var logOdds = ScoreModel.Logit(synergy.WinRate) - ScoreModel.Logit(synergy.Expected);
 
             total += logOdds;
-            variance += ScoreError.LogitVariance(synergy.WinRate, synergy.Play, Shrinkage.SynergyPrior, _meta.SynergyTarget);
+            variance += ScoreError.LogitVariance(synergy.WinRate, synergy.Play, Shrinkage.SynergyPrior, synergy.Expected);
             counted++;
 
             if (logOdds > bestLogOdds)
@@ -987,15 +1002,16 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         if (counted == 0)
             return null;
 
-        // The threshold is now measured against the average listed duo, not against even — which is
-        // what the chip was always claiming to say. Duos that merely exist no longer earn one.
+        // Measured against the pair's own expectation: the chip now says the two do better together
+        // than their separate strength explains, which is what "spielt gut mit" always claimed.
         if (bestPartner is not null && bestLogOdds > 0.08)
         {
             reasons.Add(Reason.Pro(
                 $"spielt gut mit {bestPartner}",
                 $"Zusammen mit {bestPartner} im selben Team liegt die Winrate bei "
-                + $"{bestView.WinRate:P1} aus {bestView.Play:N0} Games — besser als die üblichen "
-                + "Duos, die OP.GG überhaupt auflistet."));
+                + $"{(double.IsFinite(bestView.Measured) ? bestView.Measured : bestView.WinRate):P1} aus {bestView.Play:N0} Games "
+                + $"— erwartet hätte man aus der Stärke der beiden allein {bestView.Expected:P1}. Gezählt "
+                + $"wird nur der Unterschied, und geglättet: {bestView.WinRate:P1} statt des gemessenen Werts."));
         }
 
         // Thin duo samples are where the score is least certain; the damping applies to the
@@ -1068,8 +1084,10 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         {
             reasons.Add(Reason.Pro(
                 $"schlägt unseren {worst}",
-                $"Im direkten Matchup gewinnt dieser Champ {worstView.WinRate:P1} gegen {worst}, "
-                + $"der bei uns schon gepickt ist. Aus {worstView.Play:N0} Games."));
+                $"Im direkten Matchup gewinnt dieser Champ {(double.IsFinite(worstView.Measured) ? worstView.Measured : worstView.WinRate):P1} "
+                + $"gegen {worst}, der bei uns schon gepickt ist. Aus {worstView.Play:N0} Games; "
+                + $"gezählt wird {worstView.WinRate:P1}, weil ein einzelnes Duell über so wenige Games "
+                + "zum großen Teil Zufall ist."));
         }
 
         // Mean, not sum, for the same reason as the synergy term: otherwise the ban value climbed

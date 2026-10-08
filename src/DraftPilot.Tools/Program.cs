@@ -80,13 +80,22 @@ try
             return SnapshotCommand.Inspect();
 
         case "recommend":
-            return RecommendCommand.Run(args);
+            return await RecommendCommand.RunAsync(args, lifetime.Token);
 
         case "noise":
             return NoiseCommand.Run(args);
 
         case "matchupfit":
             return MatchupFitCommand.Run(args);
+
+        case "priors":
+            return PriorsCommand.Run(args);
+
+        case "coverage":
+            return CoverageCommand.Run();
+
+        case "guidecheck":
+            return await GuideCheckCommand.RunAsync(lifetime.Token);
 
         case "runes":
             return await RunesCommand.RunAsync(lifetime.Token);
@@ -153,6 +162,11 @@ static void PrintUsage()
                                  pruefen, ob die Reihenfolge ueberhaupt etwas bedeutet
           matchupfit [folds]     Kanten zurueckhalten und pruefen, welche Grundannahme ein
                                  unbekanntes Matchup am besten vorhersagt
+          priors [teilungen]     Messen, wie stark Lane-, Matchup- und Duo-Raten zu ihrem
+                                 Erwartungswert gezogen werden sollten (Spiele jeder Zeile
+                                 zufaellig halbieren, an der anderen Haelfte pruefen)
+          coverage               Wie viele Kandidaten je Lane ueberhaupt eine Duell-Zahl gegen
+                                 die meistgespielten Gegner haben
           runes                  Runenseiten des Accounts anzeigen (nur lesend)
           opgg tools [name]      Werkzeuge der OP.GG-Schnittstelle auflisten, mit Namen das
                                  vollstaendige Argument-Schema eines Werkzeugs

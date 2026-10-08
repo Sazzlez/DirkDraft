@@ -710,7 +710,12 @@ public class RecommenderTests
     /// <summary>
     /// The score carries the sampling error of the numbers it was built from, so the panel can say
     /// when its own ordering is meaningless. The same duo win rate measured over 40 games has to
-    /// come out visibly less certain than over 40.000 — that difference is the whole mechanism.
+    /// come out less certain than over 40.000.
+    /// <para>
+    /// Less certain, not three times as uncertain, as this once asserted: at the measured duo prior
+    /// a 40-game duo is pulled almost entirely onto its expectation, so it can barely move the score
+    /// under resampling — the error follows the value. What it must never do is look MORE certain.
+    /// </para>
     /// </summary>
     [Fact]
     public void AThinSynergy_MakesTheScoreLessCertainThanAThickOne()
@@ -744,7 +749,7 @@ public class RecommenderTests
 
         Assert.True(thin > 0, "Der Fehlerbalken darf nicht null sein.");
         Assert.True(
-            thin > thick * 3,
+            thin > thick,
             $"40 Spiele müssen unsicherer sein als 40.000 ({thin} gegen {thick}).");
     }
 
@@ -1310,6 +1315,65 @@ public class RecommenderTests
         // The 20 000-game row, not the 120-game one that happens to read two points higher.
         Assert.Equal(meta.LaneStat(Flex, Lane.Mid)!.Value.WinRate, item.Score, precision: 6);
         Assert.DoesNotContain(item.Reasons, reason => reason.Text.Contains("stark auf", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// A duo rate carries part of each champion's own strength; the synergy term must not book
+    /// that part a second time. Two candidates of very different lane strength, each with a duo
+    /// exactly as good as the line predicts for them, get the same synergy term — zero — and the
+    /// whole gap between them stays in the lane term where it belongs.
+    /// <para>
+    /// Against the old global mean the strong one's duo sat above average simply for being strong,
+    /// and earned a second helping of the lane strength the lane term had already counted.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void ADuoExactlyAsGoodAsItsTwoChampions_AddsNothing()
+    {
+        const double Intercept = 0.05, Slope = 0.4;
+
+        var builder = new MetaBuilder()
+            .Champion(Strong, "Strong", DamageType.Magic, ["Mage"], 550, 3)
+            .Champion(Weak, "Weak", DamageType.Magic, ["Mage"], 550, 3)
+            .Champion(AllySupport, "AllySupport", DamageType.Magic, ["Tank"], 125, 6)
+            .InLane(Strong, Lane.Mid, winRate: 0.54, play: 40_000)
+            .InLane(Weak, Lane.Mid, winRate: 0.46, play: 40_000)
+            .InLane(AllySupport, Lane.Support, winRate: 0.51, play: 40_000);
+
+        double OnTheLine(double mine, double partner)
+            => ScoreModel.Sigmoid(Intercept + (Slope * (ScoreModel.Logit(mine) + ScoreModel.Logit(partner))));
+
+        // Enough unrelated pairs on the same line for it to be fitted at all.
+        for (var i = 0; i < SynergyLine.MinimumRows + 20; i++)
+        {
+            int mid = 1000 + i, support = 2000 + i;
+            double midRate = 0.47 + ((i % 13) * 0.005), supportRate = 0.48 + ((i % 7) * 0.006);
+
+            builder
+                .Champion(mid, $"Mid{i}")
+                .Champion(support, $"Support{i}")
+                .InLane(mid, Lane.Mid, winRate: midRate, play: 30_000)
+                .InLane(support, Lane.Support, winRate: supportRate, play: 30_000)
+                .Synergy(mid, support, OnTheLine(midRate, supportRate), play: 2_000, lane: Lane.Mid, partnerLane: Lane.Support);
+        }
+
+        var meta = builder
+            .Synergy(Strong, AllySupport, OnTheLine(0.54, 0.51), play: 5_000, lane: Lane.Mid, partnerLane: Lane.Support)
+            .Synergy(Weak, AllySupport, OnTheLine(0.46, 0.51), play: 5_000, lane: Lane.Mid, partnerLane: Lane.Support)
+            .Build();
+
+        Assert.Equal(Slope, meta.SynergyLine.Slope, precision: 2);
+
+        var state = DraftState.From(new SessionBuilder().LocalPlayer(2).Locked(4, AllySupport).OnClock(2, "pick").Build());
+        var target = new TurnTracker().Resolve(state)!;
+        var items = new Recommender(meta, TraitTable.Empty)
+            .Recommend(state, target, new LanePredictor(meta).Predict(state.Enemies), limit: 300).Items;
+
+        double SynergyOf(int championId) => items.Single(item => item.ChampionId == championId)
+            .Breakdown.Single(term => term.Kind == ScoreTermKind.Synergy).LogOdds ?? double.NaN;
+
+        Assert.Equal(0, SynergyOf(Strong), precision: 3);
+        Assert.Equal(0, SynergyOf(Weak), precision: 3);
     }
 
     // ---- Evaluate: the figure shown for a hover ----

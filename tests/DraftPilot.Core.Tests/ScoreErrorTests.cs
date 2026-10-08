@@ -25,10 +25,11 @@ public class ScoreErrorTests
         Assert.Equal(0, ScoreError.LogitVariance(0.5, play: 0, Shrinkage.LanePrior));
     }
 
+    /// <summary>Same prior, same rate, different sample: the thinner one moves more under resampling.</summary>
     [Fact]
     public void ThinnerSamples_CarryMoreError()
     {
-        var thin = ScoreError.LogitVariance(0.547, play: 111, Shrinkage.SynergyPrior);
+        var thin = ScoreError.LogitVariance(0.547, play: 111, Shrinkage.LanePrior);
         var thick = ScoreError.LogitVariance(0.518, play: 43_504, Shrinkage.LanePrior);
 
         Assert.True(thin > thick * 10, $"111 Spiele müssen deutlich unsicherer sein als 43.504 ({thin} vs {thick}).");
@@ -36,11 +37,13 @@ public class ScoreErrorTests
 
     /// <summary>
     /// The real numbers behind the support draft that prompted this work: a 43.504-game lane rate
-    /// and a 111-game duo. Almost the whole error comes from the duo, which is the point — a single
-    /// thin statistic decided the order of the top four.
+    /// and a 111-game duo at 59 % raw. At the old duo prior of 100 the duo carried the error bar to
+    /// 1,5 points and decided the order of the top four on its own. At the measured prior the same
+    /// duo is pulled most of the way to its expectation, and what little it still moves the score is
+    /// all the error it adds — the bar stays under half a point.
     /// </summary>
     [Fact]
-    public void TheErrorIsDominatedByTheThinnestTerm()
+    public void AThinDuoNoLongerDominatesTheError()
     {
         var budget = new ErrorBudget();
         budget.Add(ScoreError.LogitVariance(0.5178, 43_504, Shrinkage.LanePrior));
@@ -49,12 +52,13 @@ public class ScoreErrorTests
 
         // The synergy term is a damped mean over exactly one partner.
         var scale = ScoreModel.SynergyDamping;
-        budget.Add(scale * scale * ScoreError.LogitVariance(0.5473, 111, Shrinkage.SynergyPrior));
+        var duo = Shrinkage.Apply(0.59, 111, Shrinkage.SynergyPrior);
+        budget.Add(scale * scale * ScoreError.LogitVariance(duo, 111, Shrinkage.SynergyPrior));
 
         var withSynergy = ScoreError.AsPoints(budget.StandardError);
 
         Assert.InRange(laneOnly, 0.2, 0.3);
-        Assert.InRange(withSynergy, 1.3, 1.7);
+        Assert.InRange(withSynergy, 0.3, 0.6);
     }
 
     [Theory]

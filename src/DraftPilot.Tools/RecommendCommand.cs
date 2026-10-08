@@ -1,6 +1,8 @@
 using DraftPilot.Core.Data;
 using DraftPilot.Core.Draft;
 using DraftPilot.Core.Lcu.Models;
+using DraftPilot.Meta;
+using DraftPilot.Meta.OpGg;
 
 namespace DraftPilot.Tools;
 
@@ -10,8 +12,16 @@ namespace DraftPilot.Tools;
 /// </summary>
 internal static class RecommendCommand
 {
-    public static int Run(string[] args)
+    public static async Task<int> RunAsync(string[] args, CancellationToken ct)
     {
+        // What the draft fetches live for every revealed enemy, replayed here so its effect on the
+        // list can be measured: --counters is the notable-counter call alone, --live adds the
+        // complete duel list on top.
+        var live = args.Contains("--live", StringComparer.OrdinalIgnoreCase);
+        var countersOnly = args.Contains("--counters", StringComparer.OrdinalIgnoreCase);
+        args = [.. args.Where(argument => !argument.Equals("--live", StringComparison.OrdinalIgnoreCase)
+            && !argument.Equals("--counters", StringComparison.OrdinalIgnoreCase))];
+
         // Pulled out before anything positional is read, so "--terms" may sit anywhere on the line
         // — including directly after the lane, where it would otherwise be parsed as the enemy list.
         var withTerms = args.Contains("--terms", StringComparer.OrdinalIgnoreCase);
@@ -62,6 +72,9 @@ internal static class RecommendCommand
         var predictions = new LanePredictor(meta, SeatPriors.Load()).Predict(state.Enemies);
         PrintPredictions(meta, predictions);
 
+        if (live || countersOnly)
+            await FetchLiveAsync(meta, predictions, withCompleteDuels: live, ct);
+
         var recommender = new Recommender(meta, traits);
 
         var set = recommender.Recommend(state, target, predictions, selectable: null, limit: 8);
@@ -74,6 +87,45 @@ internal static class RecommendCommand
         PrintComp(bans);
         PrintBalance(meta, state, predictions);
         return 0;
+    }
+
+    /// <summary>The draft's live calls for every revealed enemy, as the app makes them.</summary>
+    private static async Task FetchLiveAsync(MetaLookup meta, LanePredictionResult predictions, bool withCompleteDuels, CancellationToken ct)
+    {
+        using var client = new OpGgMcpClient();
+        var fetcher = new LiveDraftFetcher(client, "ranked", meta.Tier.Length > 0 ? meta.Tier : "all");
+        var resolver = new ChampionResolver(meta.Champions);
+        var applied = 0;
+
+        foreach (var prediction in predictions.Predictions.Where(prediction => prediction.ChampionId != 0))
+        {
+            if (meta.Champion(prediction.ChampionId) is not { } enemy)
+                continue;
+
+            var lane = LiveDraftFetcher.RequestedLane(prediction.Lane);
+            var counters = await fetcher.FetchEnemyCountersAsync(enemy, lane, resolver, ct);
+            meta.ApplyLiveMatchups(counters);
+            applied += counters.Count;
+
+            if (!withCompleteDuels)
+                continue;
+
+            var anyOpponent = meta.Roster(lane)
+                .Where(id => id != enemy.Id)
+                .OrderByDescending(id => meta.LaneStat(id, lane)?.Play ?? 0)
+                .Select(id => meta.Champion(id))
+                .FirstOrDefault(champion => champion is not null);
+
+            if (anyOpponent is null)
+                continue;
+
+            var duels = await fetcher.FetchCompleteDuelsAsync(enemy, lane, anyOpponent, resolver, ct);
+            meta.ApplyLiveMatchups(duels);
+            applied += duels.Count;
+        }
+
+        Console.WriteLine($"Live geholt: {applied} Duelle ({(withCompleteDuels ? "Counter + vollständige Listen" : "nur Counter")}).");
+        Console.WriteLine();
     }
 
     /// <summary>

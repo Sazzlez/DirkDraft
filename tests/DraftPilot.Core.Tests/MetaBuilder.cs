@@ -69,12 +69,21 @@ internal sealed class MetaBuilder
         return this;
     }
 
-    public MetaBuilder Synergy(int championId, int partnerId, double winRate, int play = 1000, int tier = -1)
+    public MetaBuilder Synergy(
+        int championId,
+        int partnerId,
+        double winRate,
+        int play = 1000,
+        int tier = -1,
+        Lane lane = Lane.Top,
+        Lane partnerLane = Lane.Top)
     {
         _snapshot.Synergies.Add(new SynergyStat
         {
             ChampionId = championId,
             PartnerId = partnerId,
+            Lane = lane,
+            PartnerLane = partnerLane,
             WinRate = winRate,
             Play = play,
             Tier = tier,

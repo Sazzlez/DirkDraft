@@ -190,6 +190,11 @@ dotnet run --project src\DraftPilot.Tools -- update
 dotnet run --project src\DraftPilot.Tools -- icons
 dotnet run --project src\DraftPilot.Tools -- inspect
 dotnet run --project src\DraftPilot.Tools -- recommend mid "Jax,Elise,Syndra" "Aatrox,LeeSin"
+dotnet run --project src\DraftPilot.Tools -- recommend top Jax "Ahri,Thresh" --live
+dotnet run --project src\DraftPilot.Tools -- noise top Jax "Ahri,Thresh"
+dotnet run --project src\DraftPilot.Tools -- priors
+dotnet run --project src\DraftPilot.Tools -- coverage
+dotnet run --project src\DraftPilot.Tools -- guidecheck
 dotnet run --project src\DraftPilot.Tools -- settings
 dotnet run --project src\DraftPilot.Tools -- settings tier gold
 dotnet run --project src\DraftPilot.Tools -- opgg tools
@@ -205,6 +210,17 @@ lesbar sein, bevor jemand die Oberfläche aufmacht. `--terms` hängt jedem Eintr
 einzeln an, dieselben Zahlen wie hinter dem Pfeil im Fenster. Ein `-` steht für „niemand": ein
 leeres `""` verschluckt PowerShell, und die nächste Liste rutscht dann in den Gegner-Platz, ohne
 dass es jemand merkt — `recommend top - "Ahri,Thresh"` meint Blind Pick mit zwei eigenen Picks.
+`--live` holt vorher, was der Draft für jeden aufgedeckten Gegner live holt (Counter und
+vollständige Duell-Liste), `--counters` nur die Counter — so lässt sich die Wirkung des Abrufs auf
+die Liste direkt ablesen.
+
+Die Messwerkzeuge hinter dem Modell, alle nur lesend: `noise` zieht denselben Draft wiederholt aus
+seinen Stichproben und prüft, ob die Reihenfolge etwas bedeutet. `priors` misst die
+Glättungsgewichte, indem es die Spiele jeder Zeile zufällig halbiert und mit der einen Hälfte die
+andere vorhersagt. `coverage` sagt, für wie viele Kandidaten überhaupt eine Duell-Zahl gegen die
+häufigsten Gegner vorliegt. `guidecheck` holt für 16 Champions die vollständigen Duell-Listen und
+misst, ob sie zu den gespeicherten Zahlen passen und wie stark die Counter-Listen übertreiben (32
+Abrufe). Die Ergebnisse stehen in `docs\modellpruefung.md`.
 
 `probe` prüft die Verbindung schichtweise — Installation, Lockfile, Zertifikatskette, HTTP, Socket.
 Von außen sehen alle fünf Schichten gleich aus („nicht verbunden"), und genau das hat schon einmal
@@ -307,24 +323,36 @@ Das solltest du wissen, bevor du den Empfehlungen zu viel zutraust:
 
 - **Tierlist und Lane-Verteilung sind solide.** Die Rollen-Anteile, aus denen die Lane-Vorhersage
   rechnet, sind Verhältnisse großer Zahlen und entsprechend belastbar.
-- **Die Abdeckung ist der harte Deckel.** Von den möglichen Lane-Matchups kennt der Vorrat je nach
-  Lane nur 14 bis 23 %. Für das konkrete Matchup, um das es geht, liegt also meistens nichts vor —
-  dafür gibt es die Draft-Abrufe, und wo auch die nichts liefern, steht „keine Daten".
+- **Die gespeicherte Counter-Matrix ist dünn — der Draft füllt sie für den echten Gegner auf.**
+  OP.GG nennt pro Champion und Lane nur die drei auffälligsten Gegner. Gegen die zehn
+  meistgespielten Gegner einer Lane hat der Vorrat deshalb nur für 14 bis 23 % der Kandidaten eine
+  Duell-Zahl (`Tools -- coverage`). Sobald ein Gegner aufgedeckt ist, holt der Draft dessen
+  **vollständige** Duell-Liste auf seiner Lane (OP.GGs Matchup-Guide, 39 bis 57 Gegner je Champion)
+  — dann hat fast jeder Kandidat eine Zahl gegen ihn. Ausnahme Jungle: dafür liefert OP.GG keine
+  Liste. Die vollständige Liste kennt keinen Rang-Filter; gemessen weicht sie im Mittel 0,36 Punkte
+  von dem ab, was die Gold-Lane-Raten erwarten lassen (`Tools -- guidecheck`).
+- **„Die auffälligsten Gegner" sind eine Auswahl der Extreme.** Am selben Tag für dieselben Paare
+  gemessen, weichen die Counter-Listen im Mittel 5,0 Punkte von der Erwartung ab, die vollständigen
+  Listen 2,3 — und von einer Counter-Abweichung findet sich in der unabhängigen Messung nur etwa
+  ein Achtel wieder. Liegt für ein Paar beides vor, zählt deshalb die vollständige Liste.
+- **Ein Matchup bewegt weniger, als es sich anfühlt.** Jenseits der Lane-Stärke beider Champions
+  verschiebt ein Duell die Winrate um etwa 1,6 Punkte (Standardabweichung). Ein einzelnes Duell
+  über ein paar hundert Games ist deshalb zum großen Teil Zufall und wird kräftig geglättet: bei 500
+  Games zählt etwa ein Drittel seiner Abweichung. Wo eine Zahl „aus N Games" zitiert, steht der
+  gemessene Wert; die Prozentzahl daneben ist die Schätzung, mit der gerechnet wird.
+- **Duos zählen nur, wo sie mehr sind als zwei starke Champions.** Eine Duo-Winrate enthält etwa
+  zu 0,4 die Einzelstärke beider Partner. Gezählt wird nur, was darüber hinausgeht, und geglättet
+  mit dem gemessenen Gewicht (`Tools -- priors`: 750, vorher 100 und damit sechsfach zu ernst).
 - **Die Reihenfolge der Liste ist oft Rauschen.** Zieht man denselben Draft wiederholt aus seinen
-  Stichproben (`Tools -- noise`), bleibt Platz 1 je nach Datenlage nur in 49 bis 92 % der Ziehungen
-  derselbe Champion. Deshalb sagt die Kopfzeile, wie viele Zeilen gleichauf liegen, jede Zeile
-  nennt ihren Abstand zu Platz 1 in Worten, und die gleichauf liegenden tragen dieselbe Kante.
-- **Die Vorrats-Counter-Matrix ist dünn.** Die Quelle liefert pro Champion und Lane nur die
-  auffälligsten drei Gegner — keine vollständige Matrix. Genau dafür gibt es die automatischen
-  Draft-Abrufe: für die fünf real aufgedeckten Gegner kommen dichte, aktuelle Zahlen nach. Wo
-  trotzdem nichts vorliegt, sagt die Aufschlüsselung „keine Daten" statt zu raten.
-- **Kleine Stichproben werden gedämpft.** Ein Duo mit 78 % Winrate über 32 Games ist Rauschen. Jede
-  Rate läuft durch eine Bayes-Glättung, bevor daraus ein Score wird. Deshalb sehen die angezeigten
-  Winrates flacher aus als auf einer Statistikseite — sie sind dafür belastbarer.
-- **Vier Konstanten des Scores sind Schätzungen.** Wie stark Gegner außerhalb der eigenen Lane,
-  die OP.GG-Stufe, Synergien und der Team-Bedarf zählen, steht begründet, aber unkalibriert in
-  `ScoreModel.cs`. Kalibrieren ließe sich das erst an echten Ranked-Aufzeichnungen
-  (`Tools -- record`) — offene Aufgabe. Die Winrate-Anteile selbst sind gemessen, nicht geschätzt.
+  Stichproben (`Tools -- noise`), bleibt Platz 1 je nach Datenlage nur in etwa der Hälfte bis fast
+  allen Ziehungen derselbe Champion. Deshalb sagt die Kopfzeile, wie viele Zeilen gleichauf liegen,
+  jede Zeile nennt ihren Abstand zu Platz 1 in Worten, und die gleichauf liegenden tragen dieselbe
+  Kante.
+- **Drei Konstanten des Scores sind Schätzungen.** Wie stark Gegner außerhalb der eigenen Lane,
+  Synergien (zusätzlich zur gemessenen Glättung) und der Team-Bedarf zählen, steht begründet, aber
+  unkalibriert in `ScoreModel.cs`. Kalibrieren ließe sich das nur an Spielausgängen, und die eigenen
+  reichen dafür nicht (bei 1.000 Spielen läge der Fehler eines Gewichts bei etwa 0,6). Gemessen
+  sind dagegen alle Winrates und alle Glättungsgewichte.
 - **Die kuratierten Traits deckt nicht alle Champions ab.** Engage, Peel, CC und Scaling stehen für
   166 der 173 Champions in `data\champion_traits.json`. Für die übrigen — meist ganz neue — feuern
   die davon abhängigen Comp-Regeln nicht, statt zu raten. Die Anzeige nennt die Trait-Abdeckung,

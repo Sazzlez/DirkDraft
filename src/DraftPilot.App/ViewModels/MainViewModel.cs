@@ -88,10 +88,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private int _liveCallsThisDraft;
 
     /// <summary>
-    /// Five enemies at up to two lanes each, plus a handful of build guides: sixteen is above what
-    /// an honest draft needs and below what a flapping prediction could spend.
+    /// Five enemies at up to two lanes each, two calls per enemy and lane (the notable counters and
+    /// the complete duel list), plus a handful of build guides: twenty-four is above what an honest
+    /// draft needs and below what a flapping prediction could spend.
     /// </summary>
-    private const int MaxLiveCallsPerDraft = 16;
+    private const int MaxLiveCallsPerDraft = 24;
 
     /// <summary>Consecutive rounds that ended with at least one failed call; drives the backoff.</summary>
     private int _fetchFailures;
@@ -2107,6 +2108,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             if (stats.Count > 0)
                 _meta.ApplyLiveMatchups(stats);
 
+            await FetchCompleteDuelsAsync(fetcher, enemy, entry.Lane, resolver, token).ConfigureAwait(true);
+
+            if (token.IsCancellationRequested)
+                return true;
+
             // Show each enemy's data as it lands rather than after the last one.
             _refreshingFromFetch = true;
             try
@@ -2135,6 +2141,54 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 _liveFetched.Add(key);
 
             return false;
+        }
+    }
+
+    /// <summary>
+    /// The enemy's complete duel list on the lane, on top of the notable counters just applied. The
+    /// counter lists give a duel number to roughly one candidate in six; this gives one to nearly
+    /// every candidate against this enemy, which is what turns the matchup term from "flags the
+    /// hard counters" into an actual comparison.
+    /// <para>
+    /// Best effort: a failure costs the extra coverage and nothing else. The enemy already counts as
+    /// fetched — its counters are in — and retrying the whole enemy for this one call would spend the
+    /// draft's budget twice on what did arrive.
+    /// </para>
+    /// </summary>
+    private async Task FetchCompleteDuelsAsync(
+        LiveDraftFetcher fetcher,
+        ChampionEntry enemy,
+        Lane lane,
+        ChampionResolver resolver,
+        CancellationToken token)
+    {
+        if (_liveCallsThisDraft >= MaxLiveCallsPerDraft)
+            return;
+
+        // The guide wants an opponent; the list does not depend on which. The lane's most played
+        // champion is one OP.GG certainly knows there.
+        var anyOpponent = _meta.Roster(lane)
+            .Where(id => id != enemy.Id)
+            .OrderByDescending(id => _meta.LaneStat(id, lane)?.Play ?? 0)
+            .Select(id => _meta.Champion(id))
+            .FirstOrDefault(champion => champion is not null);
+
+        if (anyOpponent is null)
+            return;
+
+        try
+        {
+            var duels = await fetcher.FetchCompleteDuelsAsync(enemy, lane, anyOpponent, resolver, token)
+                .ConfigureAwait(true);
+
+            _liveCallsThisDraft++;
+
+            if (!token.IsCancellationRequested && duels.Count > 0)
+                _meta.ApplyLiveMatchups(duels);
+        }
+        catch (Exception ex) when (IsRecoverable(ex, token))
+        {
+            CrashLog.Note("Draft-Abruf", $"Duell-Liste {enemy.Name}: {ex.Message}");
         }
     }
 
@@ -2604,7 +2658,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
                 (view.AllyRest, view.AllyAdvance, view.EnemyAdvance, view.EnemyRest) = BarParts(rate);
 
-                view.Note = $"{row.Play.ToString("N0", culture)} Games in diesem Matchup"
+                // The bar shows the estimate; the note quotes what the games measured.
+                view.Note = (row.Measured is { } measured
+                        ? $"Geschätzt; gemessen {measured.ToString("P1", culture)} in {row.Play.ToString("N0", culture)} Games"
+                        : $"{row.Play.ToString("N0", culture)} Games in diesem Matchup")
                     + (row.IsInferred ? " · aus der Gegenrichtung abgeleitet" : string.Empty);
             }
             else
@@ -2919,7 +2976,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _ => ScoreTone.Weak,
         };
 
-        var sample = duel.Play > 0 ? $" · {duel.Play.ToString("N0", culture)} Games" : string.Empty;
+        // The big figure is the estimate. The games behind it measured something else — a single
+        // duel over a few hundred games is mostly chance — so the line that cites them quotes what
+        // they measured, not the estimate beside it.
+        var sample = duel.Play <= 0
+            ? string.Empty
+            : double.IsFinite(duel.Measured)
+                ? $" · gemessen {duel.Measured.ToString("P1", culture)} in {duel.Play.ToString("N0", culture)} Games"
+                : $" · {duel.Play.ToString("N0", culture)} Games";
         MatchupSubline = $"{lanePart}{sample}";
 
         MatchupNote = (duel.WinRateDelta, teammate) switch
@@ -3347,11 +3411,18 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _ => ScoreTone.Weak,
         };
 
-        row.WinRateHint = $"Lane-Matchup auf {duel.Lane.Display()}: "
+        // The estimate, then what the games measured — the two differ by design, and "aus N Games"
+        // next to the estimate would claim those games showed it.
+        var measured = duel.Measured is { } raw
+            ? $" Gemessen: {(isAlly ? raw : 1 - raw).ToString("P1", culture)} in {duel.Play.ToString("N0", culture)} Games — "
+                + "die Schätzung rückt das zu dem, was die Lane-Stärke beider erwarten lässt."
+            : $" Aus {duel.Play.ToString("N0", culture)} Games.";
+
+        row.WinRateHint = $"Lane-Matchup auf {duel.Lane.Display()}, geschätzt: "
             + $"{_meta.ChampionName(duel.AllyId)} {allyRate.ToString($"P{decimals}", culture)} gegen "
-            + $"{_meta.ChampionName(duel.EnemyId)} {(1 - allyRate).ToString($"P{decimals}", culture)}, "
-            + $"aus {duel.Play.ToString("N0", culture)} Games"
-            + (duel.IsInferred ? " · aus der Gegenrichtung abgeleitet." : ".");
+            + $"{_meta.ChampionName(duel.EnemyId)} {(1 - allyRate).ToString($"P{decimals}", culture)}."
+            + measured
+            + (duel.IsInferred ? " Aus der Gegenrichtung abgeleitet." : string.Empty);
     }
 
     /// <summary>

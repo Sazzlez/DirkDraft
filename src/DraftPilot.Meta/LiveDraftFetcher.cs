@@ -603,6 +603,114 @@ public sealed class LiveDraftFetcher(
         return [];
     }
 
+    /// <summary>
+    /// Every duel one champion has on one lane — the whole row, not the three notable opponents the
+    /// counter lists name.
+    /// <para>
+    /// OP.GG's matchup guide carries it in <c>data.counters</c>, sorted by games: measured on
+    /// 2026-10-08, Jax Top answers with 56 opponents and Garen Top with 57, from 30 to 558 games each.
+    /// The counter lists the rest of this class reads give a candidate list a duel number for 14 to
+    /// 23 % of a lane's candidates against its most-played opponents (<c>Tools -- coverage</c>); for
+    /// the opponent actually revealed, this one call covers nearly all of them.
+    /// </para>
+    /// <para>
+    /// The guide takes no rank bracket (a <c>tier</c> argument is accepted and ignored), so these
+    /// duels describe OP.GG's default bracket while the lane rates beside them describe the file's.
+    /// Measured with <c>Tools -- guidecheck</c> over 788 duels of 16 champions: they sit 0,36 points from
+    /// what the file's lane rates expect for each pair — no shift worth correcting. Jungle answers with an
+    /// empty list and is not asked.
+    /// </para>
+    /// </summary>
+    /// <param name="anyOpponent">
+    /// The guide insists on an opponent. The duel list does not depend on which, so the caller
+    /// passes any regular of the lane.
+    /// </param>
+    public async Task<IReadOnlyList<MatchupStat>> FetchCompleteDuelsAsync(
+        ChampionEntry champion,
+        Lane lane,
+        ChampionEntry anyOpponent,
+        ChampionResolver resolver,
+        CancellationToken ct)
+    {
+        if (lane is Lane.Unknown or Lane.Jungle)
+            return [];
+
+        foreach (var myName in ChampionResolver.ApiNames(champion))
+        {
+            foreach (var opponentName in ChampionResolver.ApiNames(anyOpponent))
+            {
+                var arguments = new JsonObject
+                {
+                    ["my_champion"] = myName,
+                    ["opponent_champion"] = opponentName,
+                    ["position"] = lane.ToOpGg(),
+                };
+
+                try
+                {
+                    var text = await client.CallToolRawAsync("lol_get_lane_matchup_guide", arguments, ct)
+                        .ConfigureAwait(false);
+
+                    return ParseCompleteDuels(text, champion.Id, lane, resolver);
+                }
+                catch (OpGgApiException ex) when (ex.Status is null)
+                {
+                    // A spelling the tool does not know; try the next combination. An HTTP status is
+                    // an outage and goes up, like everywhere else in this class.
+                }
+                catch (JsonException ex)
+                {
+                    diagnostic?.Invoke($"Duell-Liste unlesbar für {myName}: {ex.Message}");
+                    return [];
+                }
+            }
+        }
+
+        return [];
+    }
+
+    /// <summary>Reads the guide's complete duel list as live matchup edges, from the given champion's side.</summary>
+    public static List<MatchupStat> ParseCompleteDuels(string text, int championId, Lane lane, ChampionResolver resolver)
+    {
+        var stats = new List<MatchupStat>();
+
+        if (JsonNode.Parse(text)?["data"]?["counters"] is not JsonArray counters)
+            return stats;
+
+        foreach (var counter in counters)
+        {
+            if (counter is not JsonObject entry)
+                continue;
+
+            var play = Number(entry["play"]);
+            var win = Number(entry["win"]);
+
+            // The id is in the answer; the name is the fallback for an id this file does not know.
+            var opponent = Number(entry["champion_id"]) is var id and > 0 && resolver.Knows(id)
+                ? id
+                : resolver.Resolve(entry["champion_name"]?.GetValue<string>()) ?? 0;
+
+            if (play <= 0 || win < 0 || win > play || opponent == 0 || opponent == championId)
+                continue;
+
+            stats.Add(new MatchupStat
+            {
+                ChampionId = championId,
+                OpponentId = opponent,
+                Lane = lane,
+                WinRate = (double)win / play,
+                Play = play,
+                FromCompleteList = true,
+            });
+        }
+
+        return stats;
+
+        // A number that is not one counts as absent rather than taking the parse down with it.
+        static int Number(JsonNode? node)
+            => node is JsonValue value && value.TryGetValue<int>(out var number) ? number : 0;
+    }
+
     /// <summary>Reads counters exactly like the snapshot updater does, as live matchup edges.</summary>
     private static List<MatchupStat> ParseCounters(OpGgNode node, int enemyId, Lane requested, ChampionResolver resolver)
     {

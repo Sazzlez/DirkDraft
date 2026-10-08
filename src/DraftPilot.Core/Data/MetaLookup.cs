@@ -17,13 +17,32 @@ public readonly record struct LaneView(
 
 /// <summary>A matchup, already shrunk, with the weight its sample deserves.</summary>
 /// <param name="IsLive">Fetched on demand for the current draft rather than from the snapshot.</param>
-public readonly record struct MatchupView(double WinRate, int Play, double Confidence, bool IsInferred, bool IsLive = false)
+/// <param name="FromCompleteList">
+/// From a complete duel list rather than a notable-opponent one; see <see cref="MatchupStat.FromCompleteList"/>.
+/// </param>
+/// <param name="Measured">
+/// The rate as OP.GG measured it, before shrinkage. Shown wherever a text says "over N games", which
+/// the shrunk <paramref name="WinRate"/> is not; the score uses the shrunk one.
+/// </param>
+public readonly record struct MatchupView(
+    double WinRate,
+    int Play,
+    double Confidence,
+    bool IsInferred,
+    bool IsLive = false,
+    bool FromCompleteList = false,
+    double Measured = double.NaN)
 {
     public double WinRateDelta => WinRate - 0.5;
 }
 
 /// <summary>A duo, already shrunk.</summary>
-public readonly record struct SynergyView(double WinRate, int Play, double Confidence, int Tier)
+/// <param name="Expected">
+/// What the duo was expected to win from the two champions' lane strength alone — the rate it was
+/// shrunk towards, and the one the synergy term measures it against. See <see cref="SynergyLine"/>.
+/// </param>
+/// <param name="Measured">The duo's rate as measured, before shrinkage; for texts that cite the games.</param>
+public readonly record struct SynergyView(double WinRate, int Play, double Confidence, int Tier, double Expected = 0.5, double Measured = double.NaN)
 {
     public double WinRateDelta => WinRate - 0.5;
 }
@@ -44,6 +63,9 @@ public sealed class MetaLookup
 
     private readonly Dictionary<long, MatchupView> _matchups;
     private readonly Dictionary<long, SynergyView> _synergies;
+
+    /// <summary>The duo expectation fitted to this file's rows; see <see cref="SynergyLine"/>.</summary>
+    private readonly SynergyLine _synergyLine;
 
     /// <summary>
     /// Matchups fetched on demand for the draft on screen. Consulted before the snapshot: the
@@ -74,6 +96,13 @@ public sealed class MetaLookup
         NormaliseRolePriors();
 
         _matchups = BuildMatchups(snapshot);
+
+        // After the lane rows, because the line is fitted on them; before the duo views, because
+        // each view is shrunk towards it.
+        _synergyLine = SynergyLine.Fit(
+            snapshot.Synergies,
+            (championId, lane) => LaneStat(championId, lane)?.WinRate,
+            snapshot.SynergyBaseline);
         _synergies = BuildSynergies(snapshot);
     }
 
@@ -110,8 +139,15 @@ public sealed class MetaLookup
     /// <summary>The rate a lane row is shrunk towards — see <see cref="MetaSnapshot.LaneBaseline"/>.</summary>
     public double LaneTarget => ScoreModel.Sigmoid(_snapshot.LaneBaseline);
 
-    /// <summary>The rate a duo row is shrunk towards — see <see cref="MetaSnapshot.SynergyBaseline"/>.</summary>
+    /// <summary>
+    /// The global duo expectation — see <see cref="MetaSnapshot.SynergyBaseline"/>. Only the fallback
+    /// now: a duo whose two champions both have lane rows is shrunk towards its own expectation on
+    /// <see cref="SynergyLine"/> instead.
+    /// </summary>
     public double SynergyTarget => ScoreModel.Sigmoid(_snapshot.SynergyBaseline);
+
+    /// <summary>The duo expectation this file was fitted to.</summary>
+    public SynergyLine SynergyLine => _synergyLine;
 
     /// <summary>
     /// The rate a matchup row is shrunk towards — see <see cref="MatchupBaseline"/>. Public because
@@ -133,7 +169,18 @@ public sealed class MetaLookup
     /// </para>
     /// </summary>
     public double MatchupBaseline(int championId, int opponentId, Lane lane)
+        => PairBaseline(championId, opponentId, lane, listed: Matchup(championId, opponentId, lane) is not { FromCompleteList: true });
+
+    /// <param name="listed">
+    /// Whether the duel comes from a list of notable opponents, which carries the listing offset. A
+    /// complete list carries none: measured with <c>Tools -- guidecheck</c>, 788 complete-list duels
+    /// sit 0,014 log-odds from the plain lane-rate expectation, against 0,03 for the notable ones.
+    /// The shrink target and the centring both come through here, so they agree for either kind.
+    /// </param>
+    private double PairBaseline(int championId, int opponentId, Lane lane, bool listed)
     {
+        var offset = listed ? _snapshot.MatchupBaseline : 0;
+
         // Falling back to the champion's own main lane matters for the off-lane term, where the
         // edge was recorded on the OPPONENT's lane and our candidate has no row there at all.
         var mine = LaneStat(championId, lane)?.WinRate ?? MainLaneWinRate(championId);
@@ -142,11 +189,11 @@ public sealed class MetaLookup
         // Without both rates there is no pair to reason about; the listing offset alone is still
         // better than claiming an even duel.
         if (mine is null || theirs is null)
-            return _snapshot.MatchupBaseline;
+            return offset;
 
         return ScoreModel.Logit(mine.Value)
             - ScoreModel.Logit(theirs.Value)
-            + _snapshot.MatchupBaseline;
+            + offset;
     }
 
     /// <summary>The champion's win rate on the lane it is played on most — "how good is it, in
@@ -276,26 +323,41 @@ public sealed class MetaLookup
                 continue;
 
             var view = new MatchupView(
-                WinRate: ShrinkMatchup(stat.ChampionId, stat.OpponentId, stat.Lane, stat.WinRate, stat.Play),
+                WinRate: ShrinkMatchup(stat.ChampionId, stat.OpponentId, stat.Lane, stat.WinRate, stat.Play, listed: !stat.FromCompleteList),
                 Play: stat.Play,
                 Confidence: Shrinkage.Confidence(stat.Play, Shrinkage.MatchupPrior),
                 IsInferred: false,
-                IsLive: true);
+                IsLive: true,
+                FromCompleteList: stat.FromCompleteList,
+                Measured: Math.Clamp(stat.WinRate, 0, 1));
 
             var key = MatchupKey(stat.Lane, a, b);
-            if (!_liveMatchups.TryGetValue(key, out var existing) || stat.Play > existing.Play)
+            if (!_liveMatchups.TryGetValue(key, out var existing) || Supersedes(view, existing))
                 _liveMatchups[key] = view;
 
             var mirrorView = view with
             {
                 WinRate = 1 - view.WinRate,
                 IsInferred = true,
+                Measured = 1 - view.Measured,
             };
             var mirror = MatchupKey(stat.Lane, b, a);
-            if (!_liveMatchups.TryGetValue(mirror, out var existingMirror) || stat.Play > existingMirror.Play)
+            if (!_liveMatchups.TryGetValue(mirror, out var existingMirror) || Supersedes(mirrorView, existingMirror))
                 _liveMatchups[mirror] = mirrorView;
         }
     }
+
+    /// <summary>
+    /// Which of two measurements of the same duel to keep. A complete-list duel beats a notable-list
+    /// one whatever their samples: the notable lists name the extremes of some fifty noisy duels,
+    /// and measured against the complete lists on the same day their deviations run at more than
+    /// twice the size and carry an eighth of the signal (<see cref="Shrinkage.MatchupPrior"/>). Of
+    /// the same kind, the larger sample wins, as it always did.
+    /// </summary>
+    private static bool Supersedes(MatchupView candidate, MatchupView existing)
+        => candidate.FromCompleteList != existing.FromCompleteList
+            ? candidate.FromCompleteList
+            : candidate.Play > existing.Play;
 
     /// <summary>Drops the overlay; called when the draft it was fetched for ends.</summary>
     public void ClearLiveMatchups() => _liveMatchups.Clear();
@@ -397,7 +459,8 @@ public sealed class MetaLookup
                 WinRate: ShrinkMatchup(stat.ChampionId, stat.OpponentId, stat.Lane, stat.WinRate, stat.Play),
                 Play: stat.Play,
                 Confidence: Shrinkage.Confidence(stat.Play, Shrinkage.MatchupPrior),
-                IsInferred: false);
+                IsInferred: false,
+                Measured: Math.Clamp(stat.WinRate, 0, 1));
         }
 
         foreach (var stat in snapshot.Matchups)
@@ -419,7 +482,8 @@ public sealed class MetaLookup
                 WinRate: 1 - ShrinkMatchup(stat.ChampionId, stat.OpponentId, stat.Lane, stat.WinRate, stat.Play),
                 Play: stat.Play,
                 Confidence: Shrinkage.Confidence(stat.Play, Shrinkage.MatchupPrior),
-                IsInferred: true);
+                IsInferred: true,
+                Measured: 1 - Math.Clamp(stat.WinRate, 0, 1));
         }
 
         return map;
@@ -429,12 +493,12 @@ public sealed class MetaLookup
     /// One matchup rate, pulled towards what the two lane win rates imply for the pair rather than
     /// towards 50 % — see <see cref="MatchupBaseline"/> for why, and for the measurement.
     /// </summary>
-    private double ShrinkMatchup(int championId, int opponentId, Lane lane, double winRate, int play)
+    private double ShrinkMatchup(int championId, int opponentId, Lane lane, double winRate, int play, bool listed = true)
         => Shrinkage.Apply(
             winRate,
             play,
             Shrinkage.MatchupPrior,
-            ScoreModel.Sigmoid(MatchupBaseline(championId, opponentId, lane)));
+            ScoreModel.Sigmoid(PairBaseline(championId, opponentId, lane, listed)));
 
     private Dictionary<long, SynergyView> BuildSynergies(MetaSnapshot snapshot)
     {
@@ -445,11 +509,15 @@ public sealed class MetaLookup
             if (!_indexById.TryGetValue(stat.ChampionId, out var a) || !_indexById.TryGetValue(stat.PartnerId, out var b))
                 continue;
 
+            var expected = ExpectedDuo(stat);
+
             var view = new SynergyView(
-                WinRate: Shrinkage.Apply(stat.WinRate, stat.Play, Shrinkage.SynergyPrior, SynergyTarget),
+                WinRate: Shrinkage.Apply(stat.WinRate, stat.Play, Shrinkage.SynergyPrior, expected),
                 Play: stat.Play,
                 Confidence: Shrinkage.Confidence(stat.Play, Shrinkage.SynergyPrior),
-                Tier: stat.Tier);
+                Tier: stat.Tier,
+                Expected: expected,
+                Measured: Math.Clamp(stat.WinRate, 0, 1));
 
             // A duo is symmetric, so index it from both sides.
             var forward = SynergyKey(a, b);
@@ -458,6 +526,18 @@ public sealed class MetaLookup
         }
 
         return map;
+    }
+
+    /// <summary>
+    /// What this duo is expected to win from the two lane rows it was recorded on, or the global
+    /// expectation when either champion has no row there.
+    /// </summary>
+    private double ExpectedDuo(SynergyStat stat)
+    {
+        if (LaneStat(stat.ChampionId, stat.Lane) is not { } mine || LaneStat(stat.PartnerId, stat.PartnerLane) is not { } theirs)
+            return SynergyTarget;
+
+        return ScoreModel.Sigmoid(_synergyLine.ExpectedLogit(ScoreModel.Logit(mine.WinRate), ScoreModel.Logit(theirs.WinRate)));
     }
 
     // Bit-packed rather than decimal-packed so the keys stay correct no matter how many champions

@@ -94,6 +94,17 @@ public sealed class MatchupStat
     public double WinRate { get; set; }
 
     public int Play { get; set; }
+
+    /// <summary>
+    /// From a champion's COMPLETE duel list on the lane (OP.GG's matchup guide), not from a list of
+    /// the most notable opponents. A notable-opponent list is a selection — it names the extremes,
+    /// which is what the listing offset in <see cref="MetaSnapshot.MatchupBaseline"/> corrects for —
+    /// and a complete list is not, so the offset must not be applied to it. Only live edges set
+    /// this; the stored file is built from the notable lists — and is not written for them, so the
+    /// file does not carry a "false" on every one of its edges.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool FromCompleteList { get; set; }
 }
 
 /// <summary>One duo, e.g. a support and the ADC they are played with.</summary>
