@@ -4,14 +4,25 @@
         xmlns:vm="clr-namespace:DraftPilot.App.ViewModels"
         Title="DirkDraft"
         Width="1120" Height="900"
+        MinWidth="1000" MinHeight="640"
         WindowStyle="None"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize"
         Background="Transparent"
         AllowsTransparency="True"
         ShowInTaskbar="True"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Ideal">
+
+    <!-- A borderless window has no frame to grab, so the chrome supplies the drag zone along the
+         edges. No caption of its own: the title bar moves the window by DragMove, as before.
+         The minimum is measured, not picked: below 1000 wide the verdicts in an expanded score
+         breakdown ("stark dagegen") are cut to "star…"; below 640 high the draft list shows
+         barely two rows. Anything taller than the window scrolls instead of being clipped. -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome ResizeBorderThickness="6" CaptionHeight="0" GlassFrameThickness="0"
+                      CornerRadius="0" UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
 
     <Window.Resources>
         <!-- Icon tile. Sits behind the portrait and stands in for it while a seat is still hidden. -->
@@ -607,11 +618,48 @@
                 <Border Grid.ColumnSpan="2" Height="2" VerticalAlignment="Bottom"
                         Background="{StaticResource BrandLine}" CornerRadius="1" Margin="0,0,0,1" />
 
-                <Button Grid.Column="1" Style="{StaticResource IconButton}" Margin="2,0,0,0"
-                        Click="Hide_Click" ToolTip="In den Infobereich minimieren">
-                    <Path Data="M 0 0 L 9 9 M 9 0 L 0 9" Stroke="{StaticResource Muted}"
-                          StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                </Button>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <!-- Pin: keeps the window above everything else. Off by default; the glyph
+                         takes the accent colour while it is on, so the state is visible without
+                         a hover. -->
+                    <Button Click="Pin_Click">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
+                                <Setter Property="ToolTip" Value="Im Vordergrund halten — bleibt dann über allen anderen Fenstern" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="ToolTip" Value="Nicht mehr im Vordergrund halten" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <Path Data="M 3 1 L 7 1 M 3.8 1 L 3.8 5 M 6.2 1 L 6.2 5 M 1.8 5.5 L 8.2 5.5 M 5 5.5 L 5 10"
+                              StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
+                            <Path.Style>
+                                <Style TargetType="Path">
+                                    <Setter Property="Stroke" Value="{StaticResource Faint}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                            <Setter Property="Stroke" Value="{StaticResource Accent}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
+                    </Button>
+
+                    <Button Style="{StaticResource IconButton}" Margin="2,0,0,0"
+                            Click="Minimise_Click" ToolTip="In die Taskleiste minimieren">
+                        <Path Data="M 0 4.5 L 9 4.5" Width="9" Height="9" Stroke="{StaticResource Muted}"
+                              StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                    </Button>
+
+                    <Button Style="{StaticResource IconButton}" Margin="2,0,0,0"
+                            Click="Hide_Click" ToolTip="In den Infobereich minimieren">
+                        <Path Data="M 0 0 L 9 9 M 9 0 L 0 9" Stroke="{StaticResource Muted}"
+                              StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                    </Button>
+                </StackPanel>
             </Grid>
 
             <!-- ===================== Turn line (only while a draft runs) ===================== -->
@@ -799,10 +847,18 @@
                 Shown while the game runs: the drafted matchup's runes, purchase order with item
                 pictures, and the level-by-level skill table. Same row as the idle card — the two
                 are mutually exclusive by ShowIdleCard/ShowGameView.
+
+                Scrolls once the window is dragged shorter than the card: runes, items, skills and
+                augments are taller than the smallest window, and a clipped card hides exactly the
+                rows at the bottom. The scroller spans the content row too, which is empty while
+                the game runs.
             -->
-            <Border Grid.Row="1" Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
+            <ScrollViewer Grid.Row="1" Grid.RowSpan="2"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          Visibility="{Binding ShowGameView, Converter={StaticResource BoolToVisibility}}">
+            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"
                     BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,3,0,0"
-                    Visibility="{Binding ShowGameView, Converter={StaticResource BoolToVisibility}}">
+                    VerticalAlignment="Top">
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -1385,6 +1441,7 @@
                     </ItemsControl>
                 </StackPanel>
             </Border>
+            </ScrollViewer>
 
             <!--
                 ===================== Content: three columns =====================
@@ -1412,10 +1469,13 @@
 
             <!--
                 Enemy column, collapsed as a block when no draft is running. Five empty rows
-                outside a champion select are 250 pixels that say nothing.
+                outside a champion select are 250 pixels that say nothing. Scrolls like the own
+                team column if the window is ever dragged shorter than five rows.
             -->
-            <StackPanel Grid.Row="0" Grid.RowSpan="3" Grid.Column="4"
-                        Visibility="{Binding IsDraftActive, Converter={StaticResource BoolToVisibility}}">
+            <ScrollViewer Grid.Row="0" Grid.RowSpan="3" Grid.Column="4"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          Visibility="{Binding IsDraftActive, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
 
             <!-- ===================== Enemies ===================== -->
             <Grid Margin="2,13,2,3">
@@ -1550,13 +1610,30 @@
             </ItemsControl>
 
             </StackPanel>
+            </ScrollViewer>
 
             <!--
                 Own team column. Same block structure as the enemy column so both sides read the
                 same way; the build card sits underneath it because it belongs to your champion.
+
+                Team and build scroll as one: five rows plus a full build are taller than a window
+                dragged to its minimum, and the build is the part that would be cut off.
             -->
-            <StackPanel Grid.Row="0" Grid.Column="0"
-                        Visibility="{Binding IsDraftActive, Converter={StaticResource BoolToVisibility}}">
+            <ScrollViewer Grid.Row="0" Grid.RowSpan="3" Grid.Column="0"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ScrollViewer.Style>
+                    <Style TargetType="ScrollViewer">
+                        <Style.Triggers>
+                            <!-- After the draft the teams and the list are gone; the surviving
+                                 build card takes the full width instead of one narrow column. -->
+                            <DataTrigger Binding="{Binding IsDraftActive}" Value="False">
+                                <Setter Property="Grid.ColumnSpan" Value="5" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ScrollViewer.Style>
+            <StackPanel>
+            <StackPanel Visibility="{Binding IsDraftActive, Converter={StaticResource BoolToVisibility}}">
 
             <!-- ===================== Own team ===================== -->
             <Grid Margin="2,13,2,3">
@@ -1757,21 +1834,10 @@
                 in-game view shows, sized for the column. Always open: this is what the user came
                 for once their pick is locked, and hiding it behind a chevron only cost a click.
             -->
-            <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource Surface}"
+            <Border Background="{StaticResource Surface}"
                     BorderBrush="{StaticResource LineSoft}"
                     BorderThickness="1" CornerRadius="10" Padding="13,9" Margin="0,11,0,0"
                     Visibility="{Binding ShowBuildSection, Converter={StaticResource BoolToVisibility}}">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Style.Triggers>
-                            <!-- After the draft the teams and the list are gone; the surviving
-                                 build card takes the full width instead of one narrow column. -->
-                            <DataTrigger Binding="{Binding IsDraftActive}" Value="False">
-                                <Setter Property="Grid.ColumnSpan" Value="5" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -1795,6 +1861,8 @@
                     <ContentControl Content="{Binding}" ContentTemplate="{StaticResource BuildBody}" />
                 </StackPanel>
             </Border>
+            </StackPanel>
+            </ScrollViewer>
 
             <DockPanel Grid.Row="0" Grid.RowSpan="3" Grid.Column="2" LastChildFill="True"
                        Margin="0,13,0,0"

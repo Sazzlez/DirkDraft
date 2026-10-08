@@ -6,11 +6,18 @@ namespace DraftPilot.Core.Config;
 /// <summary>User settings. Written on change, read once at start-up.</summary>
 public sealed class AppSettings
 {
-    /// <summary>Window position; NaN means "not placed yet, park at the working area's edge".
-    /// The size is fixed in XAML and deliberately not stored — see MainWindow.SavePlacement.</summary>
+    /// <summary>Window position; NaN means "not placed yet, park at the working area's edge".</summary>
     public double WindowLeft { get; set; } = double.NaN;
 
     public double WindowTop { get; set; } = double.NaN;
+
+    /// <summary>
+    /// Window size as the user last dragged it; NaN means "never resized, use the designed
+    /// 1120 × 900". Clamped against the window's minimum and the screen on every start.
+    /// </summary>
+    public double WindowWidth { get; set; } = double.NaN;
+
+    public double WindowHeight { get; set; } = double.NaN;
 
     /// <summary>
     /// Show champions the account does not own. Off by default: a pick you cannot click is not a
@@ -34,7 +41,16 @@ public sealed class AppSettings
     /// </summary>
     public bool AutoHideAfterChampSelect { get; set; }
 
-    public bool AlwaysOnTop { get; set; } = true;
+    /// <summary>
+    /// Keep the window above every other window. Off by default, switched with the pin in the
+    /// title bar.
+    /// <para>
+    /// This used to be <c>alwaysOnTop</c>, on by default and with no switch anywhere — so every
+    /// settings file written before carries <c>true</c> there without anybody having chosen it.
+    /// A new key is the only way to let those installs start unpinned; the old one is ignored.
+    /// </para>
+    /// </summary>
+    public bool KeepOnTop { get; set; }
 
     /// <summary>The one-off "still running in the tray" balloon has been shown.</summary>
     public bool TrayHintShown { get; set; }
@@ -122,7 +138,7 @@ public sealed class AppSettings
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     PropertyNameCaseInsensitive = true,
-    // WindowLeft/Top default to NaN ("not placed yet") — without this, serialising a settings
+    // The window bounds default to NaN ("not placed yet") — without this, serialising a settings
     // object before the first placement threw instead of writing.
     NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     WriteIndented = true)]

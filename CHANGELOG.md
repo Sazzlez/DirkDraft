@@ -3,6 +3,24 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
+## Unveröffentlicht
+
+- **Minimieren in die Taskleiste.** Neuer Knopf links neben dem X. Das X legt das Fenster weiter in
+  den Infobereich; der neue Knopf in die Taskleiste. Die automatische Rückholung beim Spielstart
+  (das Spiel minimiert fremde Fenster mit) lässt ein von Hand minimiertes Fenster in Ruhe.
+- **Die Fenstergröße lässt sich an allen Rändern und Ecken ziehen** und wird beim nächsten Start
+  wiederhergestellt — auch über einen Monitorwechsel, dann passend gekürzt. Mindestens 1000 × 640:
+  Darunter schneidet die aufgeklappte Begründung ihre Urteile ab („star…" statt „stark dagegen"),
+  gemessen an Screenshots in 960, 1000, 1040 und 1060 Breite. Was nicht ins Fenster passt — Team
+  und Build links, die Gegner rechts, die Spielansicht —, scrollt jetzt, statt abgeschnitten zu
+  werden. Maximieren bleibt aus: Ein randloses Fenster ragt maximiert über den Bildschirmrand und
+  hätte keinen Knopf zum Zurückholen.
+- **Nicht mehr immer im Vordergrund.** Bisher lag das Fenster fest über allen anderen, ohne
+  Schalter. Jetzt ist das aus, und ein Pin in der Titelleiste schaltet es bei Bedarf ein (er färbt
+  sich, solange es an ist). Die alte Einstellung `alwaysOnTop` stand in jeder gespeicherten Datei
+  auf `true`, ohne dass sie je jemand gewählt hätte — sie heißt deshalb jetzt `keepOnTop` und
+  beginnt bei „aus".
+
 ## 1.4.0 — 2026-09-19
 
 - **Augmente im Spielbildschirm**, für ARAM Chaos. Acht Zeilen mit OP.GGs Tier und OP.GGs Wert,

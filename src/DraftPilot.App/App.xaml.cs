@@ -114,6 +114,9 @@ public partial class App : Application
 
         _window = new MainWindow(_model);
 
+        if (dev.IsDemo || dev.IsScreenshot)
+            _window.UseSize(dev.WindowSize);
+
         _tray = new TrayPresence("DirkDraft");
 
         // The close glyph hides into the tray rather than quitting. Said once, out loud, because a
@@ -168,10 +171,10 @@ public partial class App : Application
         // InProgress — the fullscreen grab happens at the latter), and around those moments a
         // minimise is never the user's doing, so the window puts itself back (without Activate:
         // the game keeps the focus). The time window keeps this from fighting the user's own
-        // minimise later in the game.
+        // minimise later in the game; the minimise button is the user's own at any time.
         _window.StateChanged += (_, _) =>
         {
-            if (_window is not { WindowState: WindowState.Minimized }
+            if (_window is not { WindowState: WindowState.Minimized, MinimisedByHand: false }
                 || _model is not { IsGameRunning: true }
                 || !_model.Settings.AutoShowOnGameStart
                 || _gameStartedAtTick == 0

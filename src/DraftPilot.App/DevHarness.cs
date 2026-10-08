@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Size = System.Windows.Size;
 
 namespace DraftPilot.App;
 
@@ -16,6 +17,7 @@ namespace DraftPilot.App;
 /// Gameflow phases to simulate before capturing, comma-separated and applied in order
 /// (e.g. "InProgress" or "InProgress,EndOfGame" for a game that starts and ends).
 /// </param>
+/// <param name="WindowSize">Window size for the run, e.g. "1000x640"; null means the designed size.</param>
 public sealed record DevOptions(
     string? DemoRecording,
     int DemoFrames,
@@ -23,7 +25,8 @@ public sealed record DevOptions(
     double ScreenshotDelaySeconds,
     double DemoSpeed,
     int ExpandRows,
-    string? Phase)
+    string? Phase,
+    Size? WindowSize = null)
 {
     public bool IsDemo => DemoRecording is { Length: > 0 };
 
@@ -56,6 +59,7 @@ public static class DevHarness
         var speed = double.PositiveInfinity;
         var expand = 0;
         string? phase = null;
+        Size? size = null;
 
         // Whether one of OUR dev switches was seen yet. GetCommandLineArgs starts with the
         // executable path, Windows and wrappers append their own tokens — none of that may
@@ -65,7 +69,7 @@ public static class DevHarness
 
         for (var i = 0; i < args.Length; i++)
         {
-            if (args[i] is "--demo" or "--frames" or "--screenshot" or "--screenshot-delay" or "--speed" or "--expand" or "--phase")
+            if (args[i] is "--demo" or "--frames" or "--screenshot" or "--screenshot-delay" or "--speed" or "--expand" or "--phase" or "--size")
                 sawDevFlag = true;
 
             switch (args[i])
@@ -111,6 +115,13 @@ public static class DevHarness
                     phase = args[++i];
                     break;
 
+                // The window can be dragged to any size above its minimum, so the layout has to
+                // be checkable at more sizes than the one it was designed for.
+                case "--size" when i + 1 < args.Length && TryParseSize(args[i + 1], out var parsedSize):
+                    size = parsedSize;
+                    i++;
+                    break;
+
                 // Development-only flags may still not fail silently: an unquoted path with a
                 // space arrives as several tokens and used to be truncated without a word (the
                 // crash log has a FileNotFoundException for 'D:\Claude' to prove it), and an
@@ -135,7 +146,24 @@ public static class DevHarness
             throw new FileNotFoundException(
                 $"Aufnahme nicht gefunden: {recording} — Pfad in Anführungszeichen setzen?", recording);
 
-        return new DevOptions(recording, frames, screenshot, delay, speed, expand, phase);
+        return new DevOptions(recording, frames, screenshot, delay, speed, expand, phase, size);
+    }
+
+    private static bool TryParseSize(string text, out Size size)
+    {
+        size = default;
+        var parts = text.Split('x', 'X');
+
+        if (parts.Length != 2
+            || !double.TryParse(parts[0], System.Globalization.CultureInfo.InvariantCulture, out var width)
+            || !double.TryParse(parts[1], System.Globalization.CultureInfo.InvariantCulture, out var height)
+            || width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        size = new Size(width, height);
+        return true;
     }
 
     /// <summary>
