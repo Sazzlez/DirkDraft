@@ -198,13 +198,7 @@ public sealed class RecommendationViewModel : ObservableObject
             // draft shows eight rows between 53,4 % and 52,0 % with errors of 0,15 to 0,40 points.
             var hasError = recommendation.Uncertainty > 0;
 
-            Tone = (hasError, standing) switch
-            {
-                (false, _) => ScoreTone.Weak,
-                (_, ScoreStanding.Tied) => ScoreTone.Strong,
-                (_, ScoreStanding.Ahead) => ScoreTone.Fair,
-                _ => ScoreTone.Weak,
-            };
+            Tone = PickTone(hasError, standing);
 
             ScoreVerdict = (hasError, rank, standing) switch
             {
@@ -229,6 +223,20 @@ public sealed class RecommendationViewModel : ObservableObject
         for (var i = 0; i < recommendation.Breakdown.Count; i++)
             Breakdown[i].Apply(recommendation.Breakdown[i]);
     }
+
+    /// <summary>
+    /// A pick's colour, from how the leader of the same ranking stands against it. Shared with the
+    /// hover strip, so one champion cannot be green in the list and grey above it.
+    /// </summary>
+    /// <param name="hasError">False when nothing behind the score carries a sample size.</param>
+    /// <param name="standing">The leader against this row; see <see cref="ScoreError.Standing"/>.</param>
+    public static ScoreTone PickTone(bool hasError, ScoreStanding standing) => (hasError, standing) switch
+    {
+        (false, _) => ScoreTone.Weak,
+        (_, ScoreStanding.Tied) => ScoreTone.Strong,
+        (_, ScoreStanding.Ahead) => ScoreTone.Fair,
+        _ => ScoreTone.Weak,
+    };
 }
 
 /// <summary>

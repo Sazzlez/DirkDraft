@@ -122,6 +122,26 @@ public sealed record RecommendationSet(
 }
 
 /// <summary>
+/// How one particular champion would do on a seat — what the panel shows for a hover.
+/// </summary>
+/// <param name="Item">The champion, scored exactly as a row of the pick list would be.</param>
+/// <param name="Ranking">
+/// Every candidate the pick list chooses from, best first; the list on screen is the head of this.
+/// Lets the caller print the hover with the list's precision and measure it against the list's
+/// leader, so the two can never disagree about the same champion.
+/// </param>
+/// <param name="Rank">
+/// 1-based place in <paramref name="Ranking"/>; 0 when the champion is not among the candidates —
+/// not played on this lane, banned, or taken.
+/// </param>
+/// <param name="Lane">The lane the seat was scored for.</param>
+public sealed record PickEvaluation(
+    Recommendation Item,
+    IReadOnlyList<Recommendation> Ranking,
+    int Rank,
+    Lane Lane);
+
+/// <summary>
 /// Scores every available champion for one seat and explains the result.
 /// <para>
 /// Every piece of evidence is a shift in log-odds of winning (see <see cref="ScoreModel"/>); the
@@ -164,6 +184,67 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         if (!state.IsActive || _meta.IsEmpty)
             return RecommendationSet.Empty;
 
+        var seat = Prepare(state, target, enemyLanes, allyLanes);
+
+        var items = target.Action == TurnAction.Ban
+            ? ScoreBans(state, seat.Lane, seat.Allies, seat.HoveredByOthers, enemyLanes, limit)
+            : Top(ScorePicks(state, seat, enemyLanes, selectable), limit);
+
+        return new RecommendationSet(target.Slot.CellId, seat.Lane, target.Action, items, seat.AllyComp, seat.EnemyComp);
+    }
+
+    /// <summary>
+    /// Scores one champion for the seat as the pick list would, and places it in the list's order.
+    /// <para>
+    /// For a hover, which the list does not necessarily contain: it shows the best eight, and the
+    /// champion somebody is actually thinking about is often the ninth or the twentieth. The number
+    /// comes from the very same scoring as every row of the list — a second formula for the same
+    /// question would sooner or later give a second answer.
+    /// </para>
+    /// <para>
+    /// Always scored as a pick, whatever the seat's turn is: the question a hover asks is how the
+    /// champion would do in this game, and a declared pick intent stays one during the bans.
+    /// </para>
+    /// </summary>
+    /// <returns><see langword="null"/> without a champion, a draft or data.</returns>
+    public PickEvaluation? Evaluate(
+        DraftState state,
+        RecommendationTarget target,
+        int championId,
+        LanePredictionResult enemyLanes,
+        LanePredictionResult? allyLanes = null,
+        IReadOnlySet<int>? selectable = null)
+    {
+        if (!state.IsActive || _meta.IsEmpty || championId == 0)
+            return null;
+
+        var seat = Prepare(state, target with { Action = TurnAction.Pick }, enemyLanes, allyLanes);
+        var ranking = Ordered(ScorePicks(state, seat, enemyLanes, selectable));
+        var index = ranking.FindIndex(item => item.ChampionId == championId);
+
+        // Not a candidate — off its lanes, banned, taken. Scored all the same, by the same rules,
+        // and reported without a place: there is no place in a list it cannot be in.
+        var item = index >= 0
+            ? ranking[index]
+            : ScorePick(championId, seat, enemyLanes, OpenLaneBlocked(state, seat, enemyLanes));
+
+        return new PickEvaluation(item, ranking, index + 1, seat.Lane);
+    }
+
+    /// <summary>What every scoring pass needs to know about the advised seat.</summary>
+    private readonly record struct Seat(
+        Lane Lane,
+        List<int> Allies,
+        IReadOnlySet<int> HoveredByOthers,
+        CompProfile AllyComp,
+        CompProfile EnemyComp);
+
+    private Seat Prepare(
+        DraftState state,
+        RecommendationTarget target,
+        LanePredictionResult enemyLanes,
+        LanePredictionResult? allyLanes)
+    {
         var lane = ResolveLane(target, enemyLanes, allyLanes);
         var allyChampions = state.Allies
             .Where(slot => slot.CellId != target.Slot.CellId)
@@ -183,14 +264,7 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
             .Select(slot => slot.HoverChampionId)
             .ToHashSet();
 
-        var allyComp = _comp.Analyze(allyChampions);
-        var enemyComp = _comp.Analyze(enemyChampions);
-
-        var items = target.Action == TurnAction.Ban
-            ? ScoreBans(state, lane, allyChampions, hoveredByOthers, enemyLanes, limit)
-            : ScorePicks(state, lane, allyChampions, hoveredByOthers, enemyLanes, allyComp, enemyComp, selectable, limit);
-
-        return new RecommendationSet(target.Slot.CellId, lane, target.Action, items, allyComp, enemyComp);
+        return new Seat(lane, allyChampions, hoveredByOthers, _comp.Analyze(allyChampions), _comp.Analyze(enemyChampions));
     }
 
     /// <summary>
@@ -207,76 +281,87 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
         return predictions?.ForCell(target.Slot.CellId)?.Lane ?? Lane.Unknown;
     }
 
+    /// <summary>Every candidate for the seat, scored and unsorted.</summary>
     private List<Recommendation> ScorePicks(
         DraftState state,
-        Lane lane,
-        List<int> allyChampions,
-        IReadOnlySet<int> hoveredByOthers,
+        Seat seat,
         LanePredictionResult enemyLanes,
-        CompProfile allyComp,
-        CompProfile enemyComp,
-        IReadOnlySet<int>? selectable,
-        int limit)
+        IReadOnlySet<int>? selectable)
     {
         var results = new List<Recommendation>();
+        var blocked = OpenLaneBlocked(state, seat, enemyLanes);
 
-        // Nobody on this lane yet: then the duel term has nothing to say, and the question the pick
-        // actually faces is how easily it can be answered later. Once an opponent is revealed the
-        // duel itself answers that far better, so this only runs while it cannot.
-        var laneIsOpen = lane != Lane.Unknown && enemyLanes.ChampionOnLane(lane) == 0;
-
-        // Everything the enemy can no longer reach for: bans, locked picks on both sides, and what
-        // an ally is hovering — that champion is as good as taken.
-        var blocked = laneIsOpen
-            ? new HashSet<int>(state.Unavailable.Concat(hoveredByOthers))
-            : [];
-
-        foreach (var candidate in Candidates(lane))
+        foreach (var candidate in Candidates(seat.Lane))
         {
-            if (state.Unavailable.Contains(candidate) || hoveredByOthers.Contains(candidate))
+            if (state.Unavailable.Contains(candidate) || seat.HoveredByOthers.Contains(candidate))
                 continue;
 
             if (selectable is not null && !selectable.Contains(candidate))
                 continue;
 
-            var reasons = new List<Reason>();
-
-            // One budget per candidate: the terms add up, so their sampling errors add up too.
-            var budget = new ErrorBudget();
-
-            // Without a lane — custom games, blind pick — the lane-bound base is null for everyone
-            // and the list degenerates into an alphabet. Strength on the champion's own best lane
-            // is the honest substitute.
-            var baseTerm = lane == Lane.Unknown
-                ? MainLaneLogOdds(candidate, lane, reasons, budget)
-                : LaneLogOdds(candidate, lane, reasons, budget);
-
-            var compFit = _comp.Fit(candidate, allyComp, enemyComp, reasons);
-
-            if (laneIsOpen)
-                AddCounterRisk(candidate, lane, blocked, reasons);
-
-            var terms = new List<ScoreTerm>(5)
-            {
-                new(ScoreTermKind.LaneStrength, baseTerm),
-                new(ScoreTermKind.LaneMatchup, LaneMatchupLogOdds(candidate, lane, enemyLanes, reasons, budget)),
-                new(ScoreTermKind.EnemyTeam, OffLaneMatchupLogOdds(candidate, lane, enemyLanes, reasons, budget)),
-                new(ScoreTermKind.Synergy, SynergyLogOdds(candidate, allyChampions, reasons, budget)),
-                new(ScoreTermKind.Composition, compFit is null ? null : ScoreModel.CompScale * compFit),
-            };
-
-            var total = terms.Sum(term => term.LogOdds ?? 0);
-
-            results.Add(new Recommendation(
-                candidate,
-                _meta.ChampionName(candidate),
-                ScoreModel.Sigmoid(total),
-                Dedupe(reasons),
-                terms,
-                budget.StandardError));
+            results.Add(ScorePick(candidate, seat, enemyLanes, blocked));
         }
 
-        return Top(results, limit);
+        return results;
+    }
+
+    /// <summary>
+    /// Nobody on this lane yet: then the duel term has nothing to say, and the question the pick
+    /// actually faces is how easily it can be answered later. Once an opponent is revealed the duel
+    /// itself answers that far better, so this is <see langword="null"/> then.
+    /// <para>
+    /// Otherwise everything the enemy can no longer reach for: bans, locked picks on both sides, and
+    /// what an ally is hovering — that champion is as good as taken.
+    /// </para>
+    /// </summary>
+    private static HashSet<int>? OpenLaneBlocked(DraftState state, Seat seat, LanePredictionResult enemyLanes)
+        => seat.Lane != Lane.Unknown && enemyLanes.ChampionOnLane(seat.Lane) == 0
+            ? new HashSet<int>(state.Unavailable.Concat(seat.HoveredByOthers))
+            : null;
+
+    /// <param name="openLaneBlocked">See <see cref="OpenLaneBlocked"/>.</param>
+    private Recommendation ScorePick(
+        int candidate,
+        Seat seat,
+        LanePredictionResult enemyLanes,
+        IReadOnlySet<int>? openLaneBlocked)
+    {
+        var lane = seat.Lane;
+        var reasons = new List<Reason>();
+
+        // One budget per candidate: the terms add up, so their sampling errors add up too.
+        var budget = new ErrorBudget();
+
+        // Without a lane — custom games, blind pick — the lane-bound base is null for everyone
+        // and the list degenerates into an alphabet. Strength on the champion's own best lane
+        // is the honest substitute.
+        var baseTerm = lane == Lane.Unknown
+            ? MainLaneLogOdds(candidate, lane, reasons, budget)
+            : LaneLogOdds(candidate, lane, reasons, budget);
+
+        var compFit = _comp.Fit(candidate, seat.AllyComp, seat.EnemyComp, reasons);
+
+        if (openLaneBlocked is not null)
+            AddCounterRisk(candidate, lane, openLaneBlocked, reasons);
+
+        var terms = new List<ScoreTerm>(5)
+        {
+            new(ScoreTermKind.LaneStrength, baseTerm),
+            new(ScoreTermKind.LaneMatchup, LaneMatchupLogOdds(candidate, lane, enemyLanes, reasons, budget)),
+            new(ScoreTermKind.EnemyTeam, OffLaneMatchupLogOdds(candidate, lane, enemyLanes, reasons, budget)),
+            new(ScoreTermKind.Synergy, SynergyLogOdds(candidate, seat.Allies, reasons, budget)),
+            new(ScoreTermKind.Composition, compFit is null ? null : ScoreModel.CompScale * compFit),
+        };
+
+        var total = terms.Sum(term => term.LogOdds ?? 0);
+
+        return new Recommendation(
+            candidate,
+            _meta.ChampionName(candidate),
+            ScoreModel.Sigmoid(total),
+            Dedupe(reasons),
+            terms,
+            budget.StandardError);
     }
 
     /// <summary>
@@ -381,13 +466,15 @@ public sealed class Recommender(MetaLookup meta, TraitTable traits)
     }
 
     private static List<Recommendation> Top(List<Recommendation> results, int limit)
+        // Max(0), not Max(1): RecommendationCount is user-editable JSON, and a zero should mean an
+        // empty list, not a surprise single row.
+        => [.. Ordered(results).Take(Math.Max(0, limit))];
+
+    private static List<Recommendation> Ordered(List<Recommendation> results)
         => [.. results
             .OrderByDescending(item => item.Score)
             // Stable order so equal scores do not shuffle between events.
-            .ThenBy(item => item.Name, StringComparer.Ordinal)
-            // Max(0), not Max(1): RecommendationCount is user-editable JSON, and a zero should
-            // mean an empty list, not a surprise single row.
-            .Take(Math.Max(0, limit))];
+            .ThenBy(item => item.Name, StringComparer.Ordinal)];
 
     /// <summary>
     /// The base term: how the champion does on this lane regardless of opponents. The shrunk win

@@ -5,6 +5,14 @@ Kopien melden sie beim nächsten Start.
 
 ## Unveröffentlicht
 
+- **Winrate des gehoverten Champions.** Sobald du im Champ Select einen Champion hoverst, steht
+  über der Liste „DEIN HOVER" mit seiner geschätzten Winrate in diesem Draft und seinem Platz auf
+  deiner Lane, z. B. „Teemo · Platz 11 von 58 auf Toplane · deutlich hinter Platz 1 · 53 % WR".
+  Die Zahl kommt aus derselben Rechnung wie die Liste — gleiche Kriterien, gleiche Nachkommastellen,
+  gemessen am selben Platz 1 —, gilt aber auch für Champions jenseits der ersten acht. Das Hover
+  meldet der Client live: gemessen an einer echten Aufzeichnung wechselt `championPickIntent` mit
+  jedem Klick im Raster (266 → 893 → 266), lange bevor gelockt wird. Ohne OP.GG-Zahlen auf der Lane
+  steht dort „keine OP.GG-Zahlen" statt einer Prozentzahl, bei einem gebannten Champion „gebannt".
 - **Minimieren in die Taskleiste.** Neuer Knopf links neben dem X. Das X legt das Fenster weiter in
   den Infobereich; der neue Knopf in die Taskleiste. Die automatische Rückholung beim Spielstart
   (das Spiel minimiert fremde Fenster mit) lässt ein von Hand minimiertes Fenster in Ruhe.

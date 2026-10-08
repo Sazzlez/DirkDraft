@@ -1959,6 +1959,63 @@
                     </Grid>
                 </Border>
 
+                <!--
+                    The own hover, pinned, before the lock: what that champion would be worth in
+                    this draft. The list below shows the best eight; the champion actually being
+                    considered is often not among them, and this line answers for it anyway — with
+                    the list's own arithmetic, so the two agree wherever both show a champion.
+                    Takes the place the matchup strip holds after the lock.
+                -->
+                <Border DockPanel.Dock="Top" Background="{StaticResource Surface}"
+                        BorderBrush="{StaticResource LineSoft}" BorderThickness="1" CornerRadius="10"
+                        Padding="12,7" Margin="0,0,10,8"
+                        ToolTip="{Binding Hover.Note}"
+                        Visibility="{Binding Hover.IsVisible, Converter={StaticResource BoolToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="DEIN HOVER" Style="{StaticResource Caption}"
+                                   VerticalAlignment="Center" Margin="0,0,12,0" />
+
+                        <Image Grid.Column="1" Source="{Binding Hover.Icon}" Width="24" Height="24"
+                               VerticalAlignment="Center" />
+
+                        <TextBlock Grid.Column="2" Style="{StaticResource Small}" Margin="9,0,0,0"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                            <Run Text="{Binding Hover.Headline, Mode=OneWay}" />
+                            <Run Text=" · " Foreground="{StaticResource Faint}" />
+                            <Run Text="{Binding Hover.Subline, Mode=OneWay}"
+                                 Foreground="{StaticResource Muted}" />
+                        </TextBlock>
+
+                        <!-- A size above the matchup strip's: this figure is the whole answer the
+                             line exists for, not a detail beside a headline. -->
+                        <TextBlock Grid.Column="3" Text="{Binding Hover.Figure}"
+                                   FontSize="15"
+                                   FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0"
+                                   Visibility="{Binding Hover.HasFigure, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Hover.Tone}" Value="Strong">
+                                            <Setter Property="Foreground" Value="{StaticResource Good}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Hover.Tone}" Value="Fair">
+                                            <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Border>
+
                 <Grid>
                     <!-- Empty state instead of a blank gap. -->
                     <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineSoft}"

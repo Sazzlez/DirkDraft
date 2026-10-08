@@ -1311,4 +1311,135 @@ public class RecommenderTests
         Assert.Equal(meta.LaneStat(Flex, Lane.Mid)!.Value.WinRate, item.Score, precision: 6);
         Assert.DoesNotContain(item.Reasons, reason => reason.Text.Contains("stark auf", StringComparison.Ordinal));
     }
+
+    // ---- Evaluate: the figure shown for a hover ----
+
+    /// <summary>The mid seat on the clock, hovering <paramref name="hover"/>.</summary>
+    private static (DraftState State, RecommendationTarget Target, LanePredictionResult Lanes) Hovering(int hover, string turn = "pick")
+    {
+        var state = DraftState.From(new SessionBuilder()
+            .LocalPlayer(2)
+            .Locked(0, AllyTop)
+            .Locked(4, AllySupport)
+            .Locked(7, EnemyMid)
+            .Locked(5, EnemyTop)
+            .Hovering(2, hover)
+            .OnClock(2, turn)
+            .Build());
+
+        return (state, new TurnTracker().Resolve(state)!, new LanePredictor(Meta()).Predict(state.Enemies));
+    }
+
+    /// <summary>
+    /// The hover's figure IS the list's figure. Computed twice, the two would sooner or later
+    /// disagree about the same champion on the same screen.
+    /// </summary>
+    [Fact]
+    public void Evaluate_GivesTheListsOwnScoreAndPlace()
+    {
+        var (state, target, lanes) = Scenario();
+        var recommender = Recommender();
+        var list = recommender.Recommend(state, target, lanes, limit: 50).Items;
+
+        Assert.NotEmpty(list);
+
+        for (var i = 0; i < list.Count; i++)
+        {
+            var evaluation = recommender.Evaluate(state, target, list[i].ChampionId, lanes)!;
+
+            Assert.Equal(list[i].Score, evaluation.Item.Score, precision: 12);
+            Assert.Equal(list[i].Uncertainty, evaluation.Item.Uncertainty, precision: 12);
+            Assert.Equal(i + 1, evaluation.Rank);
+            Assert.Equal(list.Select(item => item.ChampionId), evaluation.Ranking.Select(item => item.ChampionId));
+        }
+    }
+
+    /// <summary>
+    /// What the feature is for: the champion somebody hovers is often not among the rows on screen.
+    /// It still gets its number, and its place below them.
+    /// </summary>
+    [Fact]
+    public void Evaluate_ReachesBelowTheVisibleRows()
+    {
+        var (state, target, lanes) = Scenario();
+        var recommender = Recommender();
+        var full = recommender.Recommend(state, target, lanes, limit: 50).Items;
+        var last = full[^1];
+
+        Assert.DoesNotContain(recommender.Recommend(state, target, lanes, limit: 1).Items, item => item.ChampionId == last.ChampionId);
+
+        var evaluation = recommender.Evaluate(state, target, last.ChampionId, lanes)!;
+
+        Assert.Equal(full.Count, evaluation.Rank);
+        Assert.Equal(last.Score, evaluation.Item.Score, precision: 12);
+    }
+
+    /// <summary>The seat's own hover is one of its candidates: that hover is what the list is about.</summary>
+    [Fact]
+    public void Evaluate_TheSeatsOwnHoverIsACandidate()
+    {
+        var (state, target, lanes) = Hovering(Weak);
+
+        var evaluation = Recommender().Evaluate(state, target, Weak, lanes)!;
+
+        Assert.True(evaluation.Rank > 0);
+        Assert.Contains(evaluation.Ranking, item => item.ChampionId == Weak);
+    }
+
+    /// <summary>
+    /// A pick intent declared in planning stays one through the bans. Asked during a ban turn, the
+    /// answer is still the champion's win rate as a pick — not its value as a ban.
+    /// </summary>
+    [Fact]
+    public void Evaluate_ScoresAPickEvenDuringABanTurn()
+    {
+        var (state, target, lanes) = Hovering(Strong, turn: "ban");
+        var recommender = Recommender();
+
+        Assert.Equal(TurnAction.Ban, target.Action);
+
+        var evaluation = recommender.Evaluate(state, target, Strong, lanes)!;
+        var asPick = recommender.Recommend(state, target with { Action = TurnAction.Pick }, lanes, limit: 50).Items
+            .Single(item => item.ChampionId == Strong);
+
+        Assert.Equal(asPick.Score, evaluation.Item.Score, precision: 12);
+        Assert.Equal(ScoreTermKind.LaneStrength, evaluation.Item.Breakdown[0].Kind);
+    }
+
+    /// <summary>
+    /// Off the seat's lane: scored by the same rules, reported without a place — and the missing lane
+    /// statistic stays missing instead of quietly reading as an average champion.
+    /// </summary>
+    [Fact]
+    public void Evaluate_AnOffLaneChampionHasNoPlaceAndNoLaneStrength()
+    {
+        var (state, target, lanes) = Scenario();
+
+        var evaluation = Recommender().Evaluate(state, target, Menace, lanes)!;
+
+        Assert.Equal(0, evaluation.Rank);
+        Assert.Equal(Menace, evaluation.Item.ChampionId);
+        Assert.Equal(Lane.Mid, evaluation.Lane);
+        Assert.False(evaluation.Item.Breakdown.Single(term => term.Kind == ScoreTermKind.LaneStrength).HasData);
+    }
+
+    [Fact]
+    public void Evaluate_ABannedChampionHasNoPlace()
+    {
+        var (state, target, lanes) = Scenario(Strong);
+
+        var evaluation = Recommender().Evaluate(state, target, Strong, lanes)!;
+
+        Assert.Equal(0, evaluation.Rank);
+        Assert.DoesNotContain(evaluation.Ranking, item => item.ChampionId == Strong);
+    }
+
+    [Fact]
+    public void Evaluate_WithoutAChampionOrData_SaysNothing()
+    {
+        var (state, target, lanes) = Scenario();
+
+        Assert.Null(Recommender().Evaluate(state, target, 0, lanes));
+        Assert.Null(new Recommender(MetaLookup.Empty, TraitTable.Empty).Evaluate(state, target, Strong, lanes));
+    }
 }

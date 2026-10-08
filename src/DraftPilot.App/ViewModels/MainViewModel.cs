@@ -455,6 +455,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     /// <summary>The in-game build view's content: runes, purchase order, skill table.</summary>
     public GameBuildViewModel GameBuild { get; } = new();
 
+    /// <summary>What the own hover would be worth in this draft, pinned above the pick list.</summary>
+    public HoverViewModel Hover { get; } = new();
+
     public bool IsGameRunning
     {
         get => _isGameRunning;
@@ -1554,6 +1557,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         RenderBalance(allyPredictions, enemyPredictions, laneDuels);
 
         RenderRecommendations(enemyPredictions, allyPredictions);
+        RenderHover(enemyPredictions, allyPredictions);
         RenderDraftPreview();
 
         // Re-derived on every render, not only when a build lands: the enemy composition keeps
@@ -3311,6 +3315,50 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             + (duel.IsInferred ? " · aus der Gegenrichtung abgeleitet." : ".");
     }
 
+    /// <summary>
+    /// The own hover's worth in this draft, for the strip above the list. Always our own seat and
+    /// always as a pick, whoever the list is advising at the moment: the strip says "DEIN HOVER",
+    /// and a declared pick intent is still one while the bans run.
+    /// <para>
+    /// Only before our own lock — after it the matchup strip takes the same place — and only where
+    /// there are lanes: on the Abyss nobody hovers, the champion is handed out.
+    /// </para>
+    /// </summary>
+    private void RenderHover(LanePredictionResult enemyPredictions, LanePredictionResult allyPredictions)
+    {
+        if (!_state.Queue.UsesLanes() || _state.LocalSlot is not { IsLocked: false, HoverChampionId: not 0 } mine)
+        {
+            Hover.Hide();
+            return;
+        }
+
+        var championId = mine.HoverChampionId;
+        var icon = _icons.Get(championId);
+
+        if (_state.Unavailable.Contains(championId))
+        {
+            Hover.ShowUnavailable(_meta.ChampionName(championId), icon, HoverWarning(mine) ?? "schon vergeben");
+            return;
+        }
+
+        // The same ownership filter as our own seat's list, so the place counts the same rows.
+        var evaluation = _recommender.Evaluate(
+            _state,
+            new RecommendationTarget(mine, TurnAction.Pick, IsFollowingTurn: false),
+            championId,
+            enemyPredictions,
+            allyPredictions,
+            _settings.ShowUnowned ? null : _selectable);
+
+        if (evaluation is null)
+        {
+            Hover.Hide();
+            return;
+        }
+
+        Hover.Show(evaluation, icon, _settings.RecommendationCount);
+    }
+
     /// <summary>Flags an ally hover that cannot work out, which is worth saying before they lock it.</summary>
     private string? HoverWarning(DraftSlot slot)
     {
@@ -3447,6 +3495,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Recommendations.Clear();
         Warnings.Clear();
         DraftStats.Clear();
+        Hover.Hide();
 
         // The build hints read this between drafts too; without the reset the first render of the
         // next draft would answer with the last one's enemies.

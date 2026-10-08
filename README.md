@@ -92,8 +92,12 @@ wieder herunterzuladen.
 - **Gegner-Block**: pro Slot der Champion, die geschätzte Lane und die Konfidenz. Unter 60 % wird die
   Zahl orange — dann lohnt ein eigener Blick. Über das Dropdown legst du eine Lane von Hand fest;
   die übrigen Slots werden sofort neu zugeordnet.
+- **Fenster**: Das X legt es in den Infobereich (Beenden per Rechtsklick auf das Symbol dort), der
+  Strich daneben in die Taskleiste. Die Größe lässt sich an allen Rändern ziehen, mindestens
+  1000 × 640, und wird gespeichert; was nicht hineinpasst, scrollt. Der Pin ganz links hält das
+  Fenster über allen anderen — standardmäßig aus.
 - **Dein Team**: klickbar. Die Empfehlungsliste folgt normalerweise dem Spieler am Zug; ein Klick
-  schaltet auf einen anderen Slot, das Pin-Symbol oben hält sie dort fest.
+  schaltet auf einen anderen Slot, bis der Zug weitergeht.
 - **Empfehlungen**: Der Score ist eine **geschätzte Winrate** — Lane-Stärke, Matchups, Synergien
   und Team-Bedarf werden als Log-Odds-Verschiebungen addiert und zurück in Prozent übersetzt
   (`ScoreModel.cs` dokumentiert jede Konstante). Alles darin ist eine gemessene Quote mit
@@ -118,6 +122,13 @@ wieder herunterzuladen.
   Der Tooltip nennt die Namen mit Winrate und Anzahl Games. Gezählt wird, was OP.GG als auffällige
   Gegner kennt; kein Chip heißt „keiner fällt auf", nicht „es gibt keinen". Bans rechnen dieselbe
   Einheit aus Gegnersicht: Stärke mal Wahrscheinlichkeit, dass der Champion überhaupt genommen wird.
+- **Dein Hover**: Sobald du einen Champion hoverst — in der Planungsphase, während der Bans oder in
+  deinem Zug —, steht über der Liste eine feste Zeile mit seiner geschätzten Winrate in diesem Draft
+  und seinem Platz auf deiner Lane („Platz 11 von 58 auf Toplane · deutlich hinter Platz 1"). Das
+  ist dieselbe Rechnung wie jede Zeile der Liste, also auch für Champions, die nicht unter den
+  ersten acht stehen; der Tooltip schlüsselt sie auf. Hat OP.GG für den Champion auf dieser Lane
+  keine Zahlen, steht das dort statt einer Prozentzahl. Nach deinem Lock nimmt „Dein Matchup" den
+  Platz ein.
 - **Dein Build**: nach deinem Pick Runen, Shards, Startitems, Boots und Core-Items, plus Hinweise
   zur gegnerischen Comp. Welche Quelle das ist, entscheidet eine Frage — **steht der Lane-Gegner?**
   - **Ja:** der Build für genau dieses Matchup. Unter Start/Boots und unter dem Core steht
@@ -160,8 +171,9 @@ wieder herunterzuladen.
 - **Im Spiel**: sobald das Spiel startet, zeigt das Fenster den Build groß — Item-Bilder in
   Kaufreihenfolge (Start → Boots → Core → Late), Summoner Spells und die Skill-Tabelle für
   Stufe 1–18. Die Stufen 16–18 liefert die Quelle nicht; sie sind abgeleitet und blasser
-  dargestellt. Das Fenster ist „immer oben", also im randlosen Fenstermodus über dem Spiel sichtbar;
-  im exklusiven Vollbild versteckt Windows fremde Fenster prinzipbedingt.
+  dargestellt. Läuft das Spiel auf demselben Bildschirm, liegt das Fenster dahinter — es sei denn,
+  der Pin in der Titelleiste ist an; dann ist es im randlosen Fenstermodus über dem Spiel sichtbar.
+  Im exklusiven Vollbild versteckt Windows fremde Fenster prinzipbedingt.
 
 ## Kommandozeile
 
