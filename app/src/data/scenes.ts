@@ -78,7 +78,10 @@ function play(engine: DraftEngine, recording: string): { frames: { frame?: Golde
 
 function load(): Promise<Sources> {
   sources ??= (async () => {
-    const snapshot = await json<MetaSnapshot>('/tests/golden/snapshot.json');
+    // ?data=own: our own meta.json from a local collector run (copied to public/dev-data, not in git);
+    // otherwise the 1.5 reference snapshot.
+    const own = new URLSearchParams(location.search).get('data') === 'own';
+    const snapshot = await json<MetaSnapshot>(own ? '/dev-data/meta.json' : '/tests/golden/snapshot.json');
     const aram = await json<AramStat[]>('/tests/golden/aram-stats.json');
     await loadAssets(snapshot.patch);
     // A sample pool, so the "Mein Pool" switch has something to show without a client.

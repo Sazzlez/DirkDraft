@@ -19,9 +19,24 @@ export interface AssetNames {
 let loaded: Promise<AssetNames> | null = null;
 let current: AssetNames | null = null;
 
+/**
+ * Data Dragon names its folders by full version ("16.22.1"); our data names the patch line ("16.22").
+ * A line is resolved to the newest full version of it — or the newest overall, if the line is unknown.
+ */
+export async function fullVersion(version: string): Promise<string> {
+  if (version.split('.').length >= 3) return version;
+  try {
+    const versions = (await (await fetch('https://ddragon.leagueoflegends.com/api/versions.json')).json()) as string[];
+    return versions.find((v) => v.startsWith(`${version}.`)) ?? versions[0] ?? `${version}.1`;
+  } catch {
+    return `${version}.1`;
+  }
+}
+
 /** Loads the localised tables once per session. */
-export function loadAssets(version: string, language = 'de_DE'): Promise<AssetNames> {
+export function loadAssets(patch: string, language = 'de_DE'): Promise<AssetNames> {
   loaded ??= (async () => {
+    const version = await fullVersion(patch);
     const get = async (file: string) => (await fetch(`${CDN}/${version}/data/${language}/${file}`)).json();
     const [champions, items, spells, runes] = await Promise.all([
       get('champion.json'),

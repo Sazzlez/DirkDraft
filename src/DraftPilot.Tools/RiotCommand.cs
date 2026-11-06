@@ -149,7 +149,7 @@ internal static class RiotCommand
             Write(metaPath, JsonSerializer.Serialize(snapshot, MetaJson.Default.MetaSnapshot));
             Console.WriteLine(
                 $"Meta: {snapshot.Games:N0} Spiele, {snapshot.LaneStats.Count} Lane-Zeilen, {snapshot.Matchups.Count:N0} Duelle, "
-                + $"{snapshot.Synergies.Count:N0} Duos, Duell-Linie {snapshot.CompleteDuelSlope:0.00} / {snapshot.CompleteDuelOffset:+0.000;-0.000} "
+                + $"{snapshot.Synergies.Count:N0} Duos, Duell-Linie {snapshot.CompleteDuelSlope:0.00} / {snapshot.CompleteDuelOffset:+0.000;-0.000;0.000}"
                 + $"aus {snapshot.CompleteDuelSample:N0}, {new FileInfo(metaPath).Length / 1024:N0} KB → {metaPath}");
         }
 
