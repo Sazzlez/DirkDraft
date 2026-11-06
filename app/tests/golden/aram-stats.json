@@ -1,0 +1,867 @@
+[
+  {
+    "championId": 1,
+    "winRate": 0.56,
+    "play": 30729
+  },
+  {
+    "championId": 2,
+    "winRate": 0.56,
+    "play": 21458
+  },
+  {
+    "championId": 3,
+    "winRate": 0.56,
+    "play": 12187
+  },
+  {
+    "championId": 4,
+    "winRate": 0.56,
+    "play": 2916
+  },
+  {
+    "championId": 5,
+    "winRate": 0.56,
+    "play": 31645
+  },
+  {
+    "championId": 6,
+    "winRate": 0.55,
+    "play": 22374
+  },
+  {
+    "championId": 7,
+    "winRate": 0.55,
+    "play": 13103
+  },
+  {
+    "championId": 8,
+    "winRate": 0.55,
+    "play": 3832
+  },
+  {
+    "championId": 9,
+    "winRate": 0.55,
+    "play": 32561
+  },
+  {
+    "championId": 10,
+    "winRate": 0.55,
+    "play": 23290
+  },
+  {
+    "championId": 11,
+    "winRate": 0.55,
+    "play": 14019
+  },
+  {
+    "championId": 12,
+    "winRate": 0.55,
+    "play": 4748
+  },
+  {
+    "championId": 13,
+    "winRate": 0.55,
+    "play": 33477
+  },
+  {
+    "championId": 14,
+    "winRate": 0.55,
+    "play": 24206
+  },
+  {
+    "championId": 15,
+    "winRate": 0.55,
+    "play": 14935
+  },
+  {
+    "championId": 16,
+    "winRate": 0.54,
+    "play": 5664
+  },
+  {
+    "championId": 17,
+    "winRate": 0.54,
+    "play": 34393
+  },
+  {
+    "championId": 18,
+    "winRate": 0.54,
+    "play": 25122
+  },
+  {
+    "championId": 19,
+    "winRate": 0.54,
+    "play": 15851
+  },
+  {
+    "championId": 20,
+    "winRate": 0.54,
+    "play": 6580
+  },
+  {
+    "championId": 21,
+    "winRate": 0.54,
+    "play": 35309
+  },
+  {
+    "championId": 22,
+    "winRate": 0.54,
+    "play": 26038
+  },
+  {
+    "championId": 23,
+    "winRate": 0.54,
+    "play": 16767
+  },
+  {
+    "championId": 24,
+    "winRate": 0.54,
+    "play": 7496
+  },
+  {
+    "championId": 25,
+    "winRate": 0.54,
+    "play": 36225
+  },
+  {
+    "championId": 26,
+    "winRate": 0.53,
+    "play": 26954
+  },
+  {
+    "championId": 27,
+    "winRate": 0.53,
+    "play": 17683
+  },
+  {
+    "championId": 28,
+    "winRate": 0.53,
+    "play": 8412
+  },
+  {
+    "championId": 29,
+    "winRate": 0.53,
+    "play": 37141
+  },
+  {
+    "championId": 30,
+    "winRate": 0.53,
+    "play": 27870
+  },
+  {
+    "championId": 31,
+    "winRate": 0.53,
+    "play": 18599
+  },
+  {
+    "championId": 32,
+    "winRate": 0.53,
+    "play": 9328
+  },
+  {
+    "championId": 33,
+    "winRate": 0.53,
+    "play": 38057
+  },
+  {
+    "championId": 34,
+    "winRate": 0.53,
+    "play": 28786
+  },
+  {
+    "championId": 35,
+    "winRate": 0.52,
+    "play": 19515
+  },
+  {
+    "championId": 36,
+    "winRate": 0.52,
+    "play": 10244
+  },
+  {
+    "championId": 37,
+    "winRate": 0.52,
+    "play": 38973
+  },
+  {
+    "championId": 38,
+    "winRate": 0.52,
+    "play": 29702
+  },
+  {
+    "championId": 39,
+    "winRate": 0.52,
+    "play": 20431
+  },
+  {
+    "championId": 40,
+    "winRate": 0.52,
+    "play": 11160
+  },
+  {
+    "championId": 41,
+    "winRate": 0.52,
+    "play": 39889
+  },
+  {
+    "championId": 42,
+    "winRate": 0.52,
+    "play": 30618
+  },
+  {
+    "championId": 43,
+    "winRate": 0.52,
+    "play": 21347
+  },
+  {
+    "championId": 44,
+    "winRate": 0.52,
+    "play": 12076
+  },
+  {
+    "championId": 45,
+    "winRate": 0.52,
+    "play": 2805
+  },
+  {
+    "championId": 48,
+    "winRate": 0.51,
+    "play": 12992
+  },
+  {
+    "championId": 50,
+    "winRate": 0.51,
+    "play": 32450
+  },
+  {
+    "championId": 51,
+    "winRate": 0.51,
+    "play": 23179
+  },
+  {
+    "championId": 53,
+    "winRate": 0.51,
+    "play": 4637
+  },
+  {
+    "championId": 54,
+    "winRate": 0.51,
+    "play": 33366
+  },
+  {
+    "championId": 55,
+    "winRate": 0.5,
+    "play": 24095
+  },
+  {
+    "championId": 56,
+    "winRate": 0.5,
+    "play": 14824
+  },
+  {
+    "championId": 57,
+    "winRate": 0.5,
+    "play": 5553
+  },
+  {
+    "championId": 58,
+    "winRate": 0.5,
+    "play": 34282
+  },
+  {
+    "championId": 59,
+    "winRate": 0.5,
+    "play": 25011
+  },
+  {
+    "championId": 60,
+    "winRate": 0.5,
+    "play": 15740
+  },
+  {
+    "championId": 61,
+    "winRate": 0.5,
+    "play": 6469
+  },
+  {
+    "championId": 62,
+    "winRate": 0.5,
+    "play": 35198
+  },
+  {
+    "championId": 63,
+    "winRate": 0.5,
+    "play": 25927
+  },
+  {
+    "championId": 64,
+    "winRate": 0.5,
+    "play": 16656
+  },
+  {
+    "championId": 67,
+    "winRate": 0.49,
+    "play": 26843
+  },
+  {
+    "championId": 68,
+    "winRate": 0.49,
+    "play": 17572
+  },
+  {
+    "championId": 69,
+    "winRate": 0.49,
+    "play": 8301
+  },
+  {
+    "championId": 72,
+    "winRate": 0.49,
+    "play": 18488
+  },
+  {
+    "championId": 74,
+    "winRate": 0.49,
+    "play": 37946
+  },
+  {
+    "championId": 75,
+    "winRate": 0.48,
+    "play": 28675
+  },
+  {
+    "championId": 76,
+    "winRate": 0.48,
+    "play": 19404
+  },
+  {
+    "championId": 77,
+    "winRate": 0.48,
+    "play": 10133
+  },
+  {
+    "championId": 78,
+    "winRate": 0.48,
+    "play": 38862
+  },
+  {
+    "championId": 79,
+    "winRate": 0.48,
+    "play": 29591
+  },
+  {
+    "championId": 80,
+    "winRate": 0.48,
+    "play": 20320
+  },
+  {
+    "championId": 81,
+    "winRate": 0.48,
+    "play": 11049
+  },
+  {
+    "championId": 82,
+    "winRate": 0.48,
+    "play": 39778
+  },
+  {
+    "championId": 83,
+    "winRate": 0.48,
+    "play": 30507
+  },
+  {
+    "championId": 84,
+    "winRate": 0.48,
+    "play": 21236
+  },
+  {
+    "championId": 85,
+    "winRate": 0.48,
+    "play": 11965
+  },
+  {
+    "championId": 86,
+    "winRate": 0.47,
+    "play": 2694
+  },
+  {
+    "championId": 89,
+    "winRate": 0.47,
+    "play": 12881
+  },
+  {
+    "championId": 90,
+    "winRate": 0.47,
+    "play": 3610
+  },
+  {
+    "championId": 91,
+    "winRate": 0.47,
+    "play": 32339
+  },
+  {
+    "championId": 92,
+    "winRate": 0.47,
+    "play": 23068
+  },
+  {
+    "championId": 96,
+    "winRate": 0.46,
+    "play": 23984
+  },
+  {
+    "championId": 98,
+    "winRate": 0.46,
+    "play": 5442
+  },
+  {
+    "championId": 99,
+    "winRate": 0.46,
+    "play": 34171
+  },
+  {
+    "championId": 101,
+    "winRate": 0.46,
+    "play": 15629
+  },
+  {
+    "championId": 102,
+    "winRate": 0.46,
+    "play": 6358
+  },
+  {
+    "championId": 103,
+    "winRate": 0.46,
+    "play": 35087
+  },
+  {
+    "championId": 104,
+    "winRate": 0.46,
+    "play": 25816
+  },
+  {
+    "championId": 105,
+    "winRate": 0.46,
+    "play": 16545
+  },
+  {
+    "championId": 106,
+    "winRate": 0.45,
+    "play": 7274
+  },
+  {
+    "championId": 107,
+    "winRate": 0.45,
+    "play": 36003
+  },
+  {
+    "championId": 110,
+    "winRate": 0.45,
+    "play": 8190
+  },
+  {
+    "championId": 111,
+    "winRate": 0.56,
+    "play": 36919
+  },
+  {
+    "championId": 112,
+    "winRate": 0.56,
+    "play": 27648
+  },
+  {
+    "championId": 113,
+    "winRate": 0.56,
+    "play": 18377
+  },
+  {
+    "championId": 114,
+    "winRate": 0.56,
+    "play": 9106
+  },
+  {
+    "championId": 115,
+    "winRate": 0.56,
+    "play": 37835
+  },
+  {
+    "championId": 117,
+    "winRate": 0.55,
+    "play": 19293
+  },
+  {
+    "championId": 119,
+    "winRate": 0.55,
+    "play": 38751
+  },
+  {
+    "championId": 120,
+    "winRate": 0.55,
+    "play": 29480
+  },
+  {
+    "championId": 121,
+    "winRate": 0.55,
+    "play": 20209
+  },
+  {
+    "championId": 122,
+    "winRate": 0.55,
+    "play": 10938
+  },
+  {
+    "championId": 126,
+    "winRate": 0.54,
+    "play": 11854
+  },
+  {
+    "championId": 127,
+    "winRate": 0.54,
+    "play": 2583
+  },
+  {
+    "championId": 131,
+    "winRate": 0.54,
+    "play": 3499
+  },
+  {
+    "championId": 133,
+    "winRate": 0.54,
+    "play": 22957
+  },
+  {
+    "championId": 134,
+    "winRate": 0.54,
+    "play": 13686
+  },
+  {
+    "championId": 136,
+    "winRate": 0.53,
+    "play": 33144
+  },
+  {
+    "championId": 141,
+    "winRate": 0.53,
+    "play": 24789
+  },
+  {
+    "championId": 142,
+    "winRate": 0.53,
+    "play": 15518
+  },
+  {
+    "championId": 143,
+    "winRate": 0.53,
+    "play": 6247
+  },
+  {
+    "championId": 145,
+    "winRate": 0.52,
+    "play": 25705
+  },
+  {
+    "championId": 147,
+    "winRate": 0.52,
+    "play": 7163
+  },
+  {
+    "championId": 150,
+    "winRate": 0.52,
+    "play": 17350
+  },
+  {
+    "championId": 154,
+    "winRate": 0.52,
+    "play": 18266
+  },
+  {
+    "championId": 157,
+    "winRate": 0.51,
+    "play": 28453
+  },
+  {
+    "championId": 161,
+    "winRate": 0.51,
+    "play": 29369
+  },
+  {
+    "championId": 163,
+    "winRate": 0.51,
+    "play": 10827
+  },
+  {
+    "championId": 164,
+    "winRate": 0.51,
+    "play": 39556
+  },
+  {
+    "championId": 166,
+    "winRate": 0.5,
+    "play": 21014
+  },
+  {
+    "championId": 200,
+    "winRate": 0.47,
+    "play": 9800
+  },
+  {
+    "championId": 201,
+    "winRate": 0.47,
+    "play": 38529
+  },
+  {
+    "championId": 202,
+    "winRate": 0.47,
+    "play": 29258
+  },
+  {
+    "championId": 203,
+    "winRate": 0.47,
+    "play": 19987
+  },
+  {
+    "championId": 221,
+    "winRate": 0.56,
+    "play": 5109
+  },
+  {
+    "championId": 222,
+    "winRate": 0.56,
+    "play": 33838
+  },
+  {
+    "championId": 223,
+    "winRate": 0.56,
+    "play": 24567
+  },
+  {
+    "championId": 233,
+    "winRate": 0.55,
+    "play": 7857
+  },
+  {
+    "championId": 234,
+    "winRate": 0.55,
+    "play": 36586
+  },
+  {
+    "championId": 235,
+    "winRate": 0.55,
+    "play": 27315
+  },
+  {
+    "championId": 236,
+    "winRate": 0.54,
+    "play": 18044
+  },
+  {
+    "championId": 238,
+    "winRate": 0.54,
+    "play": 37502
+  },
+  {
+    "championId": 240,
+    "winRate": 0.54,
+    "play": 18960
+  },
+  {
+    "championId": 245,
+    "winRate": 0.54,
+    "play": 10605
+  },
+  {
+    "championId": 246,
+    "winRate": 0.53,
+    "play": 39334
+  },
+  {
+    "championId": 254,
+    "winRate": 0.53,
+    "play": 3166
+  },
+  {
+    "championId": 266,
+    "winRate": 0.51,
+    "play": 5914
+  },
+  {
+    "championId": 267,
+    "winRate": 0.51,
+    "play": 34643
+  },
+  {
+    "championId": 268,
+    "winRate": 0.51,
+    "play": 25372
+  },
+  {
+    "championId": 350,
+    "winRate": 0.54,
+    "play": 25150
+  },
+  {
+    "championId": 360,
+    "winRate": 0.53,
+    "play": 8440
+  },
+  {
+    "championId": 412,
+    "winRate": 0.48,
+    "play": 20348
+  },
+  {
+    "championId": 420,
+    "winRate": 0.47,
+    "play": 22180
+  },
+  {
+    "championId": 421,
+    "winRate": 0.47,
+    "play": 12909
+  },
+  {
+    "championId": 427,
+    "winRate": 0.46,
+    "play": 33283
+  },
+  {
+    "championId": 429,
+    "winRate": 0.46,
+    "play": 14741
+  },
+  {
+    "championId": 432,
+    "winRate": 0.46,
+    "play": 24928
+  },
+  {
+    "championId": 497,
+    "winRate": 0.5,
+    "play": 30313
+  },
+  {
+    "championId": 498,
+    "winRate": 0.5,
+    "play": 21042
+  },
+  {
+    "championId": 516,
+    "winRate": 0.48,
+    "play": 6164
+  },
+  {
+    "championId": 517,
+    "winRate": 0.48,
+    "play": 34893
+  },
+  {
+    "championId": 518,
+    "winRate": 0.48,
+    "play": 25622
+  },
+  {
+    "championId": 523,
+    "winRate": 0.48,
+    "play": 17267
+  },
+  {
+    "championId": 526,
+    "winRate": 0.47,
+    "play": 27454
+  },
+  {
+    "championId": 555,
+    "winRate": 0.56,
+    "play": 24595
+  },
+  {
+    "championId": 711,
+    "winRate": 0.51,
+    "play": 22319
+  },
+  {
+    "championId": 777,
+    "winRate": 0.55,
+    "play": 18433
+  },
+  {
+    "championId": 799,
+    "winRate": 0.53,
+    "play": 4471
+  },
+  {
+    "championId": 800,
+    "winRate": 0.53,
+    "play": 33200
+  },
+  {
+    "championId": 804,
+    "winRate": 0.53,
+    "play": 34116
+  },
+  {
+    "championId": 805,
+    "winRate": 0.52,
+    "play": 24845
+  },
+  {
+    "championId": 875,
+    "winRate": 0.46,
+    "play": 21875
+  },
+  {
+    "championId": 876,
+    "winRate": 0.45,
+    "play": 12604
+  },
+  {
+    "championId": 887,
+    "winRate": 0.55,
+    "play": 24623
+  },
+  {
+    "championId": 888,
+    "winRate": 0.55,
+    "play": 15352
+  },
+  {
+    "championId": 893,
+    "winRate": 0.55,
+    "play": 6997
+  },
+  {
+    "championId": 895,
+    "winRate": 0.55,
+    "play": 26455
+  },
+  {
+    "championId": 897,
+    "winRate": 0.54,
+    "play": 7913
+  },
+  {
+    "championId": 901,
+    "winRate": 0.54,
+    "play": 8829
+  },
+  {
+    "championId": 902,
+    "winRate": 0.54,
+    "play": 37558
+  },
+  {
+    "championId": 904,
+    "winRate": 0.54,
+    "play": 19016
+  },
+  {
+    "championId": 910,
+    "winRate": 0.53,
+    "play": 39390
+  },
+  {
+    "championId": 950,
+    "winRate": 0.49,
+    "play": 10550
+  }
+]

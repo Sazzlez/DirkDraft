@@ -1,0 +1,79 @@
+{
+  "kind": "augments",
+  "input": [
+    {
+      "id": 1,
+      "name": "Grob 170",
+      "tier": 1,
+      "performance": 170,
+      "pickRate": 0
+    },
+    {
+      "id": 2,
+      "name": "Grob 2/3",
+      "tier": 2,
+      "performance": 113.33333333333333,
+      "pickRate": 0.001
+    },
+    {
+      "id": 3,
+      "name": "Beliebt hoch",
+      "tier": 1,
+      "performance": 101.37,
+      "pickRate": 0.31
+    },
+    {
+      "id": 4,
+      "name": "Beliebt mittel",
+      "tier": 2,
+      "performance": 96.12,
+      "pickRate": 0.18
+    },
+    {
+      "id": 5,
+      "name": "Selten",
+      "tier": 3,
+      "performance": 99.81,
+      "pickRate": 0.02
+    },
+    {
+      "id": 6,
+      "name": "Beliebt niedrig",
+      "tier": 3,
+      "performance": 88.4,
+      "pickRate": 0.15
+    },
+    {
+      "id": 7,
+      "name": "Mittel",
+      "tier": 2,
+      "performance": 93.07,
+      "pickRate": 0.12
+    }
+  ],
+  "coarse": [
+    true,
+    true,
+    false,
+    false,
+    false,
+    true,
+    false
+  ],
+  "output": [
+    {
+      "id": 3,
+      "name": "Beliebt hoch",
+      "tier": 1,
+      "performance": 101.37,
+      "pickRate": 0.31
+    },
+    {
+      "id": 4,
+      "name": "Beliebt mittel",
+      "tier": 2,
+      "performance": 96.12,
+      "pickRate": 0.18
+    }
+  ]
+}

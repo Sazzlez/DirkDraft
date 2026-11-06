@@ -1,0 +1,173 @@
+{
+  "kind": "buildChoice",
+  "cases": [
+    {
+      "input": [
+        {
+          "items": [
+            "d\u00FCnn, gl\u00E4nzend"
+          ],
+          "itemIds": [
+            13
+          ],
+          "winRate": 0.6153846153846154,
+          "play": 13,
+          "pickRate": 0
+        },
+        {
+          "items": [
+            "breit"
+          ],
+          "itemIds": [
+            113
+          ],
+          "winRate": 0.48672566371681414,
+          "play": 113,
+          "pickRate": 0
+        },
+        {
+          "items": [
+            "mittel"
+          ],
+          "itemIds": [
+            60
+          ],
+          "winRate": 0.5166666666666667,
+          "play": 60,
+          "pickRate": 0
+        }
+      ],
+      "take": 3,
+      "lowerBounds": [
+        0.3552248097226855,
+        0.39653058797717566,
+        0.39307594850843575
+      ],
+      "output": [
+        "breit",
+        "mittel",
+        "d\u00FCnn, gl\u00E4nzend"
+      ]
+    },
+    {
+      "input": [
+        {
+          "items": [
+            "Stahlkappen"
+          ],
+          "itemIds": [
+            49535
+          ],
+          "winRate": 0.4650045422428586,
+          "play": 49535,
+          "pickRate": 0
+        },
+        {
+          "items": [
+            "Merkurs"
+          ],
+          "itemIds": [
+            12000
+          ],
+          "winRate": 0.491,
+          "play": 12000,
+          "pickRate": 0
+        },
+        {
+          "items": [
+            "Schnelligkeit"
+          ],
+          "itemIds": [
+            3100
+          ],
+          "winRate": 0.5219354838709678,
+          "play": 3100,
+          "pickRate": 0
+        },
+        {
+          "items": [
+            "ohne Spiele"
+          ],
+          "itemIds": [
+            0
+          ],
+          "winRate": 0,
+          "play": 0,
+          "pickRate": 0
+        }
+      ],
+      "take": 3,
+      "lowerBounds": [
+        0.4606150078213485,
+        0.48205962550184955,
+        0.5043348257675145,
+        0
+      ],
+      "output": [
+        "Schnelligkeit",
+        "Merkurs",
+        "Stahlkappen"
+      ]
+    },
+    {
+      "input": [
+        {
+          "items": [
+            "a"
+          ],
+          "itemIds": [
+            1
+          ],
+          "winRate": 1,
+          "play": 1,
+          "pickRate": 0
+        },
+        {
+          "items": [
+            "b"
+          ],
+          "itemIds": [
+            2
+          ],
+          "winRate": 0.5,
+          "play": 2,
+          "pickRate": 0
+        },
+        {
+          "items": [
+            "c"
+          ],
+          "itemIds": [
+            400
+          ],
+          "winRate": 0.5,
+          "play": 400,
+          "pickRate": 0
+        },
+        {
+          "items": [
+            "d"
+          ],
+          "itemIds": [
+            400
+          ],
+          "winRate": 0.525,
+          "play": 400,
+          "pickRate": 0
+        }
+      ],
+      "take": 3,
+      "lowerBounds": [
+        0.20654329147389294,
+        0.09452865480086611,
+        0.4512336165999552,
+        0.47605621611655935
+      ],
+      "output": [
+        "d",
+        "c",
+        "a"
+      ]
+    }
+  ]
+}
