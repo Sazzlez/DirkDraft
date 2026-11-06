@@ -226,6 +226,10 @@ public class RiotBuildTests
     [Fact]
     public async Task ACollectorRun_CountsCurrentGamesOnceAndLearnsWhereThePatchBegan()
     {
+        static string WithPlayers(string match, string prefix) => match.Replace(
+            "\"matchId\":  \"EUW1_1\"",
+            "\"matchId\":  \"EUW1_1\", \"participants\": [" + string.Join(',', Enumerable.Range(1, 10).Select(i => $"\"{prefix}{i}\"")) + "]");
+
         var current = Match.Replace("\"gameVersion\":  \"16.16.804.9184\"", "\"gameVersion\":  \"16.22.123.4567\"");
         var old = Match.Replace("\"gameCreation\":  ", "\"gameCreation\":  1");  // an older patch, created whenever
 
@@ -236,10 +240,13 @@ public class RiotBuildTests
             {
                 _ when path.StartsWith("/lol/league/v4/entries/", StringComparison.Ordinal)
                     => Ok("""[{"puuid":"p1","wins":30,"losses":30,"inactive":false},{"puuid":"p2","wins":1,"losses":1,"inactive":false}]"""),
-                _ when path.EndsWith("/ids", StringComparison.Ordinal)
-                    => Ok("""["EUW1_100","EUW1_200","EUW1_100"]"""),
-                "/lol/match/v5/matches/EUW1_100" => Ok(current),
-                "/lol/match/v5/matches/EUW1_100/timeline" => Ok(Timeline),
+                "/lol/match/v5/matches/by-puuid/p1/ids" => Ok("""["EUW1_100","EUW1_200","EUW1_100"]"""),
+                // The players of p1's game are leads; their game is counted, its players are not.
+                "/lol/match/v5/matches/by-puuid/q2/ids" => Ok("""["EUW1_300"]"""),
+                _ when path.EndsWith("/ids", StringComparison.Ordinal) => Ok("[]"),
+                "/lol/match/v5/matches/EUW1_100" => Ok(WithPlayers(current, "q")),
+                "/lol/match/v5/matches/EUW1_300" => Ok(WithPlayers(current, "r")),
+                _ when path.EndsWith("/timeline", StringComparison.Ordinal) => Ok(Timeline),
                 "/lol/match/v5/matches/EUW1_200" => Ok(old),
                 _ => new HttpResponseMessage(HttpStatusCode.NotFound),
             };
@@ -253,11 +260,12 @@ public class RiotBuildTests
         var collector = new RiotCollector(api, Items, new CollectorOptions { Tiers = ["gold"], Duration = TimeSpan.FromMinutes(1), MaxPages = 1 });
         var report = await collector.RunAsync(state, _ => saves++, stop.Token);
 
-        Assert.Equal(1, report.Counted);                       // EUW1_100 once, however often it is listed
+        Assert.Equal(2, report.Counted);                       // EUW1_100 once, however often it is listed, and the lead's EUW1_300
         Assert.Equal("16.22", state.Patch);
-        Assert.Equal(1, state.Tally.Matches["gold"]);
+        Assert.Equal(2, state.Tally.Matches["gold"]);
         Assert.Contains(100L, state.Seen);
         Assert.Contains(200L, state.Seen);
+        Assert.Contains(300L, state.Seen);
         Assert.True(state.OldPatchLatestMs > 0);               // the 16.16 game marks where 16.22 began
         Assert.True(saves >= 1);
         Assert.Equal(10, state.Tally.Builds.Count);
@@ -265,9 +273,14 @@ public class RiotBuildTests
         // The player with two games this season was never asked about.
         Assert.DoesNotContain(handler.Paths, path => path.Contains("/by-puuid/p2/", StringComparison.Ordinal));
 
+        // All ten of p1's game were asked as leads; nobody from the lead's own game was.
+        Assert.Equal(10, handler.Paths.Count(path => path.Contains("/by-puuid/q", StringComparison.Ordinal)));
+        Assert.DoesNotContain(handler.Paths, path => path.Contains("/by-puuid/r", StringComparison.Ordinal));
+
         // Nothing that names a player is in what gets stored.
         var stored = System.Text.Json.JsonSerializer.Serialize(state, CollectorJson.Default.CollectorState);
-        Assert.DoesNotContain("p1", stored);
+        Assert.DoesNotContain("\"p1\"", stored);
+        Assert.DoesNotContain("\"q2\"", stored);
     }
 
     private static HttpResponseMessage Ok(string body, string? appLimit = null)

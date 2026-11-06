@@ -115,6 +115,9 @@ public sealed class RiotCollector(RiotApiClient api, ItemCatalog items, Collecto
 
     private readonly Random _random = new();
 
+    /// <summary>Leads kept waiting per bracket; beyond it a league page's player adds none.</summary>
+    private const int MaxLeads = 400;
+
     public async Task<CollectorReport> RunAsync(CollectorState state, Action<CollectorState> save, CancellationToken ct)
     {
         var clock = Stopwatch.StartNew();
@@ -141,6 +144,15 @@ public sealed class RiotCollector(RiotApiClient api, ItemCatalog items, Collecto
         var counted = 0;
         var skipped = 0;
         var round = 0;
+        var pagesFetched = 0;
+
+        // Players met in a counted game, per bracket: proven active this patch and matched into the
+        // same rank, so their lists hold current games where a random name off a league page often
+        // has none (measured: 3,7 requests per counted game from league pages alone). One step deep
+        // only — a lead's own games add no further leads, or the bracket would drift away from the
+        // league list it was drawn from. In memory for this run, never stored.
+        var leads = options.Tiers.ToDictionary(tier => tier, _ => new Queue<string>(), StringComparer.OrdinalIgnoreCase);
+        var asked = new HashSet<string>(StringComparer.Ordinal);
 
         void Persist()
         {
@@ -156,15 +168,36 @@ public sealed class RiotCollector(RiotApiClient api, ItemCatalog items, Collecto
             save(state);
         }
 
-        while (clock.Elapsed < options.Duration && !ct.IsCancellationRequested && (options.MaxPages is not { } pages || round < pages))
+        while (clock.Elapsed < options.Duration && !ct.IsCancellationRequested
+            && (options.MaxPages is not { } pages || pagesFetched < pages || leads.Values.Any(queue => queue.Count > 0)))
         {
             var tier = options.Tiers[round++ % options.Tiers.Count];
-            var division = Divisions[_random.Next(Divisions.Length)];
+            var queue = leads[tier];
 
-            foreach (var puuid in await PlayersAsync(tier, division, ct).ConfigureAwait(false))
+            List<string> players;
+            var fromLeague = queue.Count == 0;
+            if (fromLeague)
+            {
+                if (options.MaxPages is { } max && pagesFetched >= max)
+                    continue;
+
+                pagesFetched++;
+                players = await PlayersAsync(tier, Divisions[_random.Next(Divisions.Length)], ct).ConfigureAwait(false);
+            }
+            else
+            {
+                players = [];
+                while (queue.Count > 0 && players.Count < options.PlayersPerPage)
+                    players.Add(queue.Dequeue());
+            }
+
+            foreach (var puuid in players)
             {
                 if (clock.Elapsed >= options.Duration || ct.IsCancellationRequested)
                     break;
+
+                if (!asked.Add(puuid))
+                    continue;
 
                 foreach (var matchId in await MatchIdsAsync(puuid, state, ct).ConfigureAwait(false))
                 {
@@ -212,6 +245,15 @@ public sealed class RiotCollector(RiotApiClient api, ItemCatalog items, Collecto
 
                     foreach (var participant in reading.Participants)
                         tally.Add(participant, tier);
+
+                    if (fromLeague && queue.Count < MaxLeads)
+                    {
+                        foreach (var player in RiotMatchReader.PlayerIds(matchJson))
+                        {
+                            if (!asked.Contains(player))
+                                queue.Enqueue(player);
+                        }
+                    }
 
                     matches[tier] = matches.GetValueOrDefault(tier) + 1;
                     counted++;

@@ -93,6 +93,21 @@ public static class RiotMatchReader
     /// </summary>
     public const int StartingWindowMs = 90_000;
 
+    /// <summary>
+    /// The ten players' PUUIDs, for finding more active players of the same rank while a run lasts.
+    /// Deliberately not part of <see cref="ParticipantBuild"/> or <see cref="MatchReading"/>: what
+    /// is counted and stored never carries a player, and this list never leaves the collector's memory.
+    /// </summary>
+    public static IReadOnlyList<string> PlayerIds(string matchJson)
+    {
+        using var document = JsonDocument.Parse(matchJson);
+        return document.RootElement.TryGetProperty("metadata", out var metadata)
+            && metadata.TryGetProperty("participants", out var participants)
+            && participants.ValueKind == JsonValueKind.Array
+                ? [.. participants.EnumerateArray().Where(p => p.ValueKind == JsonValueKind.String).Select(p => p.GetString() ?? string.Empty).Where(p => p.Length > 0)]
+                : [];
+    }
+
     /// <summary>Reads the match alone, enough to decide whether its timeline is worth a request.</summary>
     public static (string Patch, long CreatedAtMs, int QueueId, bool Counts) ReadHeader(string matchJson)
     {
