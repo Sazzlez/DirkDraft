@@ -15,7 +15,7 @@ public sealed record CollectorOptions
     public string Region { get; init; } = "europe";
 
     /// <summary>Rank brackets to sample, as Riot spells them in lower case: <c>gold</c>, <c>platinum</c>.</summary>
-    public IReadOnlyList<string> Tiers { get; init; } = ["gold", "platinum"];
+    public IReadOnlyList<string> Tiers { get; init; } = ["platinum"];
 
     public TimeSpan Duration { get; init; } = TimeSpan.FromMinutes(30);
 
@@ -62,6 +62,15 @@ public sealed class CollectorState
 
     public RiotBuildFile Tally { get; set; } = new();
 
+    /// <summary>The draft numbers of the same games: lane rows, duels, duos, bans, damage.</summary>
+    public RiotMetaCounts Meta { get; set; } = new();
+
+    /// <summary>
+    /// The last patch's counts, kept when a new patch starts. For the first day of a patch the new
+    /// count is too thin to stand on; the previous patch's numbers, marked as such, beat an empty file.
+    /// </summary>
+    public PreviousPatch? Previous { get; set; }
+
     public static CollectorState Load(string path)
     {
         if (!File.Exists(path))
@@ -87,6 +96,16 @@ public sealed class CollectorState
 
         File.Move(temporary, path, overwrite: true);
     }
+}
+
+/// <summary>A finished patch's counts, see <see cref="CollectorState.Previous"/>.</summary>
+public sealed class PreviousPatch
+{
+    public string Patch { get; set; } = string.Empty;
+
+    public RiotBuildFile Tally { get; set; } = new();
+
+    public RiotMetaCounts Meta { get; set; } = new();
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, WriteIndented = false)]
@@ -129,15 +148,24 @@ public sealed class RiotCollector(RiotApiClient api, ItemCatalog items, Collecto
         if (state.Patch != patch || state.Platform != options.Platform)
         {
             log?.Invoke(state.Patch.Length == 0 ? $"Neuer Bestand für Patch {patch}." : $"Patch {state.Patch} → {patch}: Zählung beginnt neu.");
+
+            // Kept only for the same platform and only when it counted something: a bracket or region
+            // switch is a different population, not an older version of this one.
+            state.Previous = state.Patch.Length > 0 && state.Platform == options.Platform && state.Meta.Matches > 0
+                ? new PreviousPatch { Patch = state.Patch, Tally = state.Tally, Meta = state.Meta }
+                : null;
             state.Patch = patch;
             state.Platform = options.Platform;
             state.OldPatchLatestMs = 0;
             state.Seen = [];
             state.Tally = new RiotBuildFile();
+            state.Meta = new RiotMetaCounts();
         }
 
         var tally = new RiotBuildTally();
         tally.Add(state.Tally.Builds);
+        var meta = new RiotMetaTally();
+        meta.Add(state.Meta);
         var seen = new HashSet<long>(state.Seen);
         var matches = new Dictionary<string, int>(state.Tally.Matches, StringComparer.OrdinalIgnoreCase);
 
@@ -165,6 +193,7 @@ public sealed class RiotCollector(RiotApiClient api, ItemCatalog items, Collecto
                 Matches = new Dictionary<string, int>(matches),
                 Builds = tally.Export(CollectorState.KeptOptions),
             };
+            state.Meta = meta.Export();
             save(state);
         }
 
@@ -245,6 +274,7 @@ public sealed class RiotCollector(RiotApiClient api, ItemCatalog items, Collecto
 
                     foreach (var participant in reading.Participants)
                         tally.Add(participant, tier);
+                    meta.Add(reading);
 
                     if (fromLeague && queue.Count < MaxLeads)
                     {

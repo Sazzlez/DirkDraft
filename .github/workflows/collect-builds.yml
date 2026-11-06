@@ -1,11 +1,12 @@
-# Collects ranked games from the Riot API and publishes the counted builds as one file.
+# Collects ranked games from the Riot API and publishes what was counted: builds.json (builds) and
+# meta.json (lane rates, duels, duos, bans, damage types - the draft model's numbers).
 #
 # One key for everybody: the Riot key lives only in the repository secret RIOT_API_KEY, never in
 # the code or the app. Each run collects for about five and a half hours (the hosted runner allows
-# six), keeps its progress in the Actions cache - not public - and publishes builds.json as the
-# only file of the branch "data", from where every DirkDraft downloads it. The file holds counts
-# per champion, lane and rank; no player names, PUUIDs or match ids.
-name: Build-Daten sammeln
+# six), keeps its progress in the Actions cache - not public - and publishes both files as the
+# only files of the branch "data", from where every DirkDraft downloads them. They hold counts
+# per champion, lane and rank (Platinum, Solo/Duo); no player names, PUUIDs or match ids.
+name: Daten sammeln
 
 on:
   schedule:
@@ -32,7 +33,7 @@ jobs:
     env:
       RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
       STATE: riot-state.json.gz
-      TIERS: gold,platinum
+      TIERS: platinum
 
     steps:
       - name: Schluessel vorhanden?
@@ -79,7 +80,7 @@ jobs:
 
       - name: Exportieren
         if: steps.key.outputs.present == 'true'
-        run: dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export --state "$STATE" --out publish/builds.json
+        run: dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export --state "$STATE" --tier "$TIERS" --out publish/builds.json --meta-out publish/meta.json
 
       # One commit, force-pushed: the branch holds the current file and no history of old ones.
       - name: Veroeffentlichen
@@ -91,6 +92,6 @@ jobs:
           git init -q -b data
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add builds.json
+          git add builds.json meta.json
           git commit -q -m "Build-Daten $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data

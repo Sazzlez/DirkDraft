@@ -162,6 +162,18 @@ public sealed class MetaSnapshot
     public string? Tier { get; set; }
 
     /// <summary>
+    /// Where the numbers come from: <c>riot</c> for DirkDraft's own count of ranked games (complete
+    /// duels, no tiers), <see langword="null"/> for an OP.GG file. The app words its explanations by it.
+    /// </summary>
+    public string? Source { get; set; }
+
+    /// <summary>The Riot platform counted on, e.g. <c>euw1</c>; own data only.</summary>
+    public string? Platform { get; set; }
+
+    /// <summary>How many games the file was counted from; own data only.</summary>
+    public int Games { get; set; }
+
+    /// <summary>
     /// Mean log-odds of the shrunk duo win rates in this file — what an AVERAGE listed duo is worth.
     /// Measured at build time rather than assumed to be zero, because OP.GG only lists duos worth
     /// mentioning: on the file this was introduced with, the mean sat at 0.0552, i.e. 51,4 %.

@@ -26,7 +26,7 @@ internal static class RiotCommand
             "collect" => await CollectAsync(options, ct),
             "show" => await ShowAsync(positional, options, ct),
             "status" => Status(options),
-            "export" => Export(options),
+            "export" => await ExportAsync(options, ct),
             _ => Usage(),
         };
     }
@@ -34,10 +34,11 @@ internal static class RiotCommand
     private static int Usage()
     {
         Console.Error.WriteLine("""
-            riot collect [--minutes 30] [--tiers gold,platinum] [--state build/riot-state.json.gz] [--key-file datei]
-            riot show <champion> <lane> [--tier gold] [--state build/riot-state.json.gz]
+            riot collect [--minutes 30] [--tiers platinum] [--state build/riot-state.json.gz] [--key-file datei]
+            riot show <champion> <lane> [--tier platinum] [--state build/riot-state.json.gz]
             riot status [--state build/riot-state.json.gz]
-            riot export --out builds.json [--keep 6] [--min-games 3] [--state build/riot-state.json.gz]
+            riot export --out builds.json [--meta-out meta.json] [--tier platinum] [--keep 6] [--min-games 3]
+                        [--min-patch-games 2000] [--state build/riot-state.json.gz]
             """);
         return 2;
     }
@@ -50,6 +51,9 @@ internal static class RiotCommand
 
         Console.WriteLine($"Patch {state.Patch} · {state.Platform} · Stand {state.Tally.CollectedAtUtc.ToLocalTime():dd.MM. HH:mm}");
         Console.WriteLine($"Spiele: {string.Join(", ", state.Tally.Matches.Select(m => $"{m.Key} {m.Value:N0}"))} · angesehen {state.Seen.Count:N0}");
+        Console.WriteLine(
+            $"Draft-Zählung: {state.Meta.Matches:N0} Spiele, {state.Meta.Duels.Count:N0} Duelle, {state.Meta.Duos.Count:N0} Duos"
+            + (state.Previous is { } previous ? $" · Vorpatch {previous.Patch}: {previous.Meta.Matches:N0} Spiele" : string.Empty));
 
         foreach (var lane in Lanes.All)
         {
@@ -72,7 +76,7 @@ internal static class RiotCommand
     /// Long tails of one-off starting buys and skill orders are what the state needs to keep
     /// counting correctly and what nobody needs to download.
     /// </summary>
-    private static int Export(Dictionary<string, string> options)
+    private static async Task<int> ExportAsync(Dictionary<string, string> options, CancellationToken ct)
     {
         var statePath = options.GetValueOrDefault("state", Path.Combine("build", "riot-state.json.gz"));
         if (!options.TryGetValue("out", out var outPath) || outPath.Length == 0)
@@ -80,27 +84,62 @@ internal static class RiotCommand
 
         var keep = int.Parse(options.GetValueOrDefault("keep", "6"), CultureInfo.InvariantCulture);
         var minimum = int.Parse(options.GetValueOrDefault("min-games", "3"), CultureInfo.InvariantCulture);
+        var enough = int.Parse(options.GetValueOrDefault("min-patch-games", "2000"), CultureInfo.InvariantCulture);
+        var tier = options.GetValueOrDefault("tier", "platinum");
 
         var state = CollectorState.Load(statePath);
+
+        // Early in a patch the new count is thin; until it has enough games the previous patch's
+        // numbers are published instead, under their own patch, so the app knows they trail.
+        var (patch, buildFile, metaCounts) = (state.Patch, state.Tally, state.Meta);
+        if (state.Meta.Matches < enough && state.Previous is { } previous && previous.Meta.Matches > state.Meta.Matches)
+        {
+            (patch, buildFile, metaCounts) = (previous.Patch, previous.Tally, previous.Meta);
+            Console.WriteLine($"Patch {state.Patch} hat erst {state.Meta.Matches:N0} Spiele — veröffentlicht wird Patch {patch} ({metaCounts.Matches:N0}).");
+        }
+
         var tally = new RiotBuildTally();
-        tally.Add(state.Tally.Builds);
+        tally.Add(buildFile.Builds);
 
         var file = new RiotBuildFile
         {
-            Patch = state.Tally.Patch,
-            Platform = state.Tally.Platform,
-            CollectedAtUtc = state.Tally.CollectedAtUtc,
-            Matches = state.Tally.Matches,
+            Patch = patch,
+            Platform = buildFile.Platform,
+            CollectedAtUtc = buildFile.CollectedAtUtc,
+            Matches = buildFile.Matches,
             Builds = tally.Export(keep, minimum),
         };
 
-        var directory = Path.GetDirectoryName(Path.GetFullPath(outPath));
-        if (!string.IsNullOrEmpty(directory))
-            Directory.CreateDirectory(directory);
-
-        File.WriteAllText(outPath, JsonSerializer.Serialize(file, RiotBuildJson.Default.RiotBuildFile));
+        Write(outPath, JsonSerializer.Serialize(file, RiotBuildJson.Default.RiotBuildFile));
         Console.WriteLine($"{file.Builds.Count} Champion-Lanes, {new FileInfo(outPath).Length / 1024:N0} KB → {outPath}");
+
+        if (options.TryGetValue("meta-out", out var metaPath) && metaPath.Length > 0)
+        {
+            var meta = new RiotMetaTally();
+            meta.Add(metaCounts);
+
+            using var http = new HttpClient();
+            var version = await LatestVersionAsync(http, ct);
+            var champions = RiotMetaExport.ParseDataDragon(
+                await http.GetStringAsync($"{DataDragon}/cdn/{version}/data/en_US/champion.json", ct));
+
+            var snapshot = RiotMetaExport.Build(meta.Rows(), champions, patch, tier, buildFile.Platform, buildFile.CollectedAtUtc, DateTimeOffset.UtcNow);
+            Write(metaPath, JsonSerializer.Serialize(snapshot, MetaJson.Default.MetaSnapshot));
+            Console.WriteLine(
+                $"Meta: {snapshot.Games:N0} Spiele, {snapshot.LaneStats.Count} Lane-Zeilen, {snapshot.Matchups.Count:N0} Duelle, "
+                + $"{snapshot.Synergies.Count:N0} Duos, Duell-Linie {snapshot.CompleteDuelSlope:0.00} / {snapshot.CompleteDuelOffset:+0.000;-0.000} "
+                + $"aus {snapshot.CompleteDuelSample:N0}, {new FileInfo(metaPath).Length / 1024:N0} KB → {metaPath}");
+        }
+
         return 0;
+
+        static void Write(string path, string text)
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(path));
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+            File.WriteAllText(path, text);
+        }
     }
 
     private static async Task<int> CollectAsync(Dictionary<string, string> options, CancellationToken ct)
@@ -114,7 +153,7 @@ internal static class RiotCommand
 
         var statePath = options.GetValueOrDefault("state", Path.Combine("build", "riot-state.json.gz"));
         var minutes = double.Parse(options.GetValueOrDefault("minutes", "30"), CultureInfo.InvariantCulture);
-        var tiers = options.GetValueOrDefault("tiers", "gold,platinum")
+        var tiers = options.GetValueOrDefault("tiers", "platinum")
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(tier => tier.ToLowerInvariant())
             .ToList();

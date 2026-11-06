@@ -127,11 +127,16 @@ export const ARAM_PRIOR = 400;
 export const ARAM_ROUNDING_VARIANCE = (0.01 * 0.01) / 12;
 
 /** Own champion and bench in one list, best first; empty when the own champion has no number. */
+/**
+ * `rounded`: the rates arrive rounded to whole percent (OP.GG), which widens every error bar by the
+ * rounding; DirkDraft's own Mayhem count is exact.
+ */
 export function rankAram(
   ownChampion: number,
   bench: readonly number[],
   stats: ReadonlyMap<number, AramStat>,
   names: (id: number) => string,
+  rounded = true,
 ): Recommendation[] {
   const candidates: number[] = [];
   if (ownChampion !== 0) candidates.push(ownChampion);
@@ -142,12 +147,12 @@ export function rankAram(
     const stat = stats.get(champion);
     if (!stat || stat.play <= 0) continue;
     const shrunk = shrink(stat.winRate, stat.play, ARAM_PRIOR);
-    const variance = logitVariance(shrunk, stat.play, ARAM_PRIOR, 0.5) + logitRoundingVariance(shrunk);
+    const variance = logitVariance(shrunk, stat.play, ARAM_PRIOR, 0.5) + (rounded ? logitRoundingVariance(shrunk) : 0);
     rows.push({
       championId: champion,
       name: names(champion),
       score: shrunk,
-      reasons: aramReasons(stat, shrunk, champion === ownChampion),
+      reasons: aramReasons(stat, shrunk, champion === ownChampion, rounded),
       breakdown: [{ kind: 'laneStrength', logOdds: logit(shrunk) }],
       uncertainty: Math.sqrt(variance),
     });
@@ -164,7 +169,7 @@ function logitRoundingVariance(rate: number): number {
   return slope * slope * ARAM_ROUNDING_VARIANCE;
 }
 
-function aramReasons(stat: AramStat, shrunk: number, isOwn: boolean): Reason[] {
+function aramReasons(stat: AramStat, shrunk: number, isOwn: boolean, rounded: boolean): Reason[] {
   const reasons: Reason[] = [];
   if (isOwn) {
     reasons.push(
@@ -176,12 +181,18 @@ function aramReasons(stat: AramStat, shrunk: number, isOwn: boolean): Reason[] {
     );
   }
   reasons.push(
-    neutral(
-      `${netPercent(stat.winRate, 0)} WR in ARAM aus ${netN0(stat.play)} Games`,
-      'OP.GGs ARAM-Zahl für diesen Champion. Sie kommt auf zwei Nachkommastellen gerundet — ' +
-        'ein Prozentpunkt Auflösung — und die Rundung steckt im Fehlerbalken mit drin. ' +
-        `Nach Glättung über die Stichprobe: ${netPercent(shrunk, 1)}.`,
-    ),
+    rounded
+      ? neutral(
+          `${netPercent(stat.winRate, 0)} WR in ARAM aus ${netN0(stat.play)} Games`,
+          'OP.GGs ARAM-Zahl für diesen Champion. Sie kommt auf zwei Nachkommastellen gerundet — ' +
+            'ein Prozentpunkt Auflösung — und die Rundung steckt im Fehlerbalken mit drin. ' +
+            `Nach Glättung über die Stichprobe: ${netPercent(shrunk, 1)}.`,
+        )
+      : neutral(
+          `${netPercent(stat.winRate, 1)} WR in Mayhem aus ${netN0(stat.play)} Games`,
+          'Unsere eigene Zählung für diesen Champion in ARAM Mayhem. ' +
+            `Nach Glättung über die Stichprobe: ${netPercent(shrunk, 1)}.`,
+        ),
   );
   return reasons;
 }

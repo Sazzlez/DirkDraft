@@ -117,6 +117,8 @@ export interface EngineOptions {
   traits?: TraitTable;
   seats?: SeatPriors;
   aramStats?: ReadonlyMap<number, AramStat>;
+  /** Whether the ARAM rates are rounded to whole percent (OP.GG) rather than counted exactly (own data). */
+  aramRounded?: boolean;
 }
 
 export class DraftEngine {
@@ -124,6 +126,7 @@ export class DraftEngine {
   readonly traits: TraitTable;
   readonly seats: SeatPriors;
   readonly aramStats: ReadonlyMap<number, AramStat>;
+  readonly aramRounded: boolean;
 
   private readonly turns = new TurnTracker();
   private wasActive = false;
@@ -135,6 +138,7 @@ export class DraftEngine {
     this.traits = options.traits ?? TraitTable.bundled();
     this.seats = options.seats ?? SeatPriors.fromJson(priors);
     this.aramStats = options.aramStats ?? new Map();
+    this.aramRounded = options.aramRounded ?? true;
   }
 
   /**
@@ -204,7 +208,7 @@ export class DraftEngine {
       const own = effectiveChampionId(mine);
       const ids = [...state.bench, own].filter((id, i, all) => id !== 0 && this.aramStats.has(id) && all.indexOf(id) === i);
       const stats = new Map(ids.map((id) => [id, this.aramStats.get(id)!]));
-      const rows = rankAram(own, state.bench, stats, (id) => meta.championName(id));
+      const rows = rankAram(own, state.bench, stats, (id) => meta.championName(id), this.aramRounded);
       bench = {
         own,
         bench: [...state.bench],

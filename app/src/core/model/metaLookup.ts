@@ -66,6 +66,11 @@ export interface MetaSnapshot {
   builtAtUtc: string;
   gameMode: string;
   tier?: string | null;
+  /** 'riot' for DirkDraft's own count (complete duels, no tiers); absent for an OP.GG file. */
+  source?: string | null;
+  platform?: string | null;
+  /** Games the file was counted from; own data only. */
+  games?: number;
   synergyBaseline: number;
   laneBaseline: number;
   matchupBaseline: number;
@@ -193,6 +198,11 @@ export class MetaLookup {
 
   get gameMode(): string {
     return this.snapshot.gameMode ?? '';
+  }
+
+  /** DirkDraft's own count of ranked games rather than an OP.GG file; the texts are worded by it. */
+  get isOwnData(): boolean {
+    return this.snapshot.source === 'riot';
   }
 
   get warnings(): readonly string[] {
@@ -404,13 +414,16 @@ export class MetaLookup {
       const existing = map.get(key);
       if (existing && existing.play >= stat.play) continue;
 
+      // A complete duel (own data counts every pairing) is shrunk towards the complete-duel line;
+      // OP.GG's stored rows never carried the flag, so 1.5 files read exactly as before.
+      const complete = stat.fromCompleteList ?? false;
       map.set(key, {
-        winRate: this.shrinkMatchup(stat.championId, stat.opponentId, stat.lane, stat.winRate, stat.play),
+        winRate: this.shrinkMatchup(stat.championId, stat.opponentId, stat.lane, stat.winRate, stat.play, !complete),
         play: stat.play,
         confidence: confidence(stat.play, MATCHUP_PRIOR),
         isInferred: false,
         isLive: false,
-        fromCompleteList: false,
+        fromCompleteList: complete,
         measured: clampRate(stat.winRate),
       });
     }
@@ -425,13 +438,14 @@ export class MetaLookup {
       if (map.has(mirror)) continue;
 
       // Mirrored AFTER shrinking: the reverse edge is the exact complement of the stored one.
+      const complete = stat.fromCompleteList ?? false;
       map.set(mirror, {
-        winRate: 1 - this.shrinkMatchup(stat.championId, stat.opponentId, stat.lane, stat.winRate, stat.play),
+        winRate: 1 - this.shrinkMatchup(stat.championId, stat.opponentId, stat.lane, stat.winRate, stat.play, !complete),
         play: stat.play,
         confidence: confidence(stat.play, MATCHUP_PRIOR),
         isInferred: true,
         isLive: false,
-        fromCompleteList: false,
+        fromCompleteList: complete,
         measured: 1 - clampRate(stat.winRate),
       });
     }

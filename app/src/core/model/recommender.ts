@@ -72,10 +72,13 @@ export function termLabel(kind: ScoreTermKind): string {
   }
 }
 
-export function termHint(kind: ScoreTermKind): string {
+/** `ownData`: the numbers are DirkDraft's own count, which has no OP.GG tier to explain away. */
+export function termHint(kind: ScoreTermKind, ownData = false): string {
   switch (kind) {
     case 'laneStrength':
-      return 'Wie gut der Champ auf dieser Lane allgemein läuft: die Winrate, geglättet nach Stichprobe. OP.GGs Tier steht als eigener Hinweis daneben und zählt hier nicht mit — es mischt Winrate und Pickrate, und die Winrate ist schon diese Zeile.';
+      return ownData
+        ? 'Wie gut der Champ auf dieser Lane allgemein läuft: die Winrate, geglättet nach Stichprobe.'
+        : 'Wie gut der Champ auf dieser Lane allgemein läuft: die Winrate, geglättet nach Stichprobe. OP.GGs Tier steht als eigener Hinweis daneben und zählt hier nicht mit — es mischt Winrate und Pickrate, und die Winrate ist schon diese Zeile.';
     case 'laneMatchup':
       return 'Wie viel besser oder schlechter dieser Champ gegen den erwarteten Lane-Gegner abschneidet als auf dieser Lane üblich. Die allgemeine Stärke steckt schon in der Zeile darüber — sonst würde sie zweimal zählen.';
     case 'enemyTeam':
@@ -372,8 +375,8 @@ export class Recommender {
         `Auf ${laneDisplay(lane)} ist noch niemand aufgedeckt, und diese Champs sind noch frei ` +
           `und schneiden gegen ${this.meta.championName(candidate)} besser ab als seine Gegner ` +
           `üblicherweise: ${named}${more}. Sie zu nehmen steht dem Gegner frei — ob er es tut, ` +
-          'sagen die Daten nicht, deshalb zählt das hier nicht in die Prozentzahl hinein. ' +
-          'Aufgelistet ist, was OP.GG als auffällige Gegner kennt, nicht jeder mögliche.',
+          'sagen die Daten nicht, deshalb zählt das hier nicht in die Prozentzahl hinein.' +
+          (this.meta.isOwnData ? '' : ' Aufgelistet ist, was OP.GG als auffällige Gegner kennt, nicht jeder mögliche.'),
       ),
     );
   }

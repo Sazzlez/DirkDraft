@@ -28,7 +28,11 @@ public sealed record ParticipantBuild(
     int Boots,
     IReadOnlyList<int> Items,
     int SupportChoice,
-    string SkillOrder)
+    string SkillOrder,
+    int TeamId = 0,
+    long PhysicalDamage = 0,
+    long MagicDamage = 0,
+    long TrueDamage = 0)
 {
     /// <summary>
     /// The order the three basic abilities were maxed in, e.g. <c>QEW</c>: by the point at which
@@ -72,7 +76,20 @@ public sealed record ParticipantBuild(
 /// Whether the game says anything about builds: Solo/Duo, at least fifteen minutes, not ended by
 /// an early surrender. A remake or a four-minute surrender is a game nobody finished building in.
 /// </param>
-public sealed record MatchReading(string Patch, long CreatedAtMs, int QueueId, bool Counts, IReadOnlyList<ParticipantBuild> Participants);
+/// <param name="Bans">
+/// The champions banned in the game, each once (both teams may ban the same one); empty when the
+/// match carries no ban list.
+/// </param>
+public sealed record MatchReading(
+    string Patch,
+    long CreatedAtMs,
+    int QueueId,
+    bool Counts,
+    IReadOnlyList<ParticipantBuild> Participants,
+    IReadOnlyList<int>? Bans = null)
+{
+    public IReadOnlyList<int> BannedChampions => Bans ?? [];
+}
 
 /// <summary>
 /// Reads Riot's MATCH-V5 match and timeline answers into <see cref="ParticipantBuild"/>s. The match
@@ -151,11 +168,44 @@ public static class RiotMatchReader
                 // The quest item is handed over, not bought, so the end-of-game inventory is the
                 // one place it reliably shows up.
                 SupportChoice: finalItems.FirstOrDefault(items.IsSupportChoice),
-                SkillOrder: SkillOrder(own)));
+                SkillOrder: SkillOrder(own),
+                // Riot numbers the blue side 1 to 5 and the red side 6 to 10; the explicit team id
+                // wins where the match carries one.
+                TeamId: Int(participant, "teamId") is > 0 and var team ? team : id <= 5 ? 100 : 200,
+                PhysicalDamage: Long(participant, "physicalDamageDealtToChampions"),
+                MagicDamage: Long(participant, "magicDamageDealtToChampions"),
+                TrueDamage: Long(participant, "trueDamageDealtToChampions")));
         }
 
-        return new MatchReading(patch, created, queue, counts, participants);
+        return new MatchReading(patch, created, queue, counts, participants, Bans(info));
     }
+
+    /// <summary>Every champion banned in the game, once — a ban by both teams is still one ban.</summary>
+    private static List<int> Bans(JsonElement info)
+    {
+        var bans = new List<int>();
+        if (!info.TryGetProperty("teams", out var teams) || teams.ValueKind != JsonValueKind.Array)
+            return bans;
+
+        foreach (var team in teams.EnumerateArray())
+        {
+            if (!team.TryGetProperty("bans", out var list) || list.ValueKind != JsonValueKind.Array)
+                continue;
+
+            foreach (var ban in list.EnumerateArray())
+            {
+                // -1 is "no ban" (a missed turn); anything below 1 is no champion.
+                var champion = Int(ban, "championId");
+                if (champion > 0 && !bans.Contains(champion))
+                    bans.Add(champion);
+            }
+        }
+
+        return bans;
+    }
+
+    private static long Long(JsonElement element, string property)
+        => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var number) ? Math.Max(0, number) : 0;
 
     private static (string Patch, long CreatedAtMs, int QueueId, bool Counts) Header(JsonElement info)
     {
