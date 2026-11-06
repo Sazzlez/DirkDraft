@@ -27,11 +27,9 @@
 <style>
   .group {
     margin-bottom: 2px;
-    font-size: 10.5px;
+    font-size: 11.5px;
     font-weight: 600;
     color: var(--green);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
   }
 
   .row {
@@ -89,7 +87,7 @@
   }
 
   .value small {
-    font-size: 10.5px;
+    font-size: 11.5px;
   }
 
   .foot {

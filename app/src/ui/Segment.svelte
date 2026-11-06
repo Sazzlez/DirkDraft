@@ -1,16 +1,27 @@
-<script lang="ts">
-  import type { Area } from '../core/view';
+<script lang="ts" generics="T extends string">
+  // A segmented control as on Apple platforms: one thumb that glides to the chosen segment.
 
-  let { value, onChange, stretch = false }: { value: Area; onChange: (area: Area) => void; stretch?: boolean } = $props();
+  let {
+    value,
+    onChange,
+    options,
+    stretch = false,
+    small = false,
+    label = 'Auswahl',
+  }: {
+    value: T;
+    onChange: (value: T) => void;
+    options: { id: T; label: string }[];
+    stretch?: boolean;
+    small?: boolean;
+    label?: string;
+  } = $props();
 
-  const options: { id: Area; label: string }[] = [
-    { id: 'draft', label: 'Draft' },
-    { id: 'build', label: 'Build' },
-    { id: 'game', label: 'Spiel' },
-  ];
+  const index = $derived(Math.max(0, options.findIndex((o) => o.id === value)));
 </script>
 
-<div class="seg" class:stretch role="tablist" aria-label="Bereich">
+<div class="seg" class:stretch class:small role="tablist" aria-label={label} style:--n={options.length} style:--i={index}>
+  <span class="thumb" aria-hidden="true"></span>
   {#each options as option (option.id)}
     <button role="tab" aria-selected={value === option.id} class:on={value === option.id} onclick={() => onChange(option.id)}>
       {option.label}
@@ -20,39 +31,49 @@
 
 <style>
   .seg {
-    display: inline-flex;
-    gap: 2px;
+    position: relative;
+    display: inline-grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
     padding: 2px;
-    border-radius: var(--r-s);
+    border-radius: 9px;
     background: var(--card-strong);
   }
 
   .seg.stretch {
-    display: flex;
+    display: grid;
     width: 100%;
   }
 
+  .thumb {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    left: 2px;
+    width: calc((100% - 4px) / var(--n));
+    transform: translateX(calc(var(--i) * 100%));
+    border-radius: 7px;
+    background: var(--thumb);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+    transition: transform 0.32s var(--spring);
+  }
+
   button {
-    padding: 4px 14px;
-    border-radius: 6px;
-    font-size: 12px;
+    position: relative;
+    padding: 4px 16px;
+    font-size: 12.5px;
     font-weight: 500;
     color: var(--fg2);
     white-space: nowrap;
-    transition: background 0.2s var(--spring), color 0.2s;
+    transition: color 0.2s var(--ease);
   }
 
-  .stretch button {
-    flex: 1;
+  .small button {
+    padding: 3px 11px;
+    font-size: 11.5px;
   }
 
   button.on {
-    background: var(--card-strong);
     color: var(--fg);
-    box-shadow: var(--shadow);
-  }
-
-  :global([data-theme='light']) button.on {
-    background: #fff;
+    font-weight: 600;
   }
 </style>

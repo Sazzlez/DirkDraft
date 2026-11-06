@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Area, ViewModel } from '../core/view';
+  import { AREAS, type Area, type ViewModel } from '../core/view';
   import Segment from './Segment.svelte';
 
   let { view, area, onArea }: { view: ViewModel; area: Area; onArea: (area: Area) => void } = $props();
@@ -10,37 +10,36 @@
 
 <header class="bar" data-tauri-drag-region>
   <div class="left" data-tauri-drag-region>
-    <span class="logo" aria-hidden="true"></span>
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M6 5.5h4.2a4.5 4.5 0 0 1 0 9H6z" /></svg></span>
     <b>DirkDraft</b>
-    <span class="dot {view.connection.state}" title={view.connection.text}></span>
-    <span class="status">{view.connection.text}</span>
+    <span class="status"><span class="dot {view.connection.state}"></span><span class="text">{view.connection.text}</span></span>
   </div>
 
   <div class="center">
-    <Segment value={area} onChange={onArea} />
+    <Segment value={area} onChange={onArea} options={AREAS} label="Bereich" />
   </div>
 
   <div class="right">
     <button class="pill" title="Daten aktualisieren">
-      {#if view.data.stale}<span class="warn-dot"></span>{/if}
+      <span class="dot-small" class:stale={view.data.stale}></span>
       <span class="num">{view.data.text}</span>
     </button>
-    <button class="menu" aria-label="Menü" onclick={() => (menuOpen = !menuOpen)}>
-      <svg viewBox="0 0 16 16"><circle cx="3" cy="8" r="1.4" /><circle cx="8" cy="8" r="1.4" /><circle cx="13" cy="8" r="1.4" /></svg>
+    <button class="ctl menu" aria-label="Menü" onclick={() => (menuOpen = !menuOpen)}>
+      <svg viewBox="0 0 20 20"><circle cx="5" cy="10" r="1.3" /><circle cx="10" cy="10" r="1.3" /><circle cx="15" cy="10" r="1.3" /></svg>
     </button>
     <button class="ctl" class:on={pinned} aria-label="Im Vordergrund halten" aria-pressed={pinned} onclick={() => (pinned = !pinned)}>
-      <svg viewBox="0 0 16 16"><path d="M10.5 1.5 14.5 5.5 12 6.5 9.5 9l.5 3.5-1 1-3-3-3.5 3.5-.5-.5L5.5 10l-3-3 1-1L7 6.5 9.5 4z" /></svg>
+      <svg viewBox="0 0 20 20" class="stroke"><path d="M12.2 3.5 16.5 7.8M14.4 5.6l-3.3 3.3 1.1 3.3-1.1 1.1-6.5-6.5 1.1-1.1 3.3 1.1 3.3-3.3M8 12l-4 4" /></svg>
     </button>
     <button class="ctl" aria-label="Minimieren">
-      <svg viewBox="0 0 16 16"><path d="M3 8.5h10v1H3z" /></svg>
+      <svg viewBox="0 0 20 20" class="stroke"><path d="M5 10.5h10" /></svg>
     </button>
     <button class="ctl" aria-label="In den Infobereich">
-      <svg viewBox="0 0 16 16"><path d="m4 3.3 4 4 4-4 .7.7-4 4 4 4-.7.7-4-4-4 4-.7-.7 4-4-4-4z" /></svg>
+      <svg viewBox="0 0 20 20" class="stroke"><path d="M5.5 5.5l9 9m0-9-9 9" /></svg>
     </button>
   </div>
 
   {#if menuOpen}
-    <div class="dropdown">
+    <div class="popover">
       <p class="num">{view.data.text}</p>
       <button>Daten aktualisieren</button>
       <button>Einstellungen</button>
@@ -55,8 +54,8 @@
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
     gap: 8px;
-    height: 46px;
-    padding: 0 8px 0 14px;
+    height: 52px;
+    padding: 0 10px 0 16px;
     user-select: none;
   }
 
@@ -64,93 +63,114 @@
   .right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
     min-width: 0;
   }
 
   .right {
     justify-content: flex-end;
-    gap: 4px;
+    gap: 2px;
   }
 
   .logo {
-    width: 20px;
-    height: 20px;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
     border-radius: 6px;
-    background: linear-gradient(135deg, #0ac8b9, var(--blue));
+    background: linear-gradient(145deg, #2fd6c5, var(--blue) 70%);
+    box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
     flex: none;
+  }
+
+  .logo svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: #fff;
+    stroke-width: 2.2;
   }
 
   b {
-    font-weight: 600;
-    font-size: 13px;
+    font: var(--t-head);
+    font-size: 14px;
+    letter-spacing: -0.015em;
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding: 0 9px 0 8px;
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--fg2);
+    font: var(--t-caption);
+    white-space: nowrap;
+    min-width: 0;
   }
 
   .dot {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     flex: none;
+    background: var(--fg3);
   }
 
   .dot.ok {
     background: var(--green);
-    box-shadow: 0 0 0 3px var(--green-wash);
+    box-shadow: 0 0 6px var(--green);
   }
 
   .dot.warn {
     background: var(--orange);
   }
 
-  .dot.off {
-    background: var(--fg3);
-  }
-
-  .status {
-    color: var(--fg2);
-    font-size: 11.5px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
   .pill {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    height: 24px;
-    padding: 0 10px;
-    border-radius: 12px;
-    background: var(--card-strong);
+    gap: 7px;
+    height: 26px;
+    padding: 0 12px;
+    margin-right: 8px;
+    border-radius: 999px;
+    background: var(--card);
+    box-shadow: var(--edge);
     color: var(--fg2);
-    font-size: 11.5px;
+    font: var(--t-caption);
     white-space: nowrap;
-    margin-right: 6px;
+    transition: background 0.2s var(--ease), color 0.2s var(--ease);
   }
 
   .pill:hover {
+    background: var(--card-strong);
     color: var(--fg);
   }
 
-  .warn-dot {
+  .dot-small {
     width: 6px;
     height: 6px;
     border-radius: 50%;
+    background: var(--green);
+  }
+
+  .dot-small.stale {
     background: var(--orange);
   }
 
-  .ctl,
-  .menu {
+  .ctl {
     display: grid;
     place-items: center;
     width: 30px;
     height: 30px;
-    border-radius: var(--r-s);
-    color: var(--fg3);
+    border-radius: 8px;
+    color: var(--fg2);
+    transition: background 0.15s var(--ease), color 0.15s var(--ease);
   }
 
-  .ctl:hover,
-  .menu:hover {
+  .ctl:hover {
     background: var(--card-hover);
     color: var(--fg);
   }
@@ -160,57 +180,71 @@
   }
 
   svg {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     fill: currentColor;
+  }
+
+  svg.stroke {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   .menu {
     display: none;
   }
 
-  .dropdown {
+  .popover {
     position: absolute;
-    right: 8px;
-    top: 44px;
+    right: 10px;
+    top: 48px;
     z-index: 20;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    min-width: 200px;
+    gap: 1px;
+    min-width: 220px;
     padding: 6px;
     border-radius: var(--r-m);
-    background: var(--window);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--separator);
+    background: var(--popover);
+    -webkit-backdrop-filter: blur(30px);
+    backdrop-filter: blur(30px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), var(--edge);
   }
 
-  .dropdown p {
-    margin: 4px 8px 6px;
+  .popover p {
+    margin: 4px 10px 6px;
     color: var(--fg2);
-    font-size: 11.5px;
+    font: var(--t-caption);
   }
 
-  .dropdown button {
+  .popover button {
     text-align: left;
-    padding: 6px 8px;
+    padding: 7px 10px;
     border-radius: 6px;
   }
 
-  .dropdown button:hover {
-    background: var(--card-hover);
+  .popover button:hover {
+    background: var(--blue);
+    color: #fff;
   }
 
-  /* Medium: the status text goes. */
   @container app (max-width: 1099px) {
-    .status {
+    .status .text {
       display: none;
+    }
+
+    .status {
+      padding: 0 8px;
     }
   }
 
-  /* Narrow: the segment gets its own row (Shell), the data pill moves into the menu. */
   @container app (max-width: 719px) {
     .bar {
       grid-template-columns: 1fr auto;
+      padding: 0 8px 0 16px;
     }
 
     .center,

@@ -28,10 +28,15 @@
 <style>
   .bar {
     display: flex;
-    height: 8px;
-    border-radius: 4px;
+    gap: 1.5px;
+    height: 6px;
+    border-radius: 3px;
     overflow: hidden;
     background: var(--track);
+  }
+
+  i {
+    border-radius: 3px;
   }
 
   i {

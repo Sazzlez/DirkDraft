@@ -29,6 +29,12 @@ export type Moment =
 
 export type Area = 'draft' | 'build' | 'game';
 
+export const AREAS: { id: Area; label: string }[] = [
+  { id: 'draft', label: 'Draft' },
+  { id: 'build', label: 'Build' },
+  { id: 'game', label: 'Spiel' },
+];
+
 /** Which area a moment opens; a manual switch holds until the next moment begins. */
 export const AREA_OF: Record<Moment, Area> = {
   lobby: 'draft',

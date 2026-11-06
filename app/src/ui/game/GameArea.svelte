@@ -182,11 +182,9 @@
   }
 
   .kicker {
-    font-size: 10px;
+    font-size: 11.5px;
     font-weight: 600;
     color: var(--blue);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
   }
 
   .t b {
@@ -241,11 +239,9 @@
   }
 
   .k {
-    font-size: 10px;
+    font-size: 11.5px;
     font-weight: 600;
     color: var(--fg2);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
   }
 
   .icons {
@@ -308,7 +304,7 @@
 
   .tiny {
     margin: 8px 0 0;
-    font-size: 10.5px;
+    font-size: 11.5px;
     color: var(--fg3);
   }
 
@@ -335,7 +331,7 @@
   }
 
   .dt {
-    font-size: 10.5px;
+    font-size: 11.5px;
     font-weight: 600;
     padding: 2px 7px;
     border-radius: 9px;

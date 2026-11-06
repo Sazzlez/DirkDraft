@@ -21,8 +21,9 @@
 <style>
   .tile {
     background: var(--card);
+    box-shadow: var(--edge);
     border-radius: var(--r-l);
-    padding: 14px;
+    padding: 16px 16px 14px;
     min-width: 0;
   }
 
@@ -34,15 +35,19 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 10px;
-    min-height: 24px;
+    margin-bottom: 12px;
+    min-height: 26px;
   }
 
   h3 {
     margin: 0;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
+    font: var(--t-head);
+    letter-spacing: -0.015em;
+  }
+
+  .main h3 {
+    font: var(--t-title);
+    letter-spacing: -0.02em;
   }
 
   .sub {

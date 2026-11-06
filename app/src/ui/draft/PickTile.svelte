@@ -3,6 +3,7 @@
   import Tile from '../Tile.svelte';
   import PickRow from './PickRow.svelte';
   import HoverRow from './HoverRow.svelte';
+  import Segment from '../Segment.svelte';
 
   let { tile }: { tile: PickTileView } = $props();
 
@@ -20,10 +21,16 @@
 <Tile title={tile.title} main>
   {#snippet accessory()}
     {#if !isBan && tile.poolAvailable}
-      <div class="seg" role="tablist" aria-label="Filter">
-        <button class:on={pool === 'all'} onclick={() => (pool = 'all')}>Alle</button>
-        <button class:on={pool === 'pool'} onclick={() => (pool = 'pool')}>Mein Pool</button>
-      </div>
+      <Segment
+        value={pool}
+        onChange={(v) => (pool = v)}
+        options={[
+          { id: 'all', label: 'Alle' },
+          { id: 'pool', label: 'Mein Pool' },
+        ]}
+        label="Filter"
+        small
+      />
     {/if}
   {/snippet}
 
@@ -76,34 +83,12 @@
 </Tile>
 
 <style>
-  .seg {
-    display: inline-flex;
-    gap: 2px;
-    padding: 2px;
-    border-radius: var(--r-s);
-    background: var(--card-strong);
-  }
-
-  .seg button {
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-size: 11.5px;
-    font-weight: 500;
-    color: var(--fg2);
-  }
-
-  .seg button.on {
-    background: var(--card-strong);
-    color: var(--fg);
-    box-shadow: var(--shadow);
-  }
-
   .legend {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
-    margin: -4px 0 8px;
-    font-size: 10.5px;
+    gap: 14px;
+    margin: -4px 0 12px;
+    font: var(--t-caption);
     color: var(--fg2);
   }
 
@@ -111,9 +96,9 @@
     display: inline-block;
     width: 8px;
     height: 8px;
-    border-radius: 2px;
-    margin-right: 5px;
-    vertical-align: -0.5px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: 0;
   }
 
   .lane { background: var(--blue); }
@@ -122,12 +107,10 @@
   .comp { background: var(--orange); }
 
   .group {
-    margin: 10px 0 2px;
-    font-size: 10.5px;
+    margin: 14px 4px 6px;
+    font: var(--t-caption);
     font-weight: 600;
     color: var(--green);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
   }
 
   .more {
@@ -135,10 +118,9 @@
     align-items: center;
     gap: 6px;
     width: 100%;
-    padding: 10px 0 4px;
-    border-top: 1px solid var(--separator);
+    padding: 12px 4px 4px;
     color: var(--blue);
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 500;
     text-align: left;
   }
@@ -153,8 +135,9 @@
   }
 
   .foot {
-    margin: 10px 0 0;
-    font-size: 11px;
+    margin: 12px 4px 0;
+    font: var(--t-caption);
+    font-weight: 400;
     color: var(--fg3);
   }
 

@@ -59,46 +59,68 @@
 </div>
 
 <style>
+  /* iOS list: the separator starts where the text does, not at the edge. */
   .row {
-    border-top: 1px solid var(--separator);
+    position: relative;
+  }
+
+  .row + :global(.row)::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 56px;
+    right: 6px;
+    height: 0.5px;
+    background: var(--separator);
   }
 
   .row.grouped {
-    border-top-color: transparent;
-    background: linear-gradient(90deg, var(--green-wash), transparent 55%);
-    border-radius: var(--r-s);
-    margin-top: 2px;
+    background: var(--green-wash);
+    border-radius: var(--r-m);
+    margin-top: 3px;
+  }
+
+  .row.grouped::before,
+  .row.grouped + :global(.row)::before {
+    display: none;
   }
 
   .line {
     display: grid;
-    grid-template-columns: 34px minmax(0, 1fr) 112px 64px;
-    gap: 10px;
+    grid-template-columns: 38px minmax(0, 1fr) 112px 72px;
+    gap: 12px;
     align-items: center;
     width: 100%;
-    padding: 9px 4px;
+    padding: 10px 8px;
     text-align: left;
+    border-radius: var(--r-m);
+    transition: background 0.15s var(--ease);
   }
 
   .line:hover {
     background: var(--card-hover);
-    border-radius: var(--r-s);
+  }
+
+  .line :global(.icon) {
+    --s: 38px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   }
 
   .text {
     display: flex;
     flex-direction: column;
+    gap: 1px;
     min-width: 0;
   }
 
   .name {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
-    letter-spacing: -0.012em;
+    letter-spacing: -0.015em;
   }
 
   .reason {
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--fg2);
     white-space: nowrap;
     overflow: hidden;
@@ -113,19 +135,20 @@
   }
 
   .value b {
-    font-size: 17px;
-    font-weight: 650;
-    letter-spacing: -0.015em;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
     white-space: nowrap;
   }
 
   .value small {
-    font-size: 10.5px;
+    font-size: 11px;
+    font-weight: 500;
     white-space: nowrap;
   }
 
   .calc {
-    padding: 2px 4px 12px 48px;
+    padding: 2px 8px 14px 58px;
   }
 
   .term {
@@ -199,7 +222,7 @@
 
   @container main (max-width: 469px) {
     .line {
-      grid-template-columns: 34px minmax(0, 1fr) auto;
+      grid-template-columns: 38px minmax(0, 1fr) auto;
     }
 
     .bar {

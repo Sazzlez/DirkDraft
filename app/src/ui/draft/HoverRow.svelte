@@ -18,14 +18,17 @@
 <style>
   .hover {
     display: grid;
-    grid-template-columns: 34px minmax(0, 1fr) auto;
-    gap: 10px;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    gap: 12px;
     align-items: center;
-    padding: 9px 10px;
-    margin-bottom: 4px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
     border-radius: var(--r-m);
     background: var(--blue-wash);
-    box-shadow: inset 0 0 0 1px var(--blue-line);
+  }
+
+  .hover :global(.icon) {
+    --s: 38px !important;
   }
 
   .text {
@@ -35,25 +38,25 @@
   }
 
   .kicker {
-    font-size: 10px;
+    font: var(--t-caption);
     font-weight: 600;
     color: var(--blue);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
   }
 
   .name {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
+    letter-spacing: -0.015em;
   }
 
   .place {
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--fg2);
   }
 
   b {
-    font-size: 17px;
-    font-weight: 650;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
   }
 </style>

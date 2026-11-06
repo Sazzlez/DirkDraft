@@ -20,7 +20,7 @@
       <span class="bans" aria-label="Banns">
         {#each Array(5) as _, i (i)}
           {@const ban = bans[i]}
-          <Icon kind="champion" champion={ban ?? null} size={16} grey={!!ban} title={ban ? `gebannt: ${ban.name}` : 'kein Bann'} />
+          <Icon kind="champion" champion={ban ?? null} size={18} grey={!!ban} title={ban ? `gebannt: ${ban.name}` : 'kein Bann'} />
         {/each}
       </span>
     {/if}
@@ -28,7 +28,10 @@
   <div class="slots">
     {#each slots as slot (slot.cellId)}
       <div class="slot" class:me={slot.isMe} class:target={slot.isTarget && !slot.isMe} class:open={!slot.champion}>
-        <Icon kind="champion" champion={slot.champion} size={44} dim={slot.hovering} />
+        <span class="avatar">
+          <Icon kind="champion" champion={slot.champion} size={48} dim={slot.hovering} />
+          {#if slot.hovering}<span class="badge">Hover</span>{/if}
+        </span>
         <span class="name">{slot.champion?.name ?? 'offen'}</span>
         <span class="who">{slot.label}</span>
         {#if usesLanes && slot.lane}
@@ -48,23 +51,21 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 4px 8px;
-    font-size: 10.5px;
-    font-weight: 600;
+    padding: 0 6px 10px;
+    font: var(--t-head);
+    font-size: 13px;
     color: var(--fg2);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
   }
 
   .bans {
     display: flex;
-    gap: 3px;
+    gap: 4px;
   }
 
   .slots {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 6px;
+    gap: 4px;
   }
 
   .slot {
@@ -72,29 +73,55 @@
     flex-direction: column;
     align-items: center;
     gap: 1px;
-    padding: 10px 4px 9px;
-    border-radius: var(--r-m);
-    background: var(--card);
+    padding: 10px 4px;
+    border-radius: var(--r-l);
     text-align: center;
     min-width: 0;
+    transition: background 0.2s var(--ease);
   }
 
-  .slot :global(.icon) {
-    margin-bottom: 4px;
+  .slot:hover {
+    background: var(--card-hover);
+  }
+
+  .avatar {
+    position: relative;
+    margin-bottom: 7px;
+    border-radius: 50%;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  }
+
+  .open .avatar {
+    box-shadow: none;
+  }
+
+  .badge {
+    position: absolute;
+    left: 50%;
+    bottom: -6px;
+    transform: translateX(-50%);
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--blue);
+    color: #fff;
+    font-size: 9.5px;
+    font-weight: 600;
   }
 
   .slot.me {
     background: var(--blue-wash);
-    box-shadow: inset 0 0 0 1.5px var(--blue);
+    box-shadow: inset 0 0 0 1px var(--blue-line);
   }
 
   .slot.target {
-    box-shadow: inset 0 0 0 1.5px var(--teal);
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--separator);
   }
 
   .name {
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 600;
+    letter-spacing: -0.01em;
     max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
@@ -107,12 +134,13 @@
   }
 
   .me .name {
-    color: var(--teal);
+    color: var(--blue);
   }
 
   .who,
   .lane {
-    font-size: 10.5px;
+    font: var(--t-caption);
+    font-size: 11px;
     color: var(--fg2);
     white-space: nowrap;
     overflow: hidden;
@@ -133,29 +161,27 @@
   }
 
   .fix {
-    font-size: 10px;
-    font-weight: 500;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 600;
     color: var(--blue);
   }
 
   .warning {
-    font-size: 10px;
+    font-size: 10.5px;
     color: var(--red);
   }
 
   @container app (max-width: 1099px) {
     .slot :global(.icon) {
-      --s: 36px !important;
+      --s: 38px !important;
     }
 
     .slot {
-      padding: 8px 3px;
+      padding: 8px 2px;
     }
 
-    .conf.only-uncertain {
-      display: none;
-    }
-
+    .conf.only-uncertain,
     .who {
       display: none;
     }

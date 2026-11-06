@@ -42,18 +42,20 @@
 <style>
   .grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 8px 12px;
+    grid-template-columns: max-content auto auto;
+    justify-content: space-between;
+    gap: 8px 14px;
     align-items: center;
     font-size: 12px;
   }
 
+  .grid > span:nth-child(3n + 1) {
+    white-space: nowrap;
+  }
+
   .h {
-    font-size: 10px;
-    font-weight: 600;
+    font: var(--t-caption);
     color: var(--fg3);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
   }
 
   .dots {
@@ -62,8 +64,8 @@
   }
 
   .dots i {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: var(--track);
   }

@@ -52,8 +52,8 @@
   .tiles {
     display: grid;
     grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
-    gap: 12px;
-    padding: 0 16px 16px;
+    gap: 14px;
+    padding: 0 20px 20px;
     align-items: start;
   }
 

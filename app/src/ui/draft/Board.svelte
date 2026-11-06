@@ -68,13 +68,13 @@
 
 <style>
   .board {
-    padding: 4px 16px 14px;
+    padding: 6px 20px 18px;
   }
 
   .grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1fr);
-    gap: 14px;
+    grid-template-columns: minmax(0, 1fr) 160px minmax(0, 1fr);
+    gap: 16px;
   }
 
   .clock {
@@ -91,12 +91,10 @@
   }
 
   .bench-head {
-    padding: 0 4px 8px;
-    font-size: 10.5px;
-    font-weight: 600;
+    padding: 0 6px 10px;
+    font: var(--t-head);
+    font-size: 13px;
     color: var(--fg2);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
   }
 
   .bench-row {
@@ -109,10 +107,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
-    padding: 10px 4px 9px;
-    border-radius: var(--r-m);
-    background: var(--card);
+    gap: 7px;
+    padding: 10px 4px;
+    border-radius: var(--r-l);
     font-size: 12.5px;
     font-weight: 600;
     min-width: 0;
@@ -179,11 +176,9 @@
     }
 
     .vs {
-      font-size: 10px;
+      font-size: 11.5px;
       font-weight: 600;
       color: var(--fg3);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
     }
 
     .mini {

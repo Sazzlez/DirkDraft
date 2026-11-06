@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fade, fly } from 'svelte/transition';
-  import { AREA_OF, type Area, type Moment, type ViewModel } from '../core/view';
+  import { AREA_OF, AREAS, type Area, type Moment, type ViewModel } from '../core/view';
   import { nextArea } from '../core/moment';
   import TitleBar from './TitleBar.svelte';
   import Segment from './Segment.svelte';
@@ -36,7 +36,7 @@
 <div class="shell">
   <TitleBar {view} {area} onArea={choose} />
   <div class="segrow">
-    <Segment value={area} onChange={choose} stretch />
+    <Segment value={area} onChange={choose} options={AREAS} label="Bereich" stretch />
   </div>
 
   {#if view.sampleNote}
@@ -76,22 +76,26 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: var(--window-glass);
     min-width: 340px;
+    background: var(--window);
+    -webkit-backdrop-filter: blur(50px) saturate(180%);
+    backdrop-filter: blur(50px) saturate(180%);
+    box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.1);
   }
 
   .segrow {
     display: none;
-    padding: 0 12px 8px;
+    padding: 0 16px 10px;
   }
 
   .sample {
-    margin: 0 16px 8px;
-    padding: 6px 10px;
-    border-radius: var(--r-s);
+    align-self: flex-start;
+    margin: 0 20px 10px;
+    padding: 4px 10px;
+    border-radius: 999px;
     background: var(--orange-wash);
     color: var(--orange);
-    font-size: 11.5px;
+    font: var(--t-caption);
   }
 
   .content {
@@ -111,7 +115,7 @@
     }
 
     .sample {
-      margin: 0 12px 8px;
+      margin: 0 16px 10px;
     }
   }
 </style>

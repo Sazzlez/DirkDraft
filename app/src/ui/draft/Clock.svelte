@@ -44,8 +44,8 @@
 
   .ring {
     position: relative;
-    width: 58px;
-    height: 58px;
+    width: 74px;
+    height: 74px;
   }
 
   svg {
@@ -56,7 +56,7 @@
 
   circle {
     fill: none;
-    stroke-width: 4;
+    stroke-width: 5;
   }
 
   .track {
@@ -78,20 +78,21 @@
     inset: 0;
     display: grid;
     place-items: center;
-    font-size: 18px;
-    font-weight: 650;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
   }
 
   .text {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
   }
 
   .turn {
-    font-size: 13px;
-    font-weight: 600;
+    font: var(--t-title);
+    letter-spacing: -0.02em;
   }
 
   .turn.mine {
@@ -150,12 +151,18 @@
   }
 
   .compact .ring {
-    width: 40px;
-    height: 40px;
+    width: 46px;
+    height: 46px;
   }
 
   .compact .ring span {
-    font-size: 14px;
+    font-size: 17px;
+  }
+
+  .compact .turn {
+    font: var(--t-large);
+    font-size: 24px;
+    letter-spacing: -0.03em;
   }
 
   .compact .text {
