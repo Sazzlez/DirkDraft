@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { Lane } from '../../src/core/model/lane';
 import { DamageType } from '../../src/core/model/metaLookup';
 import { TraitTable } from '../../src/core/model/traits';
-import { SITUATION, SLOT, situationalSuggestions, situationsOf, type RiotSituationalFile } from '../../src/core/situational';
+import { SITUATION, SLOT, SituationTracker, situationalSuggestions, situationsOf, type RiotSituationalFile } from '../../src/core/situational';
+import { enemyItemsOf, type ItemInfo } from '../../src/core/game';
 import { MetaBuilder } from './helpers';
 
 const meta = new MetaBuilder()
@@ -26,6 +27,34 @@ describe('situations in the game', () => {
   it('match the collector: dominant damage, two tanks, three hard-CC champions', () => {
     // Magic 1 + 1 + 1 + 0,5 of 5 = 70 %; Leona and Ornn are frontline; three with hard CC.
     expect(situationsOf([11, 12, 13, 14, 15], meta, traits)).toEqual([SITUATION.All, SITUATION.Magic, SITUATION.Tanks, SITUATION.HardCc]);
+  });
+});
+
+describe('situations from the enemies’ items', () => {
+  const items = new Map<number, ItemInfo>([
+    [1001, { total: 300, from: [], into: [3047], tags: ['Boots'] }],
+    [3047, { total: 1100, from: [1001], tags: ['Boots', 'Armor'], armor: 25 }],
+    [3075, { total: 2450, from: [1029], tags: ['Armor'], armor: 75 }],
+    [1029, { total: 300, from: [], into: [3075], tags: ['Armor'], armor: 15 }],
+    [3065, { total: 2700, from: [], tags: ['SpellBlock'], magicResist: 60 }],
+    [3072, { total: 3400, from: [], tags: ['LifeSteal'] }],
+  ]);
+
+  it('count finished items and boots, as the collector does', () => {
+    expect(enemyItemsOf([3047, 3075, 1029, 3065, 3072], items)).toEqual({ armor: 100, magicResist: 60, sustain: 1 });
+  });
+
+  it('turn on at the same thresholds', () => {
+    const flags = situationsOf([15], meta, traits, { armor: 150, magicResist: 119, sustain: 2 });
+    expect(flags).toEqual([SITUATION.All, SITUATION.EnemyArmor, SITUATION.EnemySustain]);
+  });
+
+  it('stay on for the rest of the game once reached', () => {
+    const tracker = new SituationTracker();
+    expect(tracker.update([SITUATION.All, SITUATION.EnemyArmor])).toEqual([SITUATION.All, SITUATION.EnemyArmor]);
+    expect(tracker.update([SITUATION.All])).toEqual([SITUATION.All, SITUATION.EnemyArmor]); // an item sold
+    tracker.reset();
+    expect(tracker.update([SITUATION.All])).toEqual([SITUATION.All]);
   });
 });
 

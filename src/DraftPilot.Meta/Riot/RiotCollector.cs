@@ -306,7 +306,7 @@ public sealed class RiotCollector(
                         tally.Add(participant, tier);
                     meta.Add(reading);
                     if (statics is not null)
-                        situational.Add(reading, Profile);
+                        situational.Add(reading, Profile, items);
 
                     if (fromLeague && queue.Count < MaxLeads)
                     {

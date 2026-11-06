@@ -40,10 +40,48 @@ export interface LiveGameData {
   gameData?: { gameTime?: number; gameMode?: string };
 }
 
-/** Price and recipe of an item (Data Dragon item.json: gold.total, from). */
+/** Price, recipe and the stats the situations read (Data Dragon item.json). */
 export interface ItemInfo {
   total: number;
   from: number[];
+  into?: number[];
+  purchasable?: boolean;
+  tags?: string[];
+  armor?: number;
+  magicResist?: number;
+}
+
+const hasTag = (info: ItemInfo | undefined, tag: string): boolean =>
+  !!info?.tags?.some((t) => t.toLowerCase() === tag.toLowerCase());
+
+/** ItemCatalog.IsBoots: a finished pair, built from basic boots. */
+export function isBoots(id: number, items: ReadonlyMap<number, ItemInfo>): boolean {
+  const info = items.get(id);
+  return hasTag(info, 'Boots') && (info?.from.includes(1001) ?? false);
+}
+
+/** ItemCatalog.IsFinished: an end point of the shop, not a component, boots or consumable. */
+export function isFinished(id: number, items: ReadonlyMap<number, ItemInfo>): boolean {
+  const info = items.get(id);
+  if (!info || info.total < 1000 || id === 1001 || isBoots(id, items)) return false;
+  if (info.from.some((f) => isBoots(f, items)) || info.from.includes(3867)) return false;
+  if (hasTag(info, 'Consumable') || hasTag(info, 'Trinket')) return false;
+  return !(info.into ?? []).some((next) => items.get(next)?.purchasable !== false && items.has(next));
+}
+
+/** What the enemies have built, summed — finished items and boots only, as the collector counts. */
+export function enemyItemsOf(itemIds: readonly number[], items: ReadonlyMap<number, ItemInfo>): { armor: number; magicResist: number; sustain: number } {
+  let armor = 0;
+  let magicResist = 0;
+  let sustain = 0;
+  for (const id of itemIds) {
+    if (!isFinished(id, items) && !isBoots(id, items)) continue;
+    const info = items.get(id)!;
+    armor += info.armor ?? 0;
+    magicResist += info.magicResist ?? 0;
+    if (hasTag(info, 'LifeSteal') || hasTag(info, 'SpellVamp')) sustain++;
+  }
+  return { armor, magicResist, sustain };
 }
 
 export type Skill = 'Q' | 'W' | 'E' | 'R';

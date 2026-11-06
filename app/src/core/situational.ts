@@ -10,13 +10,32 @@ import type { MetaLookup } from './model/metaLookup';
 import { DamageType, isTagged } from './model/metaLookup';
 import { hasHardCc, type TraitTable } from './model/traits';
 
-export const SITUATION = { All: 0, Physical: 1, Magic: 2, Tanks: 3, HardCc: 4 } as const;
+export const SITUATION = {
+  All: 0,
+  Physical: 1,
+  Magic: 2,
+  Tanks: 3,
+  HardCc: 4,
+  EnemyArmor: 5,
+  EnemyMagicResist: 6,
+  EnemySustain: 7,
+} as const;
 export type Situation = (typeof SITUATION)[keyof typeof SITUATION];
 
 export const DOMINANT_SHARE = 0.6;
 export const FRONTLINE_DEFENSE = 6;
 export const TANKS_NEEDED = 2;
 export const HARD_CC_NEEDED = 3;
+export const ARMOR_HEAVY = 150;
+export const MAGIC_RESIST_HEAVY = 120;
+export const SUSTAIN_NEEDED = 2;
+
+/** The enemy team's item totals (core/game enemyItemsOf). */
+export interface EnemyItemTotals {
+  armor: number;
+  magicResist: number;
+  sustain: number;
+}
 
 export const SLOT = { Boots: 0, Late: 1 } as const;
 
@@ -33,8 +52,13 @@ export interface RiotSituationalFile {
   classes: number[][];
 }
 
-/** The enemy line-up's situations, by the collector's definitions. Always includes All. */
-export function situationsOf(enemyIds: readonly number[], meta: MetaLookup, traits: TraitTable): Situation[] {
+/** The enemy line-up's (and, given their items, build's) situations, by the collector's definitions. */
+export function situationsOf(
+  enemyIds: readonly number[],
+  meta: MetaLookup,
+  traits: TraitTable,
+  items: EnemyItemTotals | null = null,
+): Situation[] {
   const flags: Situation[] = [SITUATION.All];
   let physical = 0;
   let magic = 0;
@@ -65,6 +89,9 @@ export function situationsOf(enemyIds: readonly number[], meta: MetaLookup, trai
   if (known >= 3 && magic / known >= DOMINANT_SHARE) flags.push(SITUATION.Magic);
   if (frontline >= TANKS_NEEDED) flags.push(SITUATION.Tanks);
   if (hardCc >= HARD_CC_NEEDED) flags.push(SITUATION.HardCc);
+  if (items && items.armor >= ARMOR_HEAVY) flags.push(SITUATION.EnemyArmor);
+  if (items && items.magicResist >= MAGIC_RESIST_HEAVY) flags.push(SITUATION.EnemyMagicResist);
+  if (items && items.sustain >= SUSTAIN_NEEDED) flags.push(SITUATION.EnemySustain);
   return flags;
 }
 
@@ -74,7 +101,28 @@ export const SITUATION_TEXT: Record<Situation, string> = {
   2: 'gegen viel magischen Schaden',
   3: 'gegen zwei oder mehr Tanks',
   4: 'gegen viel harte Kontrolle',
+  5: 'weil die Gegner viel Rüstung gebaut haben',
+  6: 'weil die Gegner viel Magieresistenz gebaut haben',
+  7: 'weil die Gegner sich über Items heilen',
 };
+
+/**
+ * Keeps the situations of one game steady: a situation, once reached, stays for the rest of the
+ * game. Items are rarely sold, but when one is, or an inventory reads short for a moment, the
+ * suggestions should not jump back and forth. Reset at the start of every game.
+ */
+export class SituationTracker {
+  private readonly seen = new Set<Situation>();
+
+  update(current: readonly Situation[]): Situation[] {
+    for (const situation of current) this.seen.add(situation);
+    return [...this.seen].sort((a, b) => a - b);
+  }
+
+  reset(): void {
+    this.seen.clear();
+  }
+}
 
 export interface SituationalSuggestion {
   itemId: number;

@@ -15,8 +15,20 @@ public static class Situations
     public const int Magic = 2;
     public const int Tanks = 3;
     public const int HardCc = 4;
+    public const int EnemyArmor = 5;
+    public const int EnemyMagicResist = 6;
+    public const int EnemySustain = 7;
 
-    public static readonly string[] Names = ["all", "physical", "magic", "tanks", "cc"];
+    public static readonly string[] Names = ["all", "physical", "magic", "tanks", "cc", "armor", "magicResist", "sustain"];
+
+    /// <summary>Armor from the enemies' finished items and boots together — two to three armor items.</summary>
+    public const int ArmorHeavy = 150;
+
+    /// <summary>Magic resist from their items together — two to three MR items.</summary>
+    public const int MagicResistHeavy = 120;
+
+    /// <summary>Items that heal their owner from damage (life steal, omnivamp), across the enemy team.</summary>
+    public const int SustainNeeded = 2;
 
     /// <summary>A damage type counts as dominant from this share of the known enemies' damage on.</summary>
     public const double DominantShare = 0.6;
@@ -27,7 +39,10 @@ public static class Situations
     public const int TanksNeeded = 2;
     public const int HardCcNeeded = 3;
 
-    public static List<int> Of(IEnumerable<EnemyProfile> enemies)
+    public static List<int> Of(IEnumerable<EnemyProfile> enemies) => Of(enemies, default);
+
+    /// <param name="items">What the enemies have built at the moment in question.</param>
+    public static List<int> Of(IEnumerable<EnemyProfile> enemies, EnemyItems items)
     {
         var list = enemies.ToList();
         var flags = new List<int> { All };
@@ -63,13 +78,39 @@ public static class Situations
             flags.Add(Tanks);
         if (list.Count(enemy => enemy.HardCc) >= HardCcNeeded)
             flags.Add(HardCc);
+        if (items.Armor >= ArmorHeavy)
+            flags.Add(EnemyArmor);
+        if (items.MagicResist >= MagicResistHeavy)
+            flags.Add(EnemyMagicResist);
+        if (items.SustainItems >= SustainNeeded)
+            flags.Add(EnemySustain);
 
         return flags;
+    }
+
+    /// <summary>The enemies' item totals from their inventories; only finished items and boots count.</summary>
+    public static EnemyItems ItemsOf(IEnumerable<int> enemyItems, ItemCatalog catalog)
+    {
+        int armor = 0, magicResist = 0, sustain = 0;
+        foreach (var item in enemyItems)
+        {
+            if (!catalog.CountsForSituation(item))
+                continue;
+            armor += catalog.Armor(item);
+            magicResist += catalog.MagicResist(item);
+            if (catalog.IsSustain(item))
+                sustain++;
+        }
+
+        return new EnemyItems(armor, magicResist, sustain);
     }
 }
 
 /// <summary>The three facts about an enemy the situations are made of.</summary>
 public readonly record struct EnemyProfile(DamageType Damage, bool Frontline, bool HardCc);
+
+/// <summary>What the enemy team had built at a moment, summed.</summary>
+public readonly record struct EnemyItems(int Armor, int MagicResist, int SustainItems);
 
 /// <summary>
 /// situational.json: for each champion, lane, slot (0 boots, 1 items four to six) and situation,
@@ -118,22 +159,39 @@ public sealed class RiotSituationalTally
 
     private readonly Dictionary<(int Champion, Lane Lane, int Slot, int Situation, int Item), (int Games, int Wins)> _rows = [];
 
-    public void Add(MatchReading game, Func<int, EnemyProfile> profile)
+    /// <param name="catalog">
+    /// Item stats for the situations made of the enemies' items, judged at the moment of each buy;
+    /// null counts only the line-up situations.
+    /// </param>
+    public void Add(MatchReading game, Func<int, EnemyProfile> profile, ItemCatalog? catalog = null)
     {
         foreach (var player in game.Participants)
         {
             if (player.Lane == Lane.Unknown)
                 continue;
 
-            var enemies = game.Participants.Where(other => other.TeamId != player.TeamId).Select(other => profile(other.ChampionId));
-            var situations = Situations.Of(enemies);
+            var enemyPlayers = game.Participants.Where(other => other.TeamId != player.TeamId).ToList();
+            var profiles = enemyPlayers.Select(other => profile(other.ChampionId)).ToList();
+
+            // The situations at the moment of a buy: the line-up is fixed, the enemies' items are not.
+            List<int> At(long timeMs) => catalog is null
+                ? Situations.Of(profiles)
+                : Situations.Of(profiles, Situations.ItemsOf(enemyPlayers.SelectMany(enemy => enemy.OwnedAt(timeMs)), catalog));
 
             if (player.Boots > 0)
-                Count(player, BootsSlot, situations, [player.Boots]);
+            {
+                var situations = At(player.BootsTimeMs);
+                Count(player, BootsSlot, situations, [(player.Boots, situations)]);
+            }
 
             // Items four to six: a game that never got there says nothing about them.
             if (player.Items.Count >= 4)
-                Count(player, LateSlot, situations, [.. player.Items.Skip(3).Take(3)]);
+            {
+                var buys = Enumerable.Range(3, Math.Min(3, player.Items.Count - 3))
+                    .Select(i => (Item: player.Items[i], Situations: At(i < player.ItemTimes.Count ? player.ItemTimes[i] : long.MaxValue)))
+                    .ToList();
+                Count(player, LateSlot, [.. buys.SelectMany(buy => buy.Situations).Distinct().Order()], buys);
+            }
         }
     }
 
@@ -205,13 +263,18 @@ public sealed class RiotSituationalTally
                 : [];
     }
 
-    private void Count(ParticipantBuild player, int slot, List<int> situations, IReadOnlyList<int> items)
+    /// <summary>
+    /// The slot total once for every situation any of the slot's buys happened in; each item under
+    /// the situations of its own buy.
+    /// </summary>
+    private void Count(ParticipantBuild player, int slot, List<int> slotSituations, IReadOnlyList<(int Item, List<int> Situations)> buys)
     {
         var win = player.Win ? 1 : 0;
-        foreach (var situation in situations)
-        {
+        foreach (var situation in slotSituations)
             Bump((player.ChampionId, player.Lane, slot, situation, 0), 1, win);
-            foreach (var item in items.Distinct())
+        foreach (var (item, situations) in buys.DistinctBy(buy => buy.Item))
+        {
+            foreach (var situation in situations)
                 Bump((player.ChampionId, player.Lane, slot, situation, item), 1, win);
         }
     }

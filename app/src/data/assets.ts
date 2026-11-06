@@ -2,14 +2,16 @@
 // URL itself: in the browser the answer is the CDN, in the Tauri shell a file from the local cache
 // (as 1.5 keeps it under %LOCALAPPDATA%\DraftPilot\data) — one place decides.
 
+import type { ItemInfo } from '../core/game';
+
 const CDN = 'https://ddragon.leagueoflegends.com/cdn';
 
 export interface AssetNames {
   version: string;
   champions: Map<number, { key: string; name: string }>;
   items: Map<number, string>;
-  /** Price and recipe per item, for "next buy" in game. */
-  itemInfo: Map<number, { total: number; from: number[] }>;
+  /** Price, recipe and situation stats per item, for the game view. */
+  itemInfo: Map<number, ItemInfo>;
   spells: Map<number, { key: string; name: string }>;
   runes: Map<number, { name: string; icon: string }>;
 }
@@ -39,9 +41,25 @@ export function loadAssets(version: string, language = 'de_DE'): Promise<AssetNa
 
     for (const c of Object.values(champions.data) as { key: string; id: string; name: string }[])
       names.champions.set(Number(c.key), { key: c.id, name: c.name });
-    for (const [id, item] of Object.entries(items.data) as [string, { name: string; gold?: { total?: number }; from?: string[] }][]) {
+    type RawItem = {
+      name: string;
+      gold?: { total?: number; purchasable?: boolean };
+      from?: string[];
+      into?: string[];
+      tags?: string[];
+      stats?: Record<string, number>;
+    };
+    for (const [id, item] of Object.entries(items.data) as [string, RawItem][]) {
       names.items.set(Number(id), item.name);
-      names.itemInfo.set(Number(id), { total: item.gold?.total ?? 0, from: (item.from ?? []).map(Number) });
+      names.itemInfo.set(Number(id), {
+        total: item.gold?.total ?? 0,
+        from: (item.from ?? []).map(Number),
+        into: (item.into ?? []).map(Number),
+        purchasable: item.gold?.purchasable !== false,
+        tags: item.tags ?? [],
+        armor: Math.round(item.stats?.FlatArmorMod ?? 0),
+        magicResist: Math.round(item.stats?.FlatSpellBlockMod ?? 0),
+      });
     }
     for (const s of Object.values(spells.data) as { key: string; id: string; name: string }[])
       names.spells.set(Number(s.key), { key: s.id, name: s.name });

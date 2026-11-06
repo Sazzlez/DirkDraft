@@ -33,8 +33,29 @@ public sealed record ParticipantBuild(
     long PhysicalDamage = 0,
     long MagicDamage = 0,
     long TrueDamage = 0,
-    IReadOnlyList<int>? Augments = null)
+    IReadOnlyList<int>? Augments = null,
+    IReadOnlyList<long>? ItemTimesMs = null,
+    long BootsTimeMs = 0)
 {
+    /// <summary>When each of <see cref="Items"/> was bought, ms into the game; empty without a timeline.</summary>
+    public IReadOnlyList<long> ItemTimes => ItemTimesMs ?? [];
+
+    /// <summary>
+    /// The finished items and boots owned at a moment — what an enemy's inventory looked like when
+    /// someone else bought. Sales are left out: a finished item is rarely sold, and the live game view
+    /// sees the same picture.
+    /// </summary>
+    public IEnumerable<int> OwnedAt(long timeMs)
+    {
+        if (Boots > 0 && BootsTimeMs <= timeMs)
+            yield return Boots;
+        for (var i = 0; i < Items.Count && i < ItemTimes.Count; i++)
+        {
+            if (ItemTimes[i] <= timeMs)
+                yield return Items[i];
+        }
+    }
+
     /// <summary>The augments picked, in order (Mayhem); empty elsewhere.</summary>
     public IReadOnlyList<int> PickedAugments => Augments ?? [];
 
@@ -158,6 +179,9 @@ public static class RiotMatchReader
             var id = Int(participant, "participantId");
             var own = events.Where(e => e.ParticipantId == id).ToList();
             var purchases = Purchases(own);
+            var boots = purchases.FirstOrDefault(p => items.IsBoots(p.ItemId));
+            // First purchase of each finished item, in order, with its time.
+            var finished = purchases.Where(p => items.IsFinished(p.ItemId)).DistinctBy(p => p.ItemId).ToList();
 
             var finalItems = Enumerable.Range(0, 7).Select(slot => Int(participant, $"item{slot}")).Where(item => item > 0).ToList();
 
@@ -168,8 +192,8 @@ public static class RiotMatchReader
                 Runes: Runes(participant),
                 Spells: [.. new[] { Int(participant, "summoner1Id"), Int(participant, "summoner2Id") }.Where(spell => spell > 0).Order()],
                 Starters: [.. purchases.Where(p => p.Timestamp <= StartingWindowMs && !items.IsTrinket(p.ItemId)).Select(p => p.ItemId).Order()],
-                Boots: purchases.Select(p => p.ItemId).FirstOrDefault(items.IsBoots),
-                Items: [.. purchases.Select(p => p.ItemId).Where(items.IsFinished).Distinct()],
+                Boots: boots?.ItemId ?? 0,
+                Items: [.. finished.Select(p => p.ItemId)],
                 // The quest item is handed over, not bought, so the end-of-game inventory is the
                 // one place it reliably shows up.
                 SupportChoice: finalItems.FirstOrDefault(items.IsSupportChoice),
@@ -180,7 +204,9 @@ public static class RiotMatchReader
                 PhysicalDamage: Long(participant, "physicalDamageDealtToChampions"),
                 MagicDamage: Long(participant, "magicDamageDealtToChampions"),
                 TrueDamage: Long(participant, "trueDamageDealtToChampions"),
-                Augments: [.. Enumerable.Range(1, 6).Select(slot => Int(participant, $"playerAugment{slot}")).Where(augment => augment > 0)]));
+                Augments: [.. Enumerable.Range(1, 6).Select(slot => Int(participant, $"playerAugment{slot}")).Where(augment => augment > 0)],
+                ItemTimesMs: [.. finished.Select(p => p.Timestamp)],
+                BootsTimeMs: boots?.Timestamp ?? 0));
         }
 
         return new MatchReading(patch, created, queue, counts, participants, Bans(info));
