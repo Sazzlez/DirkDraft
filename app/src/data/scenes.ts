@@ -12,6 +12,8 @@ import { laneFromKey } from '../core/model/lane';
 import { gameModel, type LiveGameData } from '../core/game';
 import type { PlanOption, RiotBuildPlan } from '../core/riotBuilds';
 import { gameView } from './gameView';
+import { postgameModel } from '../core/postgame';
+import { postgameView } from './postgameView';
 import { assets } from './assets';
 import { GoldenAdapter, buildFromPlan, type GoldenFrame, type GoldenPlan } from './golden';
 
@@ -303,20 +305,18 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
 }
 
 function postgameScene(a: GoldenAdapter): ViewModel {
-  const postgame: PostgameView = {
-    result: 'Sieg',
-    champion: ref(a, 122),
-    pickedFromTop3: true,
-    pickNote: 'Darius lag auf Platz 2, gleichauf mit Platz 1.',
-    buildNote: 'Kern wie empfohlen; statt Sterak’s Gage kam früh Randuin’s Omen.',
-    history: [
-      { champion: ref(a, 122), result: 'S', fromTop3: true, when: 'heute 21:40' },
-      { champion: ref(a, 86), result: 'N', fromTop3: true, when: 'heute 20:55' },
-      { champion: ref(a, 17), result: 'N', fromTop3: false, when: 'gestern' },
-      { champion: ref(a, 122), result: 'S', fromTop3: true, when: 'gestern' },
-    ],
-    topThreeRate: '3 von 4 Picks aus den ersten drei',
-  };
+  // Sample history around a fixed evening, through the real postgame logic.
+  const now = new Date(2026, 10, 6, 22, 15);
+  const at = (daysAgo: number, h: number, m: number) => new Date(2026, 10, 6 - daysAgo, h, m).getTime();
+  const record = { championId: 122, rank: 2, candidates: 58, tiedWithFirst: true, fromTop3: true, at: at(0, 21, 40) };
+  const model = postgameModel(122, record, { win: true, items: [3071, 3047, 6333] }, [3071, 6333, 3053], (id) => ref(a, id).name);
+  const history = [
+    { championId: 122, win: true, fromTop3: true, at: at(0, 21, 40) },
+    { championId: 86, win: false, fromTop3: true, at: at(0, 20, 55) },
+    { championId: 17, win: false, fromTop3: false, at: at(1, 22, 10) },
+    { championId: 122, win: true, fromTop3: true, at: at(1, 21, 5) },
+  ];
+  const postgame: PostgameView = postgameView(model, history, (id) => ref(a, id), now);
   return {
     moment: 'postgame',
     connection: CONNECTED,
