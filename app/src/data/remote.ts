@@ -7,10 +7,11 @@
 import type { MetaSnapshot } from '../core/model/metaLookup';
 import type { RiotMayhemFile } from '../core/mayhem';
 import type { RiotBuildFile } from '../core/riotBuilds';
+import type { RiotSituationalFile } from '../core/situational';
 
 export const DATA_BASE = 'https://raw.githubusercontent.com/Sazzlez/DirkDraft/data';
 
-export const FILES = { meta: 'meta.json', builds: 'builds.json', mayhem: 'mayhem.json' } as const;
+export const FILES = { meta: 'meta.json', builds: 'builds.json', mayhem: 'mayhem.json', situational: 'situational.json' } as const;
 export type DataFile = keyof typeof FILES;
 
 /** Where downloaded files are kept between runs (Tauri: app data folder; browser: localStorage). */
@@ -31,6 +32,8 @@ export interface DataSet {
   builds: RiotBuildFile | null;
   /** Absent until the collector has a Riot ID to start Mayhem from. */
   mayhem: RiotMayhemFile | null;
+  /** Situational items for the game view; null until published. */
+  situational: RiotSituationalFile | null;
   /** Whether the server was reached this time, or the numbers are the kept copy only. */
   fresh: boolean;
   /** Whether any file differs from the kept copy — false means nothing to swap in. */
@@ -69,7 +72,20 @@ export function checkMayhem(value: unknown): string | null {
   return null;
 }
 
-const CHECKS: Record<DataFile, (value: unknown) => string | null> = { meta: checkMeta, builds: checkBuilds, mayhem: checkMayhem };
+export function checkSituational(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return 'keine Daten';
+  const file = value as Partial<RiotSituationalFile>;
+  if (file.version !== 1) return `unbekannte Version ${String(file.version)}`;
+  if (!Array.isArray(file.rows) || !Array.isArray(file.classes) || !Array.isArray(file.classNames)) return 'unvollständig';
+  return null;
+}
+
+const CHECKS: Record<DataFile, (value: unknown) => string | null> = {
+  meta: checkMeta,
+  builds: checkBuilds,
+  mayhem: checkMayhem,
+  situational: checkSituational,
+};
 
 interface Loaded {
   value: unknown;
@@ -118,30 +134,38 @@ async function one(name: DataFile, fetcher: Fetcher, cache: DataCache, problems:
 /** All files, each downloaded (or confirmed unchanged) or else kept; null without any usable meta. */
 export async function loadDataSet(fetcher: Fetcher, cache: DataCache): Promise<DataSet | null> {
   const problems: string[] = [];
-  const [meta, builds, mayhem] = await Promise.all([
+  const [meta, builds, mayhem, situational] = await Promise.all([
     one('meta', fetcher, cache, problems),
     one('builds', fetcher, cache, problems),
     one('mayhem', fetcher, cache, problems),
+    one('situational', fetcher, cache, problems),
   ]);
   if (!meta) return null;
   return {
     meta: meta.value as MetaSnapshot,
     builds: (builds?.value as RiotBuildFile | undefined) ?? null,
     mayhem: (mayhem?.value as RiotMayhemFile | undefined) ?? null,
+    situational: (situational?.value as RiotSituationalFile | undefined) ?? null,
     fresh: meta.fresh,
-    changed: meta.changed || !!builds?.changed || !!mayhem?.changed,
+    changed: meta.changed || !!builds?.changed || !!mayhem?.changed || !!situational?.changed,
     problems,
   };
 }
 
 /** The kept copies only — no network. What the app starts with, whatever the client is doing. */
 export async function loadKept(cache: DataCache): Promise<DataSet | null> {
-  const [meta, builds, mayhem] = await Promise.all([kept('meta', cache), kept('builds', cache), kept('mayhem', cache)]);
+  const [meta, builds, mayhem, situational] = await Promise.all([
+    kept('meta', cache),
+    kept('builds', cache),
+    kept('mayhem', cache),
+    kept('situational', cache),
+  ]);
   if (meta === null) return null;
   return {
     meta: meta as MetaSnapshot,
     builds: (builds as RiotBuildFile | null) ?? null,
     mayhem: (mayhem as RiotMayhemFile | null) ?? null,
+    situational: (situational as RiotSituationalFile | null) ?? null,
     fresh: false,
     changed: false,
     problems: [],

@@ -9,6 +9,7 @@ const set = (patch: string, changed = true): DataSet => ({
   meta: { ...emptySnapshot(), patch },
   builds: null,
   mayhem: null,
+  situational: null,
   fresh: true,
   changed,
   problems: [],
