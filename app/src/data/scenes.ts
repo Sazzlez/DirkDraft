@@ -1,11 +1,14 @@
-// The development and screenshot scenes: one per moment, each built from a real recording frame and
-// the 1.5 model's output for it (tests/golden). Game and postgame have no recording yet; they use
-// sample data and say so on screen.
+// The development and screenshot scenes: one per moment, each a real recording played through the
+// TS model (core/engine) on the reference snapshot. Game and postgame have no recording yet; they
+// use sample data and say so on screen.
 
 import type { ViewModel, Moment, ChampionRef, GameView, PostgameView, BuildView } from '../core/view';
 import { LANE_NAMES } from '../core/view';
 import { loadAssets, itemName } from './assets';
-import { GoldenAdapter, buildFromPlan, type GoldenFrame, type GoldenPlan, type SnapshotChampion } from './golden';
+import { DraftEngine, stateFromFrame, type DraftFrame } from '../core/engine';
+import type { AramStat } from '../core/model/advisors';
+import type { MetaSnapshot } from '../core/model/metaLookup';
+import { GoldenAdapter, buildFromPlan, type GoldenFrame, type GoldenPlan } from './golden';
 
 export interface Scene {
   id: string;
@@ -41,15 +44,44 @@ async function json<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function text(path: string): Promise<string> {
+  const response = await fetch(path);
+  if (!response.ok) throw new Error(`${path}: ${response.status}`);
+  return (await response.text()).replace(/^﻿/, '');
+}
+
+/** A recording played through the TS model, one frame per session line, like the window would. */
+function play(engine: DraftEngine, recording: string): { frames: { frame?: GoldenFrame }[] } {
+  const frames: { frame?: GoldenFrame }[] = [];
+  for (const line of recording.split(/\r?\n/)) {
+    if (line.trim() === '') continue;
+    let record: Record<string, unknown>;
+    try {
+      record = (JSON.parse(line) ?? {}) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    if (typeof record.phase === 'string') continue;
+    frames.push({ frame: engine.update(record.session ?? null).frame });
+  }
+  return { frames };
+}
+
 function load(): Promise<Sources> {
   sources ??= (async () => {
-    const snapshot = await json<{ patch: string; champions: SnapshotChampion[] }>('/tests/golden/snapshot.json');
+    const snapshot = await json<MetaSnapshot>('/tests/golden/snapshot.json');
+    const aram = await json<AramStat[]>('/tests/golden/aram-stats.json');
     await loadAssets(snapshot.patch);
+    const options = { aramStats: new Map(aram.map((s) => [s.championId, s])) };
     const recordings = new Map<string, { frames: { frame?: GoldenFrame }[] }>();
     for (const name of ['live-tournament-draft', 'state-myban', 'build-demo', 'state-nachlock', 'state-final', 'state-aram-bench'])
-      recordings.set(name, await json(`/tests/golden/recordings/${name}.json`));
+      recordings.set(name, play(new DraftEngine(snapshot, options), await text(`/tests/recordings/${name}.jsonl`)));
+    // A stored draft (README example) has no session to replay; its state is evaluated directly.
     const drafts = new Map<string, { frame: GoldenFrame }>();
-    drafts.set('readme-top-vs-jax', await json('/tests/golden/drafts/readme-top-vs-jax.json'));
+    const stored = await json<{ input: { hover: number }; frame: DraftFrame }>('/tests/golden/drafts/readme-top-vs-jax.json');
+    const engine = new DraftEngine(snapshot, options);
+    const state = stateFromFrame(stored.frame.state);
+    drafts.set('readme-top-vs-jax', { frame: engine.evaluate(state, engine.resolveTarget(state), stored.input.hover) });
     const plans = await json<{ matchupGuide: GoldenPlan; laneBuild: GoldenPlan }>('/tests/golden/builds/plans.json');
     return { adapter: new GoldenAdapter(snapshot.champions), plans, recordings, drafts };
   })();
