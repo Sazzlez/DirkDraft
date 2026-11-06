@@ -22,10 +22,11 @@ function clock(seconds: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
-/** "58 % statt 51 % · 2.400 Spiele" */
-function situationalStats(s: SituationalSuggestion): string {
+/** "3× so oft gekauft wie sonst · Winrate damit 53 % (sonst 51 %) · 1.800 Spiele" */
+export function situationalStats(s: SituationalSuggestion): string {
   const pct = (r: number) => `${Math.round(r * 100)} %`;
-  return `${pct(s.winRate)} statt ${pct(s.otherRate)} · ${s.games.toLocaleString('de-DE')} Spiele`;
+  const times = s.timesMoreOften < 2 ? s.timesMoreOften.toFixed(1).replace('.', ',') : String(Math.round(s.timesMoreOften));
+  return `${times}× so oft gekauft wie sonst · Winrate damit ${pct(s.winRate)} (sonst ${pct(s.otherRate)}) · ${s.games.toLocaleString('de-DE')} Spiele`;
 }
 
 /**

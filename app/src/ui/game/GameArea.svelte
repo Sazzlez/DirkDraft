@@ -92,7 +92,7 @@
         {:else}
           <p class="tiny">Gegen diese Gegner ist nichts klar besser als dein Build. Bleib dabei.</p>
         {/each}
-        <p class="tiny">Gezählt in Platin-Spielen mit derselben Gegner-Lage. Der Build oben bleibt dein Plan; das hier ist eine Alternative für dieses Spiel.</p>
+        <p class="tiny">Was Platin-Spieler deines Champions in derselben Lage häufiger kaufen, sofern es nicht schlechter abschneidet. Der Build oben bleibt dein Plan; das hier ist eine Alternative für dieses Spiel.</p>
       </Tile>
     </div>
   {/if}

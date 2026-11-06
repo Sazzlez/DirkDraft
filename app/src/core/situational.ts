@@ -1,7 +1,12 @@
-// Situational items: alternatives to the base build for this game's enemy line-up, measured in our
-// own Platinum games (situational.json) — never a rule of thumb. An item is suggested only when, in
-// games with the same enemy situation, it clearly beat the other choices for its slot, and beat
-// them by more than it does in general: an item that is simply good belongs in the base build.
+// Situational items: alternatives to the base build for this game's enemies, measured in our own
+// Platinum games (situational.json) — never a rule of thumb.
+//
+// The signal is what players of the champion buy differently in this situation: an item bought
+// clearly more often when the enemies stack armor than otherwise is what experience reacts with.
+// That signal needs far fewer games than a win rate to stand. The win rate only guards: an item
+// that does measurably worse than the slot's other choices — compared within the same game state
+// (ahead, even, behind), since whoever is behind buys differently and loses more anyway — is never
+// suggested.
 //
 // The situation definitions mirror DraftPilot.Core.Data.Situations, which the collector counts
 // with; both must stay in step.
@@ -39,6 +44,9 @@ export interface EnemyItemTotals {
 
 export const SLOT = { Boots: 0, Late: 1 } as const;
 
+/** Game states the collector splits buys by (DraftPilot.Core.Data.GameStates). */
+export const GAME_STATES = [0, 1, 2] as const;
+
 export interface RiotSituationalFile {
   version: number;
   patch: string;
@@ -46,9 +54,9 @@ export interface RiotSituationalFile {
   collectedAtUtc: string;
   situations: string[];
   classNames: string[];
-  /** [champion, lane, slot, situation, item (0 = slot total), games, wins] */
+  /** [champion, lane, slot, situation, state, item (0 = slot total), games, wins] */
   rows: number[][];
-  /** [class index, lane, slot, situation, item, games, wins] */
+  /** [class index, lane, slot, situation, state, item, games, wins] */
   classes: number[][];
 }
 
@@ -128,25 +136,27 @@ export interface SituationalSuggestion {
   itemId: number;
   slot: 0 | 1;
   situation: Situation;
-  /** Shrunk win rate with the item, and of the slot's other choices, in this situation. */
+  /** How many times more often the item is bought in this situation than otherwise. */
+  timesMoreOften: number;
+  /** Win rate with the item and of the slot's other choices, compared within each game state. */
   winRate: number;
   otherRate: number;
+  /** Buys of the item in this situation, own champion and class. */
   games: number;
 }
 
-/**
- * Pseudo-games pulling a champion's rate towards its class: Darius's own games decide once there
- * are a few hundred, the class speaks for him before. Same idea as the draft model's priors.
- */
-export const CLASS_PRIOR = 200;
-/** And the class towards the slot's overall rate in this situation. */
+/** Pseudo-games pulling a champion's buy share and win rate towards its class's. */
+export const CLASS_PRIOR = 50;
+/** And a class's win rate towards the slot's overall one in that state. */
 export const SLOT_PRIOR = 100;
 
-/** Minimum advantage over the slot's other choices, in win rate, and over the item's general edge. */
-export const MINIMUM_LIFT = 0.02;
-export const MINIMUM_SITUATIONAL_EDGE = 0.01;
-/** The advantage must stand this many standard errors clear of zero. */
-export const MINIMUM_Z = 1.5;
+/** An item has to be bought this much more often in the situation, and in this share of the slot at least. */
+export const MINIMUM_RATIO = 1.5;
+export const MINIMUM_SHARE = 0.05;
+/** The difference in buy share must stand this many standard errors clear. */
+export const MINIMUM_ADOPTION_Z = 2;
+/** The win-rate guard: measurably worse means this many standard errors below the alternatives. */
+export const GUARD_Z = -1.5;
 export const MINIMUM_GAMES = 30;
 
 interface Count {
@@ -154,24 +164,36 @@ interface Count {
   wins: number;
 }
 
+const NONE: Count = { games: 0, wins: 0 };
+const plus = (a: Count, b: Count): Count => ({ games: a.games + b.games, wins: a.wins + b.wins });
+const minus = (a: Count, b: Count): Count => ({ games: Math.max(0, a.games - b.games), wins: Math.max(0, a.wins - b.wins) });
+
 class Index {
   private readonly map = new Map<string, Count>();
   constructor(rows: readonly number[][]) {
-    for (const row of rows) if (row.length >= 7) this.map.set(row.slice(0, 5).join(':'), { games: row[5]!, wins: row[6]! });
+    for (const row of rows) if (row.length >= 8) this.map.set(row.slice(0, 6).join(':'), { games: row[6]!, wins: row[7]! });
   }
-  get(owner: number, lane: number, slot: number, situation: number, item: number): Count {
-    return this.map.get(`${owner}:${lane}:${slot}:${situation}:${item}`) ?? { games: 0, wins: 0 };
+  get(owner: number, lane: number, slot: number, situation: number, state: number, item: number): Count {
+    return this.map.get(`${owner}:${lane}:${slot}:${situation}:${state}:${item}`) ?? NONE;
+  }
+  /** Summed over the game states. */
+  all(owner: number, lane: number, slot: number, situation: number, item: number): Count {
+    return GAME_STATES.reduce((sum, state) => plus(sum, this.get(owner, lane, slot, situation, state, item)), NONE);
   }
   items(owner: number, lane: number, slot: number, situation: number): number[] {
-    const prefix = `${owner}:${lane}:${slot}:${situation}:`;
-    const ids: number[] = [];
-    for (const key of this.map.keys()) if (key.startsWith(prefix)) ids.push(Number(key.slice(prefix.length)));
-    return ids.filter((id) => id !== 0);
+    const ids = new Set<number>();
+    for (const state of GAME_STATES) {
+      const prefix = `${owner}:${lane}:${slot}:${situation}:${state}:`;
+      for (const key of this.map.keys()) if (key.startsWith(prefix)) ids.add(Number(key.slice(prefix.length)));
+    }
+    ids.delete(0);
+    return [...ids];
   }
 }
 
+const share = (item: Count, total: Count, prior: number, target: number): number =>
+  (item.games + prior * target) / (total.games + prior);
 const rate = (c: Count, prior: number, target: number): number => (c.wins + prior * target) / (c.games + prior);
-const minus = (a: Count, b: Count): Count => ({ games: Math.max(0, a.games - b.games), wins: Math.max(0, a.wins - b.wins) });
 
 export function situationalSuggestions(
   file: RiotSituationalFile,
@@ -186,46 +208,95 @@ export function situationalSuggestions(
   const classIndex = champion?.tags[0] ? file.classNames.indexOf(champion.tags[0]) : -1;
   const own = new Index(file.rows);
   const cls = new Index(file.classes);
+  const classOf = (fn: (index: Index, owner: number) => Count): Count => (classIndex >= 0 ? fn(cls, classIndex) : NONE);
 
-  /** Item and rest rates for one situation, the champion's shrunk towards its class. */
-  const edge = (slot: number, situation: number, item: number) => {
-    const classTotal = classIndex >= 0 ? cls.get(classIndex, lane, slot, situation, 0) : { games: 0, wins: 0 };
-    const classItem = classIndex >= 0 ? cls.get(classIndex, lane, slot, situation, item) : { games: 0, wins: 0 };
-    const slotRate = classTotal.games > 0 ? classTotal.wins / classTotal.games : 0.5;
-    const classItemRate = rate(classItem, SLOT_PRIOR, slotRate);
-    const classRestRate = rate(minus(classTotal, classItem), SLOT_PRIOR, slotRate);
+  /** How often the item is bought in the situation and otherwise, champion shrunk to class. */
+  const adoption = (slot: number, situation: number, item: number) => {
+    const inTotal = own.all(championId, lane, slot, situation, 0);
+    const inItem = own.all(championId, lane, slot, situation, item);
+    const allTotal = own.all(championId, lane, slot, SITUATION.All, 0);
+    const allItem = own.all(championId, lane, slot, SITUATION.All, item);
+    const cInTotal = classOf((i, o) => i.all(o, lane, slot, situation, 0));
+    const cInItem = classOf((i, o) => i.all(o, lane, slot, situation, item));
+    const cOutTotal = minus(classOf((i, o) => i.all(o, lane, slot, SITUATION.All, 0)), cInTotal);
+    const cOutItem = minus(classOf((i, o) => i.all(o, lane, slot, SITUATION.All, item)), cInItem);
 
-    const total = own.get(championId, lane, slot, situation, 0);
-    const mine = own.get(championId, lane, slot, situation, item);
-    const rest = minus(total, mine);
-    const itemRate = rate(mine, CLASS_PRIOR, classItemRate);
-    const restRate = rate(rest, CLASS_PRIOR, classRestRate);
+    const classIn = cInTotal.games > 0 ? cInItem.games / cInTotal.games : 0;
+    const classOut = cOutTotal.games > 0 ? cOutItem.games / cOutTotal.games : 0;
+    const shareIn = share(inItem, inTotal, CLASS_PRIOR, classIn);
+    const shareOut = share(minus(allItem, inItem), minus(allTotal, inTotal), CLASS_PRIOR, classOut);
+    const n1 = inTotal.games + Math.min(CLASS_PRIOR, cInTotal.games);
+    const n2 = Math.max(0, allTotal.games - inTotal.games) + Math.min(CLASS_PRIOR, cOutTotal.games);
+    const pooled = (shareIn * n1 + shareOut * n2) / Math.max(1, n1 + n2);
+    const se = n1 > 0 && n2 > 0 ? Math.sqrt(Math.max(1e-9, pooled * (1 - pooled)) * (1 / n1 + 1 / n2)) : Number.POSITIVE_INFINITY;
+    return { shareIn, shareOut, z: (shareIn - shareOut) / se, games: inItem.games + cInItem.games };
+  };
 
-    // Effective games: own plus what the class contributed through the prior.
-    const n1 = mine.games + Math.min(CLASS_PRIOR, classItem.games);
-    const n2 = rest.games + Math.min(CLASS_PRIOR, classTotal.games - classItem.games);
-    const p = (itemRate + restRate) / 2;
-    const se = n1 > 0 && n2 > 0 ? Math.sqrt(p * (1 - p) * (1 / n1 + 1 / n2)) : Number.POSITIVE_INFINITY;
-    return { itemRate, restRate, lift: itemRate - restRate, se, games: mine.games + classItem.games };
+  /** Win rate with the item against the slot's other choices, within each game state, weighted by the item's buys. */
+  const guard = (slot: number, situation: number, item: number) => {
+    let weight = 0;
+    let withItem = 0;
+    let without = 0;
+    let variance = 0;
+    for (const state of GAME_STATES) {
+      const cTotal = classOf((i, o) => i.get(o, lane, slot, situation, state, 0));
+      const cItem = classOf((i, o) => i.get(o, lane, slot, situation, state, item));
+      const slotRate = cTotal.games > 0 ? cTotal.wins / cTotal.games : 0.5;
+      const classItemRate = rate(cItem, SLOT_PRIOR, slotRate);
+      const classRestRate = rate(minus(cTotal, cItem), SLOT_PRIOR, slotRate);
+
+      const total = own.get(championId, lane, slot, situation, state, 0);
+      const mine = own.get(championId, lane, slot, situation, state, item);
+      const rest = minus(total, mine);
+      const n1 = mine.games + Math.min(CLASS_PRIOR, cItem.games);
+      const n2 = rest.games + Math.min(CLASS_PRIOR, cTotal.games - cItem.games);
+      if (n1 <= 0 || n2 <= 0) continue;
+
+      const p1 = rate(mine, CLASS_PRIOR, classItemRate);
+      const p2 = rate(rest, CLASS_PRIOR, classRestRate);
+      const w = n1;
+      weight += w;
+      withItem += w * p1;
+      without += w * p2;
+      variance += w * w * (p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2);
+    }
+    if (weight <= 0) return null;
+    const diff = (withItem - without) / weight;
+    const se = Math.sqrt(variance) / weight;
+    return { winRate: withItem / weight, otherRate: without / weight, z: se > 0 ? diff / se : 0 };
   };
 
   const found: (SituationalSuggestion & { score: number })[] = [];
   for (const slot of [SLOT.Boots, SLOT.Late] as const) {
     for (const situation of situations) {
       if (situation === SITUATION.All) continue;
-      const candidates = new Set([...own.items(championId, lane, slot, situation), ...(classIndex >= 0 ? cls.items(classIndex, lane, slot, situation) : [])]);
+      const candidates = new Set([
+        ...own.items(championId, lane, slot, situation),
+        ...(classIndex >= 0 ? cls.items(classIndex, lane, slot, situation) : []),
+      ]);
       for (const item of candidates) {
         if (exclude.has(item)) continue;
-        const here = edge(slot, situation, item);
-        if (here.games < MINIMUM_GAMES || here.lift < MINIMUM_LIFT || here.lift / here.se < MINIMUM_Z) continue;
-        const general = edge(slot, SITUATION.All, item);
-        if (here.lift - general.lift < MINIMUM_SITUATIONAL_EDGE) continue;
-        found.push({ itemId: item, slot, situation, winRate: here.itemRate, otherRate: here.restRate, games: here.games, score: here.lift / here.se });
+        const a = adoption(slot, situation, item);
+        if (a.games < MINIMUM_GAMES || a.shareIn < MINIMUM_SHARE || a.shareOut <= 0) continue;
+        const ratio = a.shareIn / a.shareOut;
+        if (ratio < MINIMUM_RATIO || a.z < MINIMUM_ADOPTION_Z) continue;
+        const g = guard(slot, situation, item);
+        if (!g || g.z <= GUARD_Z) continue;
+        found.push({
+          itemId: item,
+          slot,
+          situation,
+          timesMoreOften: ratio,
+          winRate: g.winRate,
+          otherRate: g.otherRate,
+          games: a.games,
+          score: a.z,
+        });
       }
     }
   }
 
-  // One suggestion per item (its strongest situation), best first.
+  // One suggestion per item (its clearest situation), clearest first.
   const best = new Map<number, (typeof found)[number]>();
   for (const s of found) if (!best.has(s.itemId) || best.get(s.itemId)!.score < s.score) best.set(s.itemId, s);
   return [...best.values()]

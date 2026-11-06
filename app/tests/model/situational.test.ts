@@ -63,39 +63,57 @@ const L = SLOT.Late;
 const M = SITUATION.Magic;
 const A = SITUATION.All;
 
-// Darius, late slot. Spirit Visage (3065) is ordinary in general and strong against magic damage;
-// Sterak's (3053) is good everywhere — that is a base-build item, not a situational one.
+// Darius, late slot, rows per game state (0 even, 1 ahead, 2 behind). The slot wins 50/60/40 %.
+//  - Spirit Visage (3065): bought 40 % of the time against magic damage, 7 % otherwise, and does
+//    as well as the slot's other choices in every state — the situational item.
+//  - Sterak's (3053): bought 30 % of the time everywhere — a base-build item, not a situational one.
+//  - Death's Dance (6333): bought far more often against magic damage, but measurably worse within
+//    each state — the guard keeps it out.
+const E = 0, AH = 1, BH = 2;
 const file: RiotSituationalFile = {
-  version: 1,
+  version: 2,
   patch: '16.22',
   platform: 'euw1',
   collectedAtUtc: '',
-  situations: ['all', 'physical', 'magic', 'tanks', 'cc'],
+  situations: ['all', 'physical', 'magic', 'tanks', 'cc', 'armor', 'magicResist', 'sustain'],
   classNames: ['Fighter'],
   rows: [
-    [1, TOP, L, A, 0, 4000, 2000],
-    [1, TOP, L, A, 3065, 800, 404],
-    [1, TOP, L, A, 3053, 1500, 810],
-    [1, TOP, L, M, 0, 1000, 500],
-    [1, TOP, L, M, 3065, 400, 232],
-    [1, TOP, L, M, 3053, 350, 189],
+    [1, TOP, L, A, E, 0, 2000, 1000],
+    [1, TOP, L, A, AH, 0, 1000, 600],
+    [1, TOP, L, A, BH, 0, 1000, 400],
+    [1, TOP, L, A, E, 3065, 300, 150],
+    [1, TOP, L, A, AH, 3065, 150, 90],
+    [1, TOP, L, A, BH, 3065, 150, 60],
+    [1, TOP, L, A, E, 3053, 600, 300],
+    [1, TOP, L, A, AH, 3053, 300, 180],
+    [1, TOP, L, A, BH, 3053, 300, 120],
+    [1, TOP, L, A, E, 6333, 220, 66],
+    [1, TOP, L, A, AH, 6333, 110, 44],
+    [1, TOP, L, A, BH, 6333, 110, 28],
+    [1, TOP, L, M, E, 0, 500, 250],
+    [1, TOP, L, M, AH, 0, 250, 150],
+    [1, TOP, L, M, BH, 0, 250, 100],
+    [1, TOP, L, M, E, 3065, 200, 100],
+    [1, TOP, L, M, AH, 3065, 100, 60],
+    [1, TOP, L, M, BH, 3065, 100, 40],
+    [1, TOP, L, M, E, 3053, 150, 75],
+    [1, TOP, L, M, AH, 3053, 75, 45],
+    [1, TOP, L, M, BH, 3053, 75, 30],
+    [1, TOP, L, M, E, 6333, 200, 60],
+    [1, TOP, L, M, AH, 6333, 100, 40],
+    [1, TOP, L, M, BH, 6333, 100, 25],
   ],
-  classes: [
-    [0, TOP, L, A, 0, 20000, 10000],
-    [0, TOP, L, A, 3065, 4000, 2010],
-    [0, TOP, L, A, 3053, 7000, 3780],
-    [0, TOP, L, M, 0, 5000, 2500],
-    [0, TOP, L, M, 3065, 2000, 1120],
-    [0, TOP, L, M, 3053, 1700, 918],
-  ],
+  classes: [],
 };
 
 describe('situational suggestions', () => {
-  it('suggest an item that is better in this situation than in general', () => {
+  it('suggest what players buy clearly more often in this situation', () => {
     const list = situationalSuggestions(file, meta, 1, TOP, [A, M], new Set());
     expect(list.map((s) => s.itemId)).toEqual([3065]);
     expect(list[0]!.situation).toBe(M);
-    expect(list[0]!.winRate).toBeGreaterThan(list[0]!.otherRate + 0.02);
+    expect(list[0]!.timesMoreOften).toBeGreaterThan(5);
+    // Not worse than the alternatives within the same game states.
+    expect(Math.abs(list[0]!.winRate - list[0]!.otherRate)).toBeLessThan(0.02);
   });
 
   it('say nothing when the situation is not on', () => {
@@ -107,7 +125,7 @@ describe('situational suggestions', () => {
   });
 
   it('need enough games', () => {
-    const thin: RiotSituationalFile = { ...file, rows: file.rows.map((r) => [...r.slice(0, 5), Math.round(r[5]! / 100), Math.round(r[6]! / 100)]), classes: [] };
+    const thin: RiotSituationalFile = { ...file, rows: file.rows.map((r) => [...r.slice(0, 6), Math.round(r[6]! / 100), Math.round(r[7]! / 100)]) };
     expect(situationalSuggestions(thin, meta, 1, TOP, [A, M], new Set())).toEqual([]);
   });
 });

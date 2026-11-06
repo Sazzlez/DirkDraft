@@ -113,13 +113,34 @@ public readonly record struct EnemyProfile(DamageType Damage, bool Frontline, bo
 public readonly record struct EnemyItems(int Armor, int MagicResist, int SustainItems);
 
 /// <summary>
-/// situational.json: for each champion, lane, slot (0 boots, 1 items four to six) and situation,
-/// how each item did — and the slot's total, item 0, to compare it with. Rows are int arrays:
-/// [champion, lane, slot, situation, item, games, wins]; class rows carry the class index first.
+/// The game state at a buy, from the team's gold lead: whoever is behind buys differently and loses
+/// more often anyway, so purchases are compared only with purchases made in the same state.
+/// </summary>
+public static class GameStates
+{
+    public const int Even = 0;
+    public const int Ahead = 1;
+    public const int Behind = 2;
+
+    /// <summary>
+    /// About two kills and a dragon's worth: below this either side can still turn a fight, above it
+    /// the build is made from the front (or from behind).
+    /// </summary>
+    public const long LeadThreshold = 1500;
+
+    public static int Of(long goldLead)
+        => goldLead >= LeadThreshold ? Ahead : goldLead <= -LeadThreshold ? Behind : Even;
+}
+
+/// <summary>
+/// situational.json: for each champion, lane, slot (0 boots, 1 items four to six), situation and game
+/// state (0 even, 1 ahead, 2 behind), how often each item was bought and won — with the slot's total,
+/// item 0, to compare it with. Rows are int arrays [champion, lane, slot, situation, state, item, games,
+/// wins]; class rows carry the class index first.
 /// </summary>
 public sealed class RiotSituationalFile
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     public int Version { get; set; } = CurrentVersion;
 
@@ -147,17 +168,19 @@ public sealed class RiotSituationalFile
 public sealed partial class RiotSituationalJson : JsonSerializerContext;
 
 /// <summary>
-/// Counts situational choices: for every player, the boots and the fourth to sixth item, under each
-/// situation the enemy line-up was in. Comparing an item with its own slot's total in the same
-/// situation keeps the obvious bias out — whoever wins buys more items — though not every bias:
-/// a defensive item bought from behind still carries some of that game.
+/// Counts situational buys: for every player, the boots and the fourth to sixth item, each under the
+/// situations and the game state at the moment it was bought. What the app reads from it first is how
+/// much more often an item is bought in a situation than otherwise — players react to what they see;
+/// the win rate, compared within the same game state, only guards against suggesting what does worse.
 /// </summary>
 public sealed class RiotSituationalTally
 {
     public const int BootsSlot = 0;
     public const int LateSlot = 1;
 
-    private readonly Dictionary<(int Champion, Lane Lane, int Slot, int Situation, int Item), (int Games, int Wins)> _rows = [];
+    private readonly Dictionary<Key, (int Games, int Wins)> _rows = [];
+
+    private readonly record struct Key(int Owner, Lane Lane, int Slot, int Situation, int State, int Item);
 
     /// <param name="catalog">
     /// Item stats for the situations made of the enemies' items, judged at the moment of each buy;
@@ -173,37 +196,32 @@ public sealed class RiotSituationalTally
             var enemyPlayers = game.Participants.Where(other => other.TeamId != player.TeamId).ToList();
             var profiles = enemyPlayers.Select(other => profile(other.ChampionId)).ToList();
 
-            // The situations at the moment of a buy: the line-up is fixed, the enemies' items are not.
-            List<int> At(long timeMs) => catalog is null
-                ? Situations.Of(profiles)
-                : Situations.Of(profiles, Situations.ItemsOf(enemyPlayers.SelectMany(enemy => enemy.OwnedAt(timeMs)), catalog));
+            // The moment of a buy: the line-up is fixed, the enemies' items and the gold lead are not.
+            (List<int> Situations, int State) At(long timeMs) => (
+                catalog is null
+                    ? Situations.Of(profiles)
+                    : Situations.Of(profiles, Situations.ItemsOf(enemyPlayers.SelectMany(enemy => enemy.OwnedAt(timeMs)), catalog)),
+                GameStates.Of(game.GoldLead(player.TeamId, timeMs)));
 
             if (player.Boots > 0)
-            {
-                var situations = At(player.BootsTimeMs);
-                Count(player, BootsSlot, situations, [(player.Boots, situations)]);
-            }
+                Count(player, BootsSlot, [(player.Boots, At(player.BootsTimeMs))]);
 
             // Items four to six: a game that never got there says nothing about them.
             if (player.Items.Count >= 4)
             {
-                var buys = Enumerable.Range(3, Math.Min(3, player.Items.Count - 3))
-                    .Select(i => (Item: player.Items[i], Situations: At(i < player.ItemTimes.Count ? player.ItemTimes[i] : long.MaxValue)))
-                    .ToList();
-                Count(player, LateSlot, [.. buys.SelectMany(buy => buy.Situations).Distinct().Order()], buys);
+                Count(player, LateSlot, [.. Enumerable.Range(3, Math.Min(3, player.Items.Count - 3))
+                    .Select(i => (player.Items[i], At(i < player.ItemTimes.Count ? player.ItemTimes[i] : long.MaxValue)))]);
             }
         }
     }
 
     public void Add(IEnumerable<int[]> stored)
     {
-        foreach (var row in stored.Where(row => row.Length >= 7))
-            Bump((row[0], (Lane)row[1], row[2], row[3], row[4]), row[5], row[6]);
+        foreach (var row in stored.Where(row => row.Length >= 8))
+            Bump(new Key(row[0], (Lane)row[1], row[2], row[3], row[4], row[5]), row[6], row[7]);
     }
 
-    public List<int[]> Export() =>
-        [.. _rows.OrderBy(p => p.Key.Champion).ThenBy(p => p.Key.Lane).ThenBy(p => p.Key.Slot).ThenBy(p => p.Key.Situation).ThenBy(p => p.Key.Item)
-            .Select(p => new[] { p.Key.Champion, (int)p.Key.Lane, p.Key.Slot, p.Key.Situation, p.Key.Item, p.Value.Games, p.Value.Wins })];
+    public List<int[]> Export() => Rows(_rows);
 
     /// <summary>
     /// The published file: champion rows from <paramref name="minimumGames"/> on, class rows summed over
@@ -215,20 +233,20 @@ public sealed class RiotSituationalTally
         string platform,
         DateTimeOffset collectedAtUtc,
         IReadOnlyDictionary<int, string> classOf,
-        int minimumGames = 20,
-        int minimumClassGames = 100)
+        int minimumGames = 10,
+        int minimumClassGames = 50)
     {
         var classNames = classOf.Values.Distinct().Order(StringComparer.Ordinal).ToList();
         var classIndex = classNames.Select((name, index) => (name, index)).ToDictionary(p => p.name, p => p.index);
 
-        var classRows = new Dictionary<(int Class, Lane Lane, int Slot, int Situation, int Item), (int Games, int Wins)>();
-        foreach (var ((champion, lane, slot, situation, item), (games, wins)) in _rows)
+        var classRows = new Dictionary<Key, (int Games, int Wins)>();
+        foreach (var (key, (games, wins)) in _rows)
         {
-            if (!classOf.TryGetValue(champion, out var name))
+            if (!classOf.TryGetValue(key.Owner, out var name))
                 continue;
-            var key = (classIndex[name], lane, slot, situation, item);
-            var sum = classRows.GetValueOrDefault(key);
-            classRows[key] = (sum.Games + games, sum.Wins + wins);
+            var classKey = key with { Owner = classIndex[name] };
+            var sum = classRows.GetValueOrDefault(classKey);
+            classRows[classKey] = (sum.Games + games, sum.Wins + wins);
         }
 
         return new RiotSituationalFile
@@ -237,49 +255,57 @@ public sealed class RiotSituationalTally
             Platform = platform,
             CollectedAtUtc = collectedAtUtc,
             ClassNames = classNames,
-            Rows = Cut(_rows, minimumGames),
-            Classes = Cut(classRows, minimumClassGames),
+            Rows = Rows(Cut(_rows, minimumGames)),
+            Classes = Rows(Cut(classRows, minimumClassGames)),
         };
-
-        static List<int[]> Cut<TKey>(Dictionary<TKey, (int Games, int Wins)> rows, int minimum)
-            where TKey : notnull
-        {
-            var items = rows.Where(p => Item(p.Key) != 0 && p.Value.Games >= minimum).ToList();
-            var totals = items.Select(p => Total(p.Key)).ToHashSet();
-            return [.. rows
-                .Where(p => Item(p.Key) == 0 ? totals.Contains(Total(p.Key)) : p.Value.Games >= minimum)
-                .Select(p => Flatten(p.Key, p.Value))
-                .OrderBy(row => row[0]).ThenBy(row => row[1]).ThenBy(row => row[2]).ThenBy(row => row[3]).ThenBy(row => row[4])];
-        }
-
-        static int Item<TKey>(TKey key) => key is ValueTuple<int, Lane, int, int, int> t ? t.Item5 : 0;
-
-        static (int, Lane, int, int) Total<TKey>(TKey key)
-            => key is ValueTuple<int, Lane, int, int, int> t ? (t.Item1, t.Item2, t.Item3, t.Item4) : default;
-
-        static int[] Flatten<TKey>(TKey key, (int Games, int Wins) value)
-            => key is ValueTuple<int, Lane, int, int, int> t
-                ? [t.Item1, (int)t.Item2, t.Item3, t.Item4, t.Item5, value.Games, value.Wins]
-                : [];
     }
 
     /// <summary>
-    /// The slot total once for every situation any of the slot's buys happened in; each item under
-    /// the situations of its own buy.
+    /// Item rows whose games over all game states reach the minimum, with every state of theirs and
+    /// the slot totals they are compared with.
     /// </summary>
-    private void Count(ParticipantBuild player, int slot, List<int> slotSituations, IReadOnlyList<(int Item, List<int> Situations)> buys)
+    private static Dictionary<Key, (int Games, int Wins)> Cut(Dictionary<Key, (int Games, int Wins)> rows, int minimum)
     {
-        var win = player.Win ? 1 : 0;
-        foreach (var situation in slotSituations)
-            Bump((player.ChampionId, player.Lane, slot, situation, 0), 1, win);
-        foreach (var (item, situations) in buys.DistinctBy(buy => buy.Item))
-        {
-            foreach (var situation in situations)
-                Bump((player.ChampionId, player.Lane, slot, situation, item), 1, win);
-        }
+        var kept = rows
+            .Where(p => p.Key.Item != 0)
+            .GroupBy(p => p.Key with { State = 0 })
+            .Where(group => group.Sum(p => p.Value.Games) >= minimum)
+            .Select(group => group.Key)
+            .ToHashSet();
+        var totals = kept.Select(key => key with { Item = 0 }).ToHashSet();
+        return rows
+            .Where(p => p.Key.Item == 0 ? totals.Contains(p.Key with { State = 0 }) : kept.Contains(p.Key with { State = 0 }))
+            .ToDictionary(p => p.Key, p => p.Value);
     }
 
-    private void Bump((int, Lane, int, int, int) key, int games, int wins)
+    private static List<int[]> Rows(Dictionary<Key, (int Games, int Wins)> rows) =>
+        [.. rows
+            .OrderBy(p => p.Key.Owner).ThenBy(p => p.Key.Lane).ThenBy(p => p.Key.Slot).ThenBy(p => p.Key.Situation)
+            .ThenBy(p => p.Key.State).ThenBy(p => p.Key.Item)
+            .Select(p => new[] { p.Key.Owner, (int)p.Key.Lane, p.Key.Slot, p.Key.Situation, p.Key.State, p.Key.Item, p.Value.Games, p.Value.Wins })];
+
+    /// <summary>
+    /// The slot total once per (situation, state) any of the slot's buys happened in; each item under
+    /// the situations and state of its own buy.
+    /// </summary>
+    private void Count(ParticipantBuild player, int slot, IReadOnlyList<(int Item, (List<int> Situations, int State) At)> buys)
+    {
+        var win = player.Win ? 1 : 0;
+        var totals = new HashSet<(int Situation, int State)>();
+        foreach (var (item, (situations, state)) in buys.DistinctBy(buy => buy.Item))
+        {
+            foreach (var situation in situations)
+            {
+                totals.Add((situation, state));
+                Bump(new Key(player.ChampionId, player.Lane, slot, situation, state, item), 1, win);
+            }
+        }
+
+        foreach (var (situation, state) in totals)
+            Bump(new Key(player.ChampionId, player.Lane, slot, situation, state, 0), 1, win);
+    }
+
+    private void Bump(Key key, int games, int wins)
     {
         var current = _rows.GetValueOrDefault(key);
         _rows[key] = (current.Games + games, current.Wins + wins);

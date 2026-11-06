@@ -111,9 +111,25 @@ public sealed record MatchReading(
     int QueueId,
     bool Counts,
     IReadOnlyList<ParticipantBuild> Participants,
-    IReadOnlyList<int>? Bans = null)
+    IReadOnlyList<int>? Bans = null,
+    IReadOnlyDictionary<int, long[]>? TeamGold = null)
 {
     public IReadOnlyList<int> BannedChampions => Bans ?? [];
+
+    /// <summary>
+    /// Gold lead over the enemy team at a moment, from the timeline's minute frames (the last frame at
+    /// or before it); 0 without frames.
+    /// </summary>
+    public long GoldLead(int teamId, long timeMs)
+    {
+        if (TeamGold is null || !TeamGold.TryGetValue(teamId, out var own))
+            return 0;
+        var enemy = TeamGold.Where(pair => pair.Key != teamId).Select(pair => pair.Value).FirstOrDefault();
+        if (enemy is null || own.Length == 0)
+            return 0;
+        var minute = (int)Math.Clamp(timeMs / 60_000, 0, Math.Min(own.Length, enemy.Length) - 1);
+        return own[minute] - enemy[minute];
+    }
 }
 
 /// <summary>
@@ -209,7 +225,7 @@ public static class RiotMatchReader
                 BootsTimeMs: boots?.Timestamp ?? 0));
         }
 
-        return new MatchReading(patch, created, queue, counts, participants, Bans(info));
+        return new MatchReading(patch, created, queue, counts, participants, Bans(info), TeamGold(timeline.RootElement, info));
     }
 
     /// <summary>Every champion banned in the game, once — a ban by both teams is still one ban.</summary>
@@ -321,6 +337,49 @@ public static class RiotMatchReader
             => style.TryGetProperty("selections", out var selections)
                 ? [.. selections.EnumerateArray().Select(s => Int(s, "perk")).Where(perk => perk > 0)]
                 : [];
+    }
+
+    /// <summary>
+    /// Each team's total gold per minute frame. Every player is counted, also those without a lane
+    /// (who are left out of the build rows): the lead is the team's, not the laners'.
+    /// </summary>
+    private static Dictionary<int, long[]>? TeamGold(JsonElement timeline, JsonElement info)
+    {
+        if (!timeline.TryGetProperty("info", out var timelineInfo) || !timelineInfo.TryGetProperty("frames", out var frames) || frames.ValueKind != JsonValueKind.Array)
+            return null;
+
+        var teamOf = new Dictionary<string, int>(StringComparer.Ordinal);
+        if (info.TryGetProperty("participants", out var participants) && participants.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var participant in participants.EnumerateArray())
+            {
+                var id = Int(participant, "participantId");
+                var team = Int(participant, "teamId") is > 0 and var t ? t : id <= 5 ? 100 : 200;
+                teamOf[id.ToString(System.Globalization.CultureInfo.InvariantCulture)] = team;
+            }
+        }
+
+        var count = frames.GetArrayLength();
+        if (count == 0 || teamOf.Count == 0)
+            return null;
+
+        var gold = teamOf.Values.Distinct().ToDictionary(team => team, _ => new long[count]);
+        var index = 0;
+        foreach (var frame in frames.EnumerateArray())
+        {
+            if (frame.TryGetProperty("participantFrames", out var players) && players.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var player in players.EnumerateObject())
+                {
+                    if (teamOf.TryGetValue(player.Name, out var team) && player.Value.TryGetProperty("totalGold", out var total) && total.TryGetInt64(out var value))
+                        gold[team][index] += value;
+                }
+            }
+
+            index++;
+        }
+
+        return gold;
     }
 
     private static List<TimelineEvent> Events(JsonElement timeline)

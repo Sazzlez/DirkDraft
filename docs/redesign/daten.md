@@ -17,11 +17,19 @@ Listen-Versatz, den OP.GGs Auswahl der auffälligsten Gegner brauchte, und kein 
 OP.GG. Tiers gibt es keine — das war OP.GGs eigene Einstufung.
 
 **Situative Items** (Spielansicht, Kachel „Für dieses Spiel“): nur gemessen, keine Faustregeln.
-Ein Item wird vorgeschlagen, wenn es in Spielen mit derselben Gegner-Lage die anderen Wahlen für
-seinen Platz klar schlägt (mindestens 2 Punkte, 1,5 Standardfehler, 30 Spiele) und dort um mindestens
-1 Punkt mehr als im Allgemeinen — was überall gut ist, gehört in den Basis-Build. Der eigene Champion
-wird zur Klasse hin geglättet (200 Pseudospiele). Angezeigt als Alternative neben dem Plan, nie als
-Ersatz; Items aus dem Plan oder im Inventar werden nicht vorgeschlagen.
+
+- *Lagen:* viel physischer bzw. magischer Schaden, 2+ Tanks, 3+ mit harter Kontrolle (aus den
+  gegnerischen Champions) und — zum Zeitpunkt jedes Kaufs — Gegner mit ≥ 150 Rüstung bzw. ≥ 120
+  Magieresistenz aus Items oder ≥ 2 Lebensraub-/Omnivampir-Items. Im Spiel bleibt eine erreichte Lage
+  bis zum Ende stehen.
+- *Signal:* was Spieler des Champions in der Lage deutlich häufiger kaufen als sonst (mindestens
+  1,5-mal so oft, mindestens 5 % des Platzes, 2 Standardfehler, 30 Käufe). Zur Klasse hin geglättet
+  (50 Pseudospiele).
+- *Sicherung:* Die Winrate mit dem Item gegen die anderen Wahlen des Platzes, verglichen nur innerhalb
+  desselben Spielstands beim Kauf (vorne/ausgeglichen/hinten, ±1.500 Gold Team-Vorsprung aus der
+  Timeline). Messbar schlechter (1,5 Standardfehler darunter) heißt: kein Vorschlag.
+- Angezeigt als Alternative neben dem Plan, nie als Ersatz; Items aus dem Plan oder im Inventar
+  werden nicht vorgeschlagen; höchstens drei.
 
 Flex nutzt die Solo/Duo-Zahlen. Beim Patchwechsel bleibt der alte Bestand als Rückfall
 veröffentlicht, bis der neue Patch 2.000 Spiele hat (Mayhem: 500); die App sieht am Patch, dass die
