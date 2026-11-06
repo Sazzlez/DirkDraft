@@ -1,0 +1,390 @@
+<script lang="ts">
+  import type { BuildView, GameView } from '../../core/view';
+  import { count } from '../../core/format';
+  import Icon from '../Icon.svelte';
+  import Tile from '../Tile.svelte';
+  import SkillGrid from '../build/SkillGrid.svelte';
+
+  let { game, build }: { game: GameView; build: BuildView | null } = $props();
+  const owned = $derived(game.path.flatMap((p) => p.items).filter((i) => i.owned).length);
+  const total = $derived(game.path.flatMap((p) => p.items).length);
+</script>
+
+<div class="head">
+  <Icon kind="champion" champion={game.me} size={38} ring="me" />
+  <div class="title">
+    <b>{game.title}</b>
+    {#if game.draftLine}<span>{game.draftLine}</span>{/if}
+  </div>
+  <div class="stats num">
+    <span class="chip">{game.clock}</span>
+    <span class="chip">Stufe {game.level}</span>
+    <span class="chip gold">{count(game.gold)} Gold</span>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="col left">
+  <div class="buy">
+    {#if game.nextBuy}
+      <section class="next">
+        <Icon kind="item" id={game.nextBuy.item.id} size={44} />
+        <span class="t">
+          <span class="kicker">Nächster Kauf</span>
+          <b>{game.nextBuy.item.name}</b>
+          <span class="num">{count(game.nextBuy.cost)} Gold · {game.nextBuy.affordable ? 'kaufbar' : `noch ${count(game.nextBuy.cost - game.gold)} Gold`}</span>
+        </span>
+        {#if game.nextBuy.then}
+          <span class="then">danach <Icon kind="item" id={game.nextBuy.then.id} size={26} title={game.nextBuy.then.name} /></span>
+        {/if}
+      </section>
+    {/if}
+  </div>
+
+  <div class="skill">
+    {#if game.nextSkill}
+      <section class="next-skill">
+        <span class="key">{game.nextSkill.key}</span>
+        <span>Nächster Skillpunkt, auf Stufe {game.nextSkill.level}</span>
+      </section>
+    {/if}
+  </div>
+
+  <div class="path">
+    <Tile title="Dein Build" sub="{owned} von {total} Items">
+      <div class="track">
+        {#each game.path as group (group.slot)}
+          <div class="g">
+            <span class="k">{group.slot}</span>
+            <span class="icons">
+              {#each group.items as item, i (i)}
+                <span class="has" class:owned={item.owned}>
+                  <Icon kind="item" id={item.id} size={34} dim={item.owned} ring={item.next ? 'target' : null} title={item.name} />
+                  {#if item.owned}<svg class="tick" viewBox="0 0 12 12"><path d="m2.5 6.2 2.2 2.2 4.8-4.8" /></svg>{/if}
+                </span>
+              {/each}
+            </span>
+          </div>
+        {/each}
+      </div>
+      {#if build}
+        <div class="skills">
+          <span class="k">Skills · Stufe {game.level}</span>
+          <SkillGrid skills={build.skills} current={game.level} />
+        </div>
+      {/if}
+    </Tile>
+  </div>
+
+  </div>
+  <div class="col right">
+  <div class="hints">
+    <Tile title="Hinweise">
+      {#each game.hints as hint (hint.title)}
+        <div class="hint">
+          <i class="tone-{hint.tone}"></i>
+          <span><b>{hint.title}</b>{hint.detail}</span>
+        </div>
+      {/each}
+      <p class="tiny">Hinweise stehen neben dem Build. Sie ändern seine Reihenfolge nie.</p>
+    </Tile>
+  </div>
+
+  <div class="enemies">
+    <Tile title="Gegner im Spiel" sub="laut Scoreboard">
+      {#each game.enemies as enemy (enemy.champion.id)}
+        <div class="er">
+          <Icon kind="champion" champion={enemy.champion} size={28} />
+          <span class="nm">{enemy.champion.name}</span>
+          <span class="its">{#each enemy.items as item, i (i)}<Icon kind="item" id={item.id} size={22} title={item.name} />{/each}</span>
+          <span class="dt" class:magic={enemy.damage === 'magisch'}>{enemy.damage}</span>
+        </div>
+      {/each}
+    </Tile>
+  </div>
+  </div>
+</div>
+
+<style>
+  .head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 16px 12px;
+  }
+
+  .title {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .title b {
+    font-size: 15px;
+  }
+
+  .title span {
+    font-size: 11.5px;
+    color: var(--fg2);
+  }
+
+  .stats {
+    margin-left: auto;
+    display: flex;
+    gap: 6px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 12px;
+    background: var(--card-strong);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .chip.gold {
+    color: var(--gold);
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+    gap: 12px;
+    padding: 0 16px 16px;
+    align-items: start;
+  }
+
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .enemies { order: 1; }
+  .hints { order: 2; }
+
+  .next {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: var(--r-l);
+    background: var(--blue-wash);
+    box-shadow: inset 0 0 0 1px var(--blue-line);
+  }
+
+  .t {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .kicker {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .t b {
+    font-size: 15px;
+  }
+
+  .t .num {
+    font-size: 11.5px;
+    color: var(--fg2);
+  }
+
+  .then {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--fg2);
+  }
+
+  .next-skill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--r-l);
+    background: var(--card);
+    font-size: 12.5px;
+  }
+
+  .key {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: var(--blue);
+    color: #fff;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+  }
+
+  .track {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .g {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .k {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--fg2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .icons {
+    display: flex;
+    gap: 5px;
+  }
+
+  .has {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .tick {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    width: 15px;
+    height: 15px;
+    padding: 2px;
+    border-radius: 50%;
+    background: var(--green);
+    fill: none;
+    stroke: #06210e;
+    stroke-width: 2;
+  }
+
+  .skills {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .hint {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr);
+    gap: 10px;
+    padding: 7px 0;
+    font-size: 12px;
+    color: var(--fg2);
+  }
+
+  .hint + .hint {
+    border-top: 1px solid var(--separator);
+  }
+
+  .hint i {
+    width: 7px;
+    height: 7px;
+    margin-top: 5px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .hint b {
+    display: block;
+    color: var(--fg);
+    font-weight: 600;
+  }
+
+  .tiny {
+    margin: 8px 0 0;
+    font-size: 10.5px;
+    color: var(--fg3);
+  }
+
+  .er {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto auto;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+  }
+
+  .er + .er {
+    border-top: 1px solid var(--separator);
+  }
+
+  .nm {
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  .its {
+    display: flex;
+    gap: 3px;
+  }
+
+  .dt {
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 9px;
+    background: var(--orange-wash);
+    color: var(--orange);
+  }
+
+  .dt.magic {
+    background: var(--purple-wash);
+    color: var(--purple);
+  }
+
+  @container app (max-width: 1099px) {
+    .layout {
+      grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    }
+  }
+
+  /* Narrow: next buy, skill point, hints, build path, enemies — one column in that order. */
+  @container app (max-width: 719px) {
+    .head {
+      padding: 0 12px 10px;
+      flex-wrap: wrap;
+    }
+
+    .stats {
+      margin-left: 0;
+      width: 100%;
+    }
+
+    .layout {
+      display: flex;
+      flex-direction: column;
+      padding: 0 12px 12px;
+      gap: 10px;
+    }
+
+    .col {
+      display: contents;
+    }
+
+    .buy { order: 1; }
+    .skill { order: 2; }
+    .hints { order: 3; }
+    .path { order: 4; }
+    .enemies { order: 5; }
+
+    .then {
+      display: none;
+    }
+  }
+</style>
