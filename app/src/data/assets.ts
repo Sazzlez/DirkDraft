@@ -8,6 +8,8 @@ export interface AssetNames {
   version: string;
   champions: Map<number, { key: string; name: string }>;
   items: Map<number, string>;
+  /** Price and recipe per item, for "next buy" in game. */
+  itemInfo: Map<number, { total: number; from: number[] }>;
   spells: Map<number, { key: string; name: string }>;
   runes: Map<number, { name: string; icon: string }>;
 }
@@ -30,14 +32,17 @@ export function loadAssets(version: string, language = 'de_DE'): Promise<AssetNa
       version,
       champions: new Map(),
       items: new Map(),
+      itemInfo: new Map(),
       spells: new Map(),
       runes: new Map(),
     };
 
     for (const c of Object.values(champions.data) as { key: string; id: string; name: string }[])
       names.champions.set(Number(c.key), { key: c.id, name: c.name });
-    for (const [id, item] of Object.entries(items.data) as [string, { name: string }][])
+    for (const [id, item] of Object.entries(items.data) as [string, { name: string; gold?: { total?: number }; from?: string[] }][]) {
       names.items.set(Number(id), item.name);
+      names.itemInfo.set(Number(id), { total: item.gold?.total ?? 0, from: (item.from ?? []).map(Number) });
+    }
     for (const s of Object.values(spells.data) as { key: string; id: string; name: string }[])
       names.spells.set(Number(s.key), { key: s.id, name: s.name });
     for (const style of runes as { id: number; name: string; icon: string; slots: { runes: { id: number; name: string; icon: string }[] }[] }[]) {

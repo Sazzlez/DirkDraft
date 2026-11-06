@@ -7,7 +7,12 @@ import { LANE_NAMES } from '../core/view';
 import { loadAssets, itemName } from './assets';
 import { DraftEngine, stateFromFrame, type DraftFrame } from '../core/engine';
 import type { AramStat } from '../core/model/advisors';
-import type { MetaSnapshot } from '../core/model/metaLookup';
+import { MetaLookup, type MetaSnapshot } from '../core/model/metaLookup';
+import { laneFromKey } from '../core/model/lane';
+import { gameModel, type LiveGameData } from '../core/game';
+import type { PlanOption, RiotBuildPlan } from '../core/riotBuilds';
+import { gameView } from './gameView';
+import { assets } from './assets';
 import { GoldenAdapter, buildFromPlan, type GoldenFrame, type GoldenPlan } from './golden';
 
 export interface Scene {
@@ -34,6 +39,7 @@ interface Sources {
   plans: { matchupGuide: GoldenPlan; laneBuild: GoldenPlan };
   recordings: Map<string, { frames: { frame?: GoldenFrame }[] }>;
   drafts: Map<string, { frame: GoldenFrame }>;
+  meta: MetaLookup;
 }
 
 let sources: Promise<Sources> | null = null;
@@ -85,7 +91,7 @@ function load(): Promise<Sources> {
     const state = stateFromFrame(stored.frame.state);
     drafts.set('readme-top-vs-jax', { frame: engine.evaluate(state, engine.resolveTarget(state), stored.input.hover) });
     const plans = await json<{ matchupGuide: GoldenPlan; laneBuild: GoldenPlan }>('/tests/golden/builds/plans.json');
-    return { adapter: new GoldenAdapter(snapshot.champions), plans, recordings, drafts };
+    return { adapter: new GoldenAdapter(snapshot.champions), plans, recordings, drafts, meta: new MetaLookup(snapshot) };
   })();
   return sources;
 }
@@ -159,7 +165,7 @@ export async function sceneView(id: string): Promise<ViewModel> {
       return view;
     }
     case 'game':
-      return gameScene(a, s.plans);
+      return gameScene(a, s.plans, s.meta);
     case 'postgame':
       return postgameScene(a);
     default:
@@ -230,37 +236,55 @@ function ref(a: GoldenAdapter, id: number): ChampionRef {
   return a.champion(id)!;
 }
 
-function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }): ViewModel {
+/** A stored OP.GG plan in the shape of our own plan, until the scenes run on builds.json. */
+function planFromGolden(p: GoldenPlan): RiotBuildPlan {
+  const option = (s: { itemIds: number[]; play: number; winRate: number }): PlanOption => ({ ids: s.itemIds, text: null, games: s.play, winRate: s.winRate });
+  return {
+    championId: p.championId,
+    lane: laneFromKey(p.lane),
+    inPlaceOf: null,
+    patch: p.patch,
+    games: 0,
+    winRate: 0,
+    runes: null,
+    spells: null,
+    starters: p.starters.map(option),
+    boots: p.boots.map(option),
+    core: p.coreItems.map(option),
+    late: p.lateItems.slice(0, 3).map(option),
+    supportChoice: null,
+    skillOrder: p.skillOrder.join(''),
+    skillMax: p.skillPriority.replace(/[^QWE]/g, ''),
+  };
+}
+
+function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: MetaLookup): ViewModel {
   const darius = ref(a, 122);
   const build = buildFromPlan(plans.matchupGuide, darius, ref(a, 24));
-  const item = (id: number) => ({ id, name: itemName(id) });
-  const core = build.core?.items ?? [];
+  const plan = planFromGolden(plans.matchupGuide);
+
+  // A sample answer of /liveclientdata/allgamedata at 14:32: boots and the first core item done,
+  // level 9 with one skill point still open. Names are placeholders, as the scrubber writes them.
+  const owned = [...(plan.boots[0]?.ids ?? []), plan.core[0]?.ids[0] ?? 0, 1036];
+  const order = plan.skillOrder.slice(0, 8);
+  const abilities = Object.fromEntries((['Q', 'W', 'E', 'R'] as const).map((k) => [k, { abilityLevel: [...order].filter((c) => c === k).length }]));
+  const enemy = (raw: string, items: number[]) => ({ rawChampionName: `game_character_displayname_${raw}`, team: 'CHAOS', items: items.map((itemID) => ({ itemID })) });
+  const sample: LiveGameData = {
+    activePlayer: { riotId: 'Spieler 1', level: 9, currentGold: 1240, abilities },
+    allPlayers: [
+      { riotId: 'Spieler 1', rawChampionName: 'game_character_displayname_Darius', team: 'ORDER', items: owned.map((itemID) => ({ itemID })) },
+      enemy('Jax', [3078, 3047]),
+      enemy('Warwick', [3153, 3111]),
+      enemy('Zac', [3068, 3047]),
+      enemy('Twitch', [3153, 3006]),
+      enemy('Morgana', [3190]),
+    ],
+    gameData: { gameTime: 14 * 60 + 32 },
+  };
+
+  const model = gameModel(sample, meta, plan, assets()?.itemInfo ?? new Map());
   const game: GameView = {
-    clock: '14:32',
-    level: 9,
-    gold: 1240,
-    me: darius,
-    title: 'Darius vs Jax · Toplane',
-    nextBuy: core[1] ? { item: item(3044), cost: 1100, affordable: true, then: core[1] } : null,
-    path: [
-      { slot: 'Start', items: (build.start?.items ?? []).map((i) => ({ ...i, owned: true, next: false })) },
-      { slot: 'Schuhe', items: (build.boots?.items ?? []).map((i) => ({ ...i, owned: true, next: false })) },
-      { slot: 'Kern', items: core.map((i, n) => ({ ...i, owned: n === 0, next: n === 1 })) },
-      { slot: 'Spät', items: build.late.slice(0, 3).map((i) => ({ ...i, owned: false, next: false })) },
-    ],
-    nextSkill: { key: 'E', level: 10 },
-    enemies: [
-      { champion: ref(a, 24), items: [item(3078), item(3047)], damage: 'physisch' },
-      { champion: ref(a, 19), items: [item(3153), item(3111)], damage: 'physisch' },
-      { champion: ref(a, 268), items: [item(3115), item(3020)], damage: 'magisch' },
-      { champion: ref(a, 29), items: [item(3153), item(3006)], damage: 'physisch' },
-      { champion: ref(a, 25), items: [item(3190)], damage: 'magisch' },
-    ],
-    hints: [
-      { title: 'Rüstung zuerst passt', detail: 'Drei von fünf Gegnern bauen physisch.', tone: 'info' },
-      { title: 'Warwick heilt viel', detail: 'Anti-Heal als Option vor dem zweiten Kern-Item.', tone: 'warn' },
-    ],
-    draftLine: 'Draft 51 : 49',
+    ...gameView(model!, (id) => a.champion(id), 'Darius vs Jax · Toplane', 'Draft 51 : 49'),
     sample: 'Beispieldaten — die Spielansicht liest ab M3 die Live-Client-Schnittstelle.',
   };
   return {
