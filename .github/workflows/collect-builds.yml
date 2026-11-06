@@ -1,6 +1,7 @@
 # Collects games from the Riot API and publishes what was counted:
 #   builds.json - builds per champion and lane (Platinum, Solo/Duo)
 #   meta.json   - the draft model's numbers: lane rates, duels, duos, bans, damage types (same games)
+#   situational.json - boots and items four to six per enemy situation (AD/AP-heavy, tanks, CC)
 #   mayhem.json - ARAM Mayhem: win rate per champion, builds, augments (only with RIOT_ID set)
 #
 # One key for everybody: the Riot key lives only in the repository secret RIOT_API_KEY, never in
@@ -101,7 +102,7 @@ jobs:
       - name: Exportieren
         if: steps.key.outputs.present == 'true'
         run: |
-          dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export --state "$STATE" --tier "$TIERS" --out publish/builds.json --meta-out publish/meta.json
+          dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export --state "$STATE" --tier "$TIERS" --out publish/builds.json --meta-out publish/meta.json --situational-out publish/situational.json
           dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export-mayhem --state "$MAYHEM_STATE" --out publish/mayhem.json
 
       # One commit, force-pushed: the branch holds the current files and no history of old ones.
@@ -114,7 +115,7 @@ jobs:
           git init -q -b data
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add builds.json meta.json
+          git add builds.json meta.json situational.json
           if [ -f mayhem.json ]; then git add mayhem.json; fi
           git commit -q -m "Daten $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data

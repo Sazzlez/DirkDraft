@@ -12,6 +12,7 @@ import { laneFromKey } from '../core/model/lane';
 import { gameModel, type LiveGameData } from '../core/game';
 import type { PlanOption, RiotBuildPlan } from '../core/riotBuilds';
 import { gameView } from './gameView';
+import { SITUATION, SLOT } from '../core/situational';
 import { postgameModel } from '../core/postgame';
 import { postgameView } from './postgameView';
 import { assets } from './assets';
@@ -286,7 +287,10 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
 
   const model = gameModel(sample, meta, plan, assets()?.itemInfo ?? new Map());
   const game: GameView = {
-    ...gameView(model!, (id) => a.champion(id), 'Darius vs Jax · Toplane', 'Draft 51 : 49'),
+    // Sample numbers: situational.json comes with the collector on GitHub.
+    ...gameView(model!, (id) => a.champion(id), 'Darius vs Jax · Toplane', 'Draft 51 : 49', [
+      { itemId: 3065, slot: SLOT.Late, situation: SITUATION.Magic, winRate: 0.556, otherRate: 0.507, games: 2410 },
+    ]),
     sample: 'Beispieldaten — die Spielansicht liest ab M3 die Live-Client-Schnittstelle.',
   };
   return {

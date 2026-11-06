@@ -255,6 +255,21 @@ export interface GameView {
   hints: { title: string; detail: string; tone: Tone }[];
   draftLine: string | null;
   sample: string | null;
+  /**
+   * Alternatives for this game's enemy line-up, measured (core/situational). null without data;
+   * an empty list means nothing beats the base build clearly here.
+   */
+  situational: SituationalView[] | null;
+}
+
+export interface SituationalView {
+  item: ItemRef;
+  /** The base build's choice for that slot, which the suggestion is an alternative to. */
+  instead: ItemRef | null;
+  /** "Gegen viel magischen Schaden" */
+  reason: string;
+  /** "58 % statt 51 % · 2.400 Spiele" */
+  stats: string;
 }
 
 export interface PostgameView {

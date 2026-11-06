@@ -76,6 +76,27 @@
     </Tile>
   </div>
 
+  {#if game.situational}
+    <div class="situational">
+      <Tile title="Für dieses Spiel" sub="Vorschlag zur aktuellen Lage">
+        {#snippet accessory()}<span class="badge">Alternative</span>{/snippet}
+        {#each game.situational as s (s.item.id)}
+          <div class="alt">
+            <Icon kind="item" id={s.item.id} size={34} title={s.item.name} />
+            <span class="t">
+              <b>{s.item.name}</b>
+              <span>{s.reason}{#if s.instead}{' · '}statt {s.instead.name}{/if}</span>
+              <span class="num stats">{s.stats}</span>
+            </span>
+          </div>
+        {:else}
+          <p class="tiny">Gegen diese Gegner ist nichts klar besser als dein Build. Bleib dabei.</p>
+        {/each}
+        <p class="tiny">Gezählt in Platin-Spielen mit derselben Gegner-Lage. Der Build oben bleibt dein Plan; das hier ist eine Alternative für dieses Spiel.</p>
+      </Tile>
+    </div>
+  {/if}
+
   </div>
   <div class="col right">
   <div class="hints">
@@ -308,6 +329,57 @@
     color: var(--fg3);
   }
 
+  /* Situational alternatives: set apart from the plan by a dashed teal rim and the badge, so they
+     never read as part of the build itself. */
+  .situational :global(.tile) {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--teal, #2fd6c5) 45%, transparent);
+    background: color-mix(in srgb, var(--teal, #2fd6c5) 6%, var(--card));
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font: var(--t-caption);
+    font-weight: 600;
+    color: var(--teal, #2fd6c5);
+    background: color-mix(in srgb, var(--teal, #2fd6c5) 14%, transparent);
+  }
+
+  .alt {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 7px 0;
+  }
+
+  .alt + .alt {
+    border-top: 1px solid var(--separator);
+  }
+
+  .alt .t {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--fg2);
+  }
+
+  .alt b {
+    color: var(--fg);
+    font: var(--t-head);
+    font-size: 13px;
+  }
+
+  .alt .stats {
+    color: var(--fg3);
+    font-size: 11.5px;
+  }
+
   .er {
     display: grid;
     grid-template-columns: 28px minmax(0, 1fr) auto auto;
@@ -377,7 +449,8 @@
     .skill { order: 2; }
     .hints { order: 3; }
     .path { order: 4; }
-    .enemies { order: 5; }
+    .situational { order: 5; }
+    .enemies { order: 6; }
 
     .then {
       display: none;

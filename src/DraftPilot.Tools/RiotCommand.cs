@@ -40,7 +40,7 @@ internal static class RiotCommand
             riot collect [--minutes 30] [--tiers platinum] [--state build/riot-state.json.gz] [--key-file datei]
             riot show <champion> <lane> [--tier platinum] [--state build/riot-state.json.gz]
             riot status [--state build/riot-state.json.gz]
-            riot export --out builds.json [--meta-out meta.json] [--tier platinum] [--keep 6] [--min-games 3]
+            riot export --out builds.json [--meta-out meta.json] [--situational-out situational.json] [--tier platinum] [--keep 6] [--min-games 3]
                         [--min-patch-games 2000] [--state build/riot-state.json.gz]
             riot mayhem --riot-id "Name#TAG" [--queues 2400] [--minutes 30] [--state build/mayhem-state.json.gz] [--key-file datei]
             riot queues --riot-id "Name#TAG" [--games 20] [--key-file datei]
@@ -98,10 +98,10 @@ internal static class RiotCommand
 
         // Early in a patch the new count is thin; until it has enough games the previous patch's
         // numbers are published instead, under their own patch, so the app knows they trail.
-        var (patch, buildFile, metaCounts) = (state.Patch, state.Tally, state.Meta);
+        var (patch, buildFile, metaCounts, situationalCounts) = (state.Patch, state.Tally, state.Meta, state.Situational);
         if (state.Meta.Matches < enough && state.Previous is { } previous && previous.Meta.Matches > state.Meta.Matches)
         {
-            (patch, buildFile, metaCounts) = (previous.Patch, previous.Tally, previous.Meta);
+            (patch, buildFile, metaCounts, situationalCounts) = (previous.Patch, previous.Tally, previous.Meta, previous.Situational);
             Console.WriteLine($"Patch {state.Patch} hat erst {state.Meta.Matches:N0} Spiele — veröffentlicht wird Patch {patch} ({metaCounts.Matches:N0}).");
         }
 
@@ -120,15 +120,30 @@ internal static class RiotCommand
         Write(outPath, JsonSerializer.Serialize(file, RiotBuildJson.Default.RiotBuildFile));
         Console.WriteLine($"{file.Builds.Count} Champion-Lanes, {new FileInfo(outPath).Length / 1024:N0} KB → {outPath}");
 
-        if (options.TryGetValue("meta-out", out var metaPath) && metaPath.Length > 0)
+        var metaPath = options.GetValueOrDefault("meta-out", string.Empty);
+        var situationalPath = options.GetValueOrDefault("situational-out", string.Empty);
+        if (metaPath.Length == 0 && situationalPath.Length == 0)
+            return 0;
+
+        using var http = new HttpClient();
+        var version = await LatestVersionAsync(http, ct);
+        var champions = RiotMetaExport.ParseDataDragon(
+            await http.GetStringAsync($"{DataDragon}/cdn/{version}/data/en_US/champion.json", ct));
+
+        if (situationalPath.Length > 0)
+        {
+            var situational = new RiotSituationalTally();
+            situational.Add(situationalCounts);
+            var classOf = champions.Where(c => c.Tags.Count > 0).ToDictionary(c => c.Id, c => c.Tags[0]);
+            var situationalFile = situational.File(patch, buildFile.Platform, buildFile.CollectedAtUtc, classOf);
+            Write(situationalPath, JsonSerializer.Serialize(situationalFile, RiotSituationalJson.Default.RiotSituationalFile));
+            Console.WriteLine($"Situativ: {situationalFile.Rows.Count:N0} Champion-Zeilen, {situationalFile.Classes.Count:N0} Klassen-Zeilen, {new FileInfo(situationalPath).Length / 1024:N0} KB → {situationalPath}");
+        }
+
+        if (metaPath.Length > 0)
         {
             var meta = new RiotMetaTally();
             meta.Add(metaCounts);
-
-            using var http = new HttpClient();
-            var version = await LatestVersionAsync(http, ct);
-            var champions = RiotMetaExport.ParseDataDragon(
-                await http.GetStringAsync($"{DataDragon}/cdn/{version}/data/en_US/champion.json", ct));
 
             var snapshot = RiotMetaExport.Build(meta.Rows(), champions, patch, tier, buildFile.Platform, buildFile.CollectedAtUtc, DateTimeOffset.UtcNow);
             Write(metaPath, JsonSerializer.Serialize(snapshot, MetaJson.Default.MetaSnapshot));
@@ -257,13 +272,20 @@ internal static class RiotCommand
         var catalog = await LatestItemsAsync(http, ct);
         Console.WriteLine($"Patch {catalog.Version}, {catalog.Count} Items. Ränge: {string.Join(", ", tiers)}. Laufzeit {minutes:0.#} min.");
 
+        // Class and CC data for the situational items; the traits file sits in the repository.
+        var champions = RiotMetaExport.ParseDataDragon(
+            await http.GetStringAsync($"{DataDragon}/cdn/{catalog.Version}/data/en_US/champion.json", ct));
+        var traits = TraitTable.Load(options.GetValueOrDefault("traits", Path.Combine("data", "champion_traits.json")));
+        Console.WriteLine($"{champions.Count} Champions, {traits.Count} mit Trait-Daten.");
+
         var state = CollectorState.Load(statePath);
         using var api = new RiotApiClient(key);
         var collector = new RiotCollector(
             api,
             catalog,
             new CollectorOptions { Tiers = tiers, Duration = TimeSpan.FromMinutes(minutes) },
-            line => Console.WriteLine($"{DateTime.Now:HH:mm:ss} {line}"));
+            line => Console.WriteLine($"{DateTime.Now:HH:mm:ss} {line}"),
+            new ChampionStatics(champions.ToDictionary(champion => champion.Id), traits));
 
         var report = await collector.RunAsync(state, s => s.Save(statePath), ct);
 

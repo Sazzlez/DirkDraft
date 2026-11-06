@@ -65,6 +65,9 @@ public sealed class CollectorState
     /// <summary>The draft numbers of the same games: lane rows, duels, duos, bans, damage.</summary>
     public RiotMetaCounts Meta { get; set; } = new();
 
+    /// <summary>Situational item counts of the same games, see <see cref="RiotSituationalTally"/>.</summary>
+    public List<int[]> Situational { get; set; } = [];
+
     /// <summary>
     /// The last patch's counts, kept when a new patch starts. For the first day of a patch the new
     /// count is too thin to stand on; the previous patch's numbers, marked as such, beat an empty file.
@@ -106,7 +109,15 @@ public sealed class PreviousPatch
     public RiotBuildFile Tally { get; set; } = new();
 
     public RiotMetaCounts Meta { get; set; } = new();
+
+    public List<int[]> Situational { get; set; } = [];
 }
+
+/// <summary>
+/// Who a champion is, for the situations: Riot's class tags and defense rating (Data Dragon) and the
+/// curated hard-CC trait. Without it the collector counts no situational items.
+/// </summary>
+public sealed record ChampionStatics(IReadOnlyDictionary<int, ChampionEntry> Champions, TraitTable Traits);
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, WriteIndented = false)]
 [JsonSerializable(typeof(CollectorState))]
@@ -119,7 +130,12 @@ public sealed partial class CollectorJson : JsonSerializerContext;
 /// a game's timeline — the second request, and the one that knows the buying and skilling order —
 /// is fetched only once the match itself has shown that the game counts.
 /// </summary>
-public sealed class RiotCollector(RiotApiClient api, ItemCatalog items, CollectorOptions options, Action<string>? log = null)
+public sealed class RiotCollector(
+    RiotApiClient api,
+    ItemCatalog items,
+    CollectorOptions options,
+    Action<string>? log = null,
+    ChampionStatics? statics = null)
 {
     private static readonly string[] Divisions = ["I", "II", "III", "IV"];
 
@@ -152,7 +168,7 @@ public sealed class RiotCollector(RiotApiClient api, ItemCatalog items, Collecto
             // Kept only for the same platform and only when it counted something: a bracket or region
             // switch is a different population, not an older version of this one.
             state.Previous = state.Patch.Length > 0 && state.Platform == options.Platform && state.Meta.Matches > 0
-                ? new PreviousPatch { Patch = state.Patch, Tally = state.Tally, Meta = state.Meta }
+                ? new PreviousPatch { Patch = state.Patch, Tally = state.Tally, Meta = state.Meta, Situational = state.Situational }
                 : null;
             state.Patch = patch;
             state.Platform = options.Platform;
@@ -160,12 +176,25 @@ public sealed class RiotCollector(RiotApiClient api, ItemCatalog items, Collecto
             state.Seen = [];
             state.Tally = new RiotBuildFile();
             state.Meta = new RiotMetaCounts();
+            state.Situational = [];
         }
 
         var tally = new RiotBuildTally();
         tally.Add(state.Tally.Builds);
         var meta = new RiotMetaTally();
         meta.Add(state.Meta);
+        var situational = new RiotSituationalTally();
+        situational.Add(state.Situational);
+
+        // Damage type as counted so far in this patch; class and CC from Data Dragon and the traits.
+        EnemyProfile Profile(int championId)
+        {
+            var entry = statics?.Champions.GetValueOrDefault(championId);
+            return new EnemyProfile(
+                meta.DamageOfChampion(championId),
+                entry is not null && (entry.IsTagged("Tank") || entry.Defense >= Situations.FrontlineDefense),
+                entry is not null && statics!.Traits.For(entry.Key).HasHardCc);
+        }
         var seen = new HashSet<long>(state.Seen);
         var matches = new Dictionary<string, int>(state.Tally.Matches, StringComparer.OrdinalIgnoreCase);
 
@@ -194,6 +223,7 @@ public sealed class RiotCollector(RiotApiClient api, ItemCatalog items, Collecto
                 Builds = tally.Export(CollectorState.KeptOptions),
             };
             state.Meta = meta.Export();
+            state.Situational = situational.Export();
             save(state);
         }
 
@@ -275,6 +305,8 @@ public sealed class RiotCollector(RiotApiClient api, ItemCatalog items, Collecto
                     foreach (var participant in reading.Participants)
                         tally.Add(participant, tier);
                     meta.Add(reading);
+                    if (statics is not null)
+                        situational.Add(reading, Profile);
 
                     if (fromLeague && queue.Count < MaxLeads)
                     {

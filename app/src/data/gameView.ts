@@ -1,6 +1,7 @@
 // The game moment (core/game) as the game area shows it: names, pictures, sentences.
 
 import type { GameModel } from '../core/game';
+import { SITUATION_TEXT, SLOT, type SituationalSuggestion } from '../core/situational';
 import { DamageType } from '../core/model/metaLookup';
 import type { ChampionRef, GameView, ItemRef, Tone } from '../core/view';
 import { itemName } from './assets';
@@ -21,11 +22,22 @@ function clock(seconds: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
+/** "58 % statt 51 % · 2.400 Spiele" */
+function situationalStats(s: SituationalSuggestion): string {
+  const pct = (r: number) => `${Math.round(r * 100)} %`;
+  return `${pct(s.winRate)} statt ${pct(s.otherRate)} · ${s.games.toLocaleString('de-DE')} Spiele`;
+}
+
+/**
+ * `situational`: suggestions from core/situational, or null when there is no situational data —
+ * the tile is then left out rather than saying "nothing better" on no evidence.
+ */
 export function gameView(
   model: GameModel,
   champion: (id: number) => ChampionRef | null,
   title: string,
   draftLine: string | null,
+  situational: SituationalSuggestion[] | null = null,
 ): GameView {
   const me = champion(model.championId) ?? { id: model.championId, key: '', name: `#${model.championId}` };
 
@@ -74,5 +86,21 @@ export function gameView(
     hints,
     draftLine,
     sample: null,
+    situational: situational
+      ? situational.map((s) => {
+          // The base choice it is an alternative to: the planned boots, or the next late item not yet owned.
+          const base =
+            s.slot === SLOT.Boots
+              ? model.path.find((p) => p.slot === 'Schuhe')
+              : (model.path.find((p) => p.slot === 'Spät' && !p.owned) ?? model.path.filter((p) => p.slot === 'Spät').at(-1));
+          const text = SITUATION_TEXT[s.situation];
+          return {
+            item: item(s.itemId),
+            instead: base ? item(base.itemId) : null,
+            reason: text.charAt(0).toUpperCase() + text.slice(1),
+            stats: situationalStats(s),
+          };
+        })
+      : null,
   };
 }

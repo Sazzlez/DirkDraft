@@ -7,6 +7,7 @@ einem Riot-Schlüssel selbst zählt, und liegen als drei Dateien im Branch `data
 |---|---|---|
 | `meta.json` | Lane-Winrate, Pick-, Bann- und Rollenrate je Champion und Lane; jedes Duell (beide Richtungen); jedes Duo; Schadensart; Grundlinien und Duell-Linie | Solo/Duo, Platin, EUW |
 | `builds.json` | Runen, Spells, Start, Schuhe, Kern, Items 4–6, Support-Item, Skill-Reihenfolge je Champion und Lane | dieselben Spiele |
+| `situational.json` | Stiefel und Items 4–6 je Champion, Lane und Gegner-Lage (viel AD, viel AP, 2+ Tanks, viel harte Kontrolle), mit dem Gesamtwert des Platzes zum Vergleich; dazu dieselben Zahlen je Klasse | dieselben Spiele |
 | `mayhem.json` | Winrate je Champion (Bank), Builds, Augments je Champion | ARAM Mayhem |
 
 `meta.json` hat das Format, das das Modell schon immer gelesen hat (`MetaSnapshot`), mit drei neuen
@@ -14,6 +15,13 @@ Feldern: `source: "riot"`, `platform`, `games`. Daran erkennt die App, dass die 
 sind: Sie werden zur auf derselben Datei gemessenen Duell-Linie geglättet statt mit dem
 Listen-Versatz, den OP.GGs Auswahl der auffälligsten Gegner brauchte, und kein Text nennt mehr
 OP.GG. Tiers gibt es keine — das war OP.GGs eigene Einstufung.
+
+**Situative Items** (Spielansicht, Kachel „Für dieses Spiel“): nur gemessen, keine Faustregeln.
+Ein Item wird vorgeschlagen, wenn es in Spielen mit derselben Gegner-Lage die anderen Wahlen für
+seinen Platz klar schlägt (mindestens 2 Punkte, 1,5 Standardfehler, 30 Spiele) und dort um mindestens
+1 Punkt mehr als im Allgemeinen — was überall gut ist, gehört in den Basis-Build. Der eigene Champion
+wird zur Klasse hin geglättet (200 Pseudospiele). Angezeigt als Alternative neben dem Plan, nie als
+Ersatz; Items aus dem Plan oder im Inventar werden nicht vorgeschlagen.
 
 Flex nutzt die Solo/Duo-Zahlen. Beim Patchwechsel bleibt der alte Bestand als Rückfall
 veröffentlicht, bis der neue Patch 2.000 Spiele hat (Mayhem: 500); die App sieht am Patch, dass die
