@@ -290,6 +290,8 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
     // Sample numbers: situational.json comes with the collector on GitHub.
     ...gameView(model!, (id) => a.champion(id), 'Darius vs Jax · Toplane', 'Draft 51 : 49', [
       { itemId: 3065, slot: SLOT.Late, situation: SITUATION.Magic, winRate: 0.556, otherRate: 0.507, games: 2410 },
+      { itemId: 3111, slot: SLOT.Boots, situation: SITUATION.HardCc, winRate: 0.538, otherRate: 0.509, games: 5120 },
+      { itemId: 3075, slot: SLOT.Late, situation: SITUATION.Tanks, winRate: 0.531, otherRate: 0.504, games: 1380 },
     ]),
     sample: 'Beispieldaten — die Spielansicht liest ab M3 die Live-Client-Schnittstelle.',
   };
