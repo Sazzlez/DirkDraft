@@ -20,10 +20,10 @@
   </div>
 
   <div class="right">
-    <button class="pill" title="Daten aktualisieren">
+    <span class="pill" title="Aktualisiert sich von selbst — nie während Draft oder Spiel">
       <span class="dot-small" class:stale={view.data.stale}></span>
       <span class="num">{view.data.text}</span>
-    </button>
+    </span>
     <button class="ctl menu" aria-label="Menü" onclick={() => (menuOpen = !menuOpen)}>
       <svg viewBox="0 0 20 20"><circle cx="5" cy="10" r="1.3" /><circle cx="10" cy="10" r="1.3" /><circle cx="15" cy="10" r="1.3" /></svg>
     </button>
@@ -41,7 +41,6 @@
   {#if menuOpen}
     <div class="popover">
       <p class="num">{view.data.text}</p>
-      <button>Daten aktualisieren</button>
       <button>Einstellungen</button>
     </div>
   {/if}
@@ -141,12 +140,7 @@
     color: var(--fg2);
     font: var(--t-caption);
     white-space: nowrap;
-    transition: background 0.2s var(--ease), color 0.2s var(--ease);
-  }
-
-  .pill:hover {
-    background: var(--card-strong);
-    color: var(--fg);
+    cursor: default;
   }
 
   .dot-small {

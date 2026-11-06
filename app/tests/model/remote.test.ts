@@ -1,9 +1,10 @@
-// The data download: a broken file never replaces the kept one, and without any the app knows it.
+// The data download: a broken file never replaces the kept one, unchanged files cost nothing, and
+// without any data the app knows it.
 
 import { describe, expect, it } from 'vitest';
 import { emptySnapshot } from '../../src/core/model/metaLookup';
 import { Lane } from '../../src/core/model/lane';
-import { checkMeta, dataLine, loadDataSet, type DataCache } from '../../src/data/remote';
+import { checkMeta, dataLine, loadDataSet, loadKept, type DataCache, type Fetcher, type FetchResult } from '../../src/data/remote';
 
 const goodMeta = JSON.stringify({
   ...emptySnapshot(),
@@ -30,25 +31,42 @@ function memory(initial: Record<string, string> = {}): DataCache & { files: Reco
   };
 }
 
-const serve = (answers: Record<string, string | Error>) => async (url: string) => {
-  const name = url.slice(url.lastIndexOf('/') + 1);
-  const answer = answers[name];
-  if (answer === undefined || answer instanceof Error) throw answer ?? new Error('404');
-  return answer;
-};
+/** Serves files by name; a known ETag gets "not modified". Records what was asked with which ETag. */
+function serve(answers: Record<string, string | Error>, etags: Record<string, string> = {}) {
+  const asked: { name: string; etag: string | null }[] = [];
+  const fetcher: Fetcher = async (url, etag) => {
+    const name = url.slice(url.lastIndexOf('/') + 1);
+    asked.push({ name, etag });
+    const answer = answers[name];
+    if (answer === undefined || answer instanceof Error) throw answer ?? new Error('404');
+    if (etag && etags[name] === etag) return { status: 'notModified' } satisfies FetchResult;
+    return { status: 'ok', text: answer, etag: etags[name] ?? null };
+  };
+  return { fetcher, asked };
+}
 
 describe('data download', () => {
   it('uses and keeps a good download', async () => {
     const cache = memory();
-    const set = await loadDataSet(serve({ 'meta.json': goodMeta, 'builds.json': goodBuilds }), cache);
+    const set = await loadDataSet(serve({ 'meta.json': goodMeta, 'builds.json': goodBuilds }).fetcher, cache);
     expect(set?.fresh).toBe(true);
+    expect(set?.changed).toBe(true);
     expect(set?.meta.games).toBe(12345);
     expect(cache.files['meta.json']).toBe(goodMeta);
   });
 
+  it('asks with the stored ETag and takes "unchanged" as the kept copy', async () => {
+    const cache = memory({ 'meta.json': goodMeta, 'meta.json.etag': '"abc"' });
+    const server = serve({ 'meta.json': goodMeta }, { 'meta.json': '"abc"' });
+    const set = await loadDataSet(server.fetcher, cache);
+    expect(server.asked.find((a) => a.name === 'meta.json')?.etag).toBe('"abc"');
+    expect(set?.fresh).toBe(true);
+    expect(set?.changed).toBe(false);
+  });
+
   it('falls back to the kept copy when the download fails', async () => {
     const cache = memory({ 'meta.json': goodMeta });
-    const set = await loadDataSet(serve({ 'meta.json': new Error('offline') }), cache);
+    const set = await loadDataSet(serve({ 'meta.json': new Error('offline') }).fetcher, cache);
     expect(set?.fresh).toBe(false);
     expect(set?.builds).toBeNull();
     expect(set?.problems.join()).toContain('offline');
@@ -56,13 +74,19 @@ describe('data download', () => {
 
   it('never stores a broken file over a good one', async () => {
     const cache = memory({ 'meta.json': goodMeta });
-    const set = await loadDataSet(serve({ 'meta.json': '{"version":1,"patch":"16.23","champions":[]}' }), cache);
+    const set = await loadDataSet(serve({ 'meta.json': '{"version":1,"patch":"16.23","champions":[]}' }).fetcher, cache);
     expect(set?.meta.patch).toBe('16.22');
     expect(cache.files['meta.json']).toBe(goodMeta);
   });
 
   it('has nothing to offer without download and copy', async () => {
-    expect(await loadDataSet(serve({}), memory())).toBeNull();
+    expect(await loadDataSet(serve({}).fetcher, memory())).toBeNull();
+  });
+
+  it('reads the kept copy without any request', async () => {
+    const set = await loadKept(memory({ 'meta.json': goodMeta }));
+    expect(set?.meta.patch).toBe('16.22');
+    expect(await loadKept(memory())).toBeNull();
   });
 
   it('checks what the model needs', () => {

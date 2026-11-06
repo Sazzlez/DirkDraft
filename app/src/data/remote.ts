@@ -1,8 +1,8 @@
-// DirkDraft's own data: meta.json (draft numbers) and builds.json (builds), both published by the
-// collector to the branch "data" of the repository. Downloaded on start and on request, checked
-// before use, and kept: a broken or missing download never replaces the last good copy, and without
-// any copy the app says so instead of inventing numbers. Nothing about the user is sent — two plain
-// GET requests for public files.
+// DirkDraft's own data: meta.json (draft numbers), builds.json (builds) and mayhem.json (ARAM
+// Mayhem), published by the collector to the branch "data" of the repository. Checked before use
+// and kept: a broken or missing download never replaces the last good copy, and without any copy
+// the app says so instead of inventing numbers. Nothing about the user is sent — plain GET requests
+// for public files. When the downloads may happen is the DataRefresher's business (core/refresh.ts).
 
 import type { MetaSnapshot } from '../core/model/metaLookup';
 import type { RiotMayhemFile } from '../core/mayhem';
@@ -19,19 +19,26 @@ export interface DataCache {
   write(name: string, text: string): Promise<void>;
 }
 
-export type FetchText = (url: string) => Promise<string>;
+/**
+ * One GET. With the stored ETag the server can answer "unchanged" without sending the file again —
+ * which is what keeps a check every half hour at a few hundred bytes.
+ */
+export type FetchResult = { status: 'notModified' } | { status: 'ok'; text: string; etag: string | null };
+export type Fetcher = (url: string, etag: string | null) => Promise<FetchResult>;
 
 export interface DataSet {
   meta: MetaSnapshot;
   builds: RiotBuildFile | null;
   /** Absent until the collector has a Riot ID to start Mayhem from. */
   mayhem: RiotMayhemFile | null;
-  /** Whether this run's download succeeded, or the numbers are the kept copy. */
+  /** Whether the server was reached this time, or the numbers are the kept copy only. */
   fresh: boolean;
+  /** Whether any file differs from the kept copy — false means nothing to swap in. */
+  changed: boolean;
   problems: string[];
 }
 
-/** A meta file the model can stand on: own data, a patch, champions and lane rows. */
+/** A meta file the model can stand on: a patch, champions, lane rows and the baselines. */
 export function checkMeta(value: unknown): string | null {
   if (!value || typeof value !== 'object') return 'keine Daten';
   const meta = value as Partial<MetaSnapshot>;
@@ -62,45 +69,83 @@ export function checkMayhem(value: unknown): string | null {
   return null;
 }
 
-async function one<T>(
-  name: DataFile,
-  fetchText: FetchText,
-  cache: DataCache,
-  check: (value: unknown) => string | null,
-  problems: string[],
-): Promise<{ value: T; fresh: boolean } | null> {
-  const file = FILES[name];
-  try {
-    const text = await fetchText(`${DATA_BASE}/${file}`);
-    const value = JSON.parse(text) as unknown;
-    const problem = check(value);
-    if (problem) throw new Error(problem);
-    await cache.write(file, text);
-    return { value: value as T, fresh: true };
-  } catch (error) {
-    problems.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
-  }
+const CHECKS: Record<DataFile, (value: unknown) => string | null> = { meta: checkMeta, builds: checkBuilds, mayhem: checkMayhem };
 
-  const kept = await cache.read(file);
-  if (kept === null) return null;
+interface Loaded {
+  value: unknown;
+  fresh: boolean;
+  changed: boolean;
+}
+
+async function kept(name: DataFile, cache: DataCache): Promise<unknown | null> {
+  const text = await cache.read(FILES[name]);
+  if (text === null) return null;
   try {
-    const value = JSON.parse(kept) as unknown;
-    return check(value) ? null : { value: value as T, fresh: false };
+    const value = JSON.parse(text) as unknown;
+    return CHECKS[name](value) ? null : value;
   } catch {
     return null;
   }
 }
 
-/** Both files, each freshly downloaded or else kept; null when there is no usable meta file at all. */
-export async function loadDataSet(fetchText: FetchText, cache: DataCache): Promise<DataSet | null> {
+async function one(name: DataFile, fetcher: Fetcher, cache: DataCache, problems: string[]): Promise<Loaded | null> {
+  const file = FILES[name];
+  const etagName = `${file}.etag`;
+  // An ETag without a usable copy is worthless: "unchanged" would leave nothing to read.
+  const copy = await kept(name, cache);
+  const etag = copy === null ? null : await cache.read(etagName);
+
+  try {
+    const answer = await fetcher(`${DATA_BASE}/${file}`, etag);
+    if (answer.status === 'notModified') {
+      if (copy !== null) return { value: copy, fresh: true, changed: false };
+      throw new Error('unverändert gemeldet, aber keine Kopie');
+    }
+    const value = JSON.parse(answer.text) as unknown;
+    const problem = CHECKS[name](value);
+    if (problem) throw new Error(problem);
+    const before = await cache.read(file);
+    await cache.write(file, answer.text);
+    if (answer.etag) await cache.write(etagName, answer.etag);
+    return { value, fresh: true, changed: before !== answer.text };
+  } catch (error) {
+    problems.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  return copy === null ? null : { value: copy, fresh: false, changed: false };
+}
+
+/** All files, each downloaded (or confirmed unchanged) or else kept; null without any usable meta. */
+export async function loadDataSet(fetcher: Fetcher, cache: DataCache): Promise<DataSet | null> {
   const problems: string[] = [];
   const [meta, builds, mayhem] = await Promise.all([
-    one<MetaSnapshot>('meta', fetchText, cache, checkMeta, problems),
-    one<RiotBuildFile>('builds', fetchText, cache, checkBuilds, problems),
-    one<RiotMayhemFile>('mayhem', fetchText, cache, checkMayhem, problems),
+    one('meta', fetcher, cache, problems),
+    one('builds', fetcher, cache, problems),
+    one('mayhem', fetcher, cache, problems),
   ]);
   if (!meta) return null;
-  return { meta: meta.value, builds: builds?.value ?? null, mayhem: mayhem?.value ?? null, fresh: meta.fresh, problems };
+  return {
+    meta: meta.value as MetaSnapshot,
+    builds: (builds?.value as RiotBuildFile | undefined) ?? null,
+    mayhem: (mayhem?.value as RiotMayhemFile | undefined) ?? null,
+    fresh: meta.fresh,
+    changed: meta.changed || !!builds?.changed || !!mayhem?.changed,
+    problems,
+  };
+}
+
+/** The kept copies only — no network. What the app starts with, whatever the client is doing. */
+export async function loadKept(cache: DataCache): Promise<DataSet | null> {
+  const [meta, builds, mayhem] = await Promise.all([kept('meta', cache), kept('builds', cache), kept('mayhem', cache)]);
+  if (meta === null) return null;
+  return {
+    meta: meta as MetaSnapshot,
+    builds: (builds as RiotBuildFile | null) ?? null,
+    mayhem: (mayhem as RiotMayhemFile | null) ?? null,
+    fresh: false,
+    changed: false,
+    problems: [],
+  };
 }
 
 const BRACKETS: Record<string, string> = {
@@ -132,6 +177,16 @@ function age(ms: number): string {
   const days = Math.round(hours / 24);
   return days === 1 ? 'vor 1 Tag' : `vor ${days} Tagen`;
 }
+
+/**
+ * The browser's fetch, for the preview. `no-cache` makes the browser revalidate with its own stored
+ * ETag, so an unchanged file costs a 304 there too; the Tauri shell brings its own fetcher.
+ */
+export const browserFetcher: Fetcher = async (url) => {
+  const response = await fetch(url, { cache: 'no-cache' });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return { status: 'ok', text: await response.text(), etag: response.headers.get('etag') };
+};
 
 /** localStorage as a cache, for the browser preview; every access may throw (private mode). */
 export const browserCache: DataCache = {
