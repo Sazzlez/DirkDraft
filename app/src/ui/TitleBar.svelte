@@ -10,7 +10,7 @@
 
 <header class="bar" data-tauri-drag-region>
   <div class="left" data-tauri-drag-region>
-    <span class="logo" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M6 5.5h4.2a4.5 4.5 0 0 1 0 9H6z" /></svg></span>
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5.65 5.5h4.2a4.5 4.5 0 0 1 0 9h-4.2z" /></svg></span>
     <b>DirkDraft</b>
     <span class="status"><span class="dot {view.connection.state}"></span><span class="text">{view.connection.text}</span></span>
   </div>

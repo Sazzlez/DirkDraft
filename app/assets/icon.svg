@@ -23,7 +23,7 @@
   <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#light)" />
   <rect x="66" y="66" width="892" height="892" rx="206" fill="none" stroke="url(#edge)" stroke-width="4" />
   <path
-    d="M 362 286 H 534 A 226 226 0 0 1 534 738 H 362 Z"
+    d="M 313 286 H 485 A 226 226 0 0 1 485 738 H 313 Z"
     fill="none"
     stroke="#ffffff"
     stroke-width="92"
