@@ -348,7 +348,11 @@ public sealed class GameBuildViewModel : ObservableObject
 
         var notes = new List<string>();
         if (mode.Length == 0 && plan.OpponentId == 0)
-            notes.Add("kein Matchup bekannt, bester Build der Lane");
+        {
+            notes.Add(plan.InPlaceOfOpponentId != 0
+                ? $"kein Build gegen {plan.InPlaceOfOpponentName}, bester Build der Lane"
+                : "kein Matchup bekannt, bester Build der Lane");
+        }
         if (modeCaveat.Length > 0)
             notes.Add(modeCaveat);
 

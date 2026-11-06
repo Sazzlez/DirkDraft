@@ -1651,11 +1651,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         TryFetchDraftData();
     }
 
+    /// <summary>
+    /// Whether the build on screen answers the draft's current question. The lane build standing
+    /// in for a matchup without data answers it too — for exactly that opponent, so a lane opponent
+    /// who changes still triggers a fetch for the new pairing.
+    /// </summary>
     private bool BuildMatchesContext
         => _build is not null && _buildContext is { } context
             && _build.ChampionId == context.Champion
             && _build.Lane == context.Lane
-            && _build.OpponentId == context.Opponent;
+            && (_build.OpponentId == context.Opponent
+                || (_build.OpponentId == 0 && context.Opponent != 0 && _build.InPlaceOfOpponentId == context.Opponent));
 
     /// <summary>
     /// Queues work from a client thread onto the UI thread. BeginInvoke throws once the
@@ -2263,6 +2269,19 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             if (token.IsCancellationRequested)
                 return true;
 
+            // No matchup build is no reason for no build. The lane build takes its place, marked
+            // as standing in for this opponent so the card says so — and so the round counts as
+            // answered rather than asking the guide again for a pairing it has nothing on. A guide
+            // answer without a single item counts as none: measured on 2026-11-06, Yuumi vs Darius
+            // Top came back with two rune pages and no core, a card with nothing to buy.
+            if (opponent is not null && (plan is null || plan.IsEmpty || plan.CoreItems.Count == 0))
+            {
+                plan = await LaneBuildInPlaceOfAsync(fetcher, context, me, opponent, token).ConfigureAwait(true);
+
+                if (token.IsCancellationRequested)
+                    return true;
+            }
+
             // Marked AFTER the await, mirroring _liveFetched: marked before it, one network hiccup
             // meant no build and a locked rune button for the rest of the draft, because nothing
             // would ever ask again.
@@ -2307,6 +2326,43 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
             return false;
         }
+    }
+
+    /// <summary>
+    /// The champion's own build on the lane, standing in for a matchup the guide has no build for.
+    /// From the cache when this lane build was fetched before — it is the same file a draft
+    /// without an opponent uses — and otherwise one call, counted like every other.
+    /// </summary>
+    /// <returns>Null when the lane has no build either, or the draft's budget is spent.</returns>
+    private async Task<BuildPlan?> LaneBuildInPlaceOfAsync(
+        LiveDraftFetcher fetcher,
+        (int Champion, Lane Lane, int Opponent) context,
+        ChampionEntry me,
+        ChampionEntry opponent,
+        CancellationToken token)
+    {
+        var variant = BuildVariant(0);
+        var plan = _buildCache.Load(_meta.Patch, context.Champion, context.Lane, 0, variant);
+
+        if (plan is null || plan.IsEmpty)
+        {
+            if (_liveCallsThisDraft >= MaxLiveCallsPerDraft)
+                return null;
+
+            _liveCallsThisDraft++;
+
+            plan = await fetcher.FetchChampionBuildAsync(me, context.Lane, LiveMode(), _meta.Patch, token)
+                .ConfigureAwait(true);
+
+            if (plan is null)
+                return null;
+
+            plan.Variant = variant;
+        }
+
+        plan.InPlaceOfOpponentId = opponent.Id;
+        plan.InPlaceOfOpponentName = opponent.Name;
+        return plan;
     }
 
     /// <summary>
@@ -3116,7 +3172,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         // it. Deciding the boots slot from them made the same buy appear in nearly every draft.
 
         // Named first, because everything below it is advice about an opponent we do not have.
-        if (_build is { OpponentId: 0, Mode.Length: 0 } open)
+        if (_build is { OpponentId: 0, Mode.Length: 0, InPlaceOfOpponentId: not 0 } standIn)
+        {
+            hints.Add(Reason.Neutral(
+                $"Kein Build gegen {standIn.InPlaceOfOpponentName} — bester Build der Lane",
+                $"OP.GG hat für {standIn.ChampionName} gegen {standIn.InPlaceOfOpponentName} auf "
+                + $"{standIn.Lane.Display()} keinen Matchup-Build. Statt gar keinem steht hier der "
+                + $"Build, mit dem {standIn.ChampionName} auf dieser Lane insgesamt am besten fährt — "
+                + "über alle Gegner, mit entsprechend vielen Games dahinter."));
+        }
+        else if (_build is { OpponentId: 0, Mode.Length: 0 } open)
         {
             hints.Add(Reason.Neutral(
                 "Kein Matchup bekannt — bester Build der Lane",
@@ -3221,7 +3286,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             var result = await RuneImporter.ImportAsync(
                 _source!.Client!,
                 runes,
-                $"{build.ChampionName} vs {build.OpponentName}",
+                build.Heading,
                 confirmReplace: name => _dispatcher.Invoke(() =>
                 {
                     // Owned by the main window, or a Topmost panel covers the dialog and the
@@ -3276,7 +3341,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             {
                 (true, _) => string.Empty,
                 (false, { } ctx) when _buildFailedFor == ctx => "Build konnte nicht geladen werden — versuche es weiter.",
-                (false, { } ctx) when _buildFetched.Contains(ctx) => "OP.GG hat zu diesem Matchup keinen Build.",
+                (false, { } ctx) when _buildFetched.Contains(ctx) => ctx.Opponent != 0
+                    ? "OP.GG hat weder zu diesem Matchup noch für die Lane einen Build."
+                    : "OP.GG hat für diese Lane keinen Build.",
                 (false, { } ctx) => $"Build für {_meta.ChampionName(ctx.Champion)} gegen {_meta.ChampionName(ctx.Opponent)} wird geladen…",
                 _ => string.Empty,
             };

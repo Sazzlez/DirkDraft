@@ -3,6 +3,17 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
+## Unveröffentlicht
+
+- **Kein Matchup-Build heißt nicht mehr: gar kein Build.** Hat OP.GG für eine Paarung nichts —
+  gemessen etwa bei Taric gegen Kindred auf Mid, wo die Antwort ganz leer ist, oder bei Yuumi gegen
+  Darius auf Top, wo zwei Runenseiten und kein einziges Item zurückkommen —, blieb die Build-Karte
+  leer oder halb leer. Jetzt steht dort der Build, mit dem dein Champion auf dieser Lane insgesamt
+  am besten fährt, mit dem Hinweis „Kein Build gegen … — bester Build der Lane". Er kommt aus dem
+  Cache, wenn derselbe Lane-Build vorher schon geholt wurde, sonst kostet er einen Abruf.
+- Die übertragene Runenseite eines Lane-Builds hieß „DirkRunen · Darius vs " (mit leerem Gegner).
+  Sie heißt jetzt „DirkRunen · Darius · Toplane".
+
 ## 1.5.0 — 2026-10-09
 
 Fenster und Draft:

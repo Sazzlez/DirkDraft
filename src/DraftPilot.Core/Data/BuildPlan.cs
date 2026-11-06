@@ -139,6 +139,30 @@ public sealed class BuildPlan
 
     public string OpponentName { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Set on the lane build when it stands in for a matchup the source had no build for: the
+    /// opponent the draft asked about. Shown instead of nothing — a card that stayed empty because
+    /// eleven games of one pairing were missing helped nobody, while the champion's own build on
+    /// the lane rests on thousands. Not stored: the cache keeps the lane build as what it is, and a
+    /// draft without an opponent loads it as exactly that.
+    /// </summary>
+    [JsonIgnore]
+    public int InPlaceOfOpponentId { get; set; }
+
+    /// <inheritdoc cref="InPlaceOfOpponentId"/>
+    [JsonIgnore]
+    public string InPlaceOfOpponentName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// How to name this plan in one line: the pairing for a matchup build, champion and lane for a
+    /// lane build — which has no opponent to name, and naming one it was never measured against is
+    /// the one thing a plan must not do.
+    /// </summary>
+    [JsonIgnore]
+    public string Heading => OpponentId != 0
+        ? $"{ChampionName} vs {OpponentName}"
+        : Lane == Lane.Unknown ? ChampionName : $"{ChampionName} · {Lane.Display()}";
+
     public Lane Lane { get; set; }
 
     /// <summary>

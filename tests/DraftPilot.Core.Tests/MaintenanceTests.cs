@@ -32,6 +32,49 @@ public class MaintenanceTests : IDisposable
         CoreItems = [new ItemSet { Items = ["Item"], ItemIds = [1], Play = 1 }],
     };
 
+    /// <summary>
+    /// The lane build standing in for a matchup without a build is cached as the lane build it is.
+    /// Stored with its stand-in mark, a later draft without an opponent would load it and claim
+    /// "kein Build gegen Jax" about a lane where Jax was never in question.
+    /// </summary>
+    [Fact]
+    public void AStandInMark_IsNeverCached()
+    {
+        var cache = new BuildCache(_directory);
+        var plan = Plan("16.22.1");
+        plan.OpponentId = 0;
+        plan.OpponentName = string.Empty;
+        plan.Variant = "ranked-all";
+        plan.InPlaceOfOpponentId = 24;
+        plan.InPlaceOfOpponentName = "Jax";
+
+        cache.Save(plan);
+        var loaded = cache.Load("16.22.1", 122, Lane.Top, 0, "ranked-all");
+
+        Assert.NotNull(loaded);
+        Assert.Equal(0, loaded.InPlaceOfOpponentId);
+        Assert.Equal(string.Empty, loaded.InPlaceOfOpponentName);
+        Assert.DoesNotContain("Jax", File.ReadAllText(cache.PathFor("16.22.1", 122, Lane.Top, 0, "ranked-all")));
+    }
+
+    /// <summary>A plan names an opponent only when it was measured against one.</summary>
+    [Fact]
+    public void TheHeading_NamesAnOpponentOnlyForAMatchupBuild()
+    {
+        var matchup = Plan("16.22.1");
+        Assert.Equal("Darius vs Jax", matchup.Heading);
+
+        var lane = Plan("16.22.1");
+        lane.OpponentId = 0;
+        lane.OpponentName = string.Empty;
+        lane.InPlaceOfOpponentId = 24;
+        lane.InPlaceOfOpponentName = "Jax";
+        Assert.Equal($"Darius · {Lane.Top.Display()}", lane.Heading);
+
+        lane.Lane = Lane.Unknown;
+        Assert.Equal("Darius", lane.Heading);
+    }
+
     [Fact]
     public void CleanUp_RemovesOtherPatchesAndKeepsTheCurrentOne()
     {
