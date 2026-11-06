@@ -1,11 +1,15 @@
-# Collects ranked games from the Riot API and publishes what was counted: builds.json (builds) and
-# meta.json (lane rates, duels, duos, bans, damage types - the draft model's numbers).
+# Collects games from the Riot API and publishes what was counted:
+#   builds.json - builds per champion and lane (Platinum, Solo/Duo)
+#   meta.json   - the draft model's numbers: lane rates, duels, duos, bans, damage types (same games)
+#   mayhem.json - ARAM Mayhem: win rate per champion, builds, augments (only with RIOT_ID set)
 #
 # One key for everybody: the Riot key lives only in the repository secret RIOT_API_KEY, never in
 # the code or the app. Each run collects for about five and a half hours (the hosted runner allows
-# six), keeps its progress in the Actions cache - not public - and publishes both files as the
-# only files of the branch "data", from where every DirkDraft downloads them. They hold counts
-# per champion, lane and rank (Platinum, Solo/Duo); no player names, PUUIDs or match ids.
+# six), keeps its progress in the Actions cache - not public - and publishes the files as the only
+# files of the branch "data", from where every DirkDraft downloads them. They hold counts per
+# champion, lane and rank; no player names, PUUIDs or match ids. Mayhem has no league lists to
+# draw players from, so it starts at the Riot ID in the secret RIOT_ID and follows the players of
+# each counted game; that list stays in memory for the run.
 name: Daten sammeln
 
 on:
@@ -15,8 +19,11 @@ on:
   workflow_dispatch:
     inputs:
       minutes:
-        description: 'Sammelzeit in Minuten (hoechstens 330)'
-        default: '330'
+        description: 'Sammelzeit Ranked in Minuten'
+        default: '270'
+      mayhem_minutes:
+        description: 'Sammelzeit Mayhem in Minuten (nur mit RIOT_ID)'
+        default: '60'
 
 # Never two collectors on one state: the second would count the same games again.
 concurrency:
@@ -32,7 +39,9 @@ jobs:
     timeout-minutes: 355
     env:
       RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+      RIOT_ID: ${{ secrets.RIOT_ID }}
       STATE: riot-state.json.gz
+      MAYHEM_STATE: mayhem-state.json.gz
       TIERS: platinum
 
     steps:
@@ -59,30 +68,43 @@ jobs:
         if: steps.key.outputs.present == 'true'
         uses: actions/cache/restore@v4
         with:
-          path: ${{ env.STATE }}
+          path: |
+            ${{ env.STATE }}
+            ${{ env.MAYHEM_STATE }}
           key: riot-state-${{ github.run_id }}
           restore-keys: riot-state-
 
-      - name: Sammeln
+      - name: Ranked sammeln
         if: steps.key.outputs.present == 'true'
         run: >
           dotnet run --project src/DraftPilot.Tools -c Release --
-          riot collect --minutes "${{ inputs.minutes || '330' }}" --tiers "$TIERS" --state "$STATE"
+          riot collect --minutes "${{ inputs.minutes || '270' }}" --tiers "$TIERS" --state "$STATE"
 
-      # Also after a failed collect: the state is saved every hundred games, and what was counted
-      # before the failure is still counted.
+      # Without RIOT_ID the command says so and does nothing.
+      - name: Mayhem sammeln
+        if: always() && steps.key.outputs.present == 'true'
+        run: >
+          dotnet run --project src/DraftPilot.Tools -c Release --
+          riot mayhem --minutes "${{ inputs.mayhem_minutes || '60' }}" --state "$MAYHEM_STATE"
+
+      # Also after a failed collect: the states are saved every hundred (fifty) games, and what was
+      # counted before the failure is still counted.
       - name: Stand sichern
-        if: always() && steps.key.outputs.present == 'true' && hashFiles(env.STATE) != ''
+        if: always() && steps.key.outputs.present == 'true' && hashFiles(env.STATE, env.MAYHEM_STATE) != ''
         uses: actions/cache/save@v4
         with:
-          path: ${{ env.STATE }}
+          path: |
+            ${{ env.STATE }}
+            ${{ env.MAYHEM_STATE }}
           key: riot-state-${{ github.run_id }}
 
       - name: Exportieren
         if: steps.key.outputs.present == 'true'
-        run: dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export --state "$STATE" --tier "$TIERS" --out publish/builds.json --meta-out publish/meta.json
+        run: |
+          dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export --state "$STATE" --tier "$TIERS" --out publish/builds.json --meta-out publish/meta.json
+          dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export-mayhem --state "$MAYHEM_STATE" --out publish/mayhem.json
 
-      # One commit, force-pushed: the branch holds the current file and no history of old ones.
+      # One commit, force-pushed: the branch holds the current files and no history of old ones.
       - name: Veroeffentlichen
         if: steps.key.outputs.present == 'true'
         env:
@@ -93,5 +115,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add builds.json meta.json
-          git commit -q -m "Build-Daten $(date -u +%Y-%m-%dT%H:%MZ)"
+          if [ -f mayhem.json ]; then git add mayhem.json; fi
+          git commit -q -m "Daten $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data

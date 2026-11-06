@@ -5,11 +5,12 @@
 // GET requests for public files.
 
 import type { MetaSnapshot } from '../core/model/metaLookup';
+import type { RiotMayhemFile } from '../core/mayhem';
 import type { RiotBuildFile } from '../core/riotBuilds';
 
 export const DATA_BASE = 'https://raw.githubusercontent.com/Sazzlez/DirkDraft/data';
 
-export const FILES = { meta: 'meta.json', builds: 'builds.json' } as const;
+export const FILES = { meta: 'meta.json', builds: 'builds.json', mayhem: 'mayhem.json' } as const;
 export type DataFile = keyof typeof FILES;
 
 /** Where downloaded files are kept between runs (Tauri: app data folder; browser: localStorage). */
@@ -23,6 +24,8 @@ export type FetchText = (url: string) => Promise<string>;
 export interface DataSet {
   meta: MetaSnapshot;
   builds: RiotBuildFile | null;
+  /** Absent until the collector has a Riot ID to start Mayhem from. */
+  mayhem: RiotMayhemFile | null;
   /** Whether this run's download succeeded, or the numbers are the kept copy. */
   fresh: boolean;
   problems: string[];
@@ -48,6 +51,14 @@ export function checkBuilds(value: unknown): string | null {
   const file = value as Partial<RiotBuildFile>;
   if (file.version !== 1) return `unbekannte Version ${String(file.version)}`;
   if (!Array.isArray(file.builds)) return 'keine Builds';
+  return null;
+}
+
+export function checkMayhem(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return 'keine Daten';
+  const file = value as Partial<RiotMayhemFile>;
+  if (file.version !== 1) return `unbekannte Version ${String(file.version)}`;
+  if (!Array.isArray(file.champions) || !Array.isArray(file.augments) || !Array.isArray(file.builds)) return 'unvollständig';
   return null;
 }
 
@@ -83,12 +94,13 @@ async function one<T>(
 /** Both files, each freshly downloaded or else kept; null when there is no usable meta file at all. */
 export async function loadDataSet(fetchText: FetchText, cache: DataCache): Promise<DataSet | null> {
   const problems: string[] = [];
-  const [meta, builds] = await Promise.all([
+  const [meta, builds, mayhem] = await Promise.all([
     one<MetaSnapshot>('meta', fetchText, cache, checkMeta, problems),
     one<RiotBuildFile>('builds', fetchText, cache, checkBuilds, problems),
+    one<RiotMayhemFile>('mayhem', fetchText, cache, checkMayhem, problems),
   ]);
   if (!meta) return null;
-  return { meta: meta.value, builds: builds?.value ?? null, fresh: meta.fresh, problems };
+  return { meta: meta.value, builds: builds?.value ?? null, mayhem: mayhem?.value ?? null, fresh: meta.fresh, problems };
 }
 
 const BRACKETS: Record<string, string> = {

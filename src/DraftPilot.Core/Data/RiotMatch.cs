@@ -32,8 +32,12 @@ public sealed record ParticipantBuild(
     int TeamId = 0,
     long PhysicalDamage = 0,
     long MagicDamage = 0,
-    long TrueDamage = 0)
+    long TrueDamage = 0,
+    IReadOnlyList<int>? Augments = null)
 {
+    /// <summary>The augments picked, in order (Mayhem); empty elsewhere.</summary>
+    public IReadOnlyList<int> PickedAugments => Augments ?? [];
+
     /// <summary>
     /// The order the three basic abilities were maxed in, e.g. <c>QEW</c>: by the point at which
     /// each got its fifth rank, an ability never maxed after the ones that were, those by points.
@@ -147,7 +151,8 @@ public static class RiotMatchReader
         {
             var lane = Lanes.FromLcu(Text(participant, "teamPosition"));
             var championId = Int(participant, "championId");
-            if (lane == Lane.Unknown || championId <= 0)
+            // Mayhem has no lanes; everywhere else a player without one is a broken record.
+            if (championId <= 0 || (lane == Lane.Unknown && !IsMayhem(queue)))
                 continue;
 
             var id = Int(participant, "participantId");
@@ -174,7 +179,8 @@ public static class RiotMatchReader
                 TeamId: Int(participant, "teamId") is > 0 and var team ? team : id <= 5 ? 100 : 200,
                 PhysicalDamage: Long(participant, "physicalDamageDealtToChampions"),
                 MagicDamage: Long(participant, "magicDamageDealtToChampions"),
-                TrueDamage: Long(participant, "trueDamageDealtToChampions")));
+                TrueDamage: Long(participant, "trueDamageDealtToChampions"),
+                Augments: [.. Enumerable.Range(1, 6).Select(slot => Int(participant, $"playerAugment{slot}")).Where(augment => augment > 0)]));
         }
 
         return new MatchReading(patch, created, queue, counts, participants, Bans(info));
@@ -218,8 +224,19 @@ public static class RiotMatchReader
             && participants.ValueKind == JsonValueKind.Array
             && participants.EnumerateArray().Any(p => p.TryGetProperty("gameEndedInEarlySurrender", out var e) && e.ValueKind == JsonValueKind.True);
 
-        return (patch, created, queue, queue == RankedSoloQueue && duration >= MinimumDurationSeconds && !earlySurrender && patch.Length > 0);
+        var longEnough = queue == RankedSoloQueue ? duration >= MinimumDurationSeconds
+            : IsMayhem(queue) && duration >= MinimumMayhemSeconds;
+        return (patch, created, queue, longEnough && !earlySurrender && patch.Length > 0);
     }
+
+    /// <summary>ARAM Mayhem's queue ids, as <see cref="QueueKinds"/> knows them.</summary>
+    public static bool IsMayhem(int queueId) => QueueKinds.FromId(queueId) == QueueKind.AramMayhem;
+
+    /// <summary>
+    /// Ten minutes: a Mayhem game is short by design, and below this it was a remake or a stomp
+    /// nobody finished building in.
+    /// </summary>
+    public const int MinimumMayhemSeconds = 10 * 60;
 
     /// <summary>
     /// Every purchase that stood, in order. An undo takes back the most recent purchase of that

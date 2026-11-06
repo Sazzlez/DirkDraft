@@ -27,6 +27,9 @@ internal static class RiotCommand
             "show" => await ShowAsync(positional, options, ct),
             "status" => Status(options),
             "export" => await ExportAsync(options, ct),
+            "mayhem" => await MayhemAsync(options, ct),
+            "queues" => await QueuesAsync(options, ct),
+            "export-mayhem" => ExportMayhem(options),
             _ => Usage(),
         };
     }
@@ -39,6 +42,10 @@ internal static class RiotCommand
             riot status [--state build/riot-state.json.gz]
             riot export --out builds.json [--meta-out meta.json] [--tier platinum] [--keep 6] [--min-games 3]
                         [--min-patch-games 2000] [--state build/riot-state.json.gz]
+            riot mayhem --riot-id "Name#TAG" [--queues 2400] [--minutes 30] [--state build/mayhem-state.json.gz] [--key-file datei]
+            riot queues --riot-id "Name#TAG" [--games 20] [--key-file datei]
+            riot export-mayhem --out mayhem.json [--keep 6] [--min-games 3] [--min-patch-games 500] [--state build/mayhem-state.json.gz]
+            (Riot-ID auch über die Umgebungsvariable RIOT_ID)
             """);
         return 2;
     }
@@ -140,6 +147,94 @@ internal static class RiotCommand
                 Directory.CreateDirectory(directory);
             File.WriteAllText(path, text);
         }
+    }
+
+    private static MayhemOptions? MayhemOptionsFrom(Dictionary<string, string> options)
+    {
+        var riotId = options.GetValueOrDefault("riot-id") is { Length: > 0 } given ? given : Environment.GetEnvironmentVariable("RIOT_ID")?.Trim() ?? string.Empty;
+        if (!riotId.Contains('#'))
+            return null;
+
+        return new MayhemOptions
+        {
+            SeedRiotId = riotId,
+            Queues = [.. options.GetValueOrDefault("queues", "2400")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(queue => int.Parse(queue, CultureInfo.InvariantCulture))],
+            Duration = TimeSpan.FromMinutes(double.Parse(options.GetValueOrDefault("minutes", "30"), CultureInfo.InvariantCulture)),
+        };
+    }
+
+    private static async Task<int> MayhemAsync(Dictionary<string, string> options, CancellationToken ct)
+    {
+        var key = ReadKey(options);
+        var mayhem = MayhemOptionsFrom(options);
+        if (key is null || mayhem is null)
+        {
+            Console.Error.WriteLine(key is null ? "Kein Schlüssel: RIOT_API_KEY setzen oder --key-file angeben." : "Keine Riot-ID: --riot-id \"Name#TAG\" oder RIOT_ID setzen.");
+            return key is null ? 2 : 0;
+        }
+
+        var statePath = options.GetValueOrDefault("state", Path.Combine("build", "mayhem-state.json.gz"));
+        using var http = new HttpClient();
+        var catalog = await LatestItemsAsync(http, ct);
+        Console.WriteLine($"Mayhem · Patch {catalog.Version} · Queues {string.Join(", ", mayhem.Queues)} · Laufzeit {mayhem.Duration.TotalMinutes:0.#} min.");
+
+        var state = MayhemState.Load(statePath);
+        using var api = new RiotApiClient(key);
+        var collector = new MayhemCollector(api, catalog, mayhem, line => Console.WriteLine($"{DateTime.Now:HH:mm:ss} {line}"));
+        var report = await collector.RunAsync(state, s => s.Save(statePath), ct);
+        Console.WriteLine(
+            $"Fertig: {report.Counted} Mayhem-Spiele gezählt, {report.Skipped} übersprungen, {report.Requests} Abrufe "
+            + $"({report.Throttled}× gedrosselt) in {report.Elapsed:h\\:mm\\:ss}. Bestand: {state.Tally.Games:N0} Spiele → {statePath}");
+        return 0;
+    }
+
+    private static async Task<int> QueuesAsync(Dictionary<string, string> options, CancellationToken ct)
+    {
+        var key = ReadKey(options);
+        var mayhem = MayhemOptionsFrom(options);
+        if (key is null || mayhem is null)
+            return Usage();
+
+        using var http = new HttpClient();
+        var catalog = await LatestItemsAsync(http, ct);
+        using var api = new RiotApiClient(key);
+        var collector = new MayhemCollector(api, catalog, mayhem);
+        var games = int.Parse(options.GetValueOrDefault("games", "20"), CultureInfo.InvariantCulture);
+        foreach (var (queue, count) in (await collector.RecentQueuesAsync(games, ct)).OrderByDescending(q => q.Value))
+            Console.WriteLine($"Queue {queue,5}: {count,3} Spiele  {QueueKinds.FromId(queue).Display()}");
+        return 0;
+    }
+
+    private static int ExportMayhem(Dictionary<string, string> options)
+    {
+        if (!options.TryGetValue("out", out var outPath) || outPath.Length == 0)
+            return Usage();
+
+        var statePath = options.GetValueOrDefault("state", Path.Combine("build", "mayhem-state.json.gz"));
+        var keep = int.Parse(options.GetValueOrDefault("keep", "6"), CultureInfo.InvariantCulture);
+        var minimum = int.Parse(options.GetValueOrDefault("min-games", "3"), CultureInfo.InvariantCulture);
+        var enough = int.Parse(options.GetValueOrDefault("min-patch-games", "500"), CultureInfo.InvariantCulture);
+        var state = MayhemState.Load(statePath);
+
+        var source = state.Tally.Games < enough && state.Previous is { } previous && previous.Games > state.Tally.Games ? previous : state.Tally;
+        if (source.Games == 0)
+        {
+            Console.WriteLine("Noch keine Mayhem-Spiele gezählt — keine mayhem.json.");
+            return 0;
+        }
+
+        var tally = new RiotMayhemTally();
+        tally.Add(source);
+        var file = tally.Export(source.Patch, source.Platform, source.CollectedAtUtc, keep, minimum);
+
+        var directory = Path.GetDirectoryName(Path.GetFullPath(outPath));
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(file, RiotMayhemJson.Default.RiotMayhemFile));
+        Console.WriteLine($"Mayhem: {file.Games:N0} Spiele, {file.Champions.Count} Champions, {file.Augments.Count:N0} Augment-Zeilen, {new FileInfo(outPath).Length / 1024:N0} KB → {outPath}");
+        return 0;
     }
 
     private static async Task<int> CollectAsync(Dictionary<string, string> options, CancellationToken ct)
