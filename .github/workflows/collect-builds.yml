@@ -1,0 +1,96 @@
+# Collects ranked games from the Riot API and publishes the counted builds as one file.
+#
+# One key for everybody: the Riot key lives only in the repository secret RIOT_API_KEY, never in
+# the code or the app. Each run collects for about five and a half hours (the hosted runner allows
+# six), keeps its progress in the Actions cache - not public - and publishes builds.json as the
+# only file of the branch "data", from where every DirkDraft downloads it. The file holds counts
+# per champion, lane and rank; no player names, PUUIDs or match ids.
+name: Build-Daten sammeln
+
+on:
+  schedule:
+    # Every six hours; a run takes five and a half, so the key is busy most of the day.
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: 'Sammelzeit in Minuten (hoechstens 330)'
+        default: '330'
+
+# Never two collectors on one state: the second would count the same games again.
+concurrency:
+  group: collect-builds
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+      STATE: riot-state.json.gz
+      TIERS: gold,platinum
+
+    steps:
+      - name: Schluessel vorhanden?
+        id: key
+        run: |
+          if [ -z "$RIOT_API_KEY" ]; then
+            echo "::notice::Kein RIOT_API_KEY hinterlegt - nichts zu tun."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.present == 'true'
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.key.outputs.present == 'true'
+        with:
+          dotnet-version: '9.0.x'
+
+      # The newest state of an earlier run; a fresh start on the very first run or a new patch.
+      - name: Stand laden
+        if: steps.key.outputs.present == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.STATE }}
+          key: riot-state-${{ github.run_id }}
+          restore-keys: riot-state-
+
+      - name: Sammeln
+        if: steps.key.outputs.present == 'true'
+        run: >
+          dotnet run --project src/DraftPilot.Tools -c Release --
+          riot collect --minutes "${{ inputs.minutes || '330' }}" --tiers "$TIERS" --state "$STATE"
+
+      # Also after a failed collect: the state is saved every hundred games, and what was counted
+      # before the failure is still counted.
+      - name: Stand sichern
+        if: always() && steps.key.outputs.present == 'true' && hashFiles(env.STATE) != ''
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.STATE }}
+          key: riot-state-${{ github.run_id }}
+
+      - name: Exportieren
+        if: steps.key.outputs.present == 'true'
+        run: dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export --state "$STATE" --out publish/builds.json
+
+      # One commit, force-pushed: the branch holds the current file and no history of old ones.
+      - name: Veroeffentlichen
+        if: steps.key.outputs.present == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd publish
+          git init -q -b data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add builds.json
+          git commit -q -m "Build-Daten $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data

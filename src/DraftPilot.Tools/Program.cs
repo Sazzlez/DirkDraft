@@ -109,6 +109,9 @@ try
         case "settings":
             return SettingsCommand.Run(args);
 
+        case "riot":
+            return await RiotCommand.RunAsync(args, lifetime.Token);
+
         default:
             Console.Error.WriteLine($"Unbekannter Befehl: {args[0]}");
             PrintUsage();
@@ -173,6 +176,11 @@ static void PrintUsage()
           patchdrift <alt.json>  Wie stark sich die Lane-Raten seit einem aelteren Snapshot
                                  verschoben haben, ueber das Stichprobenrauschen hinaus
           runes                  Runenseiten des Accounts anzeigen (nur lesend)
+          riot collect [--minutes 30] [--tiers gold,platinum] [--state datei] [--key-file datei]
+                                 Ranked-Spiele ueber die Riot-API lesen und ihre Builds zaehlen
+                                 (Schluessel aus RIOT_API_KEY oder --key-file, wird nie ausgegeben)
+          riot show <champion> <lane> [--tier gold] [--state datei]
+                                 Gezaehlte Builds eines Champions auf einer Lane anzeigen
           opgg tools [name]      Werkzeuge der OP.GG-Schnittstelle auflisten, mit Namen das
                                  vollstaendige Argument-Schema eines Werkzeugs
           opgg try <werkzeug> [schluessel=wert ...] [--out datei.json]

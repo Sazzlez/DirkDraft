@@ -1,0 +1,743 @@
+{
+    "metadata":  {
+                     "matchId":  "EUW1_1"
+                 },
+    "info":  {
+                 "gameVersion":  "16.16.804.9184",
+                 "gameCreation":  1787403292673,
+                 "gameDuration":  1591,
+                 "queueId":  420,
+                 "participants":  [
+                                      {
+                                          "participantId":  1,
+                                          "championId":  10,
+                                          "teamPosition":  "TOP",
+                                          "win":  true,
+                                          "summoner1Id":  12,
+                                          "summoner2Id":  4,
+                                          "item0":  3009,
+                                          "item1":  3115,
+                                          "item2":  2510,
+                                          "item3":  3089,
+                                          "item4":  1052,
+                                          "item5":  0,
+                                          "item6":  3340,
+                                          "perks":  {
+                                                        "statPerks":  {
+                                                                          "defense":  5001,
+                                                                          "flex":  5008,
+                                                                          "offense":  5005
+                                                                      },
+                                                        "styles":  [
+                                                                       {
+                                                                           "description":  "primaryStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8005,
+                                                                                                  "var1":  2827,
+                                                                                                  "var2":  2827,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  9101,
+                                                                                                  "var1":  1812,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  9104,
+                                                                                                  "var1":  14,
+                                                                                                  "var2":  30,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8299,
+                                                                                                  "var1":  626,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8000
+                                                                       },
+                                                                       {
+                                                                           "description":  "subStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8234,
+                                                                                                  "var1":  12021,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8236,
+                                                                                                  "var1":  24,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8200
+                                                                       }
+                                                                   ]
+                                                    },
+                                          "gameEndedInEarlySurrender":  false
+                                      },
+                                      {
+                                          "participantId":  2,
+                                          "championId":  24,
+                                          "teamPosition":  "JUNGLE",
+                                          "win":  true,
+                                          "summoner1Id":  11,
+                                          "summoner2Id":  4,
+                                          "item0":  3111,
+                                          "item1":  3078,
+                                          "item2":  3157,
+                                          "item3":  6610,
+                                          "item4":  1036,
+                                          "item5":  0,
+                                          "item6":  3340,
+                                          "perks":  {
+                                                        "statPerks":  {
+                                                                          "defense":  5001,
+                                                                          "flex":  5008,
+                                                                          "offense":  5005
+                                                                      },
+                                                        "styles":  [
+                                                                       {
+                                                                           "description":  "primaryStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8008,
+                                                                                                  "var1":  336,
+                                                                                                  "var2":  336,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  9111,
+                                                                                                  "var1":  1420,
+                                                                                                  "var2":  320,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  9104,
+                                                                                                  "var1":  10,
+                                                                                                  "var2":  10,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8299,
+                                                                                                  "var1":  610,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8000
+                                                                       },
+                                                                       {
+                                                                           "description":  "subStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8347,
+                                                                                                  "var1":  0,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8304,
+                                                                                                  "var1":  9,
+                                                                                                  "var2":  4,
+                                                                                                  "var3":  5
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8300
+                                                                       }
+                                                                   ]
+                                                    },
+                                          "gameEndedInEarlySurrender":  false
+                                      },
+                                      {
+                                          "participantId":  3,
+                                          "championId":  910,
+                                          "teamPosition":  "MIDDLE",
+                                          "win":  true,
+                                          "summoner1Id":  12,
+                                          "summoner2Id":  4,
+                                          "item0":  1056,
+                                          "item1":  3041,
+                                          "item2":  6655,
+                                          "item3":  3175,
+                                          "item4":  4645,
+                                          "item5":  1058,
+                                          "item6":  3340,
+                                          "perks":  {
+                                                        "statPerks":  {
+                                                                          "defense":  5001,
+                                                                          "flex":  5010,
+                                                                          "offense":  5005
+                                                                      },
+                                                        "styles":  [
+                                                                       {
+                                                                           "description":  "primaryStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8992,
+                                                                                                  "var1":  1289,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8226,
+                                                                                                  "var1":  250,
+                                                                                                  "var2":  1109,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8210,
+                                                                                                  "var1":  15,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8236,
+                                                                                                  "var1":  24,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8200
+                                                                       },
+                                                                       {
+                                                                           "description":  "subStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8017,
+                                                                                                  "var1":  1294,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  9105,
+                                                                                                  "var1":  20,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8000
+                                                                       }
+                                                                   ]
+                                                    },
+                                          "gameEndedInEarlySurrender":  false
+                                      },
+                                      {
+                                          "participantId":  4,
+                                          "championId":  114,
+                                          "teamPosition":  "BOTTOM",
+                                          "win":  true,
+                                          "summoner1Id":  4,
+                                          "summoner2Id":  3,
+                                          "item0":  3024,
+                                          "item1":  3074,
+                                          "item2":  2517,
+                                          "item3":  3153,
+                                          "item4":  2031,
+                                          "item5":  0,
+                                          "item6":  3340,
+                                          "perks":  {
+                                                        "statPerks":  {
+                                                                          "defense":  5001,
+                                                                          "flex":  5008,
+                                                                          "offense":  5008
+                                                                      },
+                                                        "styles":  [
+                                                                       {
+                                                                           "description":  "primaryStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  9923,
+                                                                                                  "var1":  40,
+                                                                                                  "var2":  760,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8143,
+                                                                                                  "var1":  1196,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8137,
+                                                                                                  "var1":  3,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8135,
+                                                                                                  "var1":  450,
+                                                                                                  "var2":  5,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8100
+                                                                       },
+                                                                       {
+                                                                           "description":  "subStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8275,
+                                                                                                  "var1":  10,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8237,
+                                                                                                  "var1":  332,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8200
+                                                                       }
+                                                                   ]
+                                                    },
+                                          "gameEndedInEarlySurrender":  false
+                                      },
+                                      {
+                                          "participantId":  5,
+                                          "championId":  99,
+                                          "teamPosition":  "UTILITY",
+                                          "win":  true,
+                                          "summoner1Id":  7,
+                                          "summoner2Id":  4,
+                                          "item0":  3871,
+                                          "item1":  6655,
+                                          "item2":  3020,
+                                          "item3":  4645,
+                                          "item4":  2022,
+                                          "item5":  0,
+                                          "item6":  3364,
+                                          "perks":  {
+                                                        "statPerks":  {
+                                                                          "defense":  5013,
+                                                                          "flex":  5008,
+                                                                          "offense":  5008
+                                                                      },
+                                                        "styles":  [
+                                                                       {
+                                                                           "description":  "primaryStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8229,
+                                                                                                  "var1":  1368,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8226,
+                                                                                                  "var1":  250,
+                                                                                                  "var2":  995,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8210,
+                                                                                                  "var1":  15,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8237,
+                                                                                                  "var1":  337,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8200
+                                                                       },
+                                                                       {
+                                                                           "description":  "subStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8126,
+                                                                                                  "var1":  601,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8106,
+                                                                                                  "var1":  5,
+                                                                                                  "var2":  31,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8100
+                                                                       }
+                                                                   ]
+                                                    },
+                                          "gameEndedInEarlySurrender":  false
+                                      },
+                                      {
+                                          "participantId":  6,
+                                          "championId":  799,
+                                          "teamPosition":  "TOP",
+                                          "win":  false,
+                                          "summoner1Id":  14,
+                                          "summoner2Id":  4,
+                                          "item0":  1054,
+                                          "item1":  6692,
+                                          "item2":  2031,
+                                          "item3":  3071,
+                                          "item4":  0,
+                                          "item5":  2422,
+                                          "item6":  3340,
+                                          "perks":  {
+                                                        "statPerks":  {
+                                                                          "defense":  5011,
+                                                                          "flex":  5008,
+                                                                          "offense":  5008
+                                                                      },
+                                                        "styles":  [
+                                                                       {
+                                                                           "description":  "primaryStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8437,
+                                                                                                  "var1":  363,
+                                                                                                  "var2":  196,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8401,
+                                                                                                  "var1":  552,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8444,
+                                                                                                  "var1":  958,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8451,
+                                                                                                  "var1":  189,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8400
+                                                                       },
+                                                                       {
+                                                                           "description":  "subStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8345,
+                                                                                                  "var1":  3,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  231
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8304,
+                                                                                                  "var1":  11,
+                                                                                                  "var2":  1,
+                                                                                                  "var3":  5
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8300
+                                                                       }
+                                                                   ]
+                                                    },
+                                          "gameEndedInEarlySurrender":  false
+                                      },
+                                      {
+                                          "participantId":  7,
+                                          "championId":  200,
+                                          "teamPosition":  "JUNGLE",
+                                          "win":  false,
+                                          "summoner1Id":  11,
+                                          "summoner2Id":  4,
+                                          "item0":  6672,
+                                          "item1":  3124,
+                                          "item2":  3047,
+                                          "item3":  1036,
+                                          "item4":  1043,
+                                          "item5":  0,
+                                          "item6":  3364,
+                                          "perks":  {
+                                                        "statPerks":  {
+                                                                          "defense":  5001,
+                                                                          "flex":  5008,
+                                                                          "offense":  5008
+                                                                      },
+                                                        "styles":  [
+                                                                       {
+                                                                           "description":  "primaryStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8008,
+                                                                                                  "var1":  397,
+                                                                                                  "var2":  397,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  9111,
+                                                                                                  "var1":  122,
+                                                                                                  "var2":  40,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  9104,
+                                                                                                  "var1":  18,
+                                                                                                  "var2":  40,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8014,
+                                                                                                  "var1":  483,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8000
+                                                                       },
+                                                                       {
+                                                                           "description":  "subStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8313,
+                                                                                                  "var1":  3,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8316,
+                                                                                                  "var1":  6,
+                                                                                                  "var2":  8,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8300
+                                                                       }
+                                                                   ]
+                                                    },
+                                          "gameEndedInEarlySurrender":  false
+                                      },
+                                      {
+                                          "participantId":  8,
+                                          "championId":  800,
+                                          "teamPosition":  "MIDDLE",
+                                          "win":  false,
+                                          "summoner1Id":  4,
+                                          "summoner2Id":  12,
+                                          "item0":  3152,
+                                          "item1":  6655,
+                                          "item2":  3175,
+                                          "item3":  1058,
+                                          "item4":  3145,
+                                          "item5":  0,
+                                          "item6":  3340,
+                                          "perks":  {
+                                                        "statPerks":  {
+                                                                          "defense":  5001,
+                                                                          "flex":  5008,
+                                                                          "offense":  5007
+                                                                      },
+                                                        "styles":  [
+                                                                       {
+                                                                           "description":  "primaryStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8229,
+                                                                                                  "var1":  1352,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8226,
+                                                                                                  "var1":  250,
+                                                                                                  "var2":  679,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8210,
+                                                                                                  "var1":  15,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8237,
+                                                                                                  "var1":  497,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8200
+                                                                       },
+                                                                       {
+                                                                           "description":  "subStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8014,
+                                                                                                  "var1":  217,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8009,
+                                                                                                  "var1":  988,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8000
+                                                                       }
+                                                                   ]
+                                                    },
+                                          "gameEndedInEarlySurrender":  false
+                                      },
+                                      {
+                                          "participantId":  9,
+                                          "championId":  429,
+                                          "teamPosition":  "BOTTOM",
+                                          "win":  false,
+                                          "summoner1Id":  4,
+                                          "summoner2Id":  21,
+                                          "item0":  3302,
+                                          "item1":  3087,
+                                          "item2":  3124,
+                                          "item3":  1033,
+                                          "item4":  0,
+                                          "item5":  0,
+                                          "item6":  3340,
+                                          "perks":  {
+                                                        "statPerks":  {
+                                                                          "defense":  5011,
+                                                                          "flex":  5008,
+                                                                          "offense":  5005
+                                                                      },
+                                                        "styles":  [
+                                                                       {
+                                                                           "description":  "primaryStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8008,
+                                                                                                  "var1":  872,
+                                                                                                  "var2":  872,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  9111,
+                                                                                                  "var1":  222,
+                                                                                                  "var2":  80,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  9104,
+                                                                                                  "var1":  20,
+                                                                                                  "var2":  40,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8299,
+                                                                                                  "var1":  1931,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8000
+                                                                       },
+                                                                       {
+                                                                           "description":  "subStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8143,
+                                                                                                  "var1":  1585,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8135,
+                                                                                                  "var1":  120,
+                                                                                                  "var2":  2,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8100
+                                                                       }
+                                                                   ]
+                                                    },
+                                          "gameEndedInEarlySurrender":  false
+                                      },
+                                      {
+                                          "participantId":  10,
+                                          "championId":  80,
+                                          "teamPosition":  "UTILITY",
+                                          "win":  false,
+                                          "summoner1Id":  4,
+                                          "summoner2Id":  14,
+                                          "item0":  2031,
+                                          "item1":  3877,
+                                          "item2":  6610,
+                                          "item3":  3133,
+                                          "item4":  3111,
+                                          "item5":  1037,
+                                          "item6":  3364,
+                                          "perks":  {
+                                                        "statPerks":  {
+                                                                          "defense":  5011,
+                                                                          "flex":  5008,
+                                                                          "offense":  5008
+                                                                      },
+                                                        "styles":  [
+                                                                       {
+                                                                           "description":  "primaryStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8005,
+                                                                                                  "var1":  638,
+                                                                                                  "var2":  638,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  9111,
+                                                                                                  "var1":  276,
+                                                                                                  "var2":  100,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  9105,
+                                                                                                  "var1":  0,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8014,
+                                                                                                  "var1":  177,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8000
+                                                                       },
+                                                                       {
+                                                                           "description":  "subStyle",
+                                                                           "selections":  [
+                                                                                              {
+                                                                                                  "perk":  8105,
+                                                                                                  "var1":  16,
+                                                                                                  "var2":  2,
+                                                                                                  "var3":  0
+                                                                                              },
+                                                                                              {
+                                                                                                  "perk":  8143,
+                                                                                                  "var1":  653,
+                                                                                                  "var2":  0,
+                                                                                                  "var3":  0
+                                                                                              }
+                                                                                          ],
+                                                                           "style":  8100
+                                                                       }
+                                                                   ]
+                                                    },
+                                          "gameEndedInEarlySurrender":  false
+                                      }
+                                  ]
+             }
+}
