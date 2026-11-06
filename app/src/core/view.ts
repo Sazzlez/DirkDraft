@@ -142,6 +142,9 @@ export interface PickTileView {
   hover: HoverView | null;
   footnote: string | null;
   poolAvailable: boolean;
+  /** The best picks among the player's pool, ranked over the pool alone; null without a pool. */
+  poolItems: RecommendationView[] | null;
+  poolTied: number;
 }
 
 export interface HoverView {

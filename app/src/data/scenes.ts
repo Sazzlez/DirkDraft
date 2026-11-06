@@ -72,7 +72,9 @@ function load(): Promise<Sources> {
     const snapshot = await json<MetaSnapshot>('/tests/golden/snapshot.json');
     const aram = await json<AramStat[]>('/tests/golden/aram-stats.json');
     await loadAssets(snapshot.patch);
-    const options = { aramStats: new Map(aram.map((s) => [s.championId, s])) };
+    // A sample pool, so the "Mein Pool" switch has something to show without a client.
+    const samplePool = new Set([122, 86, 875, 82, 516, 54, 24, 266, 103, 134, 412, 89, 64, 222, 51]);
+    const options = { aramStats: new Map(aram.map((s) => [s.championId, s])), pool: () => samplePool };
     const recordings = new Map<string, { frames: { frame?: GoldenFrame }[] }>();
     for (const name of ['live-tournament-draft', 'state-myban', 'build-demo', 'state-nachlock', 'state-final', 'state-aram-bench'])
       recordings.set(name, play(new DraftEngine(snapshot, options), await text(`/tests/recordings/${name}.jsonl`)));

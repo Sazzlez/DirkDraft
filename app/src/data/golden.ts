@@ -111,6 +111,8 @@ export interface GoldenFrame {
   balance: { allyWinRate: number; ratedChampions: number; contestedLanes: number; isComparable: boolean; hasData: boolean };
   laneMatchups: { lane: string; allyId: number; enemyId: number; winRate: number | null; play: number; isInferred: boolean; measured: number | string | null }[];
   aramBench: { own: number; bench: number[]; rerolls: number; tied: number; decimals: number; items: GoldenItem[] } | null;
+  /** Live frames with a known pool only (core/engine). */
+  poolPicks?: GoldenSet | null;
 }
 
 export interface SnapshotChampion {
@@ -260,18 +262,27 @@ export class GoldenAdapter {
 
   pickTile(set: GoldenSet, frame: GoldenFrame, title: string): PickTileView {
     const isBan = set.action === 'ban';
-    const leader = set.items[0]!;
+    const pool = isBan ? null : (frame.poolPicks ?? null);
+    const inPool = new Set(pool?.items.map((i) => i.championId) ?? []);
+    const rows = (s: GoldenSet) =>
+      s.items.map((item, i) => {
+        const row = this.recommendation(item, i + 1, s.items[0]!, s.decimals, isBan, i < s.tied);
+        return pool ? { ...row, inPool: inPool.has(item.championId) } : row;
+      });
     return {
       kind: isBan ? 'bans' : 'picks',
       title,
       lane: toLane(set.lane),
       tied: set.tied,
-      items: set.items.map((item, i) => this.recommendation(item, i + 1, leader, set.decimals, isBan, i < set.tied)),
+      items: rows(set),
       hover: isBan ? null : this.hover(frame),
       footnote: isBan
         ? 'Bann-Wert: so viel Winrate nimmt der Bann dem Gegner, mal der Chance, dass er den Champion überhaupt pickt.'
         : 'Balken: Beitrag jedes Kriteriums in Prozentpunkten über 50 %. Rot zieht ab.',
-      poolAvailable: true,
+      // Without a known pool the switch would offer an empty list; it is hidden instead.
+      poolAvailable: !isBan && (pool?.items.length ?? 0) > 0,
+      poolItems: pool && pool.items.length > 0 ? rows(pool) : null,
+      poolTied: pool?.tied ?? 0,
     };
   }
 

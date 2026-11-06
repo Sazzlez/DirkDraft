@@ -11,11 +11,14 @@
   let showAll = $state(false);
 
   const isBan = $derived(tile.kind === 'bans');
-  const items = $derived(pool === 'pool' ? tile.items.filter((i) => i.inPool) : tile.items);
+  // The pool list is ranked over the pool alone (core/engine), not filtered out of the top eight.
+  const usePool = $derived(pool === 'pool' && !!tile.poolItems);
+  const items = $derived(usePool ? tile.poolItems! : tile.items);
+  const tied = $derived(usePool ? tile.poolTied : tile.tied);
   const head = $derived(items.slice(0, 3));
   const rest = $derived(items.slice(3));
-  const tiedShown = $derived(Math.min(tile.tied, 3));
-  const tiedHidden = $derived(Math.max(0, tile.tied - 3));
+  const tiedShown = $derived(Math.min(tied, 3));
+  const tiedHidden = $derived(Math.max(0, tied - 3));
 </script>
 
 <Tile title={tile.title} main>
@@ -47,8 +50,8 @@
     <HoverRow hover={tile.hover} />
   {/if}
 
-  {#if tile.tied >= 2}
-    <div class="group">Vorne gleichauf · {tile.tied}</div>
+  {#if tied >= 2}
+    <div class="group">Vorne gleichauf · {tied}</div>
   {/if}
 
   <div class="rows">

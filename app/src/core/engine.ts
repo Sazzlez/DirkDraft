@@ -15,7 +15,7 @@ import {
   type DraftState,
   type TurnAction,
 } from './model/draftState';
-import { laneFromKey, laneKey } from './model/lane';
+import { laneFromKey, laneKey, type Lane } from './model/lane';
 import { isUncertain, LanePredictor, SeatPriors, type LanePredictionResult } from './model/lanePredictor';
 import { MetaLookup, type MetaSnapshot } from './model/metaLookup';
 import { isAram, usesLanes, type QueueKind } from './model/queue';
@@ -111,6 +111,8 @@ export interface DraftFrame {
   balance: { allyWinRate: number; ratedChampions: number; contestedLanes: number; isComparable: boolean; hasData: boolean };
   laneMatchups: { lane: LaneName; allyId: number; enemyId: number; winRate: number | null; play: number; isInferred: boolean; measured: number | null }[];
   aramBench: { own: number; bench: number[]; rerolls: number; tied: number; decimals: number; items: FrameItem[] } | null;
+  /** The best picks among the player's pool; absent without a pool, null when it is empty here. */
+  poolPicks?: FrameSet | null;
 }
 
 export interface EngineOptions {
@@ -119,6 +121,11 @@ export interface EngineOptions {
   aramStats?: ReadonlyMap<number, AramStat>;
   /** Whether the ARAM rates are rounded to whole percent (OP.GG) rather than counted exactly (own data). */
   aramRounded?: boolean;
+  /**
+   * The player's pool for a lane ("Mein Pool"). When given, the frame carries a second pick list
+   * ranked over the pool alone — the best eight of the pool, not the pool members of the top eight.
+   */
+  pool?: (lane: Lane) => ReadonlySet<number> | null;
 }
 
 export class DraftEngine {
@@ -139,7 +146,10 @@ export class DraftEngine {
     this.seats = options.seats ?? SeatPriors.fromJson(priors);
     this.aramStats = options.aramStats ?? new Map();
     this.aramRounded = options.aramRounded ?? true;
+    this.pool = options.pool ?? null;
   }
+
+  private readonly pool: ((lane: Lane) => ReadonlySet<number> | null) | null;
 
   /**
    * One session update from the client (the parsed /lol-champ-select/v1/session, or null outside
@@ -179,13 +189,20 @@ export class DraftEngine {
     const recommender = new Recommender(meta, this.traits);
 
     let picks: FrameSet | null = null;
+    let poolPicks: FrameSet | null = null;
     let bans: FrameSet | null = null;
     let hoverResult: DraftFrame['hover'] = null;
     let bench: DraftFrame['aramBench'] = null;
 
     if (state.isActive && target && usesLanes(state.queue)) {
-      picks = frameSet(recommender.recommend(state, { ...target, action: 'pick' }, enemyPredictions, allyPredictions, null, LIST_LIMIT));
+      const pickSet = recommender.recommend(state, { ...target, action: 'pick' }, enemyPredictions, allyPredictions, null, LIST_LIMIT);
+      picks = frameSet(pickSet);
       bans = frameSet(recommender.recommend(state, { ...target, action: 'ban' }, enemyPredictions, allyPredictions, null, LIST_LIMIT));
+
+      const pool = this.pool?.(pickSet.lane) ?? null;
+      if (pool && pool.size > 0) {
+        poolPicks = frameSet(recommender.recommend(state, { ...target, action: 'pick' }, enemyPredictions, allyPredictions, pool, LIST_LIMIT));
+      }
     }
 
     const mine = localSlot(state);
@@ -264,6 +281,8 @@ export class DraftEngine {
         measured: m.measured,
       })),
       aramBench: bench,
+      // Only with a pool: the golden frames have no such key, and the comparison is key-exact.
+      ...(this.pool ? { poolPicks } : {}),
     };
   }
 }
