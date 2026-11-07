@@ -7,6 +7,7 @@ pub mod http;
 pub mod import;
 pub mod install;
 pub mod live;
+pub mod pool;
 pub mod scrub;
 pub mod socket;
 pub mod source;

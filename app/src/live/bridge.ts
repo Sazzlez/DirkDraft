@@ -68,6 +68,8 @@ async function askEndOfGame(): Promise<void> {
       if (end) {
         saveHistory(session.onEndOfGame(end));
         render();
+        // The game just played belongs in the pool's recent games now.
+        askPool(true);
         return;
       }
       await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -75,6 +77,25 @@ async function askEndOfGame(): Promise<void> {
   } finally {
     endAsked = false;
   }
+}
+
+let poolAsked = false;
+
+/** Mastery and recent games for "Mein Pool": once per connection, and again after each game. */
+function askPool(force = false): void {
+  if ((!force && !session.needsPool) || poolAsked) return;
+  poolAsked = true;
+  invoke<{ masteries: { championId: number; points: number }[]; games: { championId: number; lane: string; queueId: number }[] }>('client_pool_input')
+    .then((input) => {
+      if (input.masteries.length > 0 || input.games.length > 0) {
+        session.setPoolInput(input);
+        render();
+      }
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      poolAsked = false;
+    });
 }
 
 let selectableAsked = false;
@@ -120,6 +141,7 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   await listen<ClientStatus>('client://status', (e) => {
     session.onStatus(e.payload);
     if (!e.payload.clientRunning) void refresher.onPhase(null, Date.now());
+    if (e.payload.socketConnected) askPool();
     render();
   });
   await listen<string>('client://phase', (e) => {
@@ -131,6 +153,7 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   await listen<string | null>('client://session', (e) => {
     session.onSession(e.payload);
     askSelectable();
+    askPool();
     render();
   });
   await listen<string | null>('game://live', (e) => {
@@ -148,6 +171,7 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   }
   if (snapshot.game) session.onGame(snapshot.game);
   void refresher.onPhase(snapshot.status.clientRunning ? snapshot.phase : null, Date.now());
+  if (snapshot.status.clientRunning) askPool();
   render();
 
   // The champion select clock counts down between events; the refresher checks whether it is due.

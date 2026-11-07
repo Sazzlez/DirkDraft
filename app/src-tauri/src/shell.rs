@@ -36,6 +36,7 @@ pub fn run() {
             crate::client::client_pickable,
             crate::client::client_game_version,
             crate::client::client_end_of_game,
+            crate::client::client_pool_input,
             crate::client::client_import,
         ])
         .on_window_event(|window, event| {

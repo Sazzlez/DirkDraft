@@ -2,6 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { laneFromKey } from '../../src/core/model/lane';
 import type { MetaSnapshot } from '../../src/core/model/metaLookup';
 import type { DataSet } from '../../src/data/remote';
 import { LiveSession } from '../../src/live/session';
@@ -152,6 +153,36 @@ describe('LiveSession', () => {
     expect(live.view().postgame?.result).toBe('Sieg');
     live.onPhase('GameStart');
     expect(live.view().postgame).toBeNull();
+  });
+
+  it('offers "Mein Pool" once mastery and games are in, without ARAM games counting for a lane', () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    const last = sessions('live-tournament-draft').filter((r) => r.session).at(-1)!.session!;
+    live.onSession(last);
+    const tile = (v = live.view().main) => (v.kind === 'picks' || v.kind === 'bans' ? v.tile : null);
+    expect(live.needsPool).toBe(true);
+    expect(tile()?.poolItems ?? null).toBeNull();
+
+    const lane = tile()!.lane!;
+    const ids = snapshot.laneStats.filter((s) => s.lane === laneFromKey(lane)).slice(0, 6).map((s) => s.championId);
+    live.setPoolInput({
+      masteries: [],
+      games: [
+        ...ids.flatMap((championId) => [
+          { championId, lane, queueId: 420 },
+          { championId, lane, queueId: 420 },
+        ]),
+        { championId: 99, lane: '', queueId: 2400 },
+        { championId: 99, lane: '', queueId: 2400 },
+      ],
+    });
+    expect(live.needsPool).toBe(false);
+    const pool = tile()?.poolItems ?? [];
+    expect(pool.length).toBeGreaterThan(0);
+    for (const item of pool) expect(ids).toContain(item.champion.id);
   });
 
   it('shows the game from the live client', () => {

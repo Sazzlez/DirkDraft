@@ -8,6 +8,8 @@
 import { DraftEngine } from '../core/engine';
 import { gameModel, championIdOf, enemyItemsOf, type LiveGameData } from '../core/game';
 import { aramStatsFrom } from '../core/mayhem';
+import { poolFor, type PoolInput } from '../core/pool';
+import { queueFromId, usesLanes } from '../core/model/queue';
 import { Lane, laneFromKey } from '../core/model/lane';
 import { MetaLookup } from '../core/model/metaLookup';
 import { TraitTable } from '../core/model/traits';
@@ -65,6 +67,7 @@ export class LiveSession {
   /** The own pick of the last draft, for the build and the game after it. */
   private picked: Picked | null = null;
 
+  private poolInput: PoolInput | null = null;
   private readonly recorder = new PickRecorder();
   /** Where the own pick stood in the suggestions when it was locked. */
   private pickRecord: PickRecord | null = null;
@@ -98,10 +101,12 @@ export class LiveSession {
     this.data = set;
     this.meta = new MetaLookup(set.meta);
     this.adapter = new GoldenAdapter(set.meta.champions);
+    const meta = this.meta;
     this.engine = new DraftEngine(set.meta, {
       traits: this.traits,
       aramStats: set.mayhem ? aramStatsFrom(set.mayhem) : undefined,
       aramRounded: !set.mayhem,
+      pool: (lane) => (this.poolInput ? poolFor(lane, this.poolInput, meta).champions : null),
     });
     // New numbers arrive only while idle (core/refresh), but a kept session is re-evaluated anyway.
     if (this.session) this.onSession(this.session);
@@ -148,6 +153,25 @@ export class LiveSession {
     } else {
       this.recorder.reset();
     }
+  }
+
+  /** Whether "Mein Pool" still lacks the player's mastery and games. */
+  get needsPool(): boolean {
+    return this.poolInput === null;
+  }
+
+  /**
+   * Mastery and recent games from the client. Games of modes without lanes count for no lane, so
+   * ARAM does not fill the top pool; the pool is a filter and never changes a score.
+   */
+  setPoolInput(input: { masteries: { championId: number; points: number }[]; games: { championId: number; lane: string; queueId: number }[] }): void {
+    this.poolInput = {
+      masteries: input.masteries,
+      games: input.games
+        .filter((g) => usesLanes(queueFromId(g.queueId)))
+        .map((g) => ({ championId: g.championId, lane: laneFromKey(g.lane) })),
+    };
+    if (this.session) this.onSession(this.session, this.sessionAt);
   }
 
   /** Whether the champions the player may pick are still unknown for the running draft. */

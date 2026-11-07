@@ -16,6 +16,7 @@ use crate::lcu::http::Lcu;
 use crate::lcu::import::{self, ImportOutcome, ImportRequest};
 use crate::lcu::source::{self, ClientStatus, Update};
 use crate::lcu::live;
+use crate::lcu::pool;
 
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -115,6 +116,13 @@ pub async fn client_end_of_game(state: State<'_, ClientState>) -> Result<Option<
     let lcu = state.lcu().ok_or("Client nicht verbunden")?;
     let block: Option<serde_json::Value> = lcu.get_json("/lol-end-of-game/v1/eog-stats-block").await;
     Ok(block.as_ref().and_then(end_of_game::read))
+}
+
+/// Mastery and recent games for "Mein Pool" (champion, points, lane, queue — nothing else).
+#[tauri::command]
+pub async fn client_pool_input(state: State<'_, ClientState>) -> Result<pool::PoolInput, String> {
+    let lcu = state.lcu().ok_or("Client nicht verbunden")?;
+    Ok(pool::read(&lcu).await)
 }
 
 /// The import button: rune page and/or spells, on the user's click only.
