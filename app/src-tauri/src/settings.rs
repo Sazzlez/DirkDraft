@@ -36,6 +36,12 @@ impl Settings {
         self.values.get(key).or_else(|| self.values.iter().find(|(k, _)| k.eq_ignore_ascii_case(key)).map(|(_, v)| v))
     }
 
+    /// Settings from given values, never saved: for other modules' tests.
+    #[cfg(test)]
+    pub fn from_values(values: Map<String, Value>) -> Self {
+        Self { path: None, values, writable: false }
+    }
+
     pub fn flag(&self, key: &str, default: bool) -> bool {
         self.get(key).and_then(Value::as_bool).unwrap_or(default)
     }

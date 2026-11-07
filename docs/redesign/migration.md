@@ -63,6 +63,21 @@ prüfen nur den Standardkanal und sehen davon nichts.
      „Jetzt aktualisieren“ in 1.5 auslöst (Dateien ersetzen, Haken, Neustart); die Anzeige „Version
      2.0.0 ist da“ in 1.5 ist Velopacks Standard-Feed und unverändert.
 
+## Ergebnis des Update-Tests (07.11.2026)
+
+Bestanden, an Probe-IDs in der Claude-Shell-Umgebung (eigene AppData-Sicht), danach deinstalliert:
+
+- **2.0 → 2.0:** `DirkDraft-Beta` 2.0.1 (Setup `--silent` startet die App nicht von selbst), gestartet
+  mit `DIRKDRAFT_UPDATE_SOURCE=…uildReleases-beta` → Pill „Update 2.0.2“ → Klick → Neustart als
+  2.0.2; die Prüfung danach meldet „neu keine“. Velopack las den Kanal `beta` aus dem Manifest.
+- **1.5 → 2.0:** die 1.5-Dateien unverändert als `DirkDraft-UpdTest` 1.5.0 gepackt (Kanal `updtest`,
+  ohne Desktop-Verknüpfung), installiert, gestartet; `Update.exe apply --package …2.0.0-full.nupkg
+  --waitPid <1.5>` und 1.5 beendet → `current` enthält nur `DirkDraft.exe` und `sq.version` (2.0.0),
+  2.0 startet von selbst, `settings.json` mit 1.5-Werten erhalten, Diagnose dank `diagnostics.on` an.
+  Delta 1.5.0 → 2.0.0: 4,0 MB (Vollpaket 6,2 MB); scheitert ein Delta, lädt Velopack das Vollpaket.
+- **Befund:** ein 1.5-Fenster ohne gespeicherte Größe verlor seinen Platz → behoben (Position wird
+  auch allein übernommen), am Release-Build nachgeprüft.
+
 ## Alternative (nur falls der Spike scheitert)
 
 Tauri-eigener NSIS-Installer mit `tauri-plugin-updater` und eine **Brückenversion 1.6** über

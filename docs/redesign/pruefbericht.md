@@ -1,8 +1,10 @@
 # DirkDraft 2.0 — Prüfbericht (07.11.2026)
 
 Auftrag: `docs/redesign/auftrag-pruefung.md`. Gearbeitet im Worktree `redesign-board`, Branch
-`redesign/board`. Nichts ausgeliefert, gepusht, gemergt oder installiert; `master` und der
-Haupt-Checkout sind unverändert (`1d933e7`).
+`redesign/board`. Nichts ausgeliefert oder gemergt, kein Tag, kein Release. Mit deinem OK: zwei
+Sammler-Commits auf `master` gepusht (`57faa83`, `0c31629`) und der Update-Test an
+Probe-Installationen (eigene App-IDs, in der Claude-Shell-Umgebung, danach wieder deinstalliert); deine
+installierte 1.5 ist unberührt.
 
 ## Kurzfassung
 
@@ -10,8 +12,8 @@ Haupt-Checkout sind unverändert (`1d933e7`).
 eingecheckt waren (ein frischer Checkout hätte nicht gebaut) und weil die App die echte
 `situational.json` verwarf. Beides ist behoben, dazu eine Reihe von Fehlern in Oberfläche, Builds,
 situativen Items und Client-Anbindung. Die Build-Auswahl ist auf eine gemessene Regel umgestellt.
-Offen bleiben der Live-Durchlauf mit dir, der Update-Test an einer Probe-Installation (braucht dein
-OK) und Windows 11 (Mica) bei einem Freund.
+Der Update-Test (2.0 → 2.0 und 1.5 → 2.0) ist bestanden; sein einziger Befund ist behoben. Offen bleiben
+Reste des Live-Durchlaufs und Windows 11 (Mica) bei einem Freund.
 
 ## Gefunden und behoben
 
@@ -66,6 +68,11 @@ OK) und Windows 11 (Mica) bei einem Freund.
 - Ohne gefundenes League nie wieder gesucht → alle 10 s; nach Client-Ende alte Phase im Snapshot.
 - 1.5-Fensterplatz wurde nicht übernommen (README/CHANGELOG versprachen es) → beim ersten Start
   übernommen; Platz wird auch beim Schließen in den Infobereich gesichert.
+- Update-Test: ein 1.5-Fenster, das verschoben, aber nie in der Größe geändert wurde (1.5 speichert
+  die Größe dann als „NaN“), verlor seinen Platz → Position wird auch ohne Größe übernommen, mit
+  2.0s eigener Größe, auf dem Bildschirm gehalten.
+- Velopack schrieb jede Update-Prüfung ins Log, mit dem Windows-Profilpfad → von Velopack nur noch
+  Warnungen und Fehler; die eigenen Update-Zeilen sagen, was geschah.
 - Erster Datenabruf offline: nächster Versuch nach 30 min → nach 1 min, mit Hinweis.
 - Glas-Effekt (Mica) abschaltbar, da auf Windows 11 nie gelaufen.
 - Velopack prüft beim Update keine Paket-ID → Beta-Pakete auf eigenem Kanal „beta“; Testquelle
@@ -93,15 +100,15 @@ je Slot τ = 0, Beliebtheit vs. Winrate ohne einheitliches Muster, Stiefelkäufe
 
 | Punkt | Stand |
 |---|---|
-| `npx vitest run` | grün, 524 Tests (29 neu, davon einer gegen den echten Ranked-Draft), 7 übersprungen (OP.GG-Fälle) |
+| `npx vitest run` | grün, 529 Tests (34 neu, davon einer gegen den echten Ranked-Draft), 7 übersprungen (OP.GG-Fälle) |
 | `npm run check` | 0 Fehler, 0 Warnungen |
-| `cargo test` | grün, 24 Tests (3 neu) |
+| `cargo test` | grün, 27 Tests (6 neu) |
 | `dotnet test` | grün, 636 Tests |
 | Screenshots | 13 Szenen × 3 Breiten × 2 Themen = 78, gesichtet, ohne Darstellungsfehler |
 | Release-Build | gebaut (9,5 MB), gestartet: Daten unter CSP geladen (raw.githubusercontent.com, Data Dragon), Client verbunden, eine Instanz, X → Infobereich, Fensterplatz gesichert, 1.5-Platz übernommen |
 | `tauri dev` | echtes Fenster gegen den laufenden Client (Leerlauf), Log geprüft |
-| Beta-Paket | `release.ps1 -PackId DirkDraft-Beta` für 2.0.0 und 2.0.1: Installer 10,1 MB (1.5: 78 MB), Vollpaket 6,1 MB, Delta 2.0.0 → 2.0.1 0,96 MB, WebView2-Bootstrap drin, Kanal `beta`, kein Upload; je ca. 5 Minuten |
-| Update-Test | **offen, braucht dein OK** — sicherer Weg in `docs/redesign/migration.md` |
+| Beta-Paket | `release.ps1 -PackId DirkDraft-Beta` für 2.0.0, 2.0.1 und 2.0.2: Installer 10,1 MB (1.5: 78 MB), Vollpaket 6,1 MB, Delta 2.0.0 → 2.0.1 0,96 MB, WebView2-Bootstrap drin, Kanal `beta`, kein Upload; je ca. 5 Minuten |
+| Update-Test | **bestanden** (07.11., mit deinem OK, Probe-IDs in der Claude-Shell-Umgebung, danach deinstalliert). **A** 2.0 → 2.0: Beta 2.0.1 installiert, mit `DIRKDRAFT_UPDATE_SOURCE` gestartet → Pill „Update 2.0.2“ → Klick → Neustart als 2.0.2, Prüfung danach „neu keine“. **B** 1.5 → 2.0: die echten 1.5-Dateien als `DirkDraft-UpdTest` 1.5.0 installiert und gestartet, dann `Update.exe apply` mit dem 2.0.0-Paket derselben ID (was „Jetzt aktualisieren“ in 1.5 auslöst) → 1.5 beendet, `current` enthält nur noch 2.0, 2.0 startet, Einstellungen erhalten, Diagnose dank `diagnostics.on` an. Delta 1.5 → 2.0: 4,0 MB. Befund: Fensterplatz ohne 1.5-Größe (behoben, am Release-Build nachgeprüft: Platz 120/60 übernommen). |
 | Live-Durchlauf | **zwei echte Solo/Duo-Spiele** (07.11., Support; Release-Build lief mit, Fenster nur beobachtet, „Übernehmen“ hat der Spieler selbst geklickt): Planung → Banns → Picks → Finalisierung → Ladebildschirm → Spiel durchgängig richtig; „Runen und Zauber übernommen.“ beide Male; Teammate-Klick und „weitere“ funktionierten; Spielansicht mit nächstem Kauf, Skillpunkt und Gegner-Items stimmte. Behoben aus dem Test: Zeilengrund „ist Ranged“, „Teammate 3 bannt“ bei gleichzeitigen Banns, „Warten“ im Ladebildschirm, geratene Lanes auf leeren Gegnerplätzen, leere Hinweis-Kachel. Der Draft ist als geschwärzter Testfall `live-ranked.jsonl` im Repo. Nicht gesehen: Custom „Abwechselnde Wahl“, Blind Pick, ARAM, eine Lage mit situativem Vorschlag. |
 | Windows 11 / Mica | **offen** — hier nicht testbar (Windows 10); Schalter zum Abschalten eingebaut |
 | Sammler | Lauf 42367242351 sammelt noch (Veröffentlichung mit `aram.json` gegen 16:45 UTC). GitHubs Zeitplan ist unzuverlässig: 06:23 UTC fiel aus, 12:23 kam 53 Minuten zu spät. Mit deinem OK auf `master`: jeder Lauf startet seinen Nachfolger (`57faa83`), und situative Käufe werden auch für die ersten drei Items gezählt (`0c31629`, Wunsch nach Mikaels Segen); der nächste Lauf (42384099091) sammelt schon damit. Die App läuft mit und ohne `aram.json` und mit und ohne Kern-Zeilen. |
@@ -111,15 +118,14 @@ je Slot τ = 0, Beliebtheit vs. Winrate ohne einheitliches Muster, Stiefelkäufe
 1. **Live-Durchlauf:** Ranked ist in zwei Spielen durch. Offen: ein kurzer Blick auf Blind Pick oder
    ARAM, das Lane-Menü, Blitz auf F bei einem Champion mit Blitz auf D vorher, und ein Spiel mit
    situativem Vorschlag in „Für dieses Spiel“.
-2. **Update-Test** an einer Probe-Installation (DirkDraft-Beta, Kanal beta) 2.0.0 → 2.0.1, und der
-   Schritt 1.5 → 2.0 unter einer Test-ID — beides installiert nichts an deinem DirkDraft, braucht aber
-   dein OK (siehe migration.md).
+2. ~~Update-Test~~ — bestanden, siehe Abnahme-Stand.
 3. **Sammler:** Kette und Kern-Zählung sind auf `master`. Prüfen, ob der Lauf nach 42384099091 von selbst
    startet, und ob nach einigen Läufen Kern-Vorschläge (z. B. Mikaels Segen gegen viel Kontrolle) auftauchen.
 4. **Ein Freund mit Windows 11** sollte die Beta einmal starten (Mica).
 
 **Empfehlung:** 2.0 ist nach dieser Prüfung technisch bereit für die Probe und hat zwei echte Ranked-Spiele
-ohne Ausfall begleitet, ist aber noch **nicht** für die Auslieferung freigegeben. Ausliefern, sobald der
-Update-Test (Punkt 2) ohne Befund durch ist und die Reste aus Punkt 1 gesehen sind; Punkt 4 kann parallel als Beta
-laufen. Der Weg dann: `redesign/board` nach `master` mergen, aus dem Haupt-Checkout
+ohne Ausfall begleitet; der Update-Test ist bestanden. Freigegeben ist es erst mit deinem „release“. Die Reste
+aus Punkt 1 (Blind Pick/ARAM, Lane-Menü, ein situativer Vorschlag) sind durch Tests und Szenen abgedeckt,
+nur nicht live gesehen — nach meiner Einschätzung kein Hindernis; Punkt 4 kann nach dem Release ein Freund
+prüfen, der Glas-Schalter fängt einen Fehler dort ab. Der Weg dann: `redesign/board` nach `master` mergen, aus dem Haupt-Checkout
 `release.ps1 -Version 2.0.0` (Kanal `win`, Delta gegen 1.5 aus `build\Releases`).

@@ -49,10 +49,11 @@ impl ShellState {
 pub fn run() {
     let settings = Settings::load();
     log::info!(
-        "DirkDraft {} startet · Windows-Build {} · Glas {}",
+        "DirkDraft {} startet · Windows-Build {} · Glas {} · Diagnose {}",
         env!("CARGO_PKG_VERSION"),
         windows_build(),
-        if mica_available() && settings.flag(settings::GLASS_EFFECT.0, settings::GLASS_EFFECT.1) { "an" } else { "aus" }
+        if mica_available() && settings.flag(settings::GLASS_EFFECT.0, settings::GLASS_EFFECT.1) { "an" } else { "aus" },
+        if settings.diagnostics() { "an" } else { "aus" }
     );
     let lockfile = settings.text(settings::LOCKFILE_PATH).map(std::path::PathBuf::from);
 
@@ -292,11 +293,20 @@ fn adopt_legacy_place(app: &AppHandle, window: &WebviewWindow, settings: &Settin
     if dir.join(tauri_plugin_window_state::DEFAULT_FILENAME).exists() {
         return;
     }
-    let Some(place) = legacy_place(settings) else { return };
+    let Some((left, top, size)) = legacy_place(settings) else { return };
     let Ok(Some(primary)) = window.primary_monitor() else { return };
     let monitors = window.available_monitors().unwrap_or_default();
     let scale = primary.scale_factor();
-    let (x, y, w, h) = (place.0 * scale, place.1 * scale, place.2 * scale, place.3 * scale);
+    // A 1.5 window that was moved but never resized stored only its place: 2.0's own size goes there.
+    let (w, h) = match size {
+        Some((w, h)) => (w * scale, h * scale),
+        // set_size below sets the inner size: start from the inner size, or the frame adds up.
+        None => match window.inner_size() {
+            Ok(s) => (s.width as f64, s.height as f64),
+            Err(_) => return,
+        },
+    };
+    let (x, y) = (left * scale, top * scale);
 
     // The monitor the stored place mostly lies on (its centre), if it is still attached.
     let centre = (x + w / 2.0, y + h / 2.0);
@@ -316,11 +326,12 @@ fn adopt_legacy_place(app: &AppHandle, window: &WebviewWindow, settings: &Settin
     }
 }
 
-/// The 1.5 place (left, top, width, height in device-independent pixels), if it was ever set.
-fn legacy_place(settings: &Settings) -> Option<(f64, f64, f64, f64)> {
-    let width = settings.number("windowWidth").filter(|w| *w > 0.0)?;
-    let height = settings.number("windowHeight").filter(|h| *h > 0.0)?;
-    Some((settings.number("windowLeft")?, settings.number("windowTop")?, width, height))
+/// The 1.5 place in device-independent pixels: left and top if the window was ever moved, and its
+/// size if it was ever resized too (1.5 keeps "NaN" until then).
+fn legacy_place(settings: &Settings) -> Option<(f64, f64, Option<(f64, f64)>)> {
+    let width = settings.number("windowWidth").filter(|w| *w > 0.0);
+    let height = settings.number("windowHeight").filter(|h| *h > 0.0);
+    Some((settings.number("windowLeft")?, settings.number("windowTop")?, width.zip(height)))
 }
 
 /// Mica exists from Windows 11 (build 22000). On Windows 10 the effect silently does nothing and a
@@ -371,5 +382,24 @@ fn show(app: &AppHandle) {
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn settings(json: &str) -> Settings {
+        Settings::from_values(serde_json::from_str::<serde_json::Value>(json).unwrap().as_object().cloned().unwrap())
+    }
+
+    #[test]
+    fn takes_1_5s_place_with_or_without_its_size() {
+        let moved = settings(r#"{"windowLeft": 120, "windowTop": 60, "windowWidth": "NaN", "windowHeight": "NaN"}"#);
+        assert_eq!(legacy_place(&moved), Some((120.0, 60.0, None)));
+        let resized = settings(r#"{"WindowLeft": 120, "windowTop": 60, "windowWidth": 480, "windowHeight": 900}"#);
+        assert_eq!(legacy_place(&resized), Some((120.0, 60.0, Some((480.0, 900.0)))));
+        let never_moved = settings(r#"{"windowLeft": "NaN", "windowTop": "NaN", "windowWidth": 480, "windowHeight": 900}"#);
+        assert_eq!(legacy_place(&never_moved), None);
     }
 }

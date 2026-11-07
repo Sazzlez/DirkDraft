@@ -49,7 +49,10 @@ fn open(path: &PathBuf) -> Option<File> {
 
 impl Log for FileLog {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Info
+        // Velopack narrates every update check at info level, with the user's profile path in it:
+        // only its warnings and errors belong here; our own update lines say what happened.
+        let limit = if metadata.target().starts_with("velopack") { Level::Warn } else { Level::Info };
+        metadata.level() <= limit
     }
 
     fn log(&self, record: &Record) {
