@@ -192,7 +192,11 @@ export class LiveSession {
 
   view(now = Date.now()): ViewModel {
     const active = this.frame?.state.isActive ? this.frame : null;
-    const moment = momentOf(active ? this.adapter.facts(active) : null, this.phase);
+    let moment = momentOf(active ? this.adapter.facts(active) : null, this.phase);
+    // The client says "InProgress" as soon as the game process starts — the loading screen is still
+    // up then. Until the game's own API has the players, it is the loading screen.
+    const gameAnswers = !!this.game?.activePlayer && (this.game.allPlayers?.length ?? 0) > 0;
+    if (moment === 'game' && !gameAnswers && this.lastActive) moment = 'loading';
     // The session ends when the loading screen starts; the matchup stays on screen through it.
     const frame = active ?? (moment === 'loading' ? this.lastActive : null);
     const base: ViewModel = {
@@ -394,7 +398,9 @@ export class LiveSession {
     const lane = this.picked?.championId === championId ? this.picked.lane : Lane.Unknown;
     const plan = championId ? this.planFor(championId, lane) : null;
     const model = gameModel(game, meta, plan, items);
-    if (!model) return { ...base, build, emptyText: 'Das Spiel lädt …' };
+    if (!model) {
+      return { ...base, build, emptyText: 'Sobald das Spiel läuft: nächster Kauf gegen dein Gold, der nächste Skillpunkt und was die Gegner bauen.' };
+    }
 
     const enemyIds = model.enemies.map((e) => e.championId).filter((id) => id > 0);
     const totals = enemyItemsOf(model.enemies.flatMap((e) => e.items), items);

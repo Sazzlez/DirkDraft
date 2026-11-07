@@ -91,6 +91,21 @@ describe('LiveSession', () => {
     expect(live.view().board).toBeNull();
   });
 
+  it('treats "InProgress" without game data as the loading screen', () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    for (const record of sessions('state-nachlock')) live.onSession(record.session ?? null);
+    live.onSession(null);
+    live.onPhase('GameStart');
+    live.onPhase('InProgress');
+    expect(live.view().moment).toBe('loading');
+    expect(live.view().main.kind).toBe('matchup');
+    live.onGame(read('../fixtures/live-mayhem.json'));
+    expect(live.view().moment).toBe('game');
+  });
+
   it('shows no ban steps in blind pick', () => {
     const live = new LiveSession();
     live.setData(data);
