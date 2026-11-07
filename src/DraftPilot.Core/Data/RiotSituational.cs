@@ -133,7 +133,8 @@ public static class GameStates
 }
 
 /// <summary>
-/// situational.json: for each champion, lane, slot (0 boots, 1 items four to six), situation and game
+/// situational.json: for each champion, lane, slot (0 boots, 1 items four to six, 2 items one to three),
+/// situation and game
 /// state (0 even, 1 ahead, 2 behind), how often each item was bought and won — with the slot's total,
 /// item 0, to compare it with. Rows are int arrays [champion, lane, slot, situation, state, item, games,
 /// wins]; class rows carry the class index first.
@@ -168,8 +169,8 @@ public sealed class RiotSituationalFile
 public sealed partial class RiotSituationalJson : JsonSerializerContext;
 
 /// <summary>
-/// Counts situational buys: for every player, the boots and the fourth to sixth item, each under the
-/// situations and the game state at the moment it was bought. What the app reads from it first is how
+/// Counts situational buys: for every player, the boots, the first three items (the core) and the
+/// fourth to sixth item, each under the situations and the game state at the moment it was bought. What the app reads from it first is how
 /// much more often an item is bought in a situation than otherwise — players react to what they see;
 /// the win rate, compared within the same game state, only guards against suggesting what does worse.
 /// </summary>
@@ -177,6 +178,13 @@ public sealed class RiotSituationalTally
 {
     public const int BootsSlot = 0;
     public const int LateSlot = 1;
+
+    /// <summary>
+    /// Items one to three. Most reactions to an enemy line-up happen here — Mikael's Blessing second
+    /// against heavy crowd control, an armor item third against a fed AD — and for supports nearly all:
+    /// they rarely reach a fourth item (none counted for Soraka or Braum in 6.185 games).
+    /// </summary>
+    public const int CoreSlot = 2;
 
     private readonly Dictionary<Key, (int Games, int Wins)> _rows = [];
 
@@ -205,6 +213,13 @@ public sealed class RiotSituationalTally
 
             if (player.Boots > 0)
                 Count(player, BootsSlot, [(player.Boots, At(player.BootsTimeMs))]);
+
+            // The core: every finished item among the first three, each under its own moment.
+            if (player.Items.Count >= 1)
+            {
+                Count(player, CoreSlot, [.. Enumerable.Range(0, Math.Min(3, player.Items.Count))
+                    .Select(i => (player.Items[i], At(i < player.ItemTimes.Count ? player.ItemTimes[i] : long.MaxValue)))]);
+            }
 
             // Items four to six: a game that never got there says nothing about them.
             if (player.Items.Count >= 4)

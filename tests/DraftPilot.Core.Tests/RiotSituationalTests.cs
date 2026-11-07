@@ -81,9 +81,14 @@ public sealed class RiotSituationalTests
         Assert.Equal([1, (int)Lane.Top, RiotSituationalTally.LateSlot, Situations.Physical, GameStates.Even, 20, 3, 3], Row(1, 1, Situations.Physical, 20));
         Assert.Equal(3, Row(1, RiotSituationalTally.LateSlot, Situations.All, 0)[Games]); // the slot total
         Assert.Equal(3, Row(1, RiotSituationalTally.BootsSlot, Situations.Physical, 3047)[Games]);
-        // Champion 2 never reached a fourth item: no late slot at all, boots only.
+        // Champion 2 never reached a fourth item: no late slot at all — but its three core items count.
         Assert.DoesNotContain(rows, r => r[0] == 2 && r[2] == RiotSituationalTally.LateSlot);
         Assert.Contains(rows, r => r[0] == 2 && r[2] == RiotSituationalTally.BootsSlot && r[Item] == 3111);
+        Assert.Equal(3, Row(2, RiotSituationalTally.CoreSlot, Situations.All, 11)[Games]);
+        Assert.Equal(3, Row(2, RiotSituationalTally.CoreSlot, Situations.All, 0)[Games]); // once per game, not per item
+        // The first three items are the core, the fourth and fifth the late slot — never both.
+        Assert.DoesNotContain(rows, r => r[0] == 1 && r[2] == RiotSituationalTally.CoreSlot && r[Item] == 20);
+        Assert.DoesNotContain(rows, r => r[0] == 1 && r[2] == RiotSituationalTally.LateSlot && r[Item] == 12);
     }
 
     [Fact]
@@ -104,7 +109,9 @@ public sealed class RiotSituationalTests
         Assert.Contains(rows, r => r[Item] == 20 && r[State] == GameStates.Ahead);
         Assert.Contains(rows, r => r[Item] == 21 && r[State] == GameStates.Behind);
         // The slot total once per state any of its buys happened in.
-        Assert.Equal(2, rows.Count(r => r[Item] == 0 && r[Situation] == Situations.All));
+        Assert.Equal(2, rows.Count(r => r[2] == RiotSituationalTally.LateSlot && r[Item] == 0 && r[Situation] == Situations.All));
+        // The core (minutes 5, 10, 15) was bought ahead throughout.
+        Assert.Equal([GameStates.Ahead], rows.Where(r => r[2] == RiotSituationalTally.CoreSlot && r[Item] == 0 && r[Situation] == Situations.All).Select(r => r[State]));
     }
 
     [Fact]
