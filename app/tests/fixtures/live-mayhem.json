@@ -1,0 +1,2297 @@
+{
+  "activePlayer": {
+    "abilities": {
+      "E": {
+        "abilityLevel": 5,
+        "displayName": "Schillernde Singularität",
+        "id": "LuxLightStrikeKugel",
+        "rawDescription": "GeneratedTip_Spell_LuxLightStrikeKugel_Description",
+        "rawDisplayName": "GeneratedTip_Spell_LuxLightStrikeKugel_DisplayName"
+      },
+      "Passive": {
+        "displayName": "Erleuchtung",
+        "id": "LuxIlluminationPassive",
+        "rawDescription": "GeneratedTip_Passive_LuxIlluminationPassive_Description",
+        "rawDisplayName": "GeneratedTip_Passive_LuxIlluminationPassive_DisplayName"
+      },
+      "Q": {
+        "abilityLevel": 5,
+        "displayName": "Lichtfessel",
+        "id": "LuxLightBinding",
+        "rawDescription": "GeneratedTip_Spell_LuxLightBinding_Description",
+        "rawDisplayName": "GeneratedTip_Spell_LuxLightBinding_DisplayName"
+      },
+      "R": {
+        "abilityLevel": 3,
+        "displayName": "Finales Funkeln",
+        "id": "LuxR",
+        "rawDescription": "GeneratedTip_Spell_LuxR_Description",
+        "rawDisplayName": "GeneratedTip_Spell_LuxR_DisplayName"
+      },
+      "W": {
+        "abilityLevel": 3,
+        "displayName": "Prismatische Barriere",
+        "id": "LuxPrismaticWave",
+        "rawDescription": "GeneratedTip_Spell_LuxPrismaticWave_Description",
+        "rawDisplayName": "GeneratedTip_Spell_LuxPrismaticWave_DisplayName"
+      }
+    },
+    "championStats": {
+      "abilityHaste": 10,
+      "abilityPower": 559,
+      "armor": 96.27000427246094,
+      "armorPenetrationFlat": 0,
+      "armorPenetrationPercent": 1,
+      "attackDamage": 101.76750183105469,
+      "attackRange": 550,
+      "attackSpeed": 0.9404062628746033,
+      "bonusArmorPenetrationPercent": 1,
+      "bonusMagicPenetrationPercent": 1,
+      "critChance": 0.5015499591827393,
+      "critDamage": 200,
+      "currentHealth": 2368.3193359375,
+      "healShieldPower": 0,
+      "healthRegenRate": 2.6922502517700195,
+      "lifeSteal": 0,
+      "magicLethality": 0,
+      "magicPenetrationFlat": 42,
+      "magicPenetrationPercent": 1,
+      "magicResist": 48.817501068115234,
+      "maxHealth": 2368.3193359375,
+      "moveSpeed": 397.4999694824219,
+      "omnivamp": 0,
+      "physicalLethality": 0,
+      "physicalVamp": 0,
+      "resourceMax": 1380.16259765625,
+      "resourceRegenRate": 6.698596477508545,
+      "resourceType": "MANA",
+      "resourceValue": 651.2780151367188,
+      "spellVamp": 0,
+      "tenacity": 5
+    },
+    "currentGold": 1156.075927734375,
+    "fullRunes": {},
+    "level": 16,
+    "riotId": "Ich",
+    "riotIdGameName": "Ich",
+    "riotIdTagLine": "EUW",
+    "summonerName": "Ich",
+    "teamRelativeColors": false
+  },
+  "allPlayers": [
+    {
+      "championName": "Ashe",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Beinschienen des Berserkers",
+          "itemID": 3006,
+          "price": 300,
+          "rawDescription": "GeneratedTip_Item_3006_Description",
+          "rawDisplayName": "Item_3006_Name",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Klinge des gestürzten Königs",
+          "itemID": 3153,
+          "price": 725,
+          "rawDescription": "GeneratedTip_Item_3153_Description",
+          "rawDisplayName": "Item_3153_Name",
+          "slot": 1
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Runaans Wirbelsturm",
+          "itemID": 3085,
+          "price": 850,
+          "rawDescription": "GeneratedTip_Item_3085_Description",
+          "rawDisplayName": "Item_3085_Name",
+          "slot": 2
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Klinge der Unendlichkeit",
+          "itemID": 3031,
+          "price": 725,
+          "rawDescription": "GeneratedTip_Item_3031_Description",
+          "rawDisplayName": "Item_3031_Name",
+          "slot": 3
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Mantel des Geschicks",
+          "itemID": 1018,
+          "price": 600,
+          "rawDescription": "GeneratedTip_Item_1018_Description",
+          "rawDisplayName": "Item_1018_Name",
+          "slot": 4
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Langschwert",
+          "itemID": 1036,
+          "price": 350,
+          "rawDescription": "GeneratedTip_Item_1036_Description",
+          "rawDisplayName": "Item_1036_Name",
+          "slot": 5
+        },
+        {
+          "canUse": true,
+          "consumable": true,
+          "count": 2,
+          "displayName": "Poro-Snacks",
+          "itemID": 2052,
+          "price": 0,
+          "rawDescription": "GeneratedTip_Item_2052_Description",
+          "rawDisplayName": "Item_2052_Name",
+          "slot": 6
+        }
+      ],
+      "level": 16,
+      "position": "NONE",
+      "rawChampionName": "game_character_displayname_Ashe",
+      "rawSkinName": "game_character_displayname_Ashe",
+      "respawnTimer": 0,
+      "riotId": "Spieler 1",
+      "riotIdGameName": "Spieler 1",
+      "riotIdTagLine": "EUW",
+      "runes": null,
+      "scores": {
+        "assists": 20,
+        "creepScore": 50,
+        "deaths": 6,
+        "kills": 4,
+        "wardScore": 5.666666507720947
+      },
+      "skinID": 0,
+      "skinName": "Ashe",
+      "summonerName": "Spieler 1",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Barriere",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerBarrier_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerBarrier_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Blitz",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        }
+      },
+      "team": "ORDER"
+    },
+    {
+      "championName": "Alistar",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Herzstahl",
+          "itemID": 3084,
+          "price": 400,
+          "rawDescription": "GeneratedTip_Item_3084_Description",
+          "rawDisplayName": "Item_3084_Name",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Merkurs Schuhe",
+          "itemID": 3111,
+          "price": 550,
+          "rawDescription": "GeneratedTip_Item_3111_Description",
+          "rawDisplayName": "Item_3111_Name",
+          "slot": 1
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Endlose Verzweiflung",
+          "itemID": 2502,
+          "price": 800,
+          "rawDescription": "GeneratedTip_Item_2502_Description",
+          "rawDisplayName": "Item_2502_Name",
+          "slot": 2
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Gefrorenes Herz",
+          "itemID": 3110,
+          "price": 600,
+          "rawDescription": "GeneratedTip_Item_3110_Description",
+          "rawDisplayName": "Item_3110_Name",
+          "slot": 3
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Dornenweste",
+          "itemID": 3076,
+          "price": 200,
+          "rawDescription": "GeneratedTip_Item_3076_Description",
+          "rawDisplayName": "Item_3076_Name",
+          "slot": 4
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Stoffrüstung",
+          "itemID": 1029,
+          "price": 300,
+          "rawDescription": "GeneratedTip_Item_1029_Description",
+          "rawDisplayName": "Item_1029_Name",
+          "slot": 5
+        },
+        {
+          "canUse": true,
+          "consumable": true,
+          "count": 2,
+          "displayName": "Poro-Snacks",
+          "itemID": 220013,
+          "price": 0,
+          "rawDescription": "GeneratedTip_Item_220013_Description",
+          "rawDisplayName": "Item_2052_Name",
+          "slot": 6
+        }
+      ],
+      "level": 16,
+      "position": "NONE",
+      "rawChampionName": "game_character_displayname_Alistar",
+      "rawSkinName": "game_character_skin_displayname_Alistar_16",
+      "respawnTimer": 0,
+      "riotId": "Spieler 2",
+      "riotIdGameName": "Spieler 2",
+      "riotIdTagLine": "EUW",
+      "runes": null,
+      "scores": {
+        "assists": 23,
+        "creepScore": 10,
+        "deaths": 8,
+        "kills": 4,
+        "wardScore": 0
+      },
+      "skinID": 16,
+      "skinName": "Muhkuh-Alistar (Saphir)",
+      "summonerName": "Spieler 2",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Blitz",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Markieren",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        }
+      },
+      "team": "ORDER"
+    },
+    {
+      "championName": "Graves",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Der Sammler",
+          "itemID": 6676,
+          "price": 525,
+          "rawDescription": "GeneratedTip_Item_6676_Description",
+          "rawDisplayName": "Item_6676_Name",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Blutdürster",
+          "itemID": 3072,
+          "price": 325,
+          "rawDescription": "GeneratedTip_Item_3072_Description",
+          "rawDisplayName": "Item_3072_Name",
+          "slot": 1
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Klinge der Unendlichkeit",
+          "itemID": 3031,
+          "price": 725,
+          "rawDescription": "GeneratedTip_Item_3031_Description",
+          "rawDisplayName": "Item_3031_Name",
+          "slot": 2
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Spitzhacke",
+          "itemID": 1037,
+          "price": 875,
+          "rawDescription": "GeneratedTip_Item_1037_Description",
+          "rawDisplayName": "Item_1037_Name",
+          "slot": 3
+        },
+        {
+          "canUse": true,
+          "consumable": true,
+          "count": 2,
+          "displayName": "Poro-Snacks",
+          "itemID": 220013,
+          "price": 0,
+          "rawDescription": "GeneratedTip_Item_220013_Description",
+          "rawDisplayName": "Item_2052_Name",
+          "slot": 6
+        }
+      ],
+      "level": 16,
+      "position": "NONE",
+      "rawChampionName": "game_character_displayname_Graves",
+      "rawSkinName": "game_character_displayname_Graves",
+      "respawnTimer": 0,
+      "riotId": "Spieler 3",
+      "riotIdGameName": "Spieler 3",
+      "riotIdTagLine": "EUW",
+      "runes": null,
+      "scores": {
+        "assists": 14,
+        "creepScore": 10,
+        "deaths": 13,
+        "kills": 13,
+        "wardScore": 0
+      },
+      "skinID": 0,
+      "skinName": "Graves",
+      "summonerName": "Spieler 3",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Markieren",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Blitz",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        }
+      },
+      "team": "ORDER"
+    },
+    {
+      "championName": "Lux",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Ludens Echo",
+          "itemID": 6655,
+          "price": 450,
+          "rawDescription": "GeneratedTip_Item_6655_Description",
+          "rawDisplayName": "Item_6655_Name",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Sturmblitz",
+          "itemID": 4646,
+          "price": 800,
+          "rawDescription": "GeneratedTip_Item_4646_Description",
+          "rawDisplayName": "Item_4646_Name",
+          "slot": 1
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Zaubererschuhe",
+          "itemID": 3020,
+          "price": 800,
+          "rawDescription": "GeneratedTip_Item_3020_Description",
+          "rawDisplayName": "Item_3020_Name",
+          "slot": 2
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Schattenflamme",
+          "itemID": 4645,
+          "price": 900,
+          "rawDescription": "GeneratedTip_Item_4645_Description",
+          "rawDisplayName": "Item_4645_Name",
+          "slot": 3
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Rabadons Todeshaube",
+          "itemID": 3089,
+          "price": 1100,
+          "rawDescription": "GeneratedTip_Item_3089_Description",
+          "rawDisplayName": "Item_3089_Name",
+          "slot": 4
+        },
+        {
+          "canUse": true,
+          "consumable": true,
+          "count": 2,
+          "displayName": "Poro-Snacks",
+          "itemID": 2052,
+          "price": 0,
+          "rawDescription": "GeneratedTip_Item_2052_Description",
+          "rawDisplayName": "Item_2052_Name",
+          "slot": 6
+        }
+      ],
+      "level": 16,
+      "position": "NONE",
+      "rawChampionName": "game_character_displayname_Lux",
+      "rawSkinName": "game_character_skin_displayname_Lux_34",
+      "respawnTimer": 0,
+      "riotId": "Ich",
+      "riotIdGameName": "Ich",
+      "riotIdTagLine": "EUW",
+      "runes": null,
+      "scores": {
+        "assists": 18,
+        "creepScore": 20,
+        "deaths": 8,
+        "kills": 12,
+        "wardScore": 0
+      },
+      "skinID": 34,
+      "skinName": "Porzellan-Lux (Tansanit)",
+      "summonerName": "Ich",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Markieren",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Blitz",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        }
+      },
+      "team": "ORDER"
+    },
+    {
+      "championName": "Mel",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Ludens Echo",
+          "itemID": 6655,
+          "price": 450,
+          "rawDescription": "GeneratedTip_Item_6655_Description",
+          "rawDisplayName": "Item_6655_Name",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Rabadons Todeshaube",
+          "itemID": 3089,
+          "price": 1100,
+          "rawDescription": "GeneratedTip_Item_3089_Description",
+          "rawDisplayName": "Item_3089_Name",
+          "slot": 1
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Hextech-Generator",
+          "itemID": 3145,
+          "price": 300,
+          "rawDescription": "GeneratedTip_Item_3145_Description",
+          "rawDisplayName": "Item_3145_Name",
+          "slot": 2
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Leerenstab",
+          "itemID": 3135,
+          "price": 1050,
+          "rawDescription": "GeneratedTip_Item_3135_Description",
+          "rawDisplayName": "Item_3135_Name",
+          "slot": 3
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Zaubererschuhe",
+          "itemID": 3020,
+          "price": 800,
+          "rawDescription": "GeneratedTip_Item_3020_Description",
+          "rawDisplayName": "Item_3020_Name",
+          "slot": 4
+        },
+        {
+          "canUse": true,
+          "consumable": true,
+          "count": 2,
+          "displayName": "Poro-Snacks",
+          "itemID": 220013,
+          "price": 0,
+          "rawDescription": "GeneratedTip_Item_220013_Description",
+          "rawDisplayName": "Item_2052_Name",
+          "slot": 6
+        }
+      ],
+      "level": 17,
+      "position": "NONE",
+      "rawChampionName": "game_character_displayname_Mel",
+      "rawSkinName": "game_character_skin_displayname_Mel_1",
+      "respawnTimer": 0,
+      "riotId": "Spieler 4",
+      "riotIdGameName": "Spieler 4",
+      "riotIdTagLine": "EUW",
+      "runes": null,
+      "scores": {
+        "assists": 17,
+        "creepScore": 60,
+        "deaths": 8,
+        "kills": 7,
+        "wardScore": 0
+      },
+      "skinID": 1,
+      "skinName": "Ratsmitglied Mel (Arcane)",
+      "summonerName": "Spieler 4",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Blitz",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Markieren",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        }
+      },
+      "team": "ORDER"
+    },
+    {
+      "championName": "Jinx",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Goldener Pfannenwender",
+          "itemID": 994403,
+          "price": 2500,
+          "rawDescription": "GeneratedTip_Item_994403_Description",
+          "rawDisplayName": "game_item_displayname_994403",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Yun Tal-Wildpfeile",
+          "itemID": 3032,
+          "price": 750,
+          "rawDescription": "GeneratedTip_Item_3032_Description",
+          "rawDisplayName": "Item_3032_Name",
+          "slot": 1
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Klinge der Unendlichkeit",
+          "itemID": 3031,
+          "price": 725,
+          "rawDescription": "GeneratedTip_Item_3031_Description",
+          "rawDisplayName": "Item_3031_Name",
+          "slot": 2
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Runaans Wirbelsturm",
+          "itemID": 3085,
+          "price": 850,
+          "rawDescription": "GeneratedTip_Item_3085_Description",
+          "rawDisplayName": "Item_3085_Name",
+          "slot": 3
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Lord Dominiks Grüße",
+          "itemID": 3036,
+          "price": 550,
+          "rawDescription": "GeneratedTip_Item_3036_Description",
+          "rawDisplayName": "Item_3036_Name",
+          "slot": 4
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Stiefel der Wendigkeit",
+          "itemID": 3009,
+          "price": 700,
+          "rawDescription": "GeneratedTip_Item_3009_Description",
+          "rawDisplayName": "Item_3009_Name",
+          "slot": 5
+        },
+        {
+          "canUse": true,
+          "consumable": true,
+          "count": 2,
+          "displayName": "Poro-Snacks",
+          "itemID": 220013,
+          "price": 0,
+          "rawDescription": "GeneratedTip_Item_220013_Description",
+          "rawDisplayName": "Item_2052_Name",
+          "slot": 6
+        }
+      ],
+      "level": 16,
+      "position": "NONE",
+      "rawChampionName": "game_character_displayname_Jinx",
+      "rawSkinName": "game_character_skin_displayname_Jinx_60",
+      "respawnTimer": 0,
+      "riotId": "Spieler 5",
+      "riotIdGameName": "Spieler 5",
+      "riotIdTagLine": "EUW",
+      "runes": null,
+      "scores": {
+        "assists": 21,
+        "creepScore": 40,
+        "deaths": 10,
+        "kills": 8,
+        "wardScore": 0
+      },
+      "skinID": 60,
+      "skinName": "Zerrissene Jinx (Arcane)",
+      "summonerName": "Spieler 5",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Blitz",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Geist",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerHaste_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerHaste_DisplayName"
+        }
+      },
+      "team": "CHAOS"
+    },
+    {
+      "championName": "Viego",
+      "isBot": false,
+      "isDead": true,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Klinge der Unendlichkeit",
+          "itemID": 3031,
+          "price": 725,
+          "rawDescription": "GeneratedTip_Item_3031_Description",
+          "rawDisplayName": "Item_3031_Name",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Krakenbezwinger",
+          "itemID": 6672,
+          "price": 325,
+          "rawDescription": "GeneratedTip_Item_6672_Description",
+          "rawDisplayName": "Item_6672_Name",
+          "slot": 1
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Yun Tal-Wildpfeile",
+          "itemID": 3032,
+          "price": 750,
+          "rawDescription": "GeneratedTip_Item_3032_Description",
+          "rawDisplayName": "Item_3032_Name",
+          "slot": 2
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Eifer",
+          "itemID": 3086,
+          "price": 350,
+          "rawDescription": "GeneratedTip_Item_3086_Description",
+          "rawDisplayName": "Item_3086_Name",
+          "slot": 3
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Dolch",
+          "itemID": 1042,
+          "price": 250,
+          "rawDescription": "GeneratedTip_Item_1042_Description",
+          "rawDisplayName": "Item_1042_Name",
+          "slot": 4
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Dolch",
+          "itemID": 1042,
+          "price": 250,
+          "rawDescription": "GeneratedTip_Item_1042_Description",
+          "rawDisplayName": "Item_1042_Name",
+          "slot": 5
+        },
+        {
+          "canUse": true,
+          "consumable": true,
+          "count": 2,
+          "displayName": "Poro-Snacks",
+          "itemID": 220013,
+          "price": 0,
+          "rawDescription": "GeneratedTip_Item_220013_Description",
+          "rawDisplayName": "Item_2052_Name",
+          "slot": 6
+        }
+      ],
+      "level": 15,
+      "position": "NONE",
+      "rawChampionName": "game_character_displayname_Viego",
+      "rawSkinName": "game_character_displayname_Viego",
+      "respawnTimer": 21.291954040527344,
+      "riotId": "Spieler 6",
+      "riotIdGameName": "Spieler 6",
+      "riotIdTagLine": "EUW",
+      "runes": null,
+      "scores": {
+        "assists": 12,
+        "creepScore": 10,
+        "deaths": 13,
+        "kills": 5,
+        "wardScore": 0.1666666716337204
+      },
+      "skinID": 0,
+      "skinName": "Viego",
+      "summonerName": "Spieler 6",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Markieren",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Blitz",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        }
+      },
+      "team": "CHAOS"
+    },
+    {
+      "championName": "Jhin",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Klinge der Unendlichkeit",
+          "itemID": 3031,
+          "price": 725,
+          "rawDescription": "GeneratedTip_Item_3031_Description",
+          "rawDisplayName": "Item_3031_Name",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Schnellfeuer-Geschütz",
+          "itemID": 3094,
+          "price": 850,
+          "rawDescription": "GeneratedTip_Item_3094_Description",
+          "rawDisplayName": "Item_3094_Name",
+          "slot": 1
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Stiefel der Wendigkeit",
+          "itemID": 3009,
+          "price": 700,
+          "rawDescription": "GeneratedTip_Item_3009_Description",
+          "rawDisplayName": "Item_3009_Name",
+          "slot": 2
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Blutdürster",
+          "itemID": 3072,
+          "price": 325,
+          "rawDescription": "GeneratedTip_Item_3072_Description",
+          "rawDisplayName": "Item_3072_Name",
+          "slot": 3
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Der Sammler",
+          "itemID": 6676,
+          "price": 525,
+          "rawDescription": "GeneratedTip_Item_6676_Description",
+          "rawDisplayName": "Item_6676_Name",
+          "slot": 4
+        },
+        {
+          "canUse": true,
+          "consumable": true,
+          "count": 2,
+          "displayName": "Poro-Snacks",
+          "itemID": 2052,
+          "price": 0,
+          "rawDescription": "GeneratedTip_Item_2052_Description",
+          "rawDisplayName": "Item_2052_Name",
+          "slot": 6
+        }
+      ],
+      "level": 16,
+      "position": "NONE",
+      "rawChampionName": "game_character_displayname_Jhin",
+      "rawSkinName": "game_character_displayname_Jhin",
+      "respawnTimer": 0,
+      "riotId": "Spieler 7",
+      "riotIdGameName": "Spieler 7",
+      "riotIdTagLine": "EUW",
+      "runes": null,
+      "scores": {
+        "assists": 21,
+        "creepScore": 60,
+        "deaths": 4,
+        "kills": 9,
+        "wardScore": 0
+      },
+      "skinID": 0,
+      "skinName": "Jhin",
+      "summonerName": "Spieler 7",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Heilen",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerHeal_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerHeal_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Blitz",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        }
+      },
+      "team": "CHAOS"
+    },
+    {
+      "championName": "Master Yi",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Yun Tal-Wildpfeile",
+          "itemID": 3032,
+          "price": 750,
+          "rawDescription": "GeneratedTip_Item_3032_Description",
+          "rawDisplayName": "Item_3032_Name",
+          "slot": 0
+        },
+        {
+          "canUse": true,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Gottlose Hydra",
+          "itemID": 6698,
+          "price": 313,
+          "rawDescription": "GeneratedTip_Item_6698_Description",
+          "rawDisplayName": "Item_6698_Name",
+          "slot": 1
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Klinge der Unendlichkeit",
+          "itemID": 3031,
+          "price": 725,
+          "rawDescription": "GeneratedTip_Item_3031_Description",
+          "rawDisplayName": "Item_3031_Name",
+          "slot": 2
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Sterbliche Mahnung",
+          "itemID": 3033,
+          "price": 150,
+          "rawDescription": "GeneratedTip_Item_3033_Description",
+          "rawDisplayName": "Item_3033_Name",
+          "slot": 3
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Spitzhacke",
+          "itemID": 1037,
+          "price": 875,
+          "rawDescription": "GeneratedTip_Item_1037_Description",
+          "rawDisplayName": "Item_1037_Name",
+          "slot": 4
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Klinge des Beschützers",
+          "itemID": 3177,
+          "price": 950,
+          "rawDescription": "GeneratedTip_Item_3177_Description",
+          "rawDisplayName": "game_item_displayname_3177",
+          "slot": 5
+        },
+        {
+          "canUse": true,
+          "consumable": true,
+          "count": 2,
+          "displayName": "Poro-Snacks",
+          "itemID": 220013,
+          "price": 0,
+          "rawDescription": "GeneratedTip_Item_220013_Description",
+          "rawDisplayName": "Item_2052_Name",
+          "slot": 6
+        }
+      ],
+      "level": 17,
+      "position": "NONE",
+      "rawChampionName": "game_character_displayname_MasterYi",
+      "rawSkinName": "game_character_skin_displayname_MasterYi_9",
+      "respawnTimer": 0,
+      "riotId": "Spieler 8",
+      "riotIdGameName": "Spieler 8",
+      "riotIdTagLine": "EUW",
+      "runes": null,
+      "scores": {
+        "assists": 13,
+        "creepScore": 30,
+        "deaths": 8,
+        "kills": 19,
+        "wardScore": 0
+      },
+      "skinID": 9,
+      "skinName": "PROJEKT: Yi",
+      "summonerName": "Spieler 8",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Markieren",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Blitz",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        }
+      },
+      "team": "CHAOS"
+    },
+    {
+      "championName": "Camille",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": true,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Gefräßige Hydra",
+          "itemID": 3074,
+          "price": 150,
+          "rawDescription": "GeneratedTip_Item_3074_Description",
+          "rawDisplayName": "Item_3074_Name",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Stiefel",
+          "itemID": 1001,
+          "price": 300,
+          "rawDescription": "GeneratedTip_Item_1001_Description",
+          "rawDisplayName": "Item_1001_Name",
+          "slot": 1
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Stärke der Dreieinigkeit",
+          "itemID": 3078,
+          "price": 133,
+          "rawDescription": "GeneratedTip_Item_3078_Description",
+          "rawDisplayName": "Item_3078_Name",
+          "slot": 2
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Tanz des Todes",
+          "itemID": 6333,
+          "price": 275,
+          "rawDescription": "GeneratedTip_Item_6333_Description",
+          "rawDisplayName": "Item_6333_Name",
+          "slot": 3
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Langschwert",
+          "itemID": 1036,
+          "price": 350,
+          "rawDescription": "GeneratedTip_Item_1036_Description",
+          "rawDisplayName": "Item_1036_Name",
+          "slot": 4
+        },
+        {
+          "canUse": true,
+          "consumable": true,
+          "count": 2,
+          "displayName": "Poro-Snacks",
+          "itemID": 220013,
+          "price": 0,
+          "rawDescription": "GeneratedTip_Item_220013_Description",
+          "rawDisplayName": "Item_2052_Name",
+          "slot": 6
+        }
+      ],
+      "level": 16,
+      "position": "NONE",
+      "rawChampionName": "game_character_displayname_Camille",
+      "rawSkinName": "game_character_skin_displayname_Camille_1",
+      "respawnTimer": 0,
+      "riotId": "Spieler 9",
+      "riotIdGameName": "Spieler 9",
+      "riotIdTagLine": "EUW",
+      "runes": null,
+      "scores": {
+        "assists": 14,
+        "creepScore": 10,
+        "deaths": 5,
+        "kills": 2,
+        "wardScore": 0
+      },
+      "skinID": 1,
+      "skinName": "Programm Camille",
+      "summonerName": "Spieler 9",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Markieren",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Blitz",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        }
+      },
+      "team": "CHAOS"
+    }
+  ],
+  "events": {
+    "Events": [
+      {
+        "EventID": 0,
+        "EventName": "GameStart",
+        "EventTime": 0.022944200783967972
+      },
+      {
+        "EventID": 1,
+        "EventName": "MinionsSpawning",
+        "EventTime": 50.01485061645508
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 7"
+        ],
+        "EventID": 2,
+        "EventName": "ChampionKill",
+        "EventTime": 88.05846405029297,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 4"
+      },
+      {
+        "EventID": 3,
+        "EventName": "FirstBlood",
+        "EventTime": 88.05846405029297,
+        "Recipient": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 7",
+          "Spieler 9"
+        ],
+        "EventID": 4,
+        "EventName": "ChampionKill",
+        "EventTime": 90.48735046386719,
+        "KillerName": "Spieler 6",
+        "VictimName": "Spieler 3"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 6",
+          "Spieler 8",
+          "Spieler 9"
+        ],
+        "EventID": 5,
+        "EventName": "ChampionKill",
+        "EventTime": 94.78543090820312,
+        "KillerName": "Spieler 7",
+        "VictimName": "Spieler 2"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 3"
+        ],
+        "EventID": 6,
+        "EventName": "ChampionKill",
+        "EventTime": 135.8154296875,
+        "KillerName": "Spieler 2",
+        "VictimName": "Spieler 6"
+      },
+      {
+        "Assisters": [
+          "Spieler 6",
+          "Spieler 7",
+          "Spieler 9"
+        ],
+        "EventID": 7,
+        "EventName": "ChampionKill",
+        "EventTime": 140.9553680419922,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 3"
+      },
+      {
+        "Assisters": [],
+        "EventID": 8,
+        "EventName": "ChampionKill",
+        "EventTime": 145.6846160888672,
+        "KillerName": "Spieler 5",
+        "VictimName": "Ich"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Ich",
+          "Spieler 4"
+        ],
+        "EventID": 9,
+        "EventName": "ChampionKill",
+        "EventTime": 149.37271118164062,
+        "KillerName": "Spieler 2",
+        "VictimName": "Spieler 5"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 7",
+          "Spieler 8"
+        ],
+        "EventID": 10,
+        "EventName": "ChampionKill",
+        "EventTime": 189.30442810058594,
+        "KillerName": "Spieler 6",
+        "VictimName": "Spieler 2"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 2",
+          "Ich",
+          "Spieler 4"
+        ],
+        "EventID": 11,
+        "EventName": "ChampionKill",
+        "EventTime": 190.82174682617188,
+        "KillerName": "Spieler 3",
+        "VictimName": "Spieler 9"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 6",
+          "Spieler 7",
+          "Spieler 9"
+        ],
+        "EventID": 12,
+        "EventName": "ChampionKill",
+        "EventTime": 190.9167938232422,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 3"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 4"
+        ],
+        "EventID": 13,
+        "EventName": "ChampionKill",
+        "EventTime": 201.01686096191406,
+        "KillerName": "Ich",
+        "VictimName": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 6",
+          "Spieler 7",
+          "Spieler 8"
+        ],
+        "EventID": 14,
+        "EventName": "ChampionKill",
+        "EventTime": 209.97727966308594,
+        "KillerName": "Spieler 5",
+        "VictimName": "Spieler 4"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Ich",
+          "Spieler 4"
+        ],
+        "EventID": 15,
+        "EventName": "ChampionKill",
+        "EventTime": 211.5618438720703,
+        "KillerName": "Spieler 2",
+        "VictimName": "Spieler 6"
+      },
+      {
+        "Assisters": [
+          "Spieler 2",
+          "Ich"
+        ],
+        "EventID": 16,
+        "EventName": "ChampionKill",
+        "EventTime": 216.62525939941406,
+        "KillerName": "Spieler 3",
+        "VictimName": "Spieler 5"
+      },
+      {
+        "Assisters": [],
+        "EventID": 17,
+        "EventName": "ChampionKill",
+        "EventTime": 278.4326171875,
+        "KillerName": "Spieler 6",
+        "VictimName": "Spieler 1"
+      },
+      {
+        "Assisters": [
+          "Spieler 2",
+          "Ich",
+          "Spieler 4"
+        ],
+        "EventID": 18,
+        "EventName": "ChampionKill",
+        "EventTime": 283.1912841796875,
+        "KillerName": "Spieler 3",
+        "VictimName": "Spieler 6"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 7",
+          "Spieler 8"
+        ],
+        "EventID": 19,
+        "EventName": "ChampionKill",
+        "EventTime": 283.9425048828125,
+        "KillerName": "Spieler 9",
+        "VictimName": "Spieler 2"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 6",
+          "Spieler 7"
+        ],
+        "EventID": 20,
+        "EventName": "ChampionKill",
+        "EventTime": 296.7760009765625,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 3"
+      },
+      {
+        "Assisters": [
+          "Spieler 7",
+          "Spieler 8"
+        ],
+        "EventID": 21,
+        "EventName": "ChampionKill",
+        "EventTime": 297.1321716308594,
+        "KillerName": "Spieler 5",
+        "VictimName": "Ich"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 6",
+          "Spieler 7"
+        ],
+        "EventID": 22,
+        "EventName": "ChampionKill",
+        "EventTime": 299.5431823730469,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 4"
+      },
+      {
+        "EventID": 23,
+        "EventName": "Multikill",
+        "EventTime": 299.5431823730469,
+        "KillStreak": 2,
+        "KillerName": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 2",
+          "Spieler 3",
+          "Spieler 4"
+        ],
+        "EventID": 24,
+        "EventName": "ChampionKill",
+        "EventTime": 302.70196533203125,
+        "KillerName": "Ich",
+        "VictimName": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 7",
+          "Spieler 8"
+        ],
+        "EventID": 25,
+        "EventName": "TurretKilled",
+        "EventTime": 314.08697509765625,
+        "KillerName": "Spieler 9",
+        "TurretKilled": "Turret_TOrder_L1_P3_2250400266_0"
+      },
+      {
+        "EventID": 26,
+        "EventName": "FirstBrick",
+        "EventTime": 314.08697509765625,
+        "KillerName": "Spieler 9"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 9"
+        ],
+        "EventID": 27,
+        "EventName": "ChampionKill",
+        "EventTime": 319.8746337890625,
+        "KillerName": "Spieler 7",
+        "VictimName": "Spieler 1"
+      },
+      {
+        "Assisters": [],
+        "EventID": 28,
+        "EventName": "ChampionKill",
+        "EventTime": 324.1662902832031,
+        "KillerName": "Spieler 3",
+        "VictimName": "Spieler 5"
+      },
+      {
+        "Assisters": [
+          "Spieler 6",
+          "Spieler 7"
+        ],
+        "EventID": 29,
+        "EventName": "ChampionKill",
+        "EventTime": 327.9935607910156,
+        "KillerName": "Spieler 9",
+        "VictimName": "Spieler 3"
+      },
+      {
+        "Assisters": [
+          "Spieler 2",
+          "Spieler 3",
+          "Ich",
+          "Spieler 4"
+        ],
+        "EventID": 30,
+        "EventName": "ChampionKill",
+        "EventTime": 383.31884765625,
+        "KillerName": "Spieler 1",
+        "VictimName": "Spieler 9"
+      },
+      {
+        "Assisters": [
+          "Spieler 5"
+        ],
+        "EventID": 31,
+        "EventName": "ChampionKill",
+        "EventTime": 383.9007873535156,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 3"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 7",
+          "Spieler 8",
+          "Spieler 9"
+        ],
+        "EventID": 32,
+        "EventName": "ChampionKill",
+        "EventTime": 384.3288879394531,
+        "KillerName": "Spieler 6",
+        "VictimName": "Spieler 2"
+      },
+      {
+        "Assisters": [],
+        "EventID": 33,
+        "EventName": "ChampionKill",
+        "EventTime": 387.1929016113281,
+        "KillerName": "Spieler 8",
+        "VictimName": "Ich"
+      },
+      {
+        "EventID": 34,
+        "EventName": "Multikill",
+        "EventTime": 387.1929016113281,
+        "KillStreak": 2,
+        "KillerName": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 8",
+          "Spieler 9"
+        ],
+        "EventID": 35,
+        "EventName": "ChampionKill",
+        "EventTime": 388.4561767578125,
+        "KillerName": "Spieler 5",
+        "VictimName": "Spieler 4"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 9"
+        ],
+        "EventID": 36,
+        "EventName": "ChampionKill",
+        "EventTime": 393.6164245605469,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 1"
+      },
+      {
+        "EventID": 37,
+        "EventName": "Multikill",
+        "EventTime": 393.6164245605469,
+        "KillStreak": 3,
+        "KillerName": "Spieler 8"
+      },
+      {
+        "Acer": "Spieler 8",
+        "AcingTeam": "CHAOS",
+        "EventID": 38,
+        "EventName": "Ace",
+        "EventTime": 393.6164245605469
+      },
+      {
+        "Assisters": [
+          "Spieler 2",
+          "Spieler 3"
+        ],
+        "EventID": 39,
+        "EventName": "ChampionKill",
+        "EventTime": 400.0909423828125,
+        "KillerName": "Ich",
+        "VictimName": "Spieler 7"
+      },
+      {
+        "Assisters": [],
+        "EventID": 40,
+        "EventName": "ChampionKill",
+        "EventTime": 407.38763427734375,
+        "KillerName": "Spieler 4",
+        "VictimName": "Spieler 6"
+      },
+      {
+        "Assisters": [],
+        "EventID": 41,
+        "EventName": "ChampionKill",
+        "EventTime": 414.2723083496094,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 3"
+      },
+      {
+        "Assisters": [
+          "Spieler 3"
+        ],
+        "EventID": 42,
+        "EventName": "ChampionKill",
+        "EventTime": 415.11041259765625,
+        "KillerName": "Ich",
+        "VictimName": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 2",
+          "Ich"
+        ],
+        "EventID": 43,
+        "EventName": "ChampionKill",
+        "EventTime": 423.50665283203125,
+        "KillerName": "Spieler 4",
+        "VictimName": "Spieler 5"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Ich",
+          "Spieler 4"
+        ],
+        "EventID": 44,
+        "EventName": "ChampionKill",
+        "EventTime": 465.2393493652344,
+        "KillerName": "Spieler 2",
+        "VictimName": "Spieler 6"
+      },
+      {
+        "Assisters": [
+          "Spieler 1"
+        ],
+        "EventID": 45,
+        "EventName": "ChampionKill",
+        "EventTime": 465.5273742675781,
+        "KillerName": "Spieler 3",
+        "VictimName": "Spieler 5"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 6",
+          "Spieler 7",
+          "Spieler 9"
+        ],
+        "EventID": 46,
+        "EventName": "ChampionKill",
+        "EventTime": 469.5232238769531,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 2"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 2",
+          "Ich",
+          "Spieler 4"
+        ],
+        "EventID": 47,
+        "EventName": "ChampionKill",
+        "EventTime": 472.22454833984375,
+        "KillerName": "Spieler 3",
+        "VictimName": "Spieler 8"
+      },
+      {
+        "EventID": 48,
+        "EventName": "Multikill",
+        "EventTime": 472.22454833984375,
+        "KillStreak": 2,
+        "KillerName": "Spieler 3"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 2",
+          "Spieler 3",
+          "Spieler 4"
+        ],
+        "EventID": 49,
+        "EventName": "ChampionKill",
+        "EventTime": 474.06671142578125,
+        "KillerName": "Ich",
+        "VictimName": "Spieler 9"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 2",
+          "Ich"
+        ],
+        "EventID": 50,
+        "EventName": "ChampionKill",
+        "EventTime": 477.67578125,
+        "KillerName": "Spieler 3",
+        "VictimName": "Spieler 7"
+      },
+      {
+        "EventID": 51,
+        "EventName": "Multikill",
+        "EventTime": 477.67578125,
+        "KillStreak": 3,
+        "KillerName": "Spieler 3"
+      },
+      {
+        "Acer": "Spieler 3",
+        "AcingTeam": "ORDER",
+        "EventID": 52,
+        "EventName": "Ace",
+        "EventTime": 477.67578125
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 3",
+          "Spieler 4"
+        ],
+        "EventID": 53,
+        "EventName": "TurretKilled",
+        "EventTime": 498.31622314453125,
+        "KillerName": "Ich",
+        "TurretKilled": "Turret_TChaos_L1_P3_671196429_0"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Ich",
+          "Spieler 4"
+        ],
+        "EventID": 54,
+        "EventName": "ChampionKill",
+        "EventTime": 505.4830322265625,
+        "KillerName": "Spieler 3",
+        "VictimName": "Spieler 6"
+      },
+      {
+        "Assisters": [],
+        "EventID": 55,
+        "EventName": "ChampionKill",
+        "EventTime": 512.4652099609375,
+        "KillerName": "Spieler 8",
+        "VictimName": "Ich"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 2",
+          "Spieler 3",
+          "Spieler 4"
+        ],
+        "EventID": 56,
+        "EventName": "ChampionKill",
+        "EventTime": 516.6279296875,
+        "KillerName": "Ich",
+        "VictimName": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 8"
+        ],
+        "EventID": 57,
+        "EventName": "ChampionKill",
+        "EventTime": 533.1423950195312,
+        "KillerName": "Spieler 7",
+        "VictimName": "Spieler 3"
+      },
+      {
+        "Assisters": [
+          "Spieler 7",
+          "Spieler 9"
+        ],
+        "EventID": 58,
+        "EventName": "ChampionKill",
+        "EventTime": 548.6375122070312,
+        "KillerName": "Spieler 5",
+        "VictimName": "Spieler 4"
+      },
+      {
+        "Assisters": [
+          "Spieler 7",
+          "Spieler 9"
+        ],
+        "EventID": 59,
+        "EventName": "ChampionKill",
+        "EventTime": 552.7988891601562,
+        "KillerName": "Spieler 5",
+        "VictimName": "Spieler 2"
+      },
+      {
+        "EventID": 60,
+        "EventName": "Multikill",
+        "EventTime": 552.7988891601562,
+        "KillStreak": 2,
+        "KillerName": "Spieler 5"
+      },
+      {
+        "Assisters": [
+          "Spieler 7"
+        ],
+        "EventID": 61,
+        "EventName": "ChampionKill",
+        "EventTime": 556.4645385742188,
+        "KillerName": "Spieler 5",
+        "VictimName": "Spieler 1"
+      },
+      {
+        "EventID": 62,
+        "EventName": "Multikill",
+        "EventTime": 556.4645385742188,
+        "KillStreak": 3,
+        "KillerName": "Spieler 5"
+      },
+      {
+        "Assisters": [],
+        "EventID": 63,
+        "EventName": "ChampionKill",
+        "EventTime": 557.5369262695312,
+        "KillerName": "Ich",
+        "VictimName": "Spieler 5"
+      },
+      {
+        "Assisters": [],
+        "EventID": 64,
+        "EventName": "ChampionKill",
+        "EventTime": 572.233154296875,
+        "KillerName": "Spieler 3",
+        "VictimName": "Spieler 9"
+      },
+      {
+        "Assisters": [
+          "Spieler 6",
+          "Spieler 9"
+        ],
+        "EventID": 65,
+        "EventName": "ChampionKill",
+        "EventTime": 574.46435546875,
+        "KillerName": "Spieler 7",
+        "VictimName": "Spieler 3"
+      },
+      {
+        "Assisters": [
+          "Spieler 3"
+        ],
+        "EventID": 66,
+        "EventName": "ChampionKill",
+        "EventTime": 581.4598999023438,
+        "KillerName": "Ich",
+        "VictimName": "Spieler 6"
+      },
+      {
+        "Assisters": [
+          "Spieler 7"
+        ],
+        "EventID": 67,
+        "EventName": "ChampionKill",
+        "EventTime": 585.6104736328125,
+        "KillerName": "Spieler 8",
+        "VictimName": "Ich"
+      },
+      {
+        "Assisters": [],
+        "EventID": 68,
+        "EventName": "ChampionKill",
+        "EventTime": 590.0259399414062,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 4"
+      },
+      {
+        "EventID": 69,
+        "EventName": "Multikill",
+        "EventTime": 590.0259399414062,
+        "KillStreak": 2,
+        "KillerName": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 2",
+          "Ich",
+          "Spieler 4"
+        ],
+        "EventID": 70,
+        "EventName": "ChampionKill",
+        "EventTime": 598.2168579101562,
+        "KillerName": "Spieler 1",
+        "VictimName": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 7"
+        ],
+        "EventID": 71,
+        "EventName": "TurretKilled",
+        "EventTime": 602.6331176757812,
+        "KillerName": "Spieler 5",
+        "TurretKilled": "Turret_TOrder_L1_P2_2032291219_0"
+      },
+      {
+        "Assisters": [
+          "Spieler 5"
+        ],
+        "EventID": 72,
+        "EventName": "ChampionKill",
+        "EventTime": 609.0414428710938,
+        "KillerName": "Spieler 7",
+        "VictimName": "Spieler 3"
+      },
+      {
+        "Assisters": [
+          "Spieler 2",
+          "Spieler 3"
+        ],
+        "EventID": 73,
+        "EventName": "ChampionKill",
+        "EventTime": 613.156494140625,
+        "KillerName": "Spieler 1",
+        "VictimName": "Spieler 5"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 2",
+          "Spieler 4"
+        ],
+        "EventID": 74,
+        "EventName": "ChampionKill",
+        "EventTime": 633.0897827148438,
+        "KillerName": "Ich",
+        "VictimName": "Spieler 6"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 2",
+          "Spieler 3",
+          "Ich"
+        ],
+        "EventID": 75,
+        "EventName": "ChampionKill",
+        "EventTime": 681.3890991210938,
+        "KillerName": "Spieler 4",
+        "VictimName": "Spieler 6"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 6",
+          "Spieler 8"
+        ],
+        "EventID": 76,
+        "EventName": "ChampionKill",
+        "EventTime": 682.443359375,
+        "KillerName": "Spieler 7",
+        "VictimName": "Ich"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 8"
+        ],
+        "EventID": 77,
+        "EventName": "ChampionKill",
+        "EventTime": 686.4205322265625,
+        "KillerName": "Spieler 7",
+        "VictimName": "Spieler 3"
+      },
+      {
+        "EventID": 78,
+        "EventName": "Multikill",
+        "EventTime": 686.4205322265625,
+        "KillStreak": 2,
+        "KillerName": "Spieler 7"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 7"
+        ],
+        "EventID": 79,
+        "EventName": "ChampionKill",
+        "EventTime": 688.732421875,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 4"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 6",
+          "Spieler 7",
+          "Spieler 9"
+        ],
+        "EventID": 80,
+        "EventName": "ChampionKill",
+        "EventTime": 691.2315063476562,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 2"
+      },
+      {
+        "EventID": 81,
+        "EventName": "Multikill",
+        "EventTime": 691.2315063476562,
+        "KillStreak": 2,
+        "KillerName": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 7",
+          "Spieler 8"
+        ],
+        "EventID": 82,
+        "EventName": "ChampionKill",
+        "EventTime": 692.9364013671875,
+        "KillerName": "Spieler 5",
+        "VictimName": "Spieler 1"
+      },
+      {
+        "Acer": "Spieler 5",
+        "AcingTeam": "CHAOS",
+        "EventID": 83,
+        "EventName": "Ace",
+        "EventTime": 692.9364013671875
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 7",
+          "Spieler 9"
+        ],
+        "EventID": 84,
+        "EventName": "InhibKilled",
+        "EventTime": 708.0166625976562,
+        "InhibKilled": "Inhib_TOrder_L1_P1_196971597_0",
+        "KillerName": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 9"
+        ],
+        "EventID": 85,
+        "EventName": "TurretKilled",
+        "EventTime": 721.5446166992188,
+        "KillerName": "Spieler 7",
+        "TurretKilled": "Turret_TOrder_L1_P5_1477396591_0"
+      },
+      {
+        "Assisters": [
+          "Spieler 3"
+        ],
+        "EventID": 86,
+        "EventName": "ChampionKill",
+        "EventTime": 722.355224609375,
+        "KillerName": "Ich",
+        "VictimName": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 8"
+        ],
+        "EventID": 87,
+        "EventName": "ChampionKill",
+        "EventTime": 731.6489868164062,
+        "KillerName": "Spieler 7",
+        "VictimName": "Spieler 3"
+      },
+      {
+        "Assisters": [
+          "Spieler 2",
+          "Ich"
+        ],
+        "EventID": 88,
+        "EventName": "ChampionKill",
+        "EventTime": 731.7494506835938,
+        "KillerName": "Spieler 3",
+        "VictimName": "Spieler 5"
+      },
+      {
+        "Assisters": [
+          "Spieler 2"
+        ],
+        "EventID": 89,
+        "EventName": "ChampionKill",
+        "EventTime": 735.943359375,
+        "KillerName": "Spieler 4",
+        "VictimName": "Spieler 7"
+      },
+      {
+        "Assisters": [],
+        "EventID": 90,
+        "EventName": "ChampionKill",
+        "EventTime": 740.9376831054688,
+        "KillerName": "Spieler 6",
+        "VictimName": "Ich"
+      },
+      {
+        "Assisters": [
+          "Spieler 2",
+          "Ich",
+          "Spieler 4"
+        ],
+        "EventID": 91,
+        "EventName": "ChampionKill",
+        "EventTime": 744.0083618164062,
+        "KillerName": "Spieler 1",
+        "VictimName": "Spieler 6"
+      },
+      {
+        "Assisters": [
+          "Spieler 4"
+        ],
+        "EventID": 92,
+        "EventName": "ChampionKill",
+        "EventTime": 794.5401000976562,
+        "KillerName": "Spieler 3",
+        "VictimName": "Spieler 5"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 2",
+          "Spieler 3",
+          "Ich"
+        ],
+        "EventID": 93,
+        "EventName": "ChampionKill",
+        "EventTime": 799.0244750976562,
+        "KillerName": "Spieler 4",
+        "VictimName": "Spieler 6"
+      },
+      {
+        "Assisters": [
+          "Spieler 5",
+          "Spieler 6",
+          "Spieler 8"
+        ],
+        "EventID": 94,
+        "EventName": "ChampionKill",
+        "EventTime": 799.2811279296875,
+        "KillerName": "Spieler 7",
+        "VictimName": "Spieler 3"
+      },
+      {
+        "Assisters": [],
+        "EventID": 95,
+        "EventName": "ChampionKill",
+        "EventTime": 801.6671752929688,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 4"
+      },
+      {
+        "Assisters": [],
+        "EventID": 96,
+        "EventName": "ChampionKill",
+        "EventTime": 802.4970092773438,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 1"
+      },
+      {
+        "EventID": 97,
+        "EventName": "Multikill",
+        "EventTime": 802.4970092773438,
+        "KillStreak": 2,
+        "KillerName": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 2",
+          "Spieler 4"
+        ],
+        "EventID": 98,
+        "EventName": "ChampionKill",
+        "EventTime": 805.1551513671875,
+        "KillerName": "Ich",
+        "VictimName": "Spieler 9"
+      },
+      {
+        "Assisters": [],
+        "EventID": 99,
+        "EventName": "ChampionKill",
+        "EventTime": 808.599365234375,
+        "KillerName": "Spieler 8",
+        "VictimName": "Ich"
+      },
+      {
+        "EventID": 100,
+        "EventName": "Multikill",
+        "EventTime": 808.599365234375,
+        "KillStreak": 3,
+        "KillerName": "Spieler 8"
+      },
+      {
+        "Assisters": [
+          "Spieler 7",
+          "Spieler 9"
+        ],
+        "EventID": 101,
+        "EventName": "ChampionKill",
+        "EventTime": 813.5771484375,
+        "KillerName": "Spieler 8",
+        "VictimName": "Spieler 2"
+      },
+      {
+        "EventID": 102,
+        "EventName": "Multikill",
+        "EventTime": 813.5771484375,
+        "KillStreak": 4,
+        "KillerName": "Spieler 8"
+      },
+      {
+        "Acer": "Spieler 8",
+        "AcingTeam": "CHAOS",
+        "EventID": 103,
+        "EventName": "Ace",
+        "EventTime": 813.5771484375
+      },
+      {
+        "Assisters": [],
+        "EventID": 104,
+        "EventName": "ChampionKill",
+        "EventTime": 822.2091674804688,
+        "KillerName": "Ich",
+        "VictimName": "Spieler 8"
+      },
+      {
+        "Assisters": [],
+        "EventID": 105,
+        "EventName": "TurretKilled",
+        "EventTime": 836.4276733398438,
+        "KillerName": "Spieler 7",
+        "TurretKilled": "Turret_TOrder_L1_P4_2267177885_0"
+      },
+      {
+        "Assisters": [],
+        "EventID": 106,
+        "EventName": "ChampionKill",
+        "EventTime": 841.8590698242188,
+        "KillerName": "Spieler 3",
+        "VictimName": "Spieler 7"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 2",
+          "Spieler 3"
+        ],
+        "EventID": 107,
+        "EventName": "ChampionKill",
+        "EventTime": 864.322265625,
+        "KillerName": "Spieler 4",
+        "VictimName": "Spieler 6"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 2",
+          "Ich"
+        ],
+        "EventID": 108,
+        "EventName": "ChampionKill",
+        "EventTime": 874.5552978515625,
+        "KillerName": "Spieler 3",
+        "VictimName": "Spieler 5"
+      },
+      {
+        "Assisters": [
+          "Spieler 1",
+          "Spieler 2",
+          "Spieler 3",
+          "Ich"
+        ],
+        "EventID": 109,
+        "EventName": "ChampionKill",
+        "EventTime": 912.2509765625,
+        "KillerName": "Spieler 4",
+        "VictimName": "Spieler 6"
+      }
+    ]
+  },
+  "gameData": {
+    "gameMode": "KIWI",
+    "gameTime": 924.958984375,
+    "mapName": "Map12",
+    "mapNumber": 12,
+    "mapTerrain": "Default"
+  }
+}

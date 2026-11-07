@@ -1,0 +1,423 @@
+{
+  "kind": "plans",
+  "note": "Eingaben: tests/DraftPilot.Core.Tests/Fixtures/OpGg; FetchedAtUtc ist nicht Teil des Vergleichs.",
+  "matchupGuide": {
+    "schemaVersion": 6,
+    "championId": 122,
+    "championName": "Darius",
+    "opponentId": 24,
+    "opponentName": "Jax",
+    "lane": "top",
+    "mode": "",
+    "variant": "",
+    "patch": "16.18.1",
+    "fetchedAtUtc": "2026-11-06T19:08:44.3471752+00:00",
+    "runes": {
+      "primaryPath": "Precision",
+      "primaryPathId": 8000,
+      "primaryRunes": [
+        "Conqueror",
+        "Triumph",
+        "Legend: Alacrity",
+        "Last Stand"
+      ],
+      "primaryRuneIds": [
+        8010,
+        9111,
+        9104,
+        8299
+      ],
+      "secondaryPath": "Sorcery",
+      "secondaryPathId": 8200,
+      "secondaryRunes": [
+        "Axiom Arcanist",
+        "Celerity"
+      ],
+      "secondaryRuneIds": [
+        8224,
+        8234
+      ],
+      "shards": [
+        "Attack Speed",
+        "Adaptive Force",
+        "Health (scaling)"
+      ],
+      "shardIds": [
+        5005,
+        5008,
+        5001
+      ],
+      "winRate": 0.6,
+      "play": 55
+    },
+    "starters": [
+      {
+        "items": [
+          "Doran\u0027s Blade",
+          "Health Potion"
+        ],
+        "itemIds": [
+          1055,
+          2003
+        ],
+        "winRate": 0.48672566371681414,
+        "play": 113,
+        "pickRate": 0.7434
+      },
+      {
+        "items": [
+          "Doran\u0027s Shield",
+          "Health Potion"
+        ],
+        "itemIds": [
+          1054,
+          2003
+        ],
+        "winRate": 0.4782608695652174,
+        "play": 23,
+        "pickRate": 0.1513
+      }
+    ],
+    "boots": [
+      {
+        "items": [
+          "Plated Steelcaps"
+        ],
+        "itemIds": [
+          3047
+        ],
+        "winRate": 0.45217391304347826,
+        "play": 115,
+        "pickRate": 0.7823
+      },
+      {
+        "items": [
+          "Mercury\u0027s Treads"
+        ],
+        "itemIds": [
+          3111
+        ],
+        "winRate": 0.5833333333333334,
+        "play": 24,
+        "pickRate": 0.1633
+      },
+      {
+        "items": [
+          "Boots of Swiftness"
+        ],
+        "itemIds": [
+          3009
+        ],
+        "winRate": 0.7142857142857143,
+        "play": 7,
+        "pickRate": 0.0476
+      },
+      {
+        "items": [
+          "Gluttonous Greaves"
+        ],
+        "itemIds": [
+          3008
+        ],
+        "winRate": 0,
+        "play": 1,
+        "pickRate": 0.0068
+      }
+    ],
+    "coreItems": [
+      {
+        "items": [
+          "Youmuu\u0027s Ghostblade",
+          "Dead Man\u0027s Plate",
+          "Death\u0027s Dance"
+        ],
+        "itemIds": [
+          3142,
+          3742,
+          6333
+        ],
+        "winRate": 0.36363636363636365,
+        "play": 11,
+        "pickRate": 0.131
+      },
+      {
+        "items": [
+          "Youmuu\u0027s Ghostblade",
+          "Dead Man\u0027s Plate",
+          "Force of Nature"
+        ],
+        "itemIds": [
+          3142,
+          3742,
+          4401
+        ],
+        "winRate": 0.375,
+        "play": 8,
+        "pickRate": 0.0952
+      },
+      {
+        "items": [
+          "Youmuu\u0027s Ghostblade",
+          "Dead Man\u0027s Plate",
+          "Sterak\u0027s Gage"
+        ],
+        "itemIds": [
+          3142,
+          3742,
+          3053
+        ],
+        "winRate": 0.5,
+        "play": 6,
+        "pickRate": 0.0714
+      }
+    ],
+    "lateItems": [
+      {
+        "items": [
+          "Dead Man\u0027s Plate"
+        ],
+        "itemIds": [
+          3742
+        ],
+        "winRate": 0.5194805194805194,
+        "play": 77,
+        "pickRate": 0.4695
+      },
+      {
+        "items": [
+          "Stridebreaker"
+        ],
+        "itemIds": [
+          6631
+        ],
+        "winRate": 0.4788732394366197,
+        "play": 71,
+        "pickRate": 0.4329
+      },
+      {
+        "items": [
+          "Youmuu\u0027s Ghostblade"
+        ],
+        "itemIds": [
+          3142
+        ],
+        "winRate": 0.4925373134328358,
+        "play": 67,
+        "pickRate": 0.4085
+      }
+    ],
+    "summonerSpells": [
+      {
+        "items": [
+          "Flash",
+          "Ghost"
+        ],
+        "itemIds": [
+          4,
+          6
+        ],
+        "winRate": 0.5,
+        "play": 112,
+        "pickRate": 0.6871
+      },
+      {
+        "items": [
+          "Flash",
+          "Ignite"
+        ],
+        "itemIds": [
+          4,
+          14
+        ],
+        "winRate": 0.3939393939393939,
+        "play": 33,
+        "pickRate": 0.2025
+      }
+    ],
+    "skillPriority": "Q \u003E E \u003E W",
+    "skillOrder": [
+      "Q",
+      "E",
+      "W",
+      "Q",
+      "Q",
+      "R",
+      "Q",
+      "E",
+      "Q",
+      "E",
+      "R",
+      "E",
+      "E",
+      "W",
+      "W"
+    ],
+    "augments": [],
+    "isEmpty": false
+  },
+  "laneBuild": {
+    "schemaVersion": 6,
+    "championId": 122,
+    "championName": "Darius",
+    "opponentId": 0,
+    "opponentName": "",
+    "lane": "top",
+    "mode": "",
+    "variant": "ranked-all",
+    "patch": "16.18.1",
+    "fetchedAtUtc": "2026-11-06T19:08:44.3702845+00:00",
+    "runes": {
+      "primaryPath": "Precision",
+      "primaryPathId": 8000,
+      "primaryRunes": [
+        "Conqueror",
+        "Triumph",
+        "Legend: Alacrity",
+        "Last Stand"
+      ],
+      "primaryRuneIds": [
+        8010,
+        9111,
+        9104,
+        8299
+      ],
+      "secondaryPath": "Sorcery",
+      "secondaryPathId": 8200,
+      "secondaryRunes": [
+        "Axiom Arcanist",
+        "Celerity"
+      ],
+      "secondaryRuneIds": [
+        8224,
+        8234
+      ],
+      "shards": [
+        "Attack Speed",
+        "Adaptive Force",
+        "Health (scaling)"
+      ],
+      "shardIds": [
+        5005,
+        5008,
+        5001
+      ],
+      "winRate": 0.4877051839356387,
+      "play": 154130
+    },
+    "starters": [
+      {
+        "items": [
+          "Doran\u0027s Blade",
+          "Health Potion"
+        ],
+        "itemIds": [
+          1055,
+          2003
+        ],
+        "winRate": 0.49131665300597166,
+        "play": 350153,
+        "pickRate": 0
+      }
+    ],
+    "boots": [
+      {
+        "items": [
+          "Plated Steelcaps"
+        ],
+        "itemIds": [
+          3047
+        ],
+        "winRate": 0.48869505419931597,
+        "play": 276295,
+        "pickRate": 0
+      }
+    ],
+    "coreItems": [
+      {
+        "items": [
+          "Youmuu\u0027s Ghostblade",
+          "Dead Man\u0027s Plate",
+          "Death\u0027s Dance"
+        ],
+        "itemIds": [
+          3142,
+          3742,
+          6333
+        ],
+        "winRate": 0.5772199344068256,
+        "play": 40553,
+        "pickRate": 0
+      }
+    ],
+    "lateItems": [
+      {
+        "items": [
+          "Dead Man\u0027s Plate"
+        ],
+        "itemIds": [
+          3742
+        ],
+        "winRate": 0.533474151510812,
+        "play": 251388,
+        "pickRate": 0
+      },
+      {
+        "items": [
+          "Youmuu\u0027s Ghostblade"
+        ],
+        "itemIds": [
+          3142
+        ],
+        "winRate": 0.5020099238743827,
+        "play": 250507,
+        "pickRate": 0
+      },
+      {
+        "items": [
+          "Stridebreaker"
+        ],
+        "itemIds": [
+          6631
+        ],
+        "winRate": 0.4902142658380484,
+        "play": 172496,
+        "pickRate": 0
+      }
+    ],
+    "summonerSpells": [
+      {
+        "items": [
+          "",
+          ""
+        ],
+        "itemIds": [
+          4,
+          6
+        ],
+        "winRate": 0.489699673113593,
+        "play": 352416,
+        "pickRate": 0
+      }
+    ],
+    "skillPriority": "Q \u003E E \u003E W",
+    "skillOrder": [
+      "W",
+      "Q",
+      "E",
+      "Q",
+      "Q",
+      "R",
+      "Q",
+      "E",
+      "Q",
+      "E",
+      "R",
+      "E",
+      "E",
+      "W",
+      "W"
+    ],
+    "augments": [],
+    "isEmpty": false
+  }
+}

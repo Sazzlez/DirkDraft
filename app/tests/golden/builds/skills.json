@@ -1,0 +1,242 @@
+{
+  "kind": "skillPlan",
+  "cases": [
+    {
+      "input": [
+        "Q",
+        "E",
+        "W",
+        "Q",
+        "Q",
+        "R",
+        "Q",
+        "E",
+        "Q",
+        "E",
+        "R",
+        "E",
+        "E",
+        "W",
+        "W"
+      ],
+      "output": [
+        {
+          "level": 1,
+          "ability": "Q",
+          "isDerived": false
+        },
+        {
+          "level": 2,
+          "ability": "E",
+          "isDerived": false
+        },
+        {
+          "level": 3,
+          "ability": "W",
+          "isDerived": false
+        },
+        {
+          "level": 4,
+          "ability": "Q",
+          "isDerived": false
+        },
+        {
+          "level": 5,
+          "ability": "Q",
+          "isDerived": false
+        },
+        {
+          "level": 6,
+          "ability": "R",
+          "isDerived": false
+        },
+        {
+          "level": 7,
+          "ability": "Q",
+          "isDerived": false
+        },
+        {
+          "level": 8,
+          "ability": "E",
+          "isDerived": false
+        },
+        {
+          "level": 9,
+          "ability": "Q",
+          "isDerived": false
+        },
+        {
+          "level": 10,
+          "ability": "E",
+          "isDerived": false
+        },
+        {
+          "level": 11,
+          "ability": "R",
+          "isDerived": false
+        },
+        {
+          "level": 12,
+          "ability": "E",
+          "isDerived": false
+        },
+        {
+          "level": 13,
+          "ability": "E",
+          "isDerived": false
+        },
+        {
+          "level": 14,
+          "ability": "W",
+          "isDerived": false
+        },
+        {
+          "level": 15,
+          "ability": "W",
+          "isDerived": false
+        },
+        {
+          "level": 16,
+          "ability": "R",
+          "isDerived": true
+        },
+        {
+          "level": 17,
+          "ability": "W",
+          "isDerived": true
+        },
+        {
+          "level": 18,
+          "ability": "W",
+          "isDerived": true
+        }
+      ]
+    },
+    {
+      "input": [
+        "Q",
+        "W",
+        "E"
+      ],
+      "output": []
+    },
+    {
+      "input": [],
+      "output": []
+    },
+    {
+      "input": [
+        "E",
+        "Q",
+        "W",
+        "Q",
+        "Q",
+        "R",
+        "Q",
+        "E",
+        "E",
+        "Q",
+        "R",
+        "E",
+        "E",
+        "W",
+        "W",
+        "R",
+        "W",
+        "W"
+      ],
+      "output": [
+        {
+          "level": 1,
+          "ability": "E",
+          "isDerived": false
+        },
+        {
+          "level": 2,
+          "ability": "Q",
+          "isDerived": false
+        },
+        {
+          "level": 3,
+          "ability": "W",
+          "isDerived": false
+        },
+        {
+          "level": 4,
+          "ability": "Q",
+          "isDerived": false
+        },
+        {
+          "level": 5,
+          "ability": "Q",
+          "isDerived": false
+        },
+        {
+          "level": 6,
+          "ability": "R",
+          "isDerived": false
+        },
+        {
+          "level": 7,
+          "ability": "Q",
+          "isDerived": false
+        },
+        {
+          "level": 8,
+          "ability": "E",
+          "isDerived": false
+        },
+        {
+          "level": 9,
+          "ability": "E",
+          "isDerived": false
+        },
+        {
+          "level": 10,
+          "ability": "Q",
+          "isDerived": false
+        },
+        {
+          "level": 11,
+          "ability": "R",
+          "isDerived": false
+        },
+        {
+          "level": 12,
+          "ability": "E",
+          "isDerived": false
+        },
+        {
+          "level": 13,
+          "ability": "E",
+          "isDerived": false
+        },
+        {
+          "level": 14,
+          "ability": "W",
+          "isDerived": false
+        },
+        {
+          "level": 15,
+          "ability": "W",
+          "isDerived": false
+        },
+        {
+          "level": 16,
+          "ability": "R",
+          "isDerived": false
+        },
+        {
+          "level": 17,
+          "ability": "W",
+          "isDerived": false
+        },
+        {
+          "level": 18,
+          "ability": "W",
+          "isDerived": false
+        }
+      ]
+    }
+  ]
+}

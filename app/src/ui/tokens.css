@@ -1,0 +1,162 @@
+/* DirkDraft 2.0 design tokens, Apple style. Dark is the default, light follows the Windows scheme.
+   Colour carries meaning only: blue interacts, green/orange/red judge (good, attention, against),
+   teal informs, purple is magic damage. Surfaces are materials (glass over the desktop tint the
+   shell's Mica/Acrylic provides), separated by light and spacing rather than by borders. */
+
+:root {
+  color-scheme: dark;
+  --font: 'Inter Variable', 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+
+  --blue: #0a84ff;
+  --green: #30d158;
+  --orange: #ff9f0a;
+  --red: #ff453a;
+  --teal: #64d2ff;
+  --purple: #bf5af2;
+  --gold: #c89b3c;
+
+  /* The desktop behind the window. In the Tauri shell Mica/Acrylic supplies it; in the browser a
+     tint stands in, so the glass reads the same in screenshots. */
+  --stage: radial-gradient(70% 55% at 8% 0%, rgba(30, 96, 210, 0.42), transparent 70%),
+    radial-gradient(55% 50% at 100% 12%, rgba(10, 200, 185, 0.18), transparent 70%),
+    radial-gradient(70% 60% at 60% 110%, rgba(110, 60, 200, 0.2), transparent 70%), #0b0d14;
+
+  /* Materials, thinnest to thickest. */
+  --window: rgba(22, 23, 28, 0.62);
+  --card: rgba(255, 255, 255, 0.06);
+  --card-strong: rgba(255, 255, 255, 0.1);
+  --card-hover: rgba(255, 255, 255, 0.08);
+  --popover: rgba(40, 41, 46, 0.92);
+  --edge: inset 0 0.5px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.06);
+  --separator: rgba(255, 255, 255, 0.08);
+
+  --fg: #f5f5f7;
+  --fg2: rgba(235, 235, 245, 0.62);
+  --fg3: rgba(235, 235, 245, 0.32);
+  --track: rgba(255, 255, 255, 0.08);
+
+  --blue-wash: rgba(10, 132, 255, 0.16);
+  --blue-line: rgba(10, 132, 255, 0.42);
+  --green-wash: rgba(48, 209, 88, 0.14);
+  --orange-wash: rgba(255, 159, 10, 0.16);
+  --red-wash: rgba(255, 69, 58, 0.16);
+  --purple-wash: rgba(191, 90, 242, 0.18);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --thumb: rgba(255, 255, 255, 0.2);
+
+  --r-s: 8px;
+  --r-m: 12px;
+  --r-l: 16px;
+
+  /* Type scale. */
+  --t-large: 700 28px/1.1 var(--font);
+  --t-title: 600 17px/1.25 var(--font);
+  --t-head: 600 15px/1.3 var(--font);
+  --t-body: 400 13px/1.38 var(--font);
+  --t-caption: 500 11.5px/1.3 var(--font);
+
+  --spring: cubic-bezier(0.2, 0.9, 0.25, 1.05);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --blue: #007aff;
+  --green: #248a3d;
+  --orange: #c26a00;
+  --red: #d70015;
+  --teal: #0071a4;
+  --purple: #8944ab;
+  --stage: radial-gradient(70% 55% at 8% 0%, rgba(120, 170, 255, 0.45), transparent 70%),
+    radial-gradient(55% 50% at 100% 12%, rgba(120, 230, 220, 0.35), transparent 70%),
+    radial-gradient(70% 60% at 60% 110%, rgba(200, 170, 255, 0.35), transparent 70%), #e9ecf3;
+  --window: rgba(246, 246, 250, 0.66);
+  --card: rgba(255, 255, 255, 0.72);
+  --card-strong: rgba(0, 0, 0, 0.06);
+  --card-hover: rgba(0, 0, 0, 0.035);
+  --popover: rgba(255, 255, 255, 0.95);
+  --edge: inset 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.05);
+  --separator: rgba(60, 60, 67, 0.12);
+  --fg: #1d1d1f;
+  --fg2: rgba(60, 60, 67, 0.72);
+  --fg3: rgba(60, 60, 67, 0.38);
+  --track: rgba(60, 60, 67, 0.1);
+  --blue-wash: rgba(0, 122, 255, 0.1);
+  --blue-line: rgba(0, 122, 255, 0.32);
+  --green-wash: rgba(36, 138, 61, 0.1);
+  --orange-wash: rgba(194, 106, 0, 0.11);
+  --red-wash: rgba(215, 0, 21, 0.09);
+  --purple-wash: rgba(137, 68, 171, 0.11);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --thumb: #fff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--stage);
+  color: var(--fg);
+  font: var(--t-body);
+  letter-spacing: -0.008em;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+  overflow: hidden;
+}
+
+/* The Tauri shell draws Mica/Acrylic itself; the stage would only cover it. */
+:root[data-shell='tauri'] body {
+  background: transparent;
+}
+
+/* Windows 10 has no Mica: there the window is opaque (#1c1c1e, light: its counterpart). */
+:root[data-glass='none'] body {
+  background: #1c1c1e;
+}
+
+:root[data-theme='light'][data-glass='none'] body {
+  background: #ececf0;
+}
+
+#app {
+  height: 100%;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: var(--r-s);
+}
+
+.tone-good { color: var(--green); }
+.tone-warn { color: var(--orange); }
+.tone-bad { color: var(--red); }
+.tone-info { color: var(--teal); }
+.tone-neutral { color: var(--fg2); }
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

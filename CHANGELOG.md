@@ -3,16 +3,73 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
-## Unveröffentlicht
+## 2.0.0 — unveröffentlicht
 
-- **Kein Matchup-Build heißt nicht mehr: gar kein Build.** Hat OP.GG für eine Paarung nichts —
-  gemessen etwa bei Taric gegen Kindred auf Mid, wo die Antwort ganz leer ist, oder bei Yuumi gegen
-  Darius auf Top, wo zwei Runenseiten und kein einziges Item zurückkommen —, blieb die Build-Karte
-  leer oder halb leer. Jetzt steht dort der Build, mit dem dein Champion auf dieser Lane insgesamt
-  am besten fährt, mit dem Hinweis „Kein Build gegen … — bester Build der Lane". Er kommt aus dem
-  Cache, wenn derselbe Lane-Build vorher schon geholt wurde, sonst kostet er einen Abruf.
-- Die übertragene Runenseite eines Lane-Builds hieß „DirkRunen · Darius vs " (mit leerem Gegner).
-  Sie heißt jetzt „DirkRunen · Darius · Toplane".
+DirkDraft ist neu gebaut: neues Fenster, eigene Zahlen statt OP.GG, eine Spielansicht aus dem
+laufenden Spiel. Das Update kommt wie jedes andere („Version 2.0.0 ist da" → Jetzt aktualisieren);
+Einstellungen, Fensterplatz und Pin bleiben.
+
+Fenster:
+
+- **Ein Fenster für alles, das sich der Breite anpasst.** Breit (ab 1.100 Pixel) Board mit beiden
+  Teams und Kacheln daneben, mittel (720–1.099) dasselbe kompakter, schmal (ab 340) eine Spalte mit
+  Avatar-Leiste — das Fenster passt auch neben den Client. Oben drei Bereiche, **Draft · Build ·
+  Spiel**, die von selbst wechseln: Champ Select zeigt den Draft, das Spiel die Spielansicht; ein
+  Klick hält bis zum nächsten Moment.
+- **Einstellungen** hinter dem Zahnrad: bei Champ Select und Spielstart einblenden, nach dem Draft
+  ausblenden, immer im Vordergrund, Blitz-Taste, auch nicht gekaufte Champions vorschlagen. Alles
+  wird sofort gespeichert, in derselben Datei wie bisher; der Fensterplatz aus 1.x wird übernommen.
+- **Diagnose** für die Fehlersuche: ein kleines Log (ohne Namen) und auf Wunsch eine Aufzeichnung der
+  letzten Drafts und Spiele; „Diagnose speichern“ legt beides als Ordner auf den Desktop.
+- Unter Windows 11 mit Glas-Effekt (Mica, in den Einstellungen abschaltbar), unter Windows 10 deckend.
+
+Zahlen:
+
+- **Eigene Zahlen statt OP.GG.** Ein Sammler zählt rund um die Uhr Ranked-Spiele in Platin (Solo/
+  Duo, EUW) über die offizielle Riot-API und veröffentlicht daraus Lane-Winrates, alle Duelle, Duos,
+  Banns, Schadensarten und Builds. DirkDraft holt sie von selbst alle 30 Minuten — **nie während
+  Draft oder Spiel**; der Knopf „Daten aktualisieren" entfällt. Das Modell selbst ist unverändert:
+  auf denselben Zahlen rechnet 2.0 auf neun Nachkommastellen genau wie 1.5. Neu gemessen auf den eigenen Zahlen
+  ist nur die Glättung der Lane-Winrates (800 statt 300 Pseudospiele): Ohne sie standen Champions
+  mit 30 Spielen oben, weil die eigenen Zahlen pro Lane noch dünn sind.
+- **Builds aus diesen Spielen:** je Champion und Lane die Wahl mit der besten Winrate, die ihre
+  Spiele hergeben (Runen, Zauber, Start, Schuhe, Kern, spätere Items, Skill-Reihenfolge,
+  Support-Item). Solange die Zahlen zwischen zwei Optionen keinen messbaren Unterschied tragen —
+  heute in jedem Slot so —, steht die meistgespielte vorn statt eines Glückstreffers aus acht
+  Spielen. Zu wenige Spiele auf einer Lane: Build der Hauptlane, mit Hinweis.
+- **ARAM und Mayhem:** Die Bank „Behalten oder tauschen?" rechnet mit unserer eigenen ARAM-Zählung,
+  dazu ein ARAM-Build. Mayhem-Spiele gibt die Riot-API nicht heraus, deshalb stehen dort die Zahlen
+  aus normalem ARAM — die App sagt das dazu. Eine Augment-Liste gibt es deshalb nicht mehr.
+
+Draft:
+
+- Vorschläge stehen wie gewohnt mit Begründung, Gleichauf-Gruppe und Fehlerbalken; dazu „Dein
+  Hover", Banns mit Grund, Draft-Chance, Comp-Vergleich und „Dem Gegner fehlt noch".
+- **Klick auf einen Teammate** zeigt seine Vorschläge, bis die Uhr weiterzieht — wie in 1.x. **Lanes
+  von Hand:** ein Klick auf die Lane eines Gegners (oder eines Verbündeten ohne feste Position, etwa
+  im Blind Pick) setzt sie fest oder gibt sie mit „automatisch" an die Schätzung zurück.
+- Die Schrittleiste unter der Uhr folgt der echten Zugfolge (Ranked, Turnier-Draft, Blind Pick);
+  jeder Modus steht mit seinem Namen da, Flex mit „Zahlen aus Solo/Duo".
+- Spielt der Client schon den nächsten Patch, während die Zahlen noch vom alten sind, sagt der Draft
+  das und rechnet mit entsprechend breiteren Fehlerbalken.
+- **Nur Champions, die du spielen kannst** (besitzt oder gerade gratis) — abschaltbar.
+- **„Runen und Zauber übernehmen"**: derselbe Klick setzt jetzt auch die Beschwörerzauber. **Blitz
+  kommt immer auf F** (in den Einstellungen auf D umstellbar), auch wenn er vorher auf D lag.
+- Im Blind Pick stehen keine Bann-Schritte mehr; im Ladebildschirm bleibt dein Matchup stehen.
+
+Spiel:
+
+- **Spielansicht aus dem laufenden Spiel** (Riots Live-Client-Schnittstelle): nächster Kauf gegen
+  dein aktuelles Gold, der Build-Pfad mit Häkchen, der nächste Skillpunkt, die Items der Gegner mit
+  ihrer Schadensart. Namen anderer Spieler erreichen die Anzeige nie.
+- **„Für dieses Spiel"**: bis zu drei Items, die Spieler deines Champions gegen genau diese Gegner
+  deutlich öfter kaufen als sonst — als Alternative neben deinem Build, nie als Ersatz, und sie
+  folgen den Items der Gegner bis zum Ende des Spiels. Was schon im Build steht, wird nicht noch
+  einmal vorgeschlagen; Stiefel nur, solange noch keine gekauft sind.
+
+Unter der Haube: das Programm ist ein Bruchteil so groß wie bisher (rund 10 statt 78 MB); die Verbindung zum Client prüft
+weiter Riots Zertifikat; außer Runen und Zaubern auf deinen Klick schreibt DirkDraft nichts in den
+Client.
 
 ## 1.5.0 — 2026-10-09
 

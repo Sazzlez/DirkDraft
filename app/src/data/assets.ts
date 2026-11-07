@@ -1,0 +1,129 @@
+// Images and names from Data Dragon. The UI asks for "the picture of item 3031" and never builds a
+// URL itself: in the browser the answer is the CDN, in the Tauri shell a file from the local cache
+// (as 1.5 keeps it under %LOCALAPPDATA%\DraftPilot\data) — one place decides.
+
+import type { ItemInfo } from '../core/game';
+
+const CDN = 'https://ddragon.leagueoflegends.com/cdn';
+
+export interface AssetNames {
+  version: string;
+  champions: Map<number, { key: string; name: string }>;
+  items: Map<number, string>;
+  /** Price, recipe and situation stats per item, for the game view. */
+  itemInfo: Map<number, ItemInfo>;
+  spells: Map<number, { key: string; name: string }>;
+  runes: Map<number, { name: string; icon: string }>;
+}
+
+let loaded: Promise<AssetNames> | null = null;
+let current: AssetNames | null = null;
+
+/**
+ * Data Dragon names its folders by full version ("16.22.1"); our data names the patch line ("16.22").
+ * A line is resolved to the newest full version of it — or the newest overall, if the line is unknown.
+ */
+export async function fullVersion(version: string): Promise<string> {
+  if (version.split('.').length >= 3) return version;
+  try {
+    const versions = (await (await fetch('https://ddragon.leagueoflegends.com/api/versions.json')).json()) as string[];
+    return versions.find((v) => v.startsWith(`${version}.`)) ?? versions[0] ?? `${version}.1`;
+  } catch {
+    return `${version}.1`;
+  }
+}
+
+/** Loads the localised tables once per session. */
+export function loadAssets(patch: string, language = 'de_DE'): Promise<AssetNames> {
+  loaded ??= (async () => {
+    const version = await fullVersion(patch);
+    const get = async (file: string) => (await fetch(`${CDN}/${version}/data/${language}/${file}`)).json();
+    const [champions, items, spells, runes] = await Promise.all([
+      get('champion.json'),
+      get('item.json'),
+      get('summoner.json'),
+      get('runesReforged.json'),
+    ]);
+
+    const names: AssetNames = {
+      version,
+      champions: new Map(),
+      items: new Map(),
+      itemInfo: new Map(),
+      spells: new Map(),
+      runes: new Map(),
+    };
+
+    for (const c of Object.values(champions.data) as { key: string; id: string; name: string }[])
+      names.champions.set(Number(c.key), { key: c.id, name: c.name });
+    type RawItem = {
+      name: string;
+      gold?: { total?: number; purchasable?: boolean };
+      from?: string[];
+      into?: string[];
+      tags?: string[];
+      stats?: Record<string, number>;
+      specialRecipe?: number;
+    };
+    for (const [id, item] of Object.entries(items.data) as [string, RawItem][]) {
+      names.items.set(Number(id), item.name);
+      names.itemInfo.set(Number(id), {
+        total: item.gold?.total ?? 0,
+        from: (item.from ?? []).map(Number),
+        into: (item.into ?? []).map(Number),
+        purchasable: item.gold?.purchasable !== false,
+        tags: item.tags ?? [],
+        armor: Math.round(item.stats?.FlatArmorMod ?? 0),
+        magicResist: Math.round(item.stats?.FlatSpellBlockMod ?? 0),
+        specialRecipe: item.specialRecipe ? Number(item.specialRecipe) : undefined,
+      });
+    }
+    for (const s of Object.values(spells.data) as { key: string; id: string; name: string }[])
+      names.spells.set(Number(s.key), { key: s.id, name: s.name });
+    for (const style of runes as { id: number; name: string; icon: string; slots: { runes: { id: number; name: string; icon: string }[] }[] }[]) {
+      names.runes.set(style.id, { name: style.name, icon: style.icon });
+      for (const slot of style.slots)
+        for (const rune of slot.runes) names.runes.set(rune.id, { name: rune.name, icon: rune.icon });
+    }
+
+    current = names;
+    return names;
+  })();
+  return loaded;
+}
+
+export function assets(): AssetNames | null {
+  return current;
+}
+
+export function championIcon(key: string): string {
+  const version = current?.version ?? '16.22.1';
+  return `${CDN}/${version}/img/champion/${key}.png`;
+}
+
+export function itemIcon(id: number): string {
+  const version = current?.version ?? '16.22.1';
+  return `${CDN}/${version}/img/item/${id}.png`;
+}
+
+export function spellIcon(id: number): string | null {
+  const spell = current?.spells.get(id);
+  return spell ? `${CDN}/${current!.version}/img/spell/${spell.key}.png` : null;
+}
+
+export function runeIcon(id: number): string | null {
+  const rune = current?.runes.get(id);
+  return rune ? `https://ddragon.leagueoflegends.com/cdn/img/${rune.icon}` : null;
+}
+
+export function itemName(id: number): string {
+  return current?.items.get(id) ?? `#${id}`;
+}
+
+export function runeName(id: number): string {
+  return current?.runes.get(id)?.name ?? `#${id}`;
+}
+
+export function spellName(id: number): string {
+  return current?.spells.get(id)?.name ?? `#${id}`;
+}

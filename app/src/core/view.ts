@@ -1,0 +1,336 @@
+// What the window shows, as data. The UI renders exactly this and computes nothing of its own:
+// every number, verdict and sentence is decided in the core, so a replay, a test and the live
+// client all produce the same screen from the same draft.
+
+export type Lane = 'top' | 'jungle' | 'mid' | 'adc' | 'support';
+
+export const LANES: readonly Lane[] = ['top', 'jungle', 'mid', 'adc', 'support'];
+
+export const LANE_NAMES: Record<Lane, string> = {
+  top: 'Toplane',
+  jungle: 'Jungle',
+  mid: 'Midlane',
+  adc: 'Botlane',
+  support: 'Support',
+};
+
+/** The moments of a session; each has one main tile. */
+export type Moment =
+  | 'lobby'
+  | 'planning'
+  | 'banning'
+  | 'picking'
+  | 'teammate'
+  | 'locked'
+  | 'loading'
+  | 'aramBench'
+  | 'game';
+
+export type Area = 'draft' | 'build' | 'game';
+
+export const AREAS: { id: Area; label: string }[] = [
+  { id: 'draft', label: 'Draft' },
+  { id: 'build', label: 'Build' },
+  { id: 'game', label: 'Spiel' },
+];
+
+/** Which area a moment opens; a manual switch holds until the next moment begins. */
+export const AREA_OF: Record<Moment, Area> = {
+  lobby: 'draft',
+  planning: 'draft',
+  banning: 'draft',
+  picking: 'draft',
+  teammate: 'draft',
+  locked: 'draft',
+  loading: 'draft',
+  aramBench: 'draft',
+  game: 'game',
+};
+
+export type Tone = 'good' | 'warn' | 'bad' | 'neutral' | 'info';
+
+export interface ChampionRef {
+  id: number;
+  name: string;
+  /** Data Dragon key, e.g. MonkeyKing for Wukong; addresses the portrait. */
+  key: string;
+}
+
+export interface SlotView {
+  cellId: number;
+  side: 'ally' | 'enemy';
+  /** "Du", "Teammate 3", "Gegner 2" — never a player name. */
+  label: string;
+  champion: ChampionRef | null;
+  /** True while the champion is only hovered, not locked. */
+  hovering: boolean;
+  lane: Lane | null;
+  /** Lane confidence 0..1, shown only when below the 60 % threshold. */
+  laneConfidence: number | null;
+  laneUncertain: boolean;
+  /** Set by hand (lane picker); a manual lane is no guess. */
+  laneManual: boolean;
+  isMe: boolean;
+  /** The seat the main tile currently advises. */
+  isTarget: boolean;
+  /** An ally seat a click can make the target (until the clock moves on), as in 1.5. */
+  canTarget: boolean;
+  /** The lane can be set by hand: enemies, and allies without an assigned position (blind, custom). */
+  laneEditable: boolean;
+  /** Ally hover that cannot work: "gebannt", "schon gepickt". */
+  warning: string | null;
+}
+
+export interface PhaseStep {
+  label: string;
+  state: 'done' | 'now' | 'next';
+}
+
+export interface BoardView {
+  allies: SlotView[];
+  enemies: SlotView[];
+  allyBans: ChampionRef[];
+  enemyBans: ChampionRef[];
+  /** Seconds left in the current step; null when the client sends none. */
+  seconds: number | null;
+  /** The step's full length in seconds, for the ring; null: 30 s, a ranked pick. */
+  total: number | null;
+  /** "Du pickst", "Teammate 3 pickt", "Gegner bannen", "Finalisierung". */
+  turnText: string;
+  myTurn: boolean;
+  steps: PhaseStep[];
+  /** "Ranked Solo/Duo", "ARAM Mayhem*" … */
+  mode: string;
+  modeNote: string | null;
+  usesLanes: boolean;
+  /** ARAM and Mayhem: the bench takes the enemy column, which the client keeps hidden there. */
+  bench: ChampionRef[] | null;
+}
+
+export interface TermView {
+  label: string;
+  /** Contribution in win-rate points; null means "keine Daten", never zero. */
+  points: number | null;
+  /** For the ban popularity gate: the multiplier, 0..1. */
+  gate: number | null;
+  verdict: string;
+  hint: string;
+  kind: 'lane' | 'matchup' | 'enemies' | 'synergy' | 'comp' | 'ban';
+}
+
+export interface RecommendationView {
+  champion: ChampionRef;
+  /** Picks: estimated win rate as text at the list's precision; bans: "+2,5 Pkt". */
+  value: string;
+  /** Raw value for bars and sorting tests. */
+  score: number;
+  errorPoints: number;
+  verdict: string;
+  tone: Tone;
+  /** The one reason shown in the row. */
+  reason: string;
+  reasons: { text: string; tone: Tone }[];
+  terms: TermView[];
+  tied: boolean;
+  /** Not choosable by the viewer (shown greyed). */
+  unavailable: boolean;
+}
+
+export interface PickTileView {
+  kind: 'picks' | 'bans';
+  title: string;
+  lane: Lane | null;
+  /** Size of the leading tie group (≥ 2) or 0. */
+  tied: number;
+  items: RecommendationView[];
+  /** Pinned hover row ("Dein Hover"). */
+  hover: HoverView | null;
+  footnote: string | null;
+}
+
+export interface HoverView {
+  champion: ChampionRef;
+  value: string | null;
+  /** "Platz 9 von 58 · knapp dahinter" */
+  place: string;
+  tone: Tone;
+  note: string | null;
+}
+
+export interface OpenRolesView {
+  /** "Dem Gegner fehlt noch Botlane und Support." */
+  text: string;
+  lanes: Lane[];
+}
+
+export interface DraftChanceView {
+  ally: number | null;
+  allyText: string;
+  enemyText: string;
+  verdict: string;
+  note: string;
+}
+
+export interface CompRow {
+  label: string;
+  ally: number;
+  enemy: number;
+  max: number;
+}
+
+export interface CompView {
+  rows: CompRow[];
+  allyDamage: { physical: number; magic: number } | null;
+  enemyDamage: { physical: number; magic: number } | null;
+  verdict: string;
+  verdictTone: Tone;
+}
+
+export interface MatchupView {
+  me: ChampionRef;
+  opponent: ChampionRef | null;
+  lane: Lane;
+  value: string | null;
+  sample: string;
+  verdict: string;
+  tone: Tone;
+}
+
+export interface VerdictLine {
+  icon: 'engage' | 'scaling' | 'heal' | 'damage' | 'info';
+  tone: Tone;
+  title: string;
+  detail: string;
+}
+
+export interface ItemRef {
+  id: number;
+  name: string;
+}
+
+export interface ItemOption {
+  items: ItemRef[];
+  /** "52 % · 1.240 Spiele" or "dünne Datenlage · 31 Spiele". */
+  stats: string;
+}
+
+export interface RunePageView {
+  keystone: number;
+  primaryStyle: number;
+  primary: number[];
+  secondaryStyle: number;
+  secondary: number[];
+  shards: string[];
+  stats: string;
+}
+
+export interface BuildView {
+  champion: ChampionRef;
+  lane: Lane | null;
+  title: string;
+  source: string;
+  caveat: string | null;
+  runes: RunePageView | null;
+  spells: number[];
+  start: ItemOption | null;
+  boots: ItemOption | null;
+  core: ItemOption | null;
+  late: ItemRef[];
+  /** The support item upgrade to pick when the quest is done (supports only). */
+  support: ItemOption | null;
+  /** The other upgrades worth showing (20+ games). */
+  alsoSupport: ItemOption[];
+  alsoStart: ItemOption[];
+  alsoBoots: ItemOption[];
+  alsoCore: ItemOption[];
+  skills: { level: number; key: 'Q' | 'W' | 'E' | 'R'; derived: boolean }[];
+  skillPriority: string;
+}
+
+export interface GameView {
+  clock: string;
+  level: number;
+  gold: number;
+  me: ChampionRef;
+  title: string;
+  nextBuy: { item: ItemRef; cost: number; affordable: boolean; then: ItemRef | null; supportChoice: boolean } | null;
+  path: { slot: string; items: (ItemRef & { owned: boolean; next: boolean })[] }[];
+  /** The plan's next point; `now`: a point is open right now (level above the points spent). */
+  nextSkill: { key: 'Q' | 'W' | 'E' | 'R'; level: number; now: boolean } | null;
+  /** Points spent so far: the skill grid marks that many levels as taken. */
+  skillPoints: number;
+  enemies: { champion: ChampionRef; items: ItemRef[]; damage: 'physisch' | 'magisch' | 'gemischt' }[];
+  hints: { title: string; detail: string; tone: Tone }[];
+  draftLine: string | null;
+  sample: string | null;
+  /**
+   * Alternatives for this game's enemy line-up, measured (core/situational). null without data;
+   * an empty list means nothing beats the base build clearly here.
+   */
+  situational: SituationalView[] | null;
+}
+
+export interface SituationalView {
+  item: ItemRef;
+  /** The base build's choice for that slot, which the suggestion is an alternative to. */
+  instead: ItemRef | null;
+  /** "Gegen viel magischen Schaden" */
+  reason: string;
+  /** "58 % statt 51 % · 2.400 Spiele" */
+  stats: string;
+}
+
+export interface AramRowView extends RecommendationView {
+  own: boolean;
+}
+
+export interface AramView {
+  rows: AramRowView[];
+  rerolls: number;
+  tied: number;
+  note: string;
+}
+
+export interface DataStatus {
+  /** "Patch 16.22 · Platin · 6.185 Spiele · vor 2 Std." */
+  text: string;
+  /** "Patch 16.22 · vor 2 Std." — the pill where the title bar is tight (medium width). */
+  short: string;
+  stale: boolean;
+  /** Present when the data needs a word: older patch, other queue. */
+  chip: string | null;
+}
+
+/** Everything one frame of the app shows. */
+export interface ViewModel {
+  moment: Moment;
+  connection: { state: 'off' | 'warn' | 'ok'; text: string };
+  data: DataStatus;
+  board: BoardView | null;
+  main: MainTile;
+  side: SideTile[];
+  build: BuildView | null;
+  game: GameView | null;
+  /** What the empty area of a moment says ("Sobald das Spiel startet …"). */
+  emptyText: string | null;
+  /** Its heading where the moment's own ("Kein Draft") would mislead, e.g. before any numbers. */
+  emptyTitle?: string | null;
+  /** Shown above everything when the scene is sample data, never in a live session. */
+  sampleNote: string | null;
+  /** Runes and spells can be taken over now: champion select is running (spells exist only there). */
+  canImport: boolean;
+}
+
+export type MainTile =
+  | { kind: 'picks'; tile: PickTileView }
+  | { kind: 'bans'; tile: PickTileView }
+  | { kind: 'matchup'; matchup: MatchupView; build: BuildView | null }
+  | { kind: 'aram'; aram: AramView; build: BuildView | null }
+  | { kind: 'lobby'; title: string; lines: { label: string; value: string; tone: Tone }[] }
+  | { kind: 'none' };
+
+export type SideTile =
+  | { kind: 'chance'; chance: DraftChanceView }
+  | { kind: 'comp'; comp: CompView }
+  | { kind: 'openRoles'; roles: OpenRolesView }
+  | { kind: 'verdict'; lines: VerdictLine[] };
