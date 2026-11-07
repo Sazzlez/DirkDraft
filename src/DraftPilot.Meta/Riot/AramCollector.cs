@@ -6,30 +6,39 @@ using DraftPilot.Core.Data;
 
 namespace DraftPilot.Meta.Riot;
 
-public sealed record MayhemOptions
+public sealed record AramOptions
 {
     public string Platform { get; init; } = "euw1";
 
     public string Region { get; init; } = "europe";
 
-    /// <summary>Where the snowball starts: a Riot ID ("Name#TAG") of someone who plays Mayhem.</summary>
-    public string SeedRiotId { get; init; } = string.Empty;
+    /// <summary>
+    /// The league lists the first players come from. ARAM has no ranks of its own; drawing from the
+    /// same bracket as the ranked count keeps the numbers about the same players.
+    /// </summary>
+    public IReadOnlyList<string> Tiers { get; init; } = ["platinum"];
 
     /// <summary>
-    /// The queue ids asked for. Riot has shipped Mayhem under several (2400, 2410, …); each costs one
-    /// list request per player, so only the live one belongs here.
+    /// Plain ARAM (450). Mayhem (2400) would be the real target, but Riot's API lists none of its games
+    /// and answers 403 for each (measured 07.11.2026) — so ARAM stands in.
     /// </summary>
-    public IReadOnlyList<int> Queues { get; init; } = [2400];
+    public IReadOnlyList<int> Queues { get; init; } = [450];
+
+    /// <summary>Only for <c>riot queues</c>: whose recent games to list.</summary>
+    public string SeedRiotId { get; init; } = string.Empty;
 
     public TimeSpan Duration { get; init; } = TimeSpan.FromMinutes(30);
 
     public int MatchesPerPlayer { get; init; } = 20;
 
+    /// <summary>Players taken from one league page; most of them play no ARAM, so a few per page.</summary>
+    public int PlayersPerPage { get; init; } = 10;
+
     public int SaveEvery { get; init; } = 50;
 }
 
-/// <summary>The Mayhem collector's state between runs; the counts, never a player.</summary>
-public sealed class MayhemState
+/// <summary>The ARAM collector's state between runs; the counts, never a player.</summary>
+public sealed class AramState
 {
     public int Version { get; set; } = 1;
 
@@ -41,18 +50,18 @@ public sealed class MayhemState
 
     public List<long> Seen { get; set; } = [];
 
-    public RiotMayhemFile Tally { get; set; } = new();
+    public RiotAramFile Tally { get; set; } = new();
 
     /// <summary>The last patch's count, published until the new one has enough games.</summary>
-    public RiotMayhemFile? Previous { get; set; }
+    public RiotAramFile? Previous { get; set; }
 
-    public static MayhemState Load(string path)
+    public static AramState Load(string path)
     {
         if (!File.Exists(path))
-            return new MayhemState();
+            return new AramState();
         using var file = File.OpenRead(path);
         using var gzip = new GZipStream(file, CompressionMode.Decompress);
-        return JsonSerializer.Deserialize(gzip, MayhemJson.Default.MayhemState) ?? new MayhemState();
+        return JsonSerializer.Deserialize(gzip, AramJson.Default.AramState) ?? new AramState();
     }
 
     public void Save(string path)
@@ -64,7 +73,7 @@ public sealed class MayhemState
         using (var file = File.Create(temporary))
         using (var gzip = new GZipStream(file, CompressionLevel.Optimal))
         {
-            JsonSerializer.Serialize(gzip, this, MayhemJson.Default.MayhemState);
+            JsonSerializer.Serialize(gzip, this, AramJson.Default.AramState);
         }
 
         File.Move(temporary, path, overwrite: true);
@@ -72,23 +81,27 @@ public sealed class MayhemState
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, WriteIndented = false)]
-[JsonSerializable(typeof(MayhemState))]
-public sealed partial class MayhemJson : JsonSerializerContext;
+[JsonSerializable(typeof(AramState))]
+public sealed partial class AramJson : JsonSerializerContext;
 
 /// <summary>
-/// Counts ARAM Mayhem games. Mayhem has no league lists to draw players from, so the collector
-/// starts at one Riot ID and follows the players of every counted game — people who just played
-/// Mayhem are the likeliest to have played more. The list of players lives in memory for one run
-/// and is never stored or published.
+/// Counts plain ARAM games. The first players come from random pages of the league lists; after
+/// that, the players of every counted game come next — somebody who just played ARAM is the likeliest
+/// to have played more. The list of players lives in memory for one run and is never stored or
+/// published.
 /// </summary>
-public sealed class MayhemCollector(RiotApiClient api, ItemCatalog items, MayhemOptions options, Action<string>? log = null)
+public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOptions options, Action<string>? log = null)
 {
     private static readonly TimeSpan FirstLookBack = TimeSpan.FromDays(14);
+    private static readonly string[] Divisions = ["I", "II", "III", "IV"];
 
     /// <summary>Players waiting; beyond it a counted game adds none.</summary>
     private const int MaxLeads = 2000;
 
-    public async Task<CollectorReport> RunAsync(MayhemState state, Action<MayhemState> save, CancellationToken ct)
+    private readonly Random _random = new();
+    private readonly Dictionary<string, int> _pages = [];
+
+    public async Task<CollectorReport> RunAsync(AramState state, Action<AramState> save, CancellationToken ct)
     {
         var clock = Stopwatch.StartNew();
         var patch = PatchVersion.Line(items.Version);
@@ -97,16 +110,16 @@ public sealed class MayhemCollector(RiotApiClient api, ItemCatalog items, Mayhem
 
         if (state.Patch != patch || state.Platform != options.Platform)
         {
-            log?.Invoke(state.Patch.Length == 0 ? $"Neuer Mayhem-Bestand für Patch {patch}." : $"Mayhem: Patch {state.Patch} → {patch}, Zählung beginnt neu.");
+            log?.Invoke(state.Patch.Length == 0 ? $"Neuer ARAM-Bestand für Patch {patch}." : $"ARAM: Patch {state.Patch} → {patch}, Zählung beginnt neu.");
             state.Previous = state.Platform == options.Platform && state.Tally.Games > 0 ? state.Tally : null;
             state.Patch = patch;
             state.Platform = options.Platform;
             state.OldPatchLatestMs = 0;
             state.Seen = [];
-            state.Tally = new RiotMayhemFile();
+            state.Tally = new RiotAramFile();
         }
 
-        var tally = new RiotMayhemTally();
+        var tally = new RiotAramTally();
         tally.Add(state.Tally);
         var seen = new HashSet<long>(state.Seen);
         var counted = 0;
@@ -119,18 +132,24 @@ public sealed class MayhemCollector(RiotApiClient api, ItemCatalog items, Mayhem
             save(state);
         }
 
-        var seed = await SeedAsync(ct).ConfigureAwait(false);
-        if (seed is null)
-        {
-            log?.Invoke($"Riot-ID {options.SeedRiotId} nicht gefunden — kein Mayhem-Lauf.");
-            return new CollectorReport(0, 0, api.Requests, api.Throttled, clock.Elapsed);
-        }
-
-        var leads = new Queue<string>([seed]);
+        var leads = new Queue<string>();
         var asked = new HashSet<string>(StringComparer.Ordinal);
+        var pages = 0;
 
-        while (leads.Count > 0 && clock.Elapsed < options.Duration && !ct.IsCancellationRequested)
+        while (clock.Elapsed < options.Duration && !ct.IsCancellationRequested)
         {
+            // Out of leads: a fresh page of a league list.
+            if (leads.Count == 0)
+            {
+                var tier = options.Tiers[_random.Next(options.Tiers.Count)];
+                var division = Divisions[_random.Next(Divisions.Length)];
+                foreach (var player in await PlayersAsync(tier, division, ct).ConfigureAwait(false))
+                    leads.Enqueue(player);
+                if (++pages > 400 && leads.Count == 0)
+                    break;
+                continue;
+            }
+
             var puuid = leads.Dequeue();
             if (!asked.Add(puuid))
                 continue;
@@ -155,7 +174,7 @@ public sealed class MayhemCollector(RiotApiClient api, ItemCatalog items, Mayhem
                     continue;
                 }
 
-                if (!header.Counts || !RiotMatchReader.IsMayhem(header.QueueId))
+                if (!header.Counts || !RiotMatchReader.IsAram(header.QueueId))
                 {
                     skipped++;
                     continue;
@@ -188,24 +207,21 @@ public sealed class MayhemCollector(RiotApiClient api, ItemCatalog items, Mayhem
                 }
 
                 if (counted % 25 == 0)
-                    log?.Invoke($"Mayhem: {counted} Spiele gezählt ({skipped} übersprungen), {api.Requests} Abrufe, {leads.Count} Spieler offen");
+                    log?.Invoke($"ARAM: {counted} Spiele gezählt ({skipped} übersprungen), {api.Requests} Abrufe, {leads.Count} Spieler offen");
                 if (counted % options.SaveEvery == 0)
                     Persist();
             }
         }
 
-        if (counted == 0 && asked.Count <= 1)
-            log?.Invoke($"Mayhem: in den letzten Spielen der Riot-ID keine Spiele der Queue {string.Join("/", options.Queues)} — Queue-ID prüfen (riot queues).");
-
         Persist();
         return new CollectorReport(counted, skipped, api.Requests, api.Throttled, clock.Elapsed);
     }
 
-    /// <summary>The queue ids of a player's latest games, to find the one Mayhem runs under now.</summary>
+    /// <summary>The queue ids of a player's latest games, to find the one a mode runs under now.</summary>
     public async Task<IReadOnlyDictionary<int, int>> RecentQueuesAsync(int games, CancellationToken ct)
     {
         var result = new Dictionary<int, int>();
-        var seed = await SeedAsync(ct).ConfigureAwait(false);
+        var seed = await PuuidOfRiotIdAsync(ct).ConfigureAwait(false);
         if (seed is null)
             return result;
 
@@ -226,7 +242,7 @@ public sealed class MayhemCollector(RiotApiClient api, ItemCatalog items, Mayhem
         return result;
     }
 
-    private async Task<string?> SeedAsync(CancellationToken ct)
+    private async Task<string?> PuuidOfRiotIdAsync(CancellationToken ct)
     {
         var hash = options.SeedRiotId.LastIndexOf('#');
         if (hash <= 0 || hash == options.SeedRiotId.Length - 1)
@@ -245,7 +261,35 @@ public sealed class MayhemCollector(RiotApiClient api, ItemCatalog items, Mayhem
         return document.RootElement.TryGetProperty("puuid", out var puuid) && puuid.ValueKind == JsonValueKind.String ? puuid.GetString() : null;
     }
 
-    private async Task<List<string>> MatchIdsAsync(string puuid, MayhemState state, CancellationToken ct)
+    /// <summary>Active players from one random page of a league list, a few of them, shuffled.</summary>
+    private async Task<List<string>> PlayersAsync(string tier, string division, CancellationToken ct)
+    {
+        var key = $"{tier}/{division}";
+        var bound = _pages.GetValueOrDefault(key, 200);
+        var page = 1 + _random.Next(bound);
+
+        var json = await api.GetAsync(
+            options.Platform,
+            $"/lol/league/v4/entries/RANKED_SOLO_5x5/{tier.ToUpperInvariant()}/{division}?page={page}",
+            ct).ConfigureAwait(false);
+
+        using var document = json is null ? null : JsonDocument.Parse(json);
+        if (document is null || document.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.GetArrayLength() == 0)
+        {
+            // Past the last page: the next draw stays below this one.
+            _pages[key] = Math.Max(1, page - 1);
+            return [];
+        }
+
+        return [.. document.RootElement.EnumerateArray()
+            .Where(entry => !(entry.TryGetProperty("inactive", out var inactive) && inactive.ValueKind == JsonValueKind.True))
+            .Select(entry => entry.TryGetProperty("puuid", out var puuid) && puuid.ValueKind == JsonValueKind.String ? puuid.GetString() ?? string.Empty : string.Empty)
+            .Where(puuid => puuid.Length > 0)
+            .OrderBy(_ => _random.Next())
+            .Take(options.PlayersPerPage)];
+    }
+
+    private async Task<List<string>> MatchIdsAsync(string puuid, AramState state, CancellationToken ct)
     {
         var since = state.OldPatchLatestMs > 0
             ? DateTimeOffset.FromUnixTimeMilliseconds(state.OldPatchLatestMs)
