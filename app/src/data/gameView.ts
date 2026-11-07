@@ -94,11 +94,11 @@ export function gameView(
     sample: null,
     situational: situational
       ? situational.map((s) => {
-          // The base choice it is an alternative to: the planned boots, or the next late item not yet owned.
-          const base =
-            s.slot === SLOT.Boots
-              ? model.path.find((p) => p.slot === 'Schuhe')
-              : (model.path.find((p) => p.slot === 'Spät' && !p.owned) ?? model.path.filter((p) => p.slot === 'Spät').at(-1));
+          // The base choice it is an alternative to: the planned boots, or the next core or late item
+          // not yet owned.
+          const next = (slot: 'Kern' | 'Spät') =>
+            model.path.find((p) => p.slot === slot && !p.owned) ?? model.path.filter((p) => p.slot === slot).at(-1);
+          const base = s.slot === SLOT.Boots ? model.path.find((p) => p.slot === 'Schuhe') : next(s.slot === SLOT.Core ? 'Kern' : 'Spät');
           const text = SITUATION_TEXT[s.situation];
           return {
             item: item(s.itemId),

@@ -7,7 +7,7 @@ einem Riot-Schlüssel selbst zählt, und liegen als vier Dateien im Branch `data
 |---|---|---|
 | `meta.json` | Lane-Winrate, Pick-, Bann- und Rollenrate je Champion und Lane; jedes Duell (beide Richtungen); jedes Duo; Schadensart; Grundlinien und Duell-Linie | Solo/Duo, Platin, EUW |
 | `builds.json` | Runen, Spells, Start, Schuhe, Kern, Items 4–6, Support-Item, Skill-Reihenfolge je Champion und Lane | dieselben Spiele |
-| `situational.json` | Stiefel und Items 4–6 je Champion, Lane und Gegner-Lage (viel AD, viel AP, 2+ Tanks, viel harte Kontrolle), mit dem Gesamtwert des Platzes zum Vergleich; dazu dieselben Zahlen je Klasse | dieselben Spiele |
+| `situational.json` | Stiefel, Kern (Items 1–3) und Items 4–6 je Champion, Lane und Gegner-Lage (viel AD, viel AP, 2+ Tanks, viel harte Kontrolle), mit dem Gesamtwert des Platzes zum Vergleich; dazu dieselben Zahlen je Klasse | dieselben Spiele |
 | `aram.json` | Winrate je Champion (Bank), ARAM-Builds — auch für Mayhem | normales ARAM (Queue 450), Spieler aus den Platin-Ranglisten |
 
 `meta.json` hat das Format, das das Modell schon immer gelesen hat (`MetaSnapshot`), mit drei neuen
@@ -28,6 +28,11 @@ OP.GG. Tiers gibt es keine — das war OP.GGs eigene Einstufung.
 - *Sicherung:* Die Winrate mit dem Item gegen die anderen Wahlen des Platzes, verglichen nur innerhalb
   desselben Spielstands beim Kauf (vorne/ausgeglichen/hinten, ±1.500 Gold Team-Vorsprung aus der
   Timeline). Messbar schlechter (1,5 Standardfehler darunter) heißt: kein Vorschlag.
+- *Kern* (Items 1–3, seit 07.11.2026 gezählt): Hier passieren die meisten Reaktionen auf die Gegner
+  (Mikaels Segen gegen viel harte Kontrolle), bei Supports fast alle — sie kommen selten über drei Items
+  hinaus. Vorgeschlagen, solange noch keine drei Items fertig sind, als Alternative zum nächsten Kern-Item.
+  Der Sammler speichert nur fertige Zählungen; die Kern-Zahlen wachsen deshalb erst mit den Spielen ab
+  dieser Änderung.
 - *Stiefel* nur für die Lagen der Aufstellung (AD, AP, Tanks, harte Kontrolle): Die Item-Lagen
   entstehen erst, wenn Stiefel längst gekauft sind (0,2 % / 0,0 % / 2,9 % der Stiefelkäufe, gemessen
   07.11.2026). Mit gekauften Stiefeln keine Stiefel-Vorschläge mehr.

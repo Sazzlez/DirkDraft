@@ -42,7 +42,13 @@ export interface EnemyItemTotals {
   sustain: number;
 }
 
-export const SLOT = { Boots: 0, Late: 1 } as const;
+/**
+ * The collector's slots (RiotSituationalTally): boots, items four to six, and since 07.11.2026 the core,
+ * items one to three — where most reactions happen (Mikael's against heavy crowd control), and for
+ * supports nearly all of them. Files from before count no core: then simply nothing comes from it.
+ */
+export const SLOT = { Boots: 0, Late: 1, Core: 2 } as const;
+export type Slot = (typeof SLOT)[keyof typeof SLOT];
 
 /**
  * Boots answer the line-up, not the enemies' items: they are bought before anyone has 150 armor.
@@ -142,7 +148,7 @@ export class SituationTracker {
 
 export interface SituationalSuggestion {
   itemId: number;
-  slot: 0 | 1;
+  slot: Slot;
   situation: Situation;
   /** How many times more often the item is bought in this situation than otherwise. */
   timesMoreOften: number;
@@ -224,7 +230,7 @@ export function situationalSuggestions(
   exclude: ReadonlySet<number>,
   take = 3,
   /** The slots still open: boots drop out once a pair is bought. */
-  slots: readonly (0 | 1)[] = [SLOT.Boots, SLOT.Late],
+  slots: readonly Slot[] = [SLOT.Boots, SLOT.Core, SLOT.Late],
 ): SituationalSuggestion[] {
   const champion = meta.champion(championId);
   const classIndex = champion?.tags[0] ? file.classNames.indexOf(champion.tags[0]) : -1;

@@ -5,14 +5,14 @@
 // Left out on the user's word (07.11.2026): a postgame and "Mein Pool".
 
 import { DraftEngine } from '../core/engine';
-import { gameModel, championIdOf, enemyItemsOf, isBoots, type LiveGameData } from '../core/game';
+import { gameModel, championIdOf, enemyItemsOf, isBoots, isFinished, type LiveGameData } from '../core/game';
 import { aramBuildFile, aramStatsFrom } from '../core/aram';
 import { Lane, laneFromKey } from '../core/model/lane';
 import { MetaLookup } from '../core/model/metaLookup';
 import { TraitTable } from '../core/model/traits';
 import { momentOf, type GameflowPhase } from '../core/moment';
 import { aramPlan, riotPlan, type RiotBuildPlan } from '../core/riotBuilds';
-import { SLOT, SituationTracker, situationalSuggestions, situationsOf } from '../core/situational';
+import { SLOT, SituationTracker, situationalSuggestions, situationsOf, type Slot } from '../core/situational';
 import { LANE_NAMES, type BuildView, type ChampionRef, type DataStatus, type Lane as ViewLane, type ViewModel } from '../core/view';
 import { assets } from '../data/assets';
 import { aramBuild, buildFromRiot } from '../data/builds';
@@ -478,7 +478,11 @@ export class LiveSession {
     // Neither what is owned nor what the plan already holds is an alternative to the plan.
     const ownedIds = (me?.items ?? []).map((i) => i.itemID);
     const exclude = new Set([...ownedIds, ...(plan ? [...(plan.boots[0]?.ids ?? []), ...(plan.core[0]?.ids ?? []), ...plan.late.flatMap((o) => o.ids)] : [])]);
-    const slots = ownedIds.some((id) => isBoots(id, items)) ? [SLOT.Late] : [SLOT.Boots, SLOT.Late];
+    // Boots drop out once a pair is bought, the core once three items are finished.
+    const slots: Slot[] = [];
+    if (!ownedIds.some((id) => isBoots(id, items))) slots.push(SLOT.Boots);
+    if (ownedIds.filter((id) => isFinished(id, items)).length < 3) slots.push(SLOT.Core);
+    slots.push(SLOT.Late);
     // Situational items are counted per lane on the Rift; on the Howling Abyss there is nothing to say.
     const situational = this.data?.situational && mode === 'lanes'
       ? situationalSuggestions(this.data.situational, meta, championId, plan?.lane ?? lane, situations, exclude, 3, slots)

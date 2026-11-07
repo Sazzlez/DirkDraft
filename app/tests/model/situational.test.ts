@@ -134,6 +134,14 @@ describe('situational suggestions', () => {
     expect(situationalSuggestions(magic, meta, 1, TOP, [A, M], new Set(), 3, [SLOT.Late])).toEqual([]);
   });
 
+  it('suggest core items too (Mikael’s against heavy crowd control), and only while the core slot is open', () => {
+    // The same Spirit Visage rows, counted in the core.
+    const core: RiotSituationalFile = { ...file, rows: file.rows.map((r) => [r[0]!, r[1]!, SLOT.Core, ...r.slice(3)]) };
+    const list = situationalSuggestions(core, meta, 1, TOP, [A, M], new Set());
+    expect(list.map((s) => [s.itemId, s.slot])).toEqual([[3065, SLOT.Core]]);
+    expect(situationalSuggestions(core, meta, 1, TOP, [A, M], new Set(), 3, [SLOT.Boots, SLOT.Late])).toEqual([]);
+  });
+
   it('need enough games', () => {
     const thin: RiotSituationalFile = { ...file, rows: file.rows.map((r) => [...r.slice(0, 6), Math.round(r[6]! / 100), Math.round(r[7]! / 100)]) };
     expect(situationalSuggestions(thin, meta, 1, TOP, [A, M], new Set())).toEqual([]);
