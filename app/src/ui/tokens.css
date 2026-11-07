@@ -116,6 +116,15 @@ body {
   background: transparent;
 }
 
+/* Windows 10 has no Mica: there the window is opaque (#1c1c1e, light: its counterpart). */
+:root[data-glass='none'] body {
+  background: #1c1c1e;
+}
+
+:root[data-theme='light'][data-glass='none'] body {
+  background: #ececf0;
+}
+
 #app {
   height: 100%;
 }

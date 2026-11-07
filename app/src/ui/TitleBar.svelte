@@ -1,39 +1,46 @@
 <script lang="ts">
   import { AREAS, type Area, type ViewModel } from '../core/view';
   import Segment from './Segment.svelte';
+  import { hideToTray, minimize, setPinned } from '../platform/shell';
 
   let { view, area, onArea }: { view: ViewModel; area: Area; onArea: (area: Area) => void } = $props();
 
   let pinned = $state(false);
   let menuOpen = $state(false);
+
+  function togglePin() {
+    pinned = !pinned;
+    void setPinned(pinned);
+  }
 </script>
 
+<!-- Tauri drags by the element under the mouse, not its parent: every passive part carries the mark. -->
 <header class="bar" data-tauri-drag-region>
   <div class="left" data-tauri-drag-region>
-    <span class="logo" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5.65 5.5h4.2a4.5 4.5 0 0 1 0 9h-4.2z" /></svg></span>
-    <b>DirkDraft</b>
-    <span class="status"><span class="dot {view.connection.state}"></span><span class="text">{view.connection.text}</span></span>
+    <span class="logo" aria-hidden="true" data-tauri-drag-region><svg viewBox="0 0 20 20"><path d="M5.65 5.5h4.2a4.5 4.5 0 0 1 0 9h-4.2z" /></svg></span>
+    <b data-tauri-drag-region>DirkDraft</b>
+    <span class="status" data-tauri-drag-region><span class="dot {view.connection.state}"></span><span class="text" data-tauri-drag-region>{view.connection.text}</span></span>
   </div>
 
   <div class="center">
     <Segment value={area} onChange={onArea} options={AREAS} label="Bereich" />
   </div>
 
-  <div class="right">
-    <span class="pill" title="Aktualisiert sich von selbst — nie während Draft oder Spiel">
+  <div class="right" data-tauri-drag-region>
+    <span class="pill" title="Aktualisiert sich von selbst — nie während Draft oder Spiel" data-tauri-drag-region>
       <span class="dot-small" class:stale={view.data.stale}></span>
       <span class="num">{view.data.text}</span>
     </span>
     <button class="ctl menu" aria-label="Menü" onclick={() => (menuOpen = !menuOpen)}>
       <svg viewBox="0 0 20 20"><circle cx="5" cy="10" r="1.3" /><circle cx="10" cy="10" r="1.3" /><circle cx="15" cy="10" r="1.3" /></svg>
     </button>
-    <button class="ctl" class:on={pinned} aria-label="Im Vordergrund halten" aria-pressed={pinned} onclick={() => (pinned = !pinned)}>
+    <button class="ctl" class:on={pinned} aria-label="Im Vordergrund halten" aria-pressed={pinned} onclick={togglePin}>
       <svg viewBox="0 0 20 20" class="stroke"><path d="M12.2 3.5 16.5 7.8M14.4 5.6l-3.3 3.3 1.1 3.3-1.1 1.1-6.5-6.5 1.1-1.1 3.3 1.1 3.3-3.3M8 12l-4 4" /></svg>
     </button>
-    <button class="ctl" aria-label="Minimieren">
+    <button class="ctl" aria-label="Minimieren" onclick={() => void minimize()}>
       <svg viewBox="0 0 20 20" class="stroke"><path d="M5 10.5h10" /></svg>
     </button>
-    <button class="ctl" aria-label="In den Infobereich">
+    <button class="ctl" aria-label="In den Infobereich" onclick={() => void hideToTray()}>
       <svg viewBox="0 0 20 20" class="stroke"><path d="M5.5 5.5l9 9m0-9-9 9" /></svg>
     </button>
   </div>

@@ -46,7 +46,8 @@ Im Repository unter *Settings → Secrets and variables → Actions*:
 - `RIOT_ID` — eine Riot-ID im Format `Name#TAG`, die ARAM Mayhem spielt (deine). Von ihr aus folgt
   der Mayhem-Sammler den Mitspielern. Ohne sie gibt es keine `mayhem.json`, der Rest läuft.
 
-Falls Mayhem gerade unter einer anderen Queue-ID läuft als 2400:
+Stand 07.11.2026 läuft Mayhem unter **2400** (`gameMode` `KIWI`, „ARAM: Chaos“), gelesen aus dem
+Client während einer Runde. Falls Riot das ändert:
 
 ```
 dotnet run --project src/DraftPilot.Tools -- riot queues --riot-id "Name#TAG" --key-file build/riot-key.txt

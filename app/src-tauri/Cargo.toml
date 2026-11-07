@@ -1,0 +1,31 @@
+[package]
+name = "dirkdraft"
+version = "2.0.0-dev"
+description = "DirkDraft 2.0 — Draft- und Spielhilfe für League of Legends"
+edition = "2021"
+publish = false
+
+# Velopack packs and updates "DirkDraft.exe" (same name as 1.x, see docs/redesign/migration.md).
+[[bin]]
+name = "DirkDraft"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+velopack = "0.0"
+
+[target.'cfg(windows)'.dependencies]
+windows-version = "0.1"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
