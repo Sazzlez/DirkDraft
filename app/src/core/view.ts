@@ -311,6 +311,8 @@ export interface ViewModel {
   game: GameView | null;
   /** What the empty area of a moment says ("Sobald das Spiel startet …"). */
   emptyText: string | null;
+  /** Its heading where the moment's own ("Kein Draft") would mislead, e.g. before any numbers. */
+  emptyTitle?: string | null;
   /** Shown above everything when the scene is sample data, never in a live session. */
   sampleNote: string | null;
   /** Runes and spells can be taken over now: champion select is running (spells exist only there). */

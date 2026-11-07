@@ -55,7 +55,7 @@
           {#if view.board || view.main.kind !== 'none'}
             <DraftArea {view} />
           {:else}
-            <EmptyState title="Kein Draft" text={view.emptyText ?? 'Sobald ein Champ Select beginnt, steht hier das Board.'} />
+            <EmptyState title={view.emptyTitle ?? 'Kein Draft'} text={view.emptyText ?? 'Sobald ein Champ Select beginnt, steht hier das Board.'} />
           {/if}
         {:else if area === 'build'}
           {#if view.build}

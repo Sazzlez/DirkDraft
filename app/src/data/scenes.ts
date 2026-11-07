@@ -16,6 +16,7 @@ import { SITUATION, SLOT } from '../core/situational';
 import { assets } from './assets';
 import { GoldenAdapter, buildFromPlan, type GoldenFrame, type GoldenPlan } from './golden';
 import { draftSteps } from '../core/steps';
+import { LiveSession } from '../live/session';
 
 export interface Scene {
   id: string;
@@ -33,7 +34,11 @@ export const SCENES: Scene[] = [
   { id: 'loading', title: 'Finalisierung', moment: 'loading' },
   { id: 'aram', title: 'ARAM-Bank', moment: 'aramBench' },
   { id: 'game', title: 'Im Spiel', moment: 'game' },
+  { id: 'nodata', title: 'Ohne Daten', moment: 'lobby' },
+  { id: 'gameloading', title: 'Spiel lädt', moment: 'game' },
 ];
+
+const CONNECTED_STATUS = { leagueFound: true, clientRunning: true, socketConnected: true };
 
 interface Sources {
   adapter: GoldenAdapter;
@@ -173,6 +178,21 @@ export async function sceneView(id: string): Promise<ViewModel> {
     }
     case 'game':
       return gameScene(a, s.plans, s.meta);
+    // The empty states, from the live session itself: first start offline, and a game whose own API
+    // does not answer yet.
+    case 'nodata': {
+      const live = new LiveSession();
+      live.onStatus(CONNECTED_STATUS);
+      live.setDataFailed(true);
+      return live.view();
+    }
+    case 'gameloading': {
+      const live = new LiveSession();
+      live.setData({ meta: s.meta.snapshot, builds: null, aram: null, situational: null, fresh: true, changed: false, problems: [] });
+      live.onStatus(CONNECTED_STATUS);
+      live.onPhase('InProgress');
+      return live.view();
+    }
     default:
       throw new Error(`Unbekannte Szene ${id}`);
   }

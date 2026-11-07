@@ -205,6 +205,7 @@ export class LiveSession {
       return {
         ...base,
         main: { kind: 'none' },
+        emptyTitle: 'Noch keine Zahlen',
         emptyText: this.dataFailed
           ? 'Die Zahlen ließen sich nicht laden — keine Verbindung zu GitHub? DirkDraft versucht es jede Minute neu.'
           : 'Die Zahlen werden geladen — beim allerersten Start dauert das einen Moment.',
