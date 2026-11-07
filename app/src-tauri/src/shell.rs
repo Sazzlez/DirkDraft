@@ -60,6 +60,7 @@ pub fn run() {
                 .with_state_flags(StateFlags::SIZE | StateFlags::POSITION)
                 .build(),
         )
+        .manage(crate::updater::UpdaterState::default())
         .manage(ShellState {
             settings: Mutex::new(settings),
             minimised_by_hand: AtomicBool::new(false),
@@ -117,6 +118,8 @@ pub fn run() {
             crate::client::client_import,
             crate::data::data_read,
             crate::data::data_write,
+            crate::updater::update_check,
+            crate::updater::update_apply,
             settings_get,
             settings_set,
             shell_set_pinned,

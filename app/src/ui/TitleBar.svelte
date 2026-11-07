@@ -3,6 +3,9 @@
   import Segment from './Segment.svelte';
   import { hideToTray, minimize, onTrayHint } from '../platform/shell';
   import { changeSetting, settings } from '../live/settings.svelte';
+  import { applyUpdate, checkForUpdate, update } from '../live/update.svelte';
+
+  void checkForUpdate();
 
   let {
     view,
@@ -40,6 +43,16 @@
   </div>
 
   <div class="right" data-tauri-drag-region>
+    {#if update.available}
+      <button
+        class="update"
+        onclick={() => void applyUpdate()}
+        disabled={update.busy}
+        title={update.error ? `Fehlgeschlagen: ${update.error}` : 'Lädt das Update, installiert es und startet DirkDraft neu.'}
+      >
+        {update.busy ? 'Wird aktualisiert …' : update.error ? 'Update erneut versuchen' : `Version ${update.available} ist da · Jetzt aktualisieren`}
+      </button>
+    {/if}
     <span class="pill" title="{view.data.text} — aktualisiert sich von selbst, nie während Draft oder Spiel" data-tauri-drag-region>
       <span class="dot-small" class:stale={view.data.stale}></span>
       <span class="num">{view.data.text}</span>
@@ -185,6 +198,27 @@
   .pill .num {
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .update {
+    flex: 0 1 auto;
+    min-width: 0;
+    height: 26px;
+    padding: 0 12px;
+    margin-right: 6px;
+    border-radius: 999px;
+    background: var(--blue);
+    color: #fff;
+    font: var(--t-caption);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .update:disabled {
+    opacity: 0.7;
+    cursor: default;
   }
 
   .dot-small {

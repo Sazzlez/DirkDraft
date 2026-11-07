@@ -9,6 +9,7 @@ mod data;
 mod lcu;
 mod settings;
 mod shell;
+mod updater;
 
 fn main() {
     // First, before anything else: Velopack starts the exe with its own arguments when it installs,
