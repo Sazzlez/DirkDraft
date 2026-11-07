@@ -271,7 +271,7 @@ public class RiotBuildTests
         Assert.Equal(10, state.Tally.Builds.Count);
         Assert.Equal(2, state.Meta.Matches);
         Assert.Equal(2, state.Games.Count);                     // one line per counted game, for measuring the model
-        Assert.All(state.Games, line => Assert.Equal(11, line.Length));
+        Assert.All(state.Games, line => Assert.Equal(13, line.Length));
 
         // The player with two games this season was never asked about.
         Assert.DoesNotContain(handler.Paths, path => path.Contains("/by-puuid/p2/", StringComparison.Ordinal));

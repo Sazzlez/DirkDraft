@@ -6,17 +6,22 @@ namespace DraftPilot.Core.Data;
 /// <summary>
 /// The counted games themselves, one line each, for measuring how much each part of the draft model
 /// predicts the winner (docs/draft-konzept.md): which champion played which lane on which side, and
-/// who won. No player, no match id, no time — ten champions and a result.
+/// who won, how long it ran and who led after fifteen minutes. No player, no match id, no date.
 /// </summary>
 public static class RiotGames
 {
     public const string Format =
-        "[5 × Blau, 5 × Rot, Blau gewinnt (1/0)]; je Spieler Champion × 8 + Lane + 1 " +
-        "(Lane −1 unbekannt, 0 Top, 1 Jungle, 2 Mid, 3 ADC, 4 Support), je Seite nach Lane sortiert.";
+        "[5 × Blau, 5 × Rot, Blau gewinnt (1/0), Dauer in vollen Minuten, Gold-Vorsprung Blau nach 15 Minuten]; " +
+        "je Spieler Champion × 8 + Lane + 1 (Lane −1 unbekannt, 0 Top, 1 Jungle, 2 Mid, 3 ADC, 4 Support), " +
+        "je Seite nach Lane sortiert. Dauer und Gold 0, wo unbekannt.";
+
+    /// <summary>The moment the early-game lead is read at: the end of the laning phase.</summary>
+    public const long EarlyLeadAtMs = 15 * 60_000;
 
     /// <summary>
-    /// One game as eleven numbers (<see cref="Format"/>); null when it does not split into two sides
-    /// of five.
+    /// One game as thirteen numbers (<see cref="Format"/>); null when it does not split into two
+    /// sides of five. Duration and the early lead let the measurement tell early from late
+    /// line-ups — what a champion is worth depends on when the game is decided.
     /// </summary>
     public static int[]? Encode(MatchReading game)
     {
@@ -24,7 +29,7 @@ public static class RiotGames
         if (sides.Count != 2 || sides.Any(side => side.Count() != 5))
             return null;
 
-        var line = new int[11];
+        var line = new int[13];
         var index = 0;
         foreach (var side in sides)
         {
@@ -33,6 +38,8 @@ public static class RiotGames
         }
 
         line[10] = sides[0].First().Win ? 1 : 0;
+        line[11] = Math.Max(0, game.DurationSeconds) / 60;
+        line[12] = (int)Math.Clamp(game.GoldLead(sides[0].Key, EarlyLeadAtMs), int.MinValue, int.MaxValue);
         return line;
     }
 

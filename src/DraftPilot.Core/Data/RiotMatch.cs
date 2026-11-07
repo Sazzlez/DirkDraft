@@ -105,6 +105,7 @@ public sealed record ParticipantBuild(
 /// The champions banned in the game, each once (both teams may ban the same one); empty when the
 /// match carries no ban list.
 /// </param>
+/// <param name="DurationSeconds">How long the game ran; 0 when unknown.</param>
 public sealed record MatchReading(
     string Patch,
     long CreatedAtMs,
@@ -112,7 +113,8 @@ public sealed record MatchReading(
     bool Counts,
     IReadOnlyList<ParticipantBuild> Participants,
     IReadOnlyList<int>? Bans = null,
-    IReadOnlyDictionary<int, long[]>? TeamGold = null)
+    IReadOnlyDictionary<int, long[]>? TeamGold = null,
+    int DurationSeconds = 0)
 {
     public IReadOnlyList<int> BannedChampions => Bans ?? [];
 
@@ -225,7 +227,7 @@ public static class RiotMatchReader
                 BootsTimeMs: boots?.Timestamp ?? 0));
         }
 
-        return new MatchReading(patch, created, queue, counts, participants, Bans(info), TeamGold(timeline.RootElement, info));
+        return new MatchReading(patch, created, queue, counts, participants, Bans(info), TeamGold(timeline.RootElement, info), Int(info, "gameDuration"));
     }
 
     /// <summary>Every champion banned in the game, once — a ban by both teams is still one ban.</summary>

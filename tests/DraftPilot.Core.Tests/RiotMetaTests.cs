@@ -154,11 +154,20 @@ public sealed class RiotMetaTests
         var line = RiotGames.Encode(Game(blueWins: false, red: [21, 22, 23, 24, 25]));
 
         Assert.NotNull(line);
-        Assert.Equal(11, line.Length);
+        Assert.Equal(13, line.Length);
         Assert.Equal((1, Lane.Top), RiotGames.Decode(line[0]));
         Assert.Equal((5, Lane.Support), RiotGames.Decode(line[4]));
         Assert.Equal((24, Lane.Adc), RiotGames.Decode(line[8]));
         Assert.Equal(0, line[10]);
+        Assert.Equal((0, 0), (line[11], line[12]));            // no duration, no timeline here
+        var timed = Game(blueWins: true) with
+        {
+            DurationSeconds = 1830,
+            TeamGold = new Dictionary<int, long[]> { [100] = [.. Enumerable.Range(0, 20).Select(m => 1000L * m + 500)], [200] = [.. Enumerable.Range(0, 20).Select(m => 1000L * m)] },
+        };
+        var timedLine = RiotGames.Encode(timed)!;
+        Assert.Equal(30, timedLine[11]);
+        Assert.Equal(500, timedLine[12]);
         Assert.Equal((7, Lane.Unknown), RiotGames.Decode(7 * 8));
 
         var lopsided = Game(blueWins: true);

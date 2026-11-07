@@ -19,7 +19,7 @@ OP.GG. Tiers gibt es keine — das war OP.GGs eigene Einstufung.
 **Für die Messung des Draft-Modells** (`docs/draft-konzept.md`, seit 07.11.2026): `versus` zählt je Spiel
 die 20 Gegner-Paare auf verschiedenen Lanes, darunter die Botlane-Kreuzpaare ADC ↔ gegnerischer Support.
 Die App liest das Feld noch nicht (2.0.0 übergeht es). Außerdem legt der Sammler je gezähltem Spiel eine
-Zeile ab: zehn Champions mit Lane und den Sieger, ohne Spieler, ohne Match-ID. Die Zeilen liegen im
+Zeile ab: zehn Champions mit Lane, den Sieger, die Spieldauer und den Gold-Vorsprung nach 15 Minuten, ohne Spieler, ohne Match-ID. Die Zeilen liegen im
 Bestand (nur der laufende Patch) und als Artefakt `games` jedes Laufs (`games.json.gz`, eine Woche
 aufbewahrt, nie veröffentlicht). Herunterladen: `gh run download <Lauf> -n games`.
 
