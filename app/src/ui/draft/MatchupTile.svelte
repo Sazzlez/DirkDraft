@@ -4,8 +4,11 @@
   import Icon from '../Icon.svelte';
   import Tile from '../Tile.svelte';
   import RuneRow from '../build/RuneRow.svelte';
+  import { importLabel } from '../../core/loadout';
 
   let { matchup, build }: { matchup: MatchupView; build: BuildView | null } = $props();
+
+  const label = $derived(importLabel(!!build?.runes, (build?.spells.length ?? 0) >= 2));
 </script>
 
 <Tile title="Dein Matchup" sub={LANE_NAMES[matchup.lane]} main>
@@ -28,7 +31,7 @@
       {#if build.runes}<RuneRow runes={build.runes} />{/if}
       <button class="primary">
         <svg viewBox="0 0 16 16"><path d="M8 2v8m0 0 3-3m-3 3L5 7M3 13h10" /></svg>
-        Runen übernehmen
+        {label}
       </button>
     </div>
 

@@ -95,10 +95,15 @@ CC ≥ 6 → Tenacity, nur ab drei aufgedeckten Gegnern, nie umsortierend.
 - **Gelesen:** Session, Gameflow-Phase, `pickable-champion-ids` (Besitzfilter, bis nicht leer
   wiederholt), `lol-patch/v1/game-version` (Fallback `system/v1/builds`), Runenseiten und Inventar.
   **2.0 neu:** Mastery und eigene Spielhistorie für „Mein Pool“ (nur Filter), Live-Client-API.
-- **Geschrieben (einziger Schreibweg):** Runen-Import — `POST/DELETE /lol-perks/v1/pages`,
+- **Geschrieben (nur auf Klick, ein Knopf):** Runen-Import — `POST/DELETE /lol-perks/v1/pages`,
   Name „DirkRunen · {Überschrift}“ ≤ 30 Zeichen, eigene Seiten (Präfix DirkRunen oder alt
   DraftPilot) werden ersetzt, eine fremde nur nach Nachfrage mit Namen (älteste löschbare), Abbruch
   ohne Löschen, wenn mehr als ein Platz fehlt; 4+2+3 Perks.
+  **2.0 neu (Nutzerwunsch 07.11.2026):** derselbe Klick setzt die Beschwörerzauber —
+  `PATCH /lol-champ-select/v1/session/my-selection` (`spell1Id`, `spell2Id`). Die Plätze folgen dem
+  Spieler (`core/loadout.ts`): ein schon gewählter Zauber bleibt auf seiner Taste, Flash kommt dorthin,
+  wo der Spieler es zuletzt hatte, erst dann gilt die Reihenfolge der Daten; schon gewählt = nichts
+  schreiben. Knopf „Runen und Zauber übernehmen“.
 - **Queues:** 420 Solo/Duo, 440 Flex, 400/430/490/480 Normal/Swiftplay, 700/720 Clash, 830–890
   Bots, 450 ARAM, 2400/2410/2450/3270/3280 Mayhem, 1700/1710/1750 Arena, 900/1900/1020/1300/1400
   rotierend; Custom-Kennung nur bei unbekannter ID. Keine Lanes in ARAM, Mayhem, Arena, rotierend.
@@ -161,7 +166,8 @@ lockfilePath, gameMode, tier). Logs: crash.log, startup.log (≤ 400 Zeilen), ge
 ## 6. Feste Regeln (unverändert)
 
 Keine fremden Spielernamen, keine Cooldown-/Ult-Timer, keine Injection, kein Speicherlesen, kein
-Auto-Hover/-Pick/-Bann/-Accept, Runen-Import als einziger Schreibweg, keine Telemetrie, Netz nur für
+Auto-Hover/-Pick/-Bann/-Accept, Runen und Beschwörerzauber nur auf Klick als einziger Schreibweg
+(Zauber seit 07.11.2026 auf Nutzerwunsch), keine Telemetrie, Netz nur für
 die eigene Datendatei, Data Dragon und die Update-Prüfung. „Mein Pool“ blendet aus, gewichtet nie.
 
 ## 7. Responsiv (2.0)
