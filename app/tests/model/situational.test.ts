@@ -124,6 +124,16 @@ describe('situational suggestions', () => {
     expect(situationalSuggestions(file, meta, 1, TOP, [A, M], new Set([3065]))).toEqual([]);
   });
 
+  it('answer the enemies’ items only with late items — boots follow the line-up — and no boots once a pair is bought', () => {
+    // The same Spirit Visage rows, once as boots bought "against sustain" and once against magic damage.
+    const asBoots = (situation: number) => file.rows.filter((r) => r[3] === A || r[3] === M).map((r) => [r[0]!, r[1]!, SLOT.Boots, r[3] === M ? situation : A, ...r.slice(4)]);
+    const sustain: RiotSituationalFile = { ...file, rows: asBoots(SITUATION.EnemySustain) };
+    expect(situationalSuggestions(sustain, meta, 1, TOP, [A, SITUATION.EnemySustain], new Set())).toEqual([]);
+    const magic: RiotSituationalFile = { ...file, rows: asBoots(M) };
+    expect(situationalSuggestions(magic, meta, 1, TOP, [A, M], new Set()).map((x) => x.slot)).toEqual([SLOT.Boots]);
+    expect(situationalSuggestions(magic, meta, 1, TOP, [A, M], new Set(), 3, [SLOT.Late])).toEqual([]);
+  });
+
   it('need enough games', () => {
     const thin: RiotSituationalFile = { ...file, rows: file.rows.map((r) => [...r.slice(0, 6), Math.round(r[6]! / 100), Math.round(r[7]! / 100)]) };
     expect(situationalSuggestions(thin, meta, 1, TOP, [A, M], new Set())).toEqual([]);

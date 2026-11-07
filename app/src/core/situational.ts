@@ -44,6 +44,14 @@ export interface EnemyItemTotals {
 
 export const SLOT = { Boots: 0, Late: 1 } as const;
 
+/**
+ * Boots answer the line-up, not the enemies' items: they are bought before anyone has 150 armor.
+ * Measured on situational.json of 07.11.2026: of 57.533 boots bought, 0,2 % fell in "armor", 0,0 %
+ * in "magic resist" and 2,9 % in "sustain" — late swaps and upgrades, whose buy share says nothing
+ * about the situation (Jinx: Boots of Swiftness 13,5× as often "against sustain").
+ */
+export const BOOTS_SITUATIONS: readonly Situation[] = [SITUATION.Physical, SITUATION.Magic, SITUATION.Tanks, SITUATION.HardCc];
+
 /** Game states the collector splits buys by (DraftPilot.Core.Data.GameStates). */
 export const GAME_STATES = [0, 1, 2] as const;
 
@@ -170,8 +178,24 @@ const minus = (a: Count, b: Count): Count => ({ games: Math.max(0, a.games - b.g
 
 class Index {
   private readonly map = new Map<string, Count>();
+  /** Items per owner:lane:slot:situation, so a lookup does not walk every row. */
+  private readonly byPrefix = new Map<string, Set<number>>();
   constructor(rows: readonly number[][]) {
-    for (const row of rows) if (row.length >= 8) this.map.set(row.slice(0, 6).join(':'), { games: row[6]!, wins: row[7]! });
+    for (const row of rows) {
+      if (row.length < 8) continue;
+      this.map.set(row.slice(0, 6).join(':'), { games: row[6]!, wins: row[7]! });
+      const prefix = row.slice(0, 4).join(':');
+      let set = this.byPrefix.get(prefix);
+      if (!set) this.byPrefix.set(prefix, (set = new Set()));
+      if (row[5] !== 0) set.add(row[5]!);
+    }
+  }
+
+  /** One index per file: the game view asks every second, the file changes every few hours. */
+  static of(rows: readonly number[][]): Index {
+    let index = indexCache.get(rows);
+    if (!index) indexCache.set(rows, (index = new Index(rows)));
+    return index;
   }
   get(owner: number, lane: number, slot: number, situation: number, state: number, item: number): Count {
     return this.map.get(`${owner}:${lane}:${slot}:${situation}:${state}:${item}`) ?? NONE;
@@ -181,15 +205,11 @@ class Index {
     return GAME_STATES.reduce((sum, state) => plus(sum, this.get(owner, lane, slot, situation, state, item)), NONE);
   }
   items(owner: number, lane: number, slot: number, situation: number): number[] {
-    const ids = new Set<number>();
-    for (const state of GAME_STATES) {
-      const prefix = `${owner}:${lane}:${slot}:${situation}:${state}:`;
-      for (const key of this.map.keys()) if (key.startsWith(prefix)) ids.add(Number(key.slice(prefix.length)));
-    }
-    ids.delete(0);
-    return [...ids];
+    return [...(this.byPrefix.get(`${owner}:${lane}:${slot}:${situation}`) ?? [])];
   }
 }
+
+const indexCache = new WeakMap<readonly number[][], Index>();
 
 const share = (item: Count, total: Count, prior: number, target: number): number =>
   (item.games + prior * target) / (total.games + prior);
@@ -203,11 +223,13 @@ export function situationalSuggestions(
   situations: readonly Situation[],
   exclude: ReadonlySet<number>,
   take = 3,
+  /** The slots still open: boots drop out once a pair is bought. */
+  slots: readonly (0 | 1)[] = [SLOT.Boots, SLOT.Late],
 ): SituationalSuggestion[] {
   const champion = meta.champion(championId);
   const classIndex = champion?.tags[0] ? file.classNames.indexOf(champion.tags[0]) : -1;
-  const own = new Index(file.rows);
-  const cls = new Index(file.classes);
+  const own = Index.of(file.rows);
+  const cls = Index.of(file.classes);
   const classOf = (fn: (index: Index, owner: number) => Count): Count => (classIndex >= 0 ? fn(cls, classIndex) : NONE);
 
   /** How often the item is bought in the situation and otherwise, champion shrunk to class. */
@@ -267,9 +289,10 @@ export function situationalSuggestions(
   };
 
   const found: (SituationalSuggestion & { score: number })[] = [];
-  for (const slot of [SLOT.Boots, SLOT.Late] as const) {
+  for (const slot of slots) {
     for (const situation of situations) {
       if (situation === SITUATION.All) continue;
+      if (slot === SLOT.Boots && !BOOTS_SITUATIONS.includes(situation)) continue;
       const candidates = new Set([
         ...own.items(championId, lane, slot, situation),
         ...(classIndex >= 0 ? cls.items(classIndex, lane, slot, situation) : []),

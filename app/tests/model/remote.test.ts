@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptySnapshot } from '../../src/core/model/metaLookup';
 import { Lane } from '../../src/core/model/lane';
-import { checkMeta, dataLine, loadDataSet, loadKept, type DataCache, type Fetcher, type FetchResult } from '../../src/data/remote';
+import { checkMeta, checkSituational, dataLine, loadDataSet, loadKept, type DataCache, type Fetcher, type FetchResult } from '../../src/data/remote';
 
 const goodMeta = JSON.stringify({
   ...emptySnapshot(),
@@ -97,5 +97,12 @@ describe('data download', () => {
 
   it('describes the data for the title bar', () => {
     expect(dataLine(JSON.parse(goodMeta), new Date('2026-11-06T21:00:00Z'))).toBe('Patch 16.22 · Platin · 12.345 Spiele · vor 3 Std.');
+  });
+
+  it('accepts situational.json as the collector writes it (version 2, rows with the game state)', () => {
+    // The first 2.0 build checked for version 1 and threw the published file away.
+    const published = { version: 2, patch: '16.22', platform: 'euw1', collectedAtUtc: '', situations: [], classNames: [], rows: [[1, 0, 1, 2, 0, 3065, 10, 5]], classes: [] };
+    expect(checkSituational(published)).toBeNull();
+    expect(checkSituational({ ...published, version: 1 })).toContain('Version');
   });
 });

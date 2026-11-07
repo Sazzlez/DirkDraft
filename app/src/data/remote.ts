@@ -72,10 +72,15 @@ export function checkAram(value: unknown): string | null {
   return null;
 }
 
+/** The situational.json layout this reader understands. */
+export const SITUATIONAL_VERSION = 2;
+
 export function checkSituational(value: unknown): string | null {
   if (!value || typeof value !== 'object') return 'keine Daten';
   const file = value as Partial<RiotSituationalFile>;
-  if (file.version !== 1) return `unbekannte Version ${String(file.version)}`;
+  // Version 2 (RiotSituationalFile.CurrentVersion in C#): rows carry the game state. Version 1 had
+  // no state column, which this reader would misread — and 2 is what the collector publishes.
+  if (file.version !== SITUATIONAL_VERSION) return `unbekannte Version ${String(file.version)}`;
   if (!Array.isArray(file.rows) || !Array.isArray(file.classes) || !Array.isArray(file.classNames)) return 'unvollständig';
   return null;
 }
