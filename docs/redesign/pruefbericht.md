@@ -97,7 +97,7 @@ je Slot τ = 0, Beliebtheit vs. Winrate ohne einheitliches Muster, Stiefelkäufe
 | Update-Test | **offen, braucht dein OK** — sicherer Weg in `docs/redesign/migration.md` |
 | Live-Durchlauf | **zwei echte Solo/Duo-Spiele** (07.11., Support; Release-Build lief mit, Fenster nur beobachtet, „Übernehmen“ hat der Spieler selbst geklickt): Planung → Banns → Picks → Finalisierung → Ladebildschirm → Spiel durchgängig richtig; „Runen und Zauber übernommen.“ beide Male; Teammate-Klick und „weitere“ funktionierten; Spielansicht mit nächstem Kauf, Skillpunkt und Gegner-Items stimmte. Behoben aus dem Test: Zeilengrund „ist Ranged“, „Teammate 3 bannt“ bei gleichzeitigen Banns, „Warten“ im Ladebildschirm, geratene Lanes auf leeren Gegnerplätzen, leere Hinweis-Kachel. Der Draft ist als geschwärzter Testfall `live-ranked.jsonl` im Repo. Nicht gesehen: Custom „Abwechselnde Wahl“, Blind Pick, ARAM, eine Lage mit situativem Vorschlag. |
 | Windows 11 / Mica | **offen** — hier nicht testbar (Windows 10); Schalter zum Abschalten eingebaut |
-| Sammler | Lauf 42367242351 sammelt noch (Ranked bis ca. 15:45 UTC, dann ARAM, Veröffentlichung mit `aram.json` gegen 16:45 UTC). Die geplanten Läufe (06:23, 12:23 UTC) sind **beide nicht angesprungen**, obwohl der Workflow aktiv, das Repo öffentlich und kein Fork ist. Die App läuft mit und ohne `aram.json` (geprüft gegen die echten Dateien). |
+| Sammler | Lauf 42367242351 sammelt noch (Veröffentlichung mit `aram.json` gegen 16:45 UTC). GitHubs Zeitplan ist unzuverlässig: 06:23 UTC fiel aus, 12:23 kam 53 Minuten zu spät. Mit deinem OK auf `master`: jeder Lauf startet seinen Nachfolger (`57faa83`), und situative Käufe werden auch für die ersten drei Items gezählt (`0c31629`, Wunsch nach Mikaels Segen); der nächste Lauf (42384099091) sammelt schon damit. Die App läuft mit und ohne `aram.json` und mit und ohne Kern-Zeilen. |
 
 ## Offen und Empfehlung
 
@@ -107,9 +107,8 @@ je Slot τ = 0, Beliebtheit vs. Winrate ohne einheitliches Muster, Stiefelkäufe
 2. **Update-Test** an einer Probe-Installation (DirkDraft-Beta, Kanal beta) 2.0.0 → 2.0.1, und der
    Schritt 1.5 → 2.0 unter einer Test-ID — beides installiert nichts an deinem DirkDraft, braucht aber
    dein OK (siehe migration.md).
-3. **Sammler-Zeitplan:** Wenn auch der 18:23-Termin ausbleibt, schlage ich vor, dass jeder Lauf am Ende
-   den nächsten selbst startet (`workflow_dispatch` über `GITHUB_TOKEN`, Recht `actions: write`) —
-   das braucht eine Änderung an `master` und damit dein OK.
+3. **Sammler:** Kette und Kern-Zählung sind auf `master`. Prüfen, ob der Lauf nach 42384099091 von selbst
+   startet, und ob nach einigen Läufen Kern-Vorschläge (z. B. Mikaels Segen gegen viel Kontrolle) auftauchen.
 4. **Ein Freund mit Windows 11** sollte die Beta einmal starten (Mica).
 
 **Empfehlung:** 2.0 ist nach dieser Prüfung technisch bereit für die Probe und hat zwei echte Ranked-Spiele
