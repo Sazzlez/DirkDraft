@@ -74,7 +74,14 @@ OK) und Windows 11 (Mica) bei einem Freund.
 ### Fehlersuche
 - 2.0 schrieb kein Log → `%LOCALAPPDATA%\DraftPilot\data\2.0\dirkdraft.log` (≤ 256 KB, ohne Namen,
   Tokens, Passwörter): Start, League/Client/Socket, Übernehmen, Update, Datenprobleme, Skriptfehler,
-  Abstürze.
+  Abstürze — dazu je Spiel eine Zeile, welche Lagen erkannt und welche situativen Items vorgeschlagen
+  wurden, und mit welchem Datenstand.
+- Diagnose-Aufzeichnung (Einstellungen → Diagnose): die letzten 10 Drafts als abspielbare
+  Sitzungsaufzeichnung und die letzten 3 Spiele als ein Live-Client-Schnappschuss je Minute, beides
+  ohne Namen. Normalerweise aus; an, solange der Schalter nie benutzt wurde und neben settings.json eine
+  leere `diagnostics.on` liegt (so nur auf dem Entwickler-PC, auch nach dem Update aus 1.5, das
+  unbekannte Schlüssel beim Speichern verwirft). „Diagnose speichern“ legt Log und Aufzeichnungen als
+  Ordner auf den Desktop.
 
 ## Gemessen
 

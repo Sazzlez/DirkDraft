@@ -79,10 +79,21 @@ impl Log for FileLog {
 
 /// "2026-11-07 13:05:42" (UTC), without a date library: days since 1970 to a civil date.
 fn timestamp() -> String {
+    let (y, m, d, h, min, s) = now();
+    format!("{y:04}-{m:02}-{d:02} {h:02}:{min:02}:{s:02}")
+}
+
+/// "20261107-130542" (UTC): for file names that sort by time.
+pub fn stamp() -> String {
+    let (y, m, d, h, min, s) = now();
+    format!("{y:04}{m:02}{d:02}-{h:02}{min:02}{s:02}")
+}
+
+fn now() -> (i64, u32, u32, u64, u64, u64) {
     let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     let (days, rest) = ((secs / 86_400) as i64, secs % 86_400);
     let (y, m, d) = civil(days);
-    format!("{y:04}-{m:02}-{d:02} {:02}:{:02}:{:02}", rest / 3600, rest % 3600 / 60, rest % 60)
+    (y, m, d, rest / 3600, rest % 3600 / 60, rest % 60)
 }
 
 /// Howard Hinnant's days-to-civil.

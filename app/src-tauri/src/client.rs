@@ -66,6 +66,7 @@ pub fn start(app: &AppHandle, lockfile: Option<std::path::PathBuf>) {
                     s.phase = Some(phase.clone());
                 }
                 let _ = phase_tx.send(phase.clone());
+                handle.state::<crate::diagnostics::Diagnostics>().on_phase(&phase);
                 crate::shell::on_phase(&handle, &phase);
                 let _ = handle.emit("client://phase", phase);
             }
@@ -73,6 +74,7 @@ pub fn start(app: &AppHandle, lockfile: Option<std::path::PathBuf>) {
                 if let Ok(mut s) = state.snapshot.lock() {
                     s.session = session.clone();
                 }
+                handle.state::<crate::diagnostics::Diagnostics>().on_session(session.as_deref());
                 let _ = handle.emit("client://session", session);
             }
             Update::Client(lcu) => {
@@ -88,6 +90,7 @@ pub fn start(app: &AppHandle, lockfile: Option<std::path::PathBuf>) {
         if let Ok(mut s) = handle.state::<ClientState>().snapshot.lock() {
             s.game = game.clone();
         }
+        handle.state::<crate::diagnostics::Diagnostics>().on_game(game.as_deref());
         let _ = handle.emit("game://live", game);
     }));
 }

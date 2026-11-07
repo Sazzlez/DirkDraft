@@ -19,6 +19,8 @@ Fenster:
 - **Einstellungen** hinter dem Zahnrad: bei Champ Select und Spielstart einblenden, nach dem Draft
   ausblenden, immer im Vordergrund, Blitz-Taste, auch nicht gekaufte Champions vorschlagen. Alles
   wird sofort gespeichert, in derselben Datei wie bisher; der Fensterplatz aus 1.x wird übernommen.
+- **Diagnose** für die Fehlersuche: ein kleines Log (ohne Namen) und auf Wunsch eine Aufzeichnung der
+  letzten Drafts und Spiele; „Diagnose speichern“ legt beides als Ordner auf den Desktop.
 - Unter Windows 11 mit Glas-Effekt (Mica, in den Einstellungen abschaltbar), unter Windows 10 deckend.
 
 Zahlen:

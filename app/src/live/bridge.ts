@@ -32,8 +32,15 @@ const session = new LiveSession();
 let notify: (view: ViewModel) => void = () => {};
 let ticker: ReturnType<typeof setInterval> | null = null;
 
+let lastDiagnostic: string | null = null;
+
 function render(): void {
   notify(session.view());
+  // What the game view decided, once per change: situations seen and suggestions shown, item ids only.
+  if (session.diagnosticLine && session.diagnosticLine !== lastDiagnostic) {
+    lastDiagnostic = session.diagnosticLine;
+    logLine('info', lastDiagnostic);
+  }
 }
 
 let selectableAsked = false;
@@ -84,6 +91,12 @@ function askPatch(): void {
 async function apply(set: DataSet): Promise<void> {
   await loadAssets(set.meta.patch).catch(() => undefined);
   session.setData(set);
+  // Which numbers the suggestions came from: a later check needs the same file's date.
+  logLine(
+    'info',
+    `Daten: Patch ${set.meta.patch}, meta ${set.meta.dataAsOfUtc ?? set.meta.builtAtUtc}, builds ${set.builds?.collectedAtUtc ?? '-'}, ` +
+      `situational ${set.situational?.collectedAtUtc ?? '-'}, aram ${set.aram?.collectedAtUtc ?? '-'}`,
+  );
   render();
 }
 

@@ -4,7 +4,19 @@
   import { fly, fade } from 'svelte/transition';
   import Segment from './Segment.svelte';
   import { changeSetting, settings, type AppSettings } from '../live/settings.svelte';
-  import { canGlass, glassNow } from '../platform/shell';
+  import { canGlass, glassNow, inShell } from '../platform/shell';
+  import { invoke } from '@tauri-apps/api/core';
+
+  /** Where "Diagnose speichern" put its folder, or why it could not. */
+  let saved = $state<string | null>(null);
+
+  async function saveDiagnostics() {
+    try {
+      saved = `Gespeichert: ${await invoke<string>('diagnose_export')}`;
+    } catch (e) {
+      saved = `Nicht gespeichert: ${String(e)}`;
+    }
+  }
 
   let { onClose }: { onClose: () => void } = $props();
 
@@ -91,6 +103,26 @@
     </div>
   </section>
 
+  <section>
+    <h3>Diagnose</h3>
+    <div class="group">
+      <label class="row">
+        <span class="text">
+          <b>Drafts und Spiele mitschreiben</b>
+          <small>Für die Fehlersuche: die letzten 10 Drafts und 3 Spiele, ohne Namen, nur auf diesem PC. Normalerweise aus.</small>
+        </span>
+        <input type="checkbox" role="switch" checked={settings.diagnostics} onchange={(e) => void changeSetting('diagnostics', e.currentTarget.checked)} />
+      </label>
+      <div class="row">
+        <span class="text">
+          <b>Diagnose speichern</b>
+          <small>{saved ?? 'Legt das Log (und, falls eingeschaltet, die Aufzeichnungen) als Ordner auf den Desktop — zum Weitergeben, wenn etwas nicht stimmt.'}</small>
+        </span>
+        <button class="action" onclick={saveDiagnostics} disabled={!inShell}>Speichern</button>
+      </div>
+    </div>
+  </section>
+
   <p class="foot">Die Daten aktualisieren sich von selbst alle 30 Minuten — nie während Draft oder Spiel.</p>
 </div>
 
@@ -139,6 +171,20 @@
 
   .done:hover {
     background: var(--blue-wash);
+  }
+
+  .action {
+    flex: none;
+    padding: 5px 12px;
+    border-radius: 8px;
+    background: var(--blue-wash);
+    color: var(--blue);
+    font-weight: 600;
+  }
+
+  .action:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 
   section + section {

@@ -16,6 +16,8 @@ export interface AppSettings {
   flashKey: 'D' | 'F';
   /** Mica on Windows 11; read by the shell at start. */
   glassEffect: boolean;
+  /** The last drafts and games recorded locally (scrubbed) for finding faults. */
+  diagnostics: boolean;
 }
 
 /** 1.5's defaults, and F for Flash (user's rule). */
@@ -27,6 +29,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showUnowned: false,
   flashKey: 'F',
   glassEffect: true,
+  diagnostics: false,
 };
 
 export const settings = $state<AppSettings>({ ...DEFAULT_SETTINGS });

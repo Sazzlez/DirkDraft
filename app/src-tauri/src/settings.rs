@@ -40,6 +40,15 @@ impl Settings {
         self.get(key).and_then(Value::as_bool).unwrap_or(default)
     }
 
+    /// The diagnostics recording: the switch if it was ever set, else whether the marker file
+    /// diagnostics.on lies next to settings.json. The marker turns it on for one machine (the
+    /// developer's) and survives 1.5, which drops every settings key it does not know when it saves.
+    pub fn diagnostics(&self) -> bool {
+        self.get(DIAGNOSTICS.0).and_then(Value::as_bool).unwrap_or_else(|| {
+            self.path.as_ref().and_then(|p| p.parent()).is_some_and(|dir| dir.join(DIAGNOSTICS_MARKER).exists())
+        })
+    }
+
     /// A number as 1.5 wrote it: a JSON number, or a string (.NET writes NaN as "NaN"); None for
     /// anything not finite.
     pub fn number(&self, key: &str) -> Option<f64> {
@@ -72,6 +81,7 @@ impl Settings {
             "keepOnTop": self.flag(KEEP_ON_TOP.0, KEEP_ON_TOP.1),
             "showUnowned": self.flag(SHOW_UNOWNED.0, SHOW_UNOWNED.1),
             "glassEffect": self.flag(GLASS_EFFECT.0, GLASS_EFFECT.1),
+            "diagnostics": self.diagnostics(),
             "flashKey": if self.text(FLASH_KEY).as_deref() == Some("D") { "D" } else { "F" },
         })
     }
@@ -118,14 +128,21 @@ pub const FLASH_KEY: &str = "flashKey";
 /// 2.0: Mica behind the window on Windows 11 (read at start). Off = the opaque Windows 10 look —
 /// the way out should the transparent window misbehave on someone's machine.
 pub const GLASS_EFFECT: (&str, bool) = ("glassEffect", true);
+/// 2.0: the last drafts and games recorded locally, scrubbed, for finding faults (diagnostics.rs).
+/// Off unless switched on: only the developer's own machine needs it (user's word, 07.11.2026); the
+/// small log (logfile.rs) runs everywhere, so "Diagnose speichern" still helps a friend with a fault.
+pub const DIAGNOSTICS: (&str, bool) = ("diagnostics", false);
+/// An empty file of this name next to settings.json switches the recording on by default.
+pub const DIAGNOSTICS_MARKER: &str = "diagnostics.on";
 
-const FLAGS: [&str; 6] = [
+const FLAGS: [&str; 7] = [
     AUTO_SHOW_ON_CHAMP_SELECT.0,
     AUTO_SHOW_ON_GAME_START.0,
     AUTO_HIDE_AFTER_CHAMP_SELECT.0,
     KEEP_ON_TOP.0,
     SHOW_UNOWNED.0,
     GLASS_EFFECT.0,
+    DIAGNOSTICS.0,
 ];
 
 #[cfg(test)]
@@ -189,6 +206,29 @@ mod tests {
         assert_eq!(settings.number("windowTop"), Some(40.0));
         assert_eq!(settings.number("windowWidth"), None);
         assert_eq!(settings.number("windowHeight"), None);
+    }
+
+    #[test]
+    fn diagnostics_follow_the_marker_until_the_switch_was_used() {
+        let dir = std::env::temp_dir().join(format!("dirkdraft-marker-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("settings.json");
+        std::fs::write(&file, "{}").unwrap();
+
+        // A friend's machine: no marker, off.
+        let mut settings = at(file.clone());
+        assert!(!settings.diagnostics());
+        assert_eq!(settings.page()["diagnostics"], false);
+
+        // The developer's: the marker turns it on, also after 1.5 rewrote settings.json.
+        std::fs::write(dir.join(DIAGNOSTICS_MARKER), "").unwrap();
+        assert!(settings.diagnostics());
+        assert_eq!(settings.page()["diagnostics"], true);
+
+        // The switch wins once used.
+        settings.set_flag(DIAGNOSTICS.0, false);
+        assert!(!settings.diagnostics());
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

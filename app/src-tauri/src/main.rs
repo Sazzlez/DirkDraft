@@ -6,6 +6,7 @@
 
 mod client;
 mod data;
+mod diagnostics;
 mod lcu;
 mod logfile;
 mod settings;

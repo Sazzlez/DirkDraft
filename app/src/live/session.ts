@@ -104,6 +104,12 @@ export class LiveSession {
     return this.data !== null;
   }
 
+  /**
+   * What the game view decided last, as one plain line (situations seen, suggestions shown): the
+   * bridge writes it to the log whenever it changes, so a game can be checked afterwards.
+   */
+  diagnosticLine: string | null = null;
+
   /** The last download found no usable numbers (offline, GitHub down): said while there are none. */
   private dataFailed = false;
 
@@ -487,6 +493,13 @@ export class LiveSession {
     const situational = this.data?.situational && mode === 'lanes'
       ? situationalSuggestions(this.data.situational, meta, championId, plan?.lane ?? lane, situations, exclude, 3, slots)
       : null;
+    this.diagnosticLine =
+      `Spiel: Champion ${championId}, Lane ${plan?.lane ?? lane}, Slots ${slots.join('/')} · Lagen ${situations.join(',')} · ` +
+      (situational === null
+        ? 'keine situativen Daten'
+        : situational.length === 0
+          ? 'kein situativer Vorschlag'
+          : `Vorschläge ${situational.map((s) => `${s.itemId}@${s.slot}/${s.situation} (${s.timesMoreOften.toFixed(1)}×, ${s.games})`).join(', ')}`);
 
     const champion = this.adapter.champion(championId);
     const opponent = this.picked?.championId === championId ? this.adapter.champion(this.picked.opponentId) : null;

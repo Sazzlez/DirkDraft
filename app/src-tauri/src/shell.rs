@@ -67,6 +67,7 @@ pub fn run() {
                 .build(),
         )
         .manage(crate::updater::UpdaterState::default())
+        .manage(crate::diagnostics::Diagnostics::new(settings.diagnostics()))
         .manage(ShellState {
             settings: Mutex::new(settings),
             minimised_by_hand: AtomicBool::new(false),
@@ -136,6 +137,7 @@ pub fn run() {
             settings_get,
             settings_set,
             crate::logfile::shell_log,
+            crate::diagnostics::diagnose_export,
             shell_set_pinned,
             shell_minimize,
         ])
@@ -148,7 +150,7 @@ pub fn run() {
         });
 }
 
-fn windows_build() -> u32 {
+pub fn windows_build() -> u32 {
     #[cfg(windows)]
     {
         windows_version::OsVersion::current().build
@@ -219,7 +221,15 @@ fn settings_get(state: State<'_, ShellState>) -> serde_json::Value {
 
 /// One change from the settings page; only the page's own keys with valid values are written.
 #[tauri::command]
-fn settings_set(state: State<'_, ShellState>, key: String, value: serde_json::Value) -> Result<(), String> {
+fn settings_set(
+    state: State<'_, ShellState>,
+    diagnostics: State<'_, crate::diagnostics::Diagnostics>,
+    key: String,
+    value: serde_json::Value,
+) -> Result<(), String> {
+    if key == settings::DIAGNOSTICS.0 {
+        diagnostics.set_enabled(value.as_bool().unwrap_or(true));
+    }
     state.settings.lock().map_err(|_| "Einstellungen gesperrt".to_string())?.set_from_page(&key, value)
 }
 
