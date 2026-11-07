@@ -40,7 +40,7 @@ internal static class RiotCommand
             riot collect [--minutes 30] [--tiers platinum] [--state build/riot-state.json.gz] [--key-file datei]
             riot show <champion> <lane> [--tier platinum] [--state build/riot-state.json.gz]
             riot status [--state build/riot-state.json.gz]
-            riot export --out builds.json [--meta-out meta.json] [--situational-out situational.json] [--tier platinum] [--keep 6] [--min-games 3]
+            riot export --out builds.json [--meta-out meta.json] [--situational-out situational.json] [--games-out games.json.gz] [--tier platinum] [--keep 6] [--min-games 3]
                         [--min-patch-games 2000] [--state build/riot-state.json.gz]
             riot aram [--queues 450] [--tiers platinum] [--minutes 30] [--state build/aram-state.json.gz] [--key-file datei]
             riot queues --riot-id "Name#TAG" [--games 20] [--key-file datei]
@@ -96,6 +96,30 @@ internal static class RiotCommand
 
         var state = CollectorState.Load(statePath);
 
+        // The counted games of the current patch, for measuring the draft model — never the previous
+        // patch's, and never published (the workflow keeps the file as a run artifact).
+        var gamesPath = options.GetValueOrDefault("games-out", string.Empty);
+        if (gamesPath.Length > 0)
+        {
+            var gamesFile = new RiotGamesFile
+            {
+                Patch = state.Patch,
+                Platform = state.Platform,
+                Tier = tier,
+                CollectedAtUtc = state.Tally.CollectedAtUtc,
+                Games = state.Games,
+            };
+            var directory = Path.GetDirectoryName(Path.GetFullPath(gamesPath));
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+            using (var stream = File.Create(gamesPath))
+            using (var gzip = new System.IO.Compression.GZipStream(stream, System.IO.Compression.CompressionLevel.Optimal))
+            {
+                JsonSerializer.Serialize(gzip, gamesFile, RiotGamesJson.Default.RiotGamesFile);
+            }
+            Console.WriteLine($"Spiel-Liste: {gamesFile.Games.Count:N0} Spiele von Patch {gamesFile.Patch}, {new FileInfo(gamesPath).Length / 1024:N0} KB → {gamesPath}");
+        }
+
         // Early in a patch the new count is thin; until it has enough games the previous patch's
         // numbers are published instead, under their own patch, so the app knows they trail.
         var (patch, buildFile, metaCounts, situationalCounts) = (state.Patch, state.Tally, state.Meta, state.Situational);
@@ -149,7 +173,7 @@ internal static class RiotCommand
             Write(metaPath, JsonSerializer.Serialize(snapshot, MetaJson.Default.MetaSnapshot));
             Console.WriteLine(
                 $"Meta: {snapshot.Games:N0} Spiele, {snapshot.LaneStats.Count} Lane-Zeilen, {snapshot.Matchups.Count:N0} Duelle, "
-                + $"{snapshot.Synergies.Count:N0} Duos, Duell-Linie {snapshot.CompleteDuelSlope:0.00} / {snapshot.CompleteDuelOffset:+0.000;-0.000;0.000}"
+                + $"{snapshot.Synergies.Count:N0} Duos, {snapshot.Versus.Count:N0} Gegner-Paare, Duell-Linie {snapshot.CompleteDuelSlope:0.00} / {snapshot.CompleteDuelOffset:+0.000;-0.000;0.000} "
                 + $"aus {snapshot.CompleteDuelSample:N0}, {new FileInfo(metaPath).Length / 1024:N0} KB → {metaPath}");
         }
 

@@ -114,6 +114,59 @@ public sealed class RiotMetaTests
     }
 
     [Fact]
+    public void Versus_AreTheEnemiesOnOtherLanes_WithTheBotLaneCrossPairs()
+    {
+        var tally = new RiotMetaTally();
+        tally.Add(Game(blueWins: true));
+        tally.Add(Game(blueWins: false));
+        tally.Add(Game(blueWins: true));
+
+        var rows = tally.Rows(new MetaExportLimits { VersusMinimumGames = 1 });
+
+        // 5 × 5 enemy pairs, minus the 5 on the same lane (those are duels).
+        Assert.Equal(20, rows.Versus!.Count);
+        var adcAgainstSupport = Assert.Single(rows.Versus, v => v.ChampionId == 4 && v.OpponentId == 15);
+        Assert.Equal(Lane.Adc, adcAgainstSupport.Lane);
+        Assert.Equal(Lane.Support, adcAgainstSupport.OpponentLane);
+        Assert.Equal(3, adcAgainstSupport.Play);
+        Assert.Equal(2.0 / 3, adcAgainstSupport.WinRate, 10);
+        var supportAgainstAdc = Assert.Single(rows.Versus, v => v.ChampionId == 5 && v.OpponentId == 14);
+        Assert.Equal((Lane.Support, Lane.Adc), (supportAgainstAdc.Lane, supportAgainstAdc.OpponentLane));
+        Assert.DoesNotContain(rows.Versus, v => v.Lane == v.OpponentLane);
+        Assert.All(rows.Versus, v => Assert.True(v.ChampionId < v.OpponentId));
+    }
+
+    [Fact]
+    public void Versus_LeaveOutPlayersWithoutALane()
+    {
+        var tally = new RiotMetaTally();
+        tally.Add(Game(blueWins: true, redLanes: [Lane.Top, Lane.Jungle, Lane.Mid, Lane.Adc, Lane.Unknown]));
+
+        var rows = tally.Rows(new MetaExportLimits { VersusMinimumGames = 1 });
+
+        Assert.DoesNotContain(rows.Versus!, v => v.OpponentId == 15 || v.ChampionId == 15);
+        Assert.Equal(16, rows.Versus!.Count); // 4 known red players × 4 blue players off their lane
+    }
+
+    [Fact]
+    public void AGameLine_HoldsTenChampionsWithLanesAndTheWinner()
+    {
+        var line = RiotGames.Encode(Game(blueWins: false, red: [21, 22, 23, 24, 25]));
+
+        Assert.NotNull(line);
+        Assert.Equal(11, line.Length);
+        Assert.Equal((1, Lane.Top), RiotGames.Decode(line[0]));
+        Assert.Equal((5, Lane.Support), RiotGames.Decode(line[4]));
+        Assert.Equal((24, Lane.Adc), RiotGames.Decode(line[8]));
+        Assert.Equal(0, line[10]);
+        Assert.Equal((7, Lane.Unknown), RiotGames.Decode(7 * 8));
+
+        var lopsided = Game(blueWins: true);
+        var four = new MatchReading(lopsided.Patch, 0, 420, true, [.. lopsided.Participants.Skip(1)]);
+        Assert.Null(RiotGames.Encode(four));
+    }
+
+    [Fact]
     public void ThinRows_StayOutOfTheFile()
     {
         var tally = new RiotMetaTally();
@@ -124,6 +177,7 @@ public sealed class RiotMetaTests
         Assert.Empty(rows.Lanes);
         Assert.Empty(rows.Duels);
         Assert.Empty(rows.Duos);
+        Assert.Empty(rows.Versus!);
     }
 
     [Fact]
@@ -224,6 +278,8 @@ public sealed class RiotMetaTests
         Assert.Equal(1.0, meta.LaneStat(11, Lane.Top)!.Value.BanRate, 10);
         Assert.NotNull(meta.Matchup(1, 11, Lane.Top));
         Assert.False(meta.Matchup(1, 11, Lane.Top)!.Value.IsInferred);
+        Assert.Contains(snapshot.Versus, v => v.ChampionId == 4 && v.OpponentId == 15 && v.Play == 30);
+        Assert.Contains("\"versus\":[", System.Text.Json.JsonSerializer.Serialize(snapshot, MetaJson.Default.MetaSnapshot));
         Assert.Contains("8 gezählte Champions", snapshot.Warnings.Single()); // ten counted, two in Data Dragon
     }
 }

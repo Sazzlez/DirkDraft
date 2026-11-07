@@ -23,6 +23,12 @@ public sealed class RiotMetaCounts
 
     /// <summary>[champion, lane, partner, partner lane, games, wins]; champion &lt; partner.</summary>
     public List<int[]> Duos { get; set; } = [];
+
+    /// <summary>
+    /// [champion, lane, opponent, opponent lane, games, wins of champion]; champion &lt; opponent.
+    /// Opposite teams, different lanes — the same lane is a duel.
+    /// </summary>
+    public List<int[]> Versus { get; set; } = [];
 }
 
 /// <summary>Where a row is thin enough to leave out of the published file.</summary>
@@ -41,6 +47,9 @@ public sealed record MetaExportLimits
     public int DuelMinimumGames { get; init; } = 10;
 
     public int DuoMinimumGames { get; init; } = 30;
+
+    /// <summary>As duos: an enemy on another lane moves the rate less than a lane opponent does.</summary>
+    public int VersusMinimumGames { get; init; } = 30;
 }
 
 /// <summary>
@@ -61,6 +70,7 @@ public sealed class RiotMetaTally
     private readonly Dictionary<int, ChampionCount> _champions = [];
     private readonly Dictionary<(Lane Lane, int Champion, int Opponent), Count> _duels = [];
     private readonly Dictionary<(int Champion, Lane Lane, int Partner, Lane PartnerLane), Count> _duos = [];
+    private readonly Dictionary<(int Champion, Lane Lane, int Opponent, Lane OpponentLane), Count> _versus = [];
 
     public int Matches { get; private set; }
 
@@ -117,6 +127,25 @@ public sealed class RiotMetaTally
                 }
             }
         }
+
+        // Every enemy on another lane: the bot lane's cross pairs (ADC against the enemy support and
+        // back) and everything a jungler or roamer meets. Both lanes must be known.
+        if (sides.Count == 2)
+        {
+            foreach (var mine in sides[0])
+            {
+                foreach (var theirs in sides[1])
+                {
+                    if (mine.Lane == Lane.Unknown || theirs.Lane == Lane.Unknown || mine.Lane == theirs.Lane)
+                        continue;
+                    if (mine.ChampionId == theirs.ChampionId)
+                        continue;
+
+                    var (a, b) = mine.ChampionId < theirs.ChampionId ? (mine, theirs) : (theirs, mine);
+                    Bump(_versus, (a.ChampionId, a.Lane, b.ChampionId, b.Lane), a.Win);
+                }
+            }
+        }
     }
 
     /// <summary>Adds a stored tally, e.g. the state of the previous run.</summary>
@@ -142,6 +171,9 @@ public sealed class RiotMetaTally
 
         foreach (var row in stored.Duos.Where(row => row.Length >= 6))
             Merge(_duos, (row[0], (Lane)row[1], row[2], (Lane)row[3]), row[4], row[5]);
+
+        foreach (var row in (stored.Versus ?? []).Where(row => row.Length >= 6))
+            Merge(_versus, (row[0], (Lane)row[1], row[2], (Lane)row[3]), row[4], row[5]);
     }
 
     /// <summary>Everything, for the state file; sorted so two equal tallies write equal files.</summary>
@@ -156,6 +188,8 @@ public sealed class RiotMetaTally
             .Select(p => new[] { (int)p.Key.Lane, p.Key.Champion, p.Key.Opponent, p.Value.Games, p.Value.Wins })],
         Duos = [.. _duos.OrderBy(p => p.Key.Champion).ThenBy(p => p.Key.Lane).ThenBy(p => p.Key.Partner).ThenBy(p => p.Key.PartnerLane)
             .Select(p => new[] { p.Key.Champion, (int)p.Key.Lane, p.Key.Partner, (int)p.Key.PartnerLane, p.Value.Games, p.Value.Wins })],
+        Versus = [.. _versus.OrderBy(p => p.Key.Champion).ThenBy(p => p.Key.Lane).ThenBy(p => p.Key.Opponent).ThenBy(p => p.Key.OpponentLane)
+            .Select(p => new[] { p.Key.Champion, (int)p.Key.Lane, p.Key.Opponent, (int)p.Key.OpponentLane, p.Value.Games, p.Value.Wins })],
     };
 
     /// <summary>
@@ -220,8 +254,25 @@ public sealed class RiotMetaTally
             });
         }
 
+        var versus = new List<VersusStat>();
+        foreach (var ((a, laneA, b, laneB), count) in _versus.OrderBy(p => p.Key.Champion).ThenBy(p => p.Key.Lane).ThenBy(p => p.Key.Opponent).ThenBy(p => p.Key.OpponentLane))
+        {
+            if (count.Games < limits.VersusMinimumGames)
+                continue;
+
+            versus.Add(new VersusStat
+            {
+                ChampionId = a,
+                Lane = laneA,
+                OpponentId = b,
+                OpponentLane = laneB,
+                WinRate = (double)count.Wins / count.Games,
+                Play = count.Games,
+            });
+        }
+
         var damage = _champions.ToDictionary(p => p.Key, p => DamageOf(p.Value));
-        return new MetaRows(Matches, lanes, duels, duos, damage);
+        return new MetaRows(Matches, lanes, duels, duos, damage, versus);
     }
 
     /// <summary>Physical, magic or mixed from the champion's own damage to champions.</summary>
@@ -285,4 +336,5 @@ public sealed record MetaRows(
     IReadOnlyList<LaneStat> Lanes,
     IReadOnlyList<MatchupStat> Duels,
     IReadOnlyList<SynergyStat> Duos,
-    IReadOnlyDictionary<int, DamageType> Damage);
+    IReadOnlyDictionary<int, DamageType> Damage,
+    IReadOnlyList<VersusStat>? Versus = null);

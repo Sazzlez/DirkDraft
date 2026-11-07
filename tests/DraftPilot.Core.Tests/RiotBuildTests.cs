@@ -269,6 +269,9 @@ public class RiotBuildTests
         Assert.True(state.OldPatchLatestMs > 0);               // the 16.16 game marks where 16.22 began
         Assert.True(saves >= 1);
         Assert.Equal(10, state.Tally.Builds.Count);
+        Assert.Equal(2, state.Meta.Matches);
+        Assert.Equal(2, state.Games.Count);                     // one line per counted game, for measuring the model
+        Assert.All(state.Games, line => Assert.Equal(11, line.Length));
 
         // The player with two games this season was never asked about.
         Assert.DoesNotContain(handler.Paths, path => path.Contains("/by-puuid/p2/", StringComparison.Ordinal));

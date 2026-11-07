@@ -127,6 +127,28 @@ public sealed class SynergyStat
 }
 
 /// <summary>
+/// Two champions on opposite teams and different lanes, from the side of the champion with the
+/// lower id: e.g. an ADC against the enemy support, or a jungler against the enemy mid. Same-lane
+/// pairs are duels (<see cref="MatchupStat"/>). One row per pair; the other side's rate is
+/// <c>1 − WinRate</c>. Own data only — OP.GG never listed these.
+/// </summary>
+public sealed class VersusStat
+{
+    public int ChampionId { get; set; }
+
+    public Lane Lane { get; set; }
+
+    public int OpponentId { get; set; }
+
+    public Lane OpponentLane { get; set; }
+
+    /// <summary>Win rate of <see cref="ChampionId"/>.</summary>
+    public double WinRate { get; set; }
+
+    public int Play { get; set; }
+}
+
+/// <summary>
 /// The on-disk meta data, written by the update button and read by the app. Plain JSON: under a
 /// megabyte, loads in milliseconds, and stays readable when something looks wrong.
 /// </summary>
@@ -232,6 +254,13 @@ public sealed class MetaSnapshot
     public List<MatchupStat> Matchups { get; set; } = [];
 
     public List<SynergyStat> Synergies { get; set; } = [];
+
+    /// <summary>
+    /// Enemies on other lanes (<see cref="VersusStat"/>), own data only; empty in OP.GG files and in
+    /// files written before they were counted. Read by nothing yet: collected first, weighed after
+    /// it was measured (docs/draft-konzept.md).
+    /// </summary>
+    public List<VersusStat> Versus { get; set; } = [];
 
     /// <summary>Notes worth showing the user, e.g. which lanes came back without counter data.</summary>
     public List<string> Warnings { get; set; } = [];

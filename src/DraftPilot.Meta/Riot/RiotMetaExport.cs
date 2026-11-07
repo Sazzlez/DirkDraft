@@ -72,6 +72,7 @@ public static class RiotMetaExport
             LaneStats = lanes,
             Matchups = duels,
             Synergies = duos,
+            Versus = [.. rows.Versus ?? []],
             Warnings = warnings,
         };
     }

@@ -5,7 +5,7 @@ einem Riot-Schlüssel selbst zählt, und liegen als vier Dateien im Branch `data
 
 | Datei | Inhalt | Quelle |
 |---|---|---|
-| `meta.json` | Lane-Winrate, Pick-, Bann- und Rollenrate je Champion und Lane; jedes Duell (beide Richtungen); jedes Duo; Schadensart; Grundlinien und Duell-Linie | Solo/Duo, Platin, EUW |
+| `meta.json` | Lane-Winrate, Pick-, Bann- und Rollenrate je Champion und Lane; jedes Duell (beide Richtungen); jedes Duo; Gegner auf anderen Lanes (`versus`, ab 30 Spielen, eine Zeile je Paar); Schadensart; Grundlinien und Duell-Linie | Solo/Duo, Platin, EUW |
 | `builds.json` | Runen, Spells, Start, Schuhe, Kern, Items 4–6, Support-Item, Skill-Reihenfolge je Champion und Lane | dieselben Spiele |
 | `situational.json` | Stiefel, Kern (Items 1–3) und Items 4–6 je Champion, Lane und Gegner-Lage (viel AD, viel AP, 2+ Tanks, viel harte Kontrolle), mit dem Gesamtwert des Platzes zum Vergleich; dazu dieselben Zahlen je Klasse | dieselben Spiele |
 | `aram.json` | Winrate je Champion (Bank), ARAM-Builds — auch für Mayhem | normales ARAM (Queue 450), Spieler aus den Platin-Ranglisten |
@@ -15,6 +15,13 @@ Feldern: `source: "riot"`, `platform`, `games`. Daran erkennt die App, dass die 
 sind: Sie werden zur auf derselben Datei gemessenen Duell-Linie geglättet statt mit dem
 Listen-Versatz, den OP.GGs Auswahl der auffälligsten Gegner brauchte, und kein Text nennt mehr
 OP.GG. Tiers gibt es keine — das war OP.GGs eigene Einstufung.
+
+**Für die Messung des Draft-Modells** (`docs/draft-konzept.md`, seit 07.11.2026): `versus` zählt je Spiel
+die 20 Gegner-Paare auf verschiedenen Lanes, darunter die Botlane-Kreuzpaare ADC ↔ gegnerischer Support.
+Die App liest das Feld noch nicht (2.0.0 übergeht es). Außerdem legt der Sammler je gezähltem Spiel eine
+Zeile ab: zehn Champions mit Lane und den Sieger, ohne Spieler, ohne Match-ID. Die Zeilen liegen im
+Bestand (nur der laufende Patch) und als Artefakt `games` jedes Laufs (`games.json.gz`, eine Woche
+aufbewahrt, nie veröffentlicht). Herunterladen: `gh run download <Lauf> -n games`.
 
 **Situative Items** (Spielansicht, Kachel „Für dieses Spiel“): nur gemessen, keine Faustregeln.
 

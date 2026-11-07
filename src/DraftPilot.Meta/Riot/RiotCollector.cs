@@ -69,6 +69,12 @@ public sealed class CollectorState
     public List<int[]> Situational { get; set; } = [];
 
     /// <summary>
+    /// The counted games of this patch, one line each (<see cref="RiotGames.Encode"/>): for measuring
+    /// what each part of the draft model predicts. Not kept for the previous patch.
+    /// </summary>
+    public List<int[]> Games { get; set; } = [];
+
+    /// <summary>
     /// The last patch's counts, kept when a new patch starts. For the first day of a patch the new
     /// count is too thin to stand on; the previous patch's numbers, marked as such, beat an empty file.
     /// </summary>
@@ -177,6 +183,7 @@ public sealed class RiotCollector(
             state.Tally = new RiotBuildFile();
             state.Meta = new RiotMetaCounts();
             state.Situational = [];
+            state.Games = [];
         }
 
         var tally = new RiotBuildTally();
@@ -195,6 +202,7 @@ public sealed class RiotCollector(
                 entry is not null && (entry.IsTagged("Tank") || entry.Defense >= Situations.FrontlineDefense),
                 entry is not null && statics!.Traits.For(entry.Key).HasHardCc);
         }
+        var games = new List<int[]>(state.Games);
         var seen = new HashSet<long>(state.Seen);
         var matches = new Dictionary<string, int>(state.Tally.Matches, StringComparer.OrdinalIgnoreCase);
 
@@ -224,6 +232,7 @@ public sealed class RiotCollector(
             };
             state.Meta = meta.Export();
             state.Situational = situational.Export();
+            state.Games = games;
             save(state);
         }
 
@@ -305,6 +314,8 @@ public sealed class RiotCollector(
                     foreach (var participant in reading.Participants)
                         tally.Add(participant, tier);
                     meta.Add(reading);
+                    if (RiotGames.Encode(reading) is { } line)
+                        games.Add(line);
                     if (statics is not null)
                         situational.Add(reading, Profile, items);
 
