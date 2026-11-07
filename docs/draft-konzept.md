@@ -112,10 +112,13 @@ höchstens Hinweis.
 ### Pick-Reihenfolge
 
 - **Lane-Gegner noch offen:** Es zählt das erwartete Duell gegen die Champions, die der Gegner auf
-  deiner Lane noch nehmen kann, gewichtet nach Platin-Pickrate. Früh gewinnen so sichere Picks, spät
-  der gezielte Counter.
+  deiner Lane noch nehmen kann, gewichtet nach Platin-Pickrate. Über alle Gegner gemittelt steckt das
+  schon in der Meta-Stärke. Neu ist, was wegfällt: Sind die schlimmsten Counter eines Champions schon
+  gebannt oder vergeben, steigt er. Ist der Lane-Gegner bekannt, zählt das direkte Duell, also der
+  gezielte Counter.
 - **Bewusstes Kontern** zeigen die Spieldaten nicht, weil Riot die Pick-Reihenfolge nicht herausgibt.
-  Der schlimmste Fall bleibt deshalb als Text stehen („2 offene Counter: …“).
+  Wie vorsichtig man früh picken sollte, lässt sich deshalb nicht messen. Der schlimmste Fall bleibt als
+  Text stehen („2 offene Counter: …“).
 - **Banns** aus demselben Modell: gebannt wird, was die Winrate deines Teams am meisten drücken würde,
   wenn der Gegner es nimmt, gewichtet nach Pick-Wahrscheinlichkeit.
 
