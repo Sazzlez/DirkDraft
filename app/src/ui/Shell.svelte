@@ -7,10 +7,12 @@
   import DraftArea from './draft/DraftArea.svelte';
   import BuildArea from './build/BuildArea.svelte';
   import GameArea from './game/GameArea.svelte';
-  import PostgameArea from './game/PostgameArea.svelte';
   import EmptyState from './EmptyState.svelte';
+  import Settings from './Settings.svelte';
 
   let { view }: { view: ViewModel } = $props();
+
+  let settingsOpen = $state(false);
 
   let lastMoment = $state<Moment | null>(null);
   let manual = $state<Area | null>(null);
@@ -34,7 +36,10 @@
 </script>
 
 <div class="shell">
-  <TitleBar {view} {area} onArea={choose} />
+  <TitleBar {view} {area} onArea={choose} onSettings={() => (settingsOpen = true)} />
+  {#if settingsOpen}
+    <Settings onClose={() => (settingsOpen = false)} />
+  {/if}
   <div class="segrow">
     <Segment value={area} onChange={choose} options={AREAS} label="Bereich" stretch />
   </div>
@@ -60,12 +65,8 @@
           {/if}
         {:else if view.game}
           <GameArea game={view.game} build={view.build} />
-        {:else if view.postgame}
-          <PostgameArea postgame={view.postgame} />
         {:else if view.moment === 'game' || view.moment === 'loading'}
           <EmptyState title="Das Spiel lädt …" text={view.emptyText ?? 'Sobald das Spiel läuft: nächster Kauf gegen dein Gold, der nächste Skillpunkt und was die Gegner bauen.'} />
-        {:else if view.moment === 'postgame'}
-          <EmptyState title="Spiel vorbei" text={view.emptyText ?? 'Das Nachspiel kommt hierher.'} />
         {:else}
           <EmptyState title="Noch kein Spiel" text="Sobald das Spiel startet: nächster Kauf gegen dein Gold, der nächste Skillpunkt und was die Gegner bauen." />
         {/if}
@@ -76,6 +77,7 @@
 
 <style>
   .shell {
+    position: relative;
     container: app / inline-size;
     height: 100%;
     display: flex;

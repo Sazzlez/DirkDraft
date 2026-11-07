@@ -24,8 +24,7 @@ export type Moment =
   | 'locked'
   | 'loading'
   | 'aramBench'
-  | 'game'
-  | 'postgame';
+  | 'game';
 
 export type Area = 'draft' | 'build' | 'game';
 
@@ -46,7 +45,6 @@ export const AREA_OF: Record<Moment, Area> = {
   loading: 'draft',
   aramBench: 'draft',
   game: 'game',
-  postgame: 'game',
 };
 
 export type Tone = 'good' | 'warn' | 'bad' | 'neutral' | 'info';
@@ -126,9 +124,8 @@ export interface RecommendationView {
   reasons: { text: string; tone: Tone }[];
   terms: TermView[];
   tied: boolean;
-  /** Not choosable by the viewer (banned pool champion shown greyed). */
+  /** Not choosable by the viewer (shown greyed). */
   unavailable: boolean;
-  inPool: boolean;
 }
 
 export interface PickTileView {
@@ -141,10 +138,6 @@ export interface PickTileView {
   /** Pinned hover row ("Dein Hover"). */
   hover: HoverView | null;
   footnote: string | null;
-  poolAvailable: boolean;
-  /** The best picks among the player's pool, ranked over the pool alone; null without a pool. */
-  poolItems: RecommendationView[] | null;
-  poolTied: number;
 }
 
 export interface HoverView {
@@ -272,16 +265,6 @@ export interface SituationalView {
   stats: string;
 }
 
-export interface PostgameView {
-  result: 'Sieg' | 'Niederlage';
-  champion: ChampionRef;
-  pickedFromTop3: boolean | null;
-  pickNote: string;
-  buildNote: string;
-  history: { champion: ChampionRef; result: 'S' | 'N'; fromTop3: boolean | null; when: string }[];
-  topThreeRate: string;
-}
-
 export interface AramRowView extends RecommendationView {
   own: boolean;
 }
@@ -311,7 +294,6 @@ export interface ViewModel {
   side: SideTile[];
   build: BuildView | null;
   game: GameView | null;
-  postgame: PostgameView | null;
   /** What the empty area of a moment says ("Sobald das Spiel startet …"). */
   emptyText: string | null;
   /** Shown above everything when the scene is sample data, never in a live session. */

@@ -13,7 +13,6 @@ const shots: { scene: string; area?: 'build' | 'game' }[] = [
   { scene: 'loading' },
   { scene: 'aram' },
   { scene: 'game' },
-  { scene: 'postgame' },
 ];
 
 for (const shot of shots) {

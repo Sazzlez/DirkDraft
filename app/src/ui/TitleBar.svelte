@@ -1,21 +1,29 @@
 <script lang="ts">
   import { AREAS, type Area, type ViewModel } from '../core/view';
   import Segment from './Segment.svelte';
-  import { hideToTray, isPinned, minimize, onTrayHint, setPinned } from '../platform/shell';
+  import { hideToTray, minimize, onTrayHint } from '../platform/shell';
+  import { changeSetting, settings } from '../live/settings.svelte';
 
-  let { view, area, onArea }: { view: ViewModel; area: Area; onArea: (area: Area) => void } = $props();
+  let {
+    view,
+    area,
+    onArea,
+    onSettings,
+  }: { view: ViewModel; area: Area; onArea: (area: Area) => void; onSettings: () => void } = $props();
 
-  let pinned = $state(false);
   let menuOpen = $state(false);
   let trayHint = $state(false);
 
-  // The pin as the settings left it; the hint when the window goes to the tray for the first time.
-  void isPinned().then((on) => (pinned = on)).catch(() => undefined);
+  // The hint when the window goes to the tray for the first time (shell.rs sends it).
   onTrayHint(() => (trayHint = true));
 
   function togglePin() {
-    pinned = !pinned;
-    void setPinned(pinned);
+    void changeSetting('keepOnTop', !settings.keepOnTop);
+  }
+
+  function openSettings() {
+    menuOpen = false;
+    onSettings();
   }
 </script>
 
@@ -39,7 +47,14 @@
     <button class="ctl menu" aria-label="Menü" onclick={() => (menuOpen = !menuOpen)}>
       <svg viewBox="0 0 20 20"><circle cx="5" cy="10" r="1.3" /><circle cx="10" cy="10" r="1.3" /><circle cx="15" cy="10" r="1.3" /></svg>
     </button>
-    <button class="ctl" class:on={pinned} aria-label="Im Vordergrund halten" aria-pressed={pinned} onclick={togglePin}>
+    <button class="ctl gear" aria-label="Einstellungen" onclick={openSettings}>
+      <svg viewBox="0 0 20 20" class="stroke">
+        <circle cx="10" cy="10" r="5.2" />
+        <circle cx="10" cy="10" r="2" />
+        <path stroke-width="2.4" stroke-linecap="butt" d="M15.2 10h2.2M13.68 13.68l1.55 1.55M10 15.2v2.2M6.32 13.68l-1.55 1.55M4.8 10H2.6M6.32 6.32 4.77 4.77M10 4.8V2.6M13.68 6.32l1.55-1.55" />
+      </svg>
+    </button>
+    <button class="ctl" class:on={settings.keepOnTop} aria-label="Im Vordergrund halten" aria-pressed={settings.keepOnTop} onclick={togglePin}>
       <svg viewBox="0 0 20 20" class="stroke"><path d="M12.2 3.5 16.5 7.8M14.4 5.6l-3.3 3.3 1.1 3.3-1.1 1.1-6.5-6.5 1.1-1.1 3.3 1.1 3.3-3.3M8 12l-4 4" /></svg>
     </button>
     <button class="ctl" aria-label="Minimieren" onclick={() => void minimize()}>
@@ -60,7 +75,7 @@
   {#if menuOpen}
     <div class="popover">
       <p class="num">{view.data.text}</p>
-      <button>Einstellungen</button>
+      <button onclick={openSettings}>Einstellungen</button>
     </div>
   {/if}
 </header>
@@ -295,7 +310,8 @@
     }
 
     .center,
-    .pill {
+    .pill,
+    .gear {
       display: none;
     }
 

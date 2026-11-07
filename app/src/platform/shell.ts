@@ -35,16 +35,6 @@ export async function hideToTray(): Promise<void> {
   if (inShell) await getCurrentWindow().close();
 }
 
-/** The pin, remembered as keepOnTop in the settings 1.5 already had. */
-export async function setPinned(on: boolean): Promise<void> {
-  if (inShell) await invoke('shell_set_pinned', { on });
-}
-
-export async function isPinned(): Promise<boolean> {
-  if (!inShell) return false;
-  return (await invoke<{ keepOnTop: boolean }>('shell_settings')).keepOnTop;
-}
-
 /** The first close into the tray: the page shows the hint until the window goes. */
 export function onTrayHint(show: () => void): void {
   if (inShell) void listen('shell://tray-hint', show);

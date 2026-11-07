@@ -31,14 +31,16 @@ export interface DraftFacts {
   targetAction: 'pick' | 'ban' | 'none' | null;
 }
 
-/** GameStart is the loading screen; InProgress and Reconnect a running game (1.5: all three "running"). */
+/**
+ * GameStart is the loading screen; InProgress and Reconnect a running game (1.5: all three
+ * "running"). After the game there is no moment of its own (the user did not want a postgame,
+ * 07.11.2026): the window is back to waiting for the next champion select.
+ */
 const RUNNING = new Set(['InProgress', 'Reconnect']);
-const AFTER = new Set(['WaitingForStats', 'PreEndOfGame', 'EndOfGame']);
 
 export function momentOf(draft: DraftFacts | null, gameflow: GameflowPhase | null): Moment {
   if (gameflow === 'GameStart') return 'loading';
   if (gameflow && RUNNING.has(gameflow)) return 'game';
-  if (gameflow && AFTER.has(gameflow)) return 'postgame';
 
   if (!draft || !draft.isActive) return 'lobby';
 

@@ -58,18 +58,19 @@ Datenstand-Pill · Pin · Minimieren · Schließen), Mica/Acrylic/deckend #1c1c1
 | Lobby / kein Client | Startkarte: Client-Status, Datenstand, Update-Zeile, Version | Leerer Zustand, der sagt, was kommt; Datenstand in der Pill |
 | Planung & Hover | Liste + Zeile „DEIN HOVER“ (Winrate, Platz k von n, Urteil), offene Counter je Zeile solange Lane-Gegner unbekannt | Hauptkachel: Hover-Zeile fest, offene Counter |
 | Bannen | Ban-Liste mit Punkten (stark > 3,5, sinnvoll > 2,5), Kriterien aufklappbar | Drei Banns mit Grund und Punkten, „Weitere Banns“, Nebenkachel „Dem Gegner fehlt noch“ |
-| Dein Pick | 8 Zeilen (Einstellung), Gleichauf-Gruppe mit Akzentkante, Urteil in Worten, Kriterien mit Balken | Drei vorne, Gruppe „Vorne gleichauf · N“, Rest auf Abruf, Balken der Beiträge, Segment „Alle · Mein Pool“, Nebenkacheln Draft-Chance (Halbkreis) und Comp-Vergleich |
+| Dein Pick | 8 Zeilen (Einstellung), Gleichauf-Gruppe mit Akzentkante, Urteil in Worten, Kriterien mit Balken | Drei vorne, Gruppe „Vorne gleichauf · N“, Rest auf Abruf, Balken der Beiträge, Nebenkacheln Draft-Chance (Halbkreis) und Comp-Vergleich |
 | Teammate am Zug | dieselbe Liste für seinen Slot, Klick auf Slot wechselt das Ziel bis zum nächsten Zug | gleich |
 | Gelockt / Finalisierung / Laden | Matchup-Panel (Winrate, Spielzahl), Build-Karte, Comp-Tabelle | Hauptkachel „Dein Matchup“ + Runen + Spells + Start + Skills + Kern; Draft-Urteil in drei Sätzen |
 | ARAM / Mayhem | „Behalten oder tauschen?“ — eigener Champion + Bank nach ARAM-Winrate, Rundung im Fehlerbalken, Rerolls in der Kopfzeile; ARAM-Build; Mayhem-Stern | gleich, Daten aus eigener Zählung |
 | Arena, rotierende Modi | keine Lanes, kein Build | gleich |
 | Im Spiel | Build groß (Runen, Items, Skills 1–18 mit abgeleiteten 16–18, Augmente bei Mayhem), Lane-Übersicht mit Balken (±10 Punkte Vollausschlag), „Draft insgesamt“ | Bereich Spiel: nächster Kauf gegen Gold, Build-Pfad mit Häkchen, Skill-Leiste mit nächstem Punkt, Gegner-Items mit Schadensart, Hinweise (aus Live-Client-API Port 2999) |
-| Nachspiel | — (zurück zur Startkarte) | neu: aus Top 3 gepickt? Ausgang? Build-Abweichung? Verlauf, lokal |
+| Nach dem Spiel | — (zurück zur Startkarte) | gleich: zurück zu „Wartet auf das nächste Champ Select“. Ein Nachspiel (Ausgang, Pick-Platz, Verlauf) war gebaut und ist auf Nutzerwunsch (07.11.2026) wieder entfernt — nicht erneut vorschlagen. |
 
 Moment-Logik 1.5 (`UpdateBuildSection`, `OnGameflowPhase`): GameStart/InProgress/Reconnect = Spiel
 läuft; Spielende verwirft Build und Lanes; Client weg im Spiel = Phase None. 2.0: eine explizite
-Zustandsmaschine (Lobby, Planung, Bannen, Pick, Teammate, Gelockt, Laden, ARAM-Bank, Spiel,
-Nachspiel) im TS-Kern; der Moment schaltet den Bereich, Handwahl hält bis zum nächsten Moment.
+Zustandsmaschine (Lobby, Planung, Bannen, Pick, Teammate, Gelockt, Laden, ARAM-Bank, Spiel) im
+TS-Kern; der Moment schaltet den Bereich, Handwahl hält bis zum nächsten Moment. „InProgress“ ohne
+Antwort der Live-Client-API gilt noch als Laden (der Ladebildschirm läuft da noch).
 
 Texte und Schwellen, die 2.0 übernimmt: Urteile „bester Pick der Liste / gleichauf mit Platz 1 /
 knapp dahinter / deutlich dahinter / Datenlage zu dünn“; Kriterien-Urteile ≥ 2 „stark dafür“,
@@ -94,7 +95,8 @@ CC ≥ 6 → Tenacity, nur ab drei aufgedeckten Gegnern, nie umsortierend.
   sät per HTTP (erst Phase, dann Session), schließt das Panel nur bei echtem 404.
 - **Gelesen:** Session, Gameflow-Phase, `pickable-champion-ids` (Besitzfilter, bis nicht leer
   wiederholt), `lol-patch/v1/game-version` (Fallback `system/v1/builds`), Runenseiten und Inventar.
-  **2.0 neu:** Mastery und eigene Spielhistorie für „Mein Pool“ (nur Filter), Live-Client-API.
+  **2.0 neu:** Live-Client-API. („Mein Pool“ aus Mastery und Spielhistorie war gebaut und ist auf
+  Nutzerwunsch vom 07.11.2026 wieder entfernt — nicht erneut vorschlagen.)
 - **Geschrieben (nur auf Klick, ein Knopf):** Runen-Import — `POST/DELETE /lol-perks/v1/pages`,
   Name „DirkRunen · {Überschrift}“ ≤ 30 Zeichen, eigene Seiten (Präfix DirkRunen oder alt
   DraftPilot) werden ersetzt, eine fremde nur nach Nachfrage mit Namen (älteste löschbare), Abbruch
@@ -169,7 +171,12 @@ lockfilePath, gameMode, tier). Logs: crash.log, startup.log (≤ 400 Zeilen), ge
 Keine fremden Spielernamen, keine Cooldown-/Ult-Timer, keine Injection, kein Speicherlesen, kein
 Auto-Hover/-Pick/-Bann/-Accept, Runen und Beschwörerzauber nur auf Klick als einziger Schreibweg
 (Zauber seit 07.11.2026 auf Nutzerwunsch), keine Telemetrie, Netz nur für
-die eigene Datendatei, Data Dragon und die Update-Prüfung. „Mein Pool“ blendet aus, gewichtet nie.
+die eigene Datendatei, Data Dragon und die Update-Prüfung.
+
+**Einstellungen (2.0):** Blatt über dem Inhalt (Zahnrad in der Titelleiste, schmal im Menü): bei
+Champ Select / Spielstart einblenden, nach dem Draft ausblenden, immer im Vordergrund, Blitz auf D
+oder F (Standard F), auch nicht gekaufte Champions vorschlagen. Gespeichert sofort in 1.5s
+`settings.json` (neue Schlüssel `flashKey`; `showUnowned` wie 1.5).
 
 ## 7. Responsiv (2.0)
 

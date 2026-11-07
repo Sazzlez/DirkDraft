@@ -2,7 +2,6 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { laneFromKey } from '../../src/core/model/lane';
 import type { MetaSnapshot } from '../../src/core/model/metaLookup';
 import type { DataSet } from '../../src/data/remote';
 import { LiveSession } from '../../src/live/session';
@@ -140,64 +139,6 @@ describe('LiveSession', () => {
     live.onSession(null);
     live.onSession(last);
     expect(live.needsSelectable).toBe(true);
-  });
-
-  it('records the result once and keeps it in the game area until the next game', () => {
-    const live = new LiveSession();
-    live.setData(data);
-    live.onStatus(connected);
-    live.onPhase('ChampSelect');
-    for (const record of sessions('state-nachlock')) live.onSession(record.session ?? null);
-    live.onSession(null);
-    expect(live.needsEndOfGame).toBe(false);
-    live.onPhase('GameStart');
-    live.onPhase('InProgress');
-    expect(live.needsEndOfGame).toBe(false);
-    live.onPhase('EndOfGame');
-    expect(live.needsEndOfGame).toBe(true);
-
-    const history = live.onEndOfGame({ championId: 122, win: true, items: [3071, 3047] }, Date.UTC(2026, 10, 7, 12));
-    expect(history).toHaveLength(1);
-    expect(live.needsEndOfGame).toBe(false);
-    expect(live.onEndOfGame({ championId: 122, win: false, items: [] })).toHaveLength(1);
-
-    const view = live.view();
-    expect(view.moment).toBe('postgame');
-    expect(view.postgame?.result).toBe('Sieg');
-    live.onPhase('Lobby');
-    expect(live.view().postgame?.result).toBe('Sieg');
-    live.onPhase('GameStart');
-    expect(live.view().postgame).toBeNull();
-  });
-
-  it('offers "Mein Pool" once mastery and games are in, without ARAM games counting for a lane', () => {
-    const live = new LiveSession();
-    live.setData(data);
-    live.onStatus(connected);
-    live.onPhase('ChampSelect');
-    const last = sessions('live-tournament-draft').filter((r) => r.session).at(-1)!.session!;
-    live.onSession(last);
-    const tile = (v = live.view().main) => (v.kind === 'picks' || v.kind === 'bans' ? v.tile : null);
-    expect(live.needsPool).toBe(true);
-    expect(tile()?.poolItems ?? null).toBeNull();
-
-    const lane = tile()!.lane!;
-    const ids = snapshot.laneStats.filter((s) => s.lane === laneFromKey(lane)).slice(0, 6).map((s) => s.championId);
-    live.setPoolInput({
-      masteries: [],
-      games: [
-        ...ids.flatMap((championId) => [
-          { championId, lane, queueId: 420 },
-          { championId, lane, queueId: 420 },
-        ]),
-        { championId: 99, lane: '', queueId: 2400 },
-        { championId: 99, lane: '', queueId: 2400 },
-      ],
-    });
-    expect(live.needsPool).toBe(false);
-    const pool = tile()?.poolItems ?? [];
-    expect(pool.length).toBeGreaterThan(0);
-    for (const item of pool) expect(ids).toContain(item.champion.id);
   });
 
   it('shows the game from the live client', () => {

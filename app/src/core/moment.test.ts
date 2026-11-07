@@ -16,7 +16,9 @@ describe('momentOf', () => {
   it('follows the gameflow before the draft', () => {
     expect(momentOf(draft(), 'InProgress')).toBe('game');
     expect(momentOf(null, 'GameStart')).toBe('loading');
-    expect(momentOf(null, 'EndOfGame')).toBe('postgame');
+    // No postgame (user's choice): after the game the window waits for the next draft.
+    expect(momentOf(null, 'EndOfGame')).toBe('lobby');
+    expect(momentOf(null, 'WaitingForStats')).toBe('lobby');
     expect(momentOf(null, 'Lobby')).toBe('lobby');
   });
 

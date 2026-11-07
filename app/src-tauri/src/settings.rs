@@ -45,10 +45,40 @@ impl Settings {
     }
 
     pub fn set_flag(&mut self, key: &str, value: bool) {
+        self.set(key, Value::Bool(value));
+    }
+
+    pub fn set(&mut self, key: &str, value: Value) {
         // Replace a differently cased key from 1.5 rather than adding a second one.
         let existing = self.values.keys().find(|k| k.eq_ignore_ascii_case(key)).cloned();
-        self.values.insert(existing.unwrap_or_else(|| key.to_string()), Value::Bool(value));
+        self.values.insert(existing.unwrap_or_else(|| key.to_string()), value);
         self.save();
+    }
+
+    /// The settings the page shows and may change, with 1.5's defaults filled in.
+    pub fn page(&self) -> Value {
+        serde_json::json!({
+            "autoShowOnChampSelect": self.flag(AUTO_SHOW_ON_CHAMP_SELECT.0, AUTO_SHOW_ON_CHAMP_SELECT.1),
+            "autoShowOnGameStart": self.flag(AUTO_SHOW_ON_GAME_START.0, AUTO_SHOW_ON_GAME_START.1),
+            "autoHideAfterChampSelect": self.flag(AUTO_HIDE_AFTER_CHAMP_SELECT.0, AUTO_HIDE_AFTER_CHAMP_SELECT.1),
+            "keepOnTop": self.flag(KEEP_ON_TOP.0, KEEP_ON_TOP.1),
+            "showUnowned": self.flag(SHOW_UNOWNED.0, SHOW_UNOWNED.1),
+            "flashKey": if self.text(FLASH_KEY).as_deref() == Some("D") { "D" } else { "F" },
+        })
+    }
+
+    /// A change from the page, checked against the key's kind: nothing else reaches the file.
+    pub fn set_from_page(&mut self, key: &str, value: Value) -> Result<(), String> {
+        let valid = match key {
+            k if FLAGS.contains(&k) => value.is_boolean(),
+            FLASH_KEY => matches!(value.as_str(), Some("D" | "F")),
+            _ => return Err(format!("unbekannte Einstellung {key}")),
+        };
+        if !valid {
+            return Err(format!("ungültiger Wert für {key}"));
+        }
+        self.set(key, value);
+        Ok(())
     }
 
     fn save(&self) {
@@ -72,6 +102,18 @@ pub const AUTO_SHOW_ON_GAME_START: (&str, bool) = ("autoShowOnGameStart", true);
 pub const KEEP_ON_TOP: (&str, bool) = ("keepOnTop", false);
 pub const TRAY_HINT_SHOWN: (&str, bool) = ("trayHintShown", false);
 pub const LOCKFILE_PATH: &str = "lockfilePath";
+/// 1.5: suggest champions the account does not own too.
+pub const SHOW_UNOWNED: (&str, bool) = ("showUnowned", false);
+/// 2.0: the key Flash goes on when spells are taken over ("D" or "F", default F).
+pub const FLASH_KEY: &str = "flashKey";
+
+const FLAGS: [&str; 5] = [
+    AUTO_SHOW_ON_CHAMP_SELECT.0,
+    AUTO_SHOW_ON_GAME_START.0,
+    AUTO_HIDE_AFTER_CHAMP_SELECT.0,
+    KEEP_ON_TOP.0,
+    SHOW_UNOWNED.0,
+];
 
 #[cfg(test)]
 mod tests {
@@ -103,6 +145,23 @@ mod tests {
         assert_eq!(written["windowLeft"], "NaN");
         assert_eq!(written["tier"], "platinum");
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn the_page_sees_defaults_and_may_change_only_known_keys() {
+        let mut settings = Settings { path: None, values: Map::new(), writable: false };
+        let page = settings.page();
+        assert_eq!(page["autoShowOnChampSelect"], true);
+        assert_eq!(page["flashKey"], "F");
+
+        assert!(settings.set_from_page("flashKey", Value::from("D")).is_ok());
+        assert_eq!(settings.page()["flashKey"], "D");
+        assert!(settings.set_from_page("flashKey", Value::from("Q")).is_err());
+        assert!(settings.set_from_page("showUnowned", Value::from(true)).is_ok());
+        assert!(settings.set_from_page("showUnowned", Value::from("ja")).is_err());
+        assert!(settings.set_from_page("poolAdded", serde_json::json!([122, 86])).is_err());
+        assert!(settings.set_from_page("lockfilePath", Value::from("C:\\x")).is_err());
+        assert!(settings.set_from_page("trayHintShown", Value::from(false)).is_err());
     }
 
     #[test]

@@ -11,7 +11,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use serde::Serialize;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
@@ -115,12 +114,11 @@ pub fn run() {
             crate::client::client_snapshot,
             crate::client::client_pickable,
             crate::client::client_game_version,
-            crate::client::client_end_of_game,
-            crate::client::client_pool_input,
             crate::client::client_import,
             crate::data::data_read,
             crate::data::data_write,
-            shell_settings,
+            settings_get,
+            settings_set,
             shell_set_pinned,
             shell_minimize,
         ])
@@ -180,15 +178,16 @@ fn show_quietly(window: &WebviewWindow) {
     let _ = window.show();
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ShellSettings {
-    keep_on_top: bool,
+/// The settings page's values, 1.5's defaults filled in.
+#[tauri::command]
+fn settings_get(state: State<'_, ShellState>) -> serde_json::Value {
+    state.settings.lock().map(|s| s.page()).unwrap_or_default()
 }
 
+/// One change from the settings page; only the page's own keys with valid values are written.
 #[tauri::command]
-fn shell_settings(state: State<'_, ShellState>) -> ShellSettings {
-    ShellSettings { keep_on_top: state.flag(settings::KEEP_ON_TOP) }
+fn settings_set(state: State<'_, ShellState>, key: String, value: serde_json::Value) -> Result<(), String> {
+    state.settings.lock().map_err(|_| "Einstellungen gesperrt".to_string())?.set_from_page(&key, value)
 }
 
 /// The pin: always on top, remembered for the next start (keepOnTop, as in 1.5).

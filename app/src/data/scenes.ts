@@ -1,8 +1,8 @@
 // The development and screenshot scenes: one per moment, each a real recording played through the
-// TS model (core/engine) on the reference snapshot. Game and postgame have no recording yet; they
-// use sample data and say so on screen.
+// TS model (core/engine) on the reference snapshot. The game has no recording yet; it uses sample
+// data and says so on screen.
 
-import type { ViewModel, Moment, ChampionRef, GameView, PostgameView, BuildView } from '../core/view';
+import type { ViewModel, Moment, ChampionRef, GameView, BuildView } from '../core/view';
 import { LANE_NAMES } from '../core/view';
 import { loadAssets, itemName } from './assets';
 import { DraftEngine, stateFromFrame, type DraftFrame } from '../core/engine';
@@ -13,8 +13,6 @@ import { gameModel, type LiveGameData } from '../core/game';
 import type { PlanOption, RiotBuildPlan } from '../core/riotBuilds';
 import { gameView } from './gameView';
 import { SITUATION, SLOT } from '../core/situational';
-import { postgameModel } from '../core/postgame';
-import { postgameView } from './postgameView';
 import { assets } from './assets';
 import { GoldenAdapter, buildFromPlan, type GoldenFrame, type GoldenPlan } from './golden';
 
@@ -34,7 +32,6 @@ export const SCENES: Scene[] = [
   { id: 'loading', title: 'Finalisierung', moment: 'loading' },
   { id: 'aram', title: 'ARAM-Bank', moment: 'aramBench' },
   { id: 'game', title: 'Im Spiel', moment: 'game' },
-  { id: 'postgame', title: 'Nachspiel', moment: 'postgame' },
 ];
 
 interface Sources {
@@ -84,9 +81,7 @@ function load(): Promise<Sources> {
     const snapshot = await json<MetaSnapshot>(own ? '/dev-data/meta.json' : '/tests/golden/snapshot.json');
     const aram = await json<AramStat[]>('/tests/golden/aram-stats.json');
     await loadAssets(snapshot.patch);
-    // A sample pool, so the "Mein Pool" switch has something to show without a client.
-    const samplePool = new Set([122, 86, 875, 82, 516, 54, 24, 266, 103, 134, 412, 89, 64, 222, 51]);
-    const options = { aramStats: new Map(aram.map((s) => [s.championId, s])), pool: () => samplePool };
+    const options = { aramStats: new Map(aram.map((s) => [s.championId, s])) };
     const recordings = new Map<string, { frames: { frame?: GoldenFrame }[] }>();
     for (const name of ['live-tournament-draft', 'state-myban', 'build-demo', 'state-nachlock', 'state-final', 'state-aram-bench'])
       recordings.set(name, play(new DraftEngine(snapshot, options), await text(`/tests/recordings/${name}.jsonl`)));
@@ -136,7 +131,6 @@ export async function sceneView(id: string): Promise<ViewModel> {
         side: [],
         build: null,
         game: null,
-        postgame: null,
         emptyText: 'Das Fenster füllt sich von selbst, sobald ein Champ Select beginnt.',
         sampleNote: null,
       };
@@ -172,8 +166,6 @@ export async function sceneView(id: string): Promise<ViewModel> {
     }
     case 'game':
       return gameScene(a, s.plans, s.meta);
-    case 'postgame':
-      return postgameScene(a);
     default:
       throw new Error(`Unbekannte Szene ${id}`);
   }
@@ -232,7 +224,6 @@ function draftScene(
     side,
     build,
     game: null,
-    postgame: null,
     emptyText: null,
     sampleNote: SAMPLE,
   };
@@ -307,36 +298,7 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
     side: [],
     build,
     game,
-    postgame: null,
     emptyText: null,
     sampleNote: game.sample,
-  };
-}
-
-function postgameScene(a: GoldenAdapter): ViewModel {
-  // Sample history around a fixed evening, through the real postgame logic.
-  const now = new Date(2026, 10, 6, 22, 15);
-  const at = (daysAgo: number, h: number, m: number) => new Date(2026, 10, 6 - daysAgo, h, m).getTime();
-  const record = { championId: 122, rank: 2, candidates: 58, tiedWithFirst: true, fromTop3: true, at: at(0, 21, 40) };
-  const model = postgameModel(122, record, { win: true, items: [3071, 3047, 6333] }, [3071, 6333, 3053], (id) => ref(a, id).name);
-  const history = [
-    { championId: 122, win: true, fromTop3: true, at: at(0, 21, 40) },
-    { championId: 86, win: false, fromTop3: true, at: at(0, 20, 55) },
-    { championId: 17, win: false, fromTop3: false, at: at(1, 22, 10) },
-    { championId: 122, win: true, fromTop3: true, at: at(1, 21, 5) },
-  ];
-  const postgame: PostgameView = postgameView(model, history, (id) => ref(a, id), now);
-  return {
-    moment: 'postgame',
-    connection: CONNECTED,
-    data: DATA,
-    board: null,
-    main: { kind: 'none' },
-    side: [],
-    build: null,
-    game: null,
-    postgame,
-    emptyText: null,
-    sampleNote: 'Beispieldaten — das Nachspiel speichert ab M5 lokal mit.',
   };
 }

@@ -2,20 +2,15 @@
 // show. Pure state and computation — the events come in through live/bridge.ts, so a test can feed
 // recorded sessions and get the screen the window would show.
 //
-// Not yet here (each says so on screen instead of guessing): "Mein Pool" (needs masteries and match
-// history from the client), the postgame (needs the end-of-game result), Mayhem builds.
+// Left out on the user's word (07.11.2026): a postgame and "Mein Pool". Not yet here: Mayhem builds.
 
 import { DraftEngine } from '../core/engine';
 import { gameModel, championIdOf, enemyItemsOf, type LiveGameData } from '../core/game';
 import { aramStatsFrom } from '../core/mayhem';
-import { poolFor, type PoolInput } from '../core/pool';
-import { queueFromId, usesLanes } from '../core/model/queue';
 import { Lane, laneFromKey } from '../core/model/lane';
 import { MetaLookup } from '../core/model/metaLookup';
 import { TraitTable } from '../core/model/traits';
 import { momentOf, type GameflowPhase } from '../core/moment';
-import { PickRecorder, addToHistory, postgameModel, type HistoryEntry, type PickRecord, type PostgameModel } from '../core/postgame';
-import { postgameView } from '../data/postgameView';
 import { riotPlan, type RiotBuildPlan } from '../core/riotBuilds';
 import { SituationTracker, situationalSuggestions, situationsOf } from '../core/situational';
 import { LANE_NAMES, type BuildView, type ChampionRef, type DataStatus, type Lane as ViewLane, type ViewModel } from '../core/view';
@@ -66,47 +61,18 @@ export class LiveSession {
   private readonly situations = new SituationTracker();
   /** The own pick of the last draft, for the build and the game after it. */
   private picked: Picked | null = null;
-
-  private poolInput: PoolInput | null = null;
-  private readonly recorder = new PickRecorder();
-  /** Where the own pick stood in the suggestions when it was locked. */
-  private pickRecord: PickRecord | null = null;
-  private history: HistoryEntry[] = [];
-  private postgame: PostgameModel | null = null;
-  private endRecorded = true;
-
-  /** The stored history (newest first), from the last sessions. */
-  setHistory(history: HistoryEntry[]): void {
-    this.history = history;
-  }
-
-  /** Whether the client's result for the game just played is still to be read. */
-  get needsEndOfGame(): boolean {
-    return !this.endRecorded && (this.phase === 'WaitingForStats' || this.phase === 'PreEndOfGame' || this.phase === 'EndOfGame');
-  }
-
-  /** The game's result: postgame on screen, one more history entry. Returns the new history to keep. */
-  onEndOfGame(end: { championId: number; win: boolean; items: number[] }, now = Date.now()): HistoryEntry[] {
-    if (this.endRecorded) return this.history;
-    this.endRecorded = true;
-    const record = this.pickRecord?.championId === end.championId ? this.pickRecord : null;
-    const lane = this.picked?.championId === end.championId ? this.picked.lane : Lane.Unknown;
-    const plannedCore = this.planFor(end.championId, lane)?.core[0]?.ids ?? [];
-    this.postgame = postgameModel(end.championId, record, { win: end.win, items: end.items }, plannedCore, (id) => this.adapter.champion(id)?.name ?? `#${id}`);
-    this.history = addToHistory(this.history, { championId: end.championId, win: end.win, fromTop3: record?.fromTop3 ?? null, at: now });
-    return this.history;
-  }
+  /** 1.5's showUnowned: suggest champions the account does not own too. */
+  private showUnowned = false;
+  private selectable: readonly number[] | null = null;
 
   setData(set: DataSet): void {
     this.data = set;
     this.meta = new MetaLookup(set.meta);
     this.adapter = new GoldenAdapter(set.meta.champions);
-    const meta = this.meta;
     this.engine = new DraftEngine(set.meta, {
       traits: this.traits,
       aramStats: set.mayhem ? aramStatsFrom(set.mayhem) : undefined,
       aramRounded: !set.mayhem,
-      pool: (lane) => (this.poolInput ? poolFor(lane, this.poolInput, meta).champions : null),
     });
     // New numbers arrive only while idle (core/refresh), but a kept session is re-evaluated anyway.
     if (this.session) this.onSession(this.session);
@@ -124,12 +90,7 @@ export class LiveSession {
   onPhase(phase: string): void {
     // A new game: also when the app starts in the middle of one (no GameStart seen).
     const playing = (p: string | null) => p === 'GameStart' || p === 'InProgress' || p === 'Reconnect';
-    if (playing(phase) && !playing(this.phase)) {
-      this.situations.reset();
-      // A new game: its result is the one to read at the end.
-      this.endRecorded = false;
-      this.postgame = null;
-    }
+    if (playing(phase) && !playing(this.phase)) this.situations.reset();
     // Back in the lobby or the queue: the last draft is over for good.
     if (phase === 'Lobby' || phase === 'Matchmaking' || phase === 'None') this.lastActive = null;
     this.phase = phase;
@@ -148,40 +109,27 @@ export class LiveSession {
       // The session says so itself: bans.numBans is 0 in blind pick.
       this.noBans = (parsed.bans as { numBans?: number } | undefined)?.numBans === 0;
       this.rememberPick();
-      const record = this.recorder.observe(frame, now);
-      if (record) this.pickRecord = record;
-    } else {
-      this.recorder.reset();
     }
   }
 
-  /** Whether "Mein Pool" still lacks the player's mastery and games. */
-  get needsPool(): boolean {
-    return this.poolInput === null;
-  }
-
-  /**
-   * Mastery and recent games from the client. Games of modes without lanes count for no lane, so
-   * ARAM does not fill the top pool; the pool is a filter and never changes a score.
-   */
-  setPoolInput(input: { masteries: { championId: number; points: number }[]; games: { championId: number; lane: string; queueId: number }[] }): void {
-    this.poolInput = {
-      masteries: input.masteries,
-      games: input.games
-        .filter((g) => usesLanes(queueFromId(g.queueId)))
-        .map((g) => ({ championId: g.championId, lane: laneFromKey(g.lane) })),
-    };
+  /** The settings switch "auch nicht gekaufte Champions vorschlagen". */
+  setShowUnowned(on: boolean): void {
+    if (this.showUnowned === on) return;
+    this.showUnowned = on;
+    this.engine?.setSelectable(on || !this.selectable ? null : new Set(this.selectable));
     if (this.session) this.onSession(this.session, this.sessionAt);
   }
 
   /** Whether the champions the player may pick are still unknown for the running draft. */
   get needsSelectable(): boolean {
-    return !!this.engine && !!this.frame?.state.isActive && !this.engine.hasSelectable;
+    return !this.showUnowned && !!this.engine && !!this.frame?.state.isActive && !this.engine.hasSelectable;
   }
 
   /** The client's pickable-champion-ids; the own seat's picks are filtered to them from now on. */
   setSelectable(ids: readonly number[]): void {
     if (!this.engine || ids.length === 0) return;
+    this.selectable = ids;
+    if (this.showUnowned) return;
     this.engine.setSelectable(new Set(ids));
     if (this.session) this.onSession(this.session, this.sessionAt);
   }
@@ -208,7 +156,6 @@ export class LiveSession {
       side: [],
       build: null,
       game: null,
-      postgame: null,
       emptyText: null,
       sampleNote: null,
     };
@@ -217,15 +164,13 @@ export class LiveSession {
       return { ...base, main: { kind: 'none' }, emptyText: 'Die Zahlen werden geladen — beim allerersten Start dauert das einen Moment.' };
     }
 
-    if (moment === 'game' || moment === 'postgame') return this.gameMoment(base);
+    if (moment === 'game') return this.gameMoment(base);
 
     if (!frame) {
       return {
         ...base,
         main: { kind: 'lobby', title: 'Wartet auf das nächste Champ Select', lines: this.lobbyLines() },
         build: this.pickedBuild(),
-        // The last game's result stays in the game area until the next one.
-        postgame: this.postgame ? this.postgameView(now) : null,
         emptyText: 'Das Fenster füllt sich von selbst, sobald ein Champ Select beginnt.',
       };
     }
@@ -315,12 +260,6 @@ export class LiveSession {
     ];
   }
 
-  private postgameView(now: number): ViewModel['postgame'] {
-    if (!this.postgame) return null;
-    const ref = (id: number) => this.adapter.champion(id) ?? { id, key: '', name: `#${id}` };
-    return postgameView(this.postgame, this.history, ref, new Date(now));
-  }
-
   /** Blind pick and other modes without bans (kept through the loading screen). */
   private withoutBans(): boolean {
     return this.noBans;
@@ -378,18 +317,8 @@ export class LiveSession {
     const meta = this.meta!;
     const game = this.game;
     const build = this.pickedBuild();
-    if (base.moment === 'postgame' && this.postgame) {
-      return { ...base, build, postgame: this.postgameView(Date.now()) };
-    }
     if (!game) {
-      return {
-        ...base,
-        build,
-        emptyText:
-          base.moment === 'postgame'
-            ? 'Das Nachspiel (Ergebnis und Platz deines Picks) kommt in einem der nächsten Schritte.'
-            : 'Sobald das Spiel läuft: nächster Kauf gegen dein Gold, der nächste Skillpunkt und was die Gegner bauen.',
-      };
+      return { ...base, build, emptyText: 'Sobald das Spiel läuft: nächster Kauf gegen dein Gold, der nächste Skillpunkt und was die Gegner bauen.' };
     }
 
     const items = assets()?.itemInfo ?? new Map();

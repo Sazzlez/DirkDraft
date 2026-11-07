@@ -3,18 +3,14 @@
   import Tile from '../Tile.svelte';
   import PickRow from './PickRow.svelte';
   import HoverRow from './HoverRow.svelte';
-  import Segment from '../Segment.svelte';
 
   let { tile }: { tile: PickTileView } = $props();
 
-  let pool = $state<'all' | 'pool'>('all');
   let showAll = $state(false);
 
   const isBan = $derived(tile.kind === 'bans');
-  // The pool list is ranked over the pool alone (core/engine), not filtered out of the top eight.
-  const usePool = $derived(pool === 'pool' && !!tile.poolItems);
-  const items = $derived(usePool ? tile.poolItems! : tile.items);
-  const tied = $derived(usePool ? tile.poolTied : tile.tied);
+  const items = $derived(tile.items);
+  const tied = $derived(tile.tied);
   const head = $derived(items.slice(0, 3));
   const rest = $derived(items.slice(3));
   const tiedShown = $derived(Math.min(tied, 3));
@@ -22,21 +18,6 @@
 </script>
 
 <Tile title={tile.title} main>
-  {#snippet accessory()}
-    {#if !isBan && tile.poolAvailable}
-      <Segment
-        value={pool}
-        onChange={(v) => (pool = v)}
-        options={[
-          { id: 'all', label: 'Alle' },
-          { id: 'pool', label: 'Mein Pool' },
-        ]}
-        label="Filter"
-        small
-      />
-    {/if}
-  {/snippet}
-
   {#if !isBan}
     <div class="legend">
       <span><i class="lane"></i>Lane</span>
