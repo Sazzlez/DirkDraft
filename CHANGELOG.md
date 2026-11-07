@@ -3,7 +3,7 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
-## 2.0.0 — unveröffentlicht
+## 2.0.0 — 2026-11-07
 
 DirkDraft ist neu gebaut: neues Fenster, eigene Zahlen statt OP.GG, eine Spielansicht aus dem
 laufenden Spiel. Das Update kommt wie jedes andere („Version 2.0.0 ist da" → Jetzt aktualisieren);
