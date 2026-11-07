@@ -26,7 +26,10 @@ internal static class RiotCommand
             "collect" => await CollectAsync(options, ct),
             "show" => await ShowAsync(positional, options, ct),
             "status" => Status(options),
-            "export" => Export(options),
+            "export" => await ExportAsync(options, ct),
+            "mayhem" => await MayhemAsync(options, ct),
+            "queues" => await QueuesAsync(options, ct),
+            "export-mayhem" => ExportMayhem(options),
             _ => Usage(),
         };
     }
@@ -34,10 +37,15 @@ internal static class RiotCommand
     private static int Usage()
     {
         Console.Error.WriteLine("""
-            riot collect [--minutes 30] [--tiers gold,platinum] [--state build/riot-state.json.gz] [--key-file datei]
-            riot show <champion> <lane> [--tier gold] [--state build/riot-state.json.gz]
+            riot collect [--minutes 30] [--tiers platinum] [--state build/riot-state.json.gz] [--key-file datei]
+            riot show <champion> <lane> [--tier platinum] [--state build/riot-state.json.gz]
             riot status [--state build/riot-state.json.gz]
-            riot export --out builds.json [--keep 6] [--min-games 3] [--state build/riot-state.json.gz]
+            riot export --out builds.json [--meta-out meta.json] [--situational-out situational.json] [--tier platinum] [--keep 6] [--min-games 3]
+                        [--min-patch-games 2000] [--state build/riot-state.json.gz]
+            riot mayhem --riot-id "Name#TAG" [--queues 2400] [--minutes 30] [--state build/mayhem-state.json.gz] [--key-file datei]
+            riot queues --riot-id "Name#TAG" [--games 20] [--key-file datei]
+            riot export-mayhem --out mayhem.json [--keep 6] [--min-games 3] [--min-patch-games 500] [--state build/mayhem-state.json.gz]
+            (Riot-ID auch über die Umgebungsvariable RIOT_ID)
             """);
         return 2;
     }
@@ -50,6 +58,9 @@ internal static class RiotCommand
 
         Console.WriteLine($"Patch {state.Patch} · {state.Platform} · Stand {state.Tally.CollectedAtUtc.ToLocalTime():dd.MM. HH:mm}");
         Console.WriteLine($"Spiele: {string.Join(", ", state.Tally.Matches.Select(m => $"{m.Key} {m.Value:N0}"))} · angesehen {state.Seen.Count:N0}");
+        Console.WriteLine(
+            $"Draft-Zählung: {state.Meta.Matches:N0} Spiele, {state.Meta.Duels.Count:N0} Duelle, {state.Meta.Duos.Count:N0} Duos"
+            + (state.Previous is { } previous ? $" · Vorpatch {previous.Patch}: {previous.Meta.Matches:N0} Spiele" : string.Empty));
 
         foreach (var lane in Lanes.All)
         {
@@ -72,7 +83,7 @@ internal static class RiotCommand
     /// Long tails of one-off starting buys and skill orders are what the state needs to keep
     /// counting correctly and what nobody needs to download.
     /// </summary>
-    private static int Export(Dictionary<string, string> options)
+    private static async Task<int> ExportAsync(Dictionary<string, string> options, CancellationToken ct)
     {
         var statePath = options.GetValueOrDefault("state", Path.Combine("build", "riot-state.json.gz"));
         if (!options.TryGetValue("out", out var outPath) || outPath.Length == 0)
@@ -80,26 +91,164 @@ internal static class RiotCommand
 
         var keep = int.Parse(options.GetValueOrDefault("keep", "6"), CultureInfo.InvariantCulture);
         var minimum = int.Parse(options.GetValueOrDefault("min-games", "3"), CultureInfo.InvariantCulture);
+        var enough = int.Parse(options.GetValueOrDefault("min-patch-games", "2000"), CultureInfo.InvariantCulture);
+        var tier = options.GetValueOrDefault("tier", "platinum");
 
         var state = CollectorState.Load(statePath);
+
+        // Early in a patch the new count is thin; until it has enough games the previous patch's
+        // numbers are published instead, under their own patch, so the app knows they trail.
+        var (patch, buildFile, metaCounts, situationalCounts) = (state.Patch, state.Tally, state.Meta, state.Situational);
+        if (state.Meta.Matches < enough && state.Previous is { } previous && previous.Meta.Matches > state.Meta.Matches)
+        {
+            (patch, buildFile, metaCounts, situationalCounts) = (previous.Patch, previous.Tally, previous.Meta, previous.Situational);
+            Console.WriteLine($"Patch {state.Patch} hat erst {state.Meta.Matches:N0} Spiele — veröffentlicht wird Patch {patch} ({metaCounts.Matches:N0}).");
+        }
+
         var tally = new RiotBuildTally();
-        tally.Add(state.Tally.Builds);
+        tally.Add(buildFile.Builds);
 
         var file = new RiotBuildFile
         {
-            Patch = state.Tally.Patch,
-            Platform = state.Tally.Platform,
-            CollectedAtUtc = state.Tally.CollectedAtUtc,
-            Matches = state.Tally.Matches,
+            Patch = patch,
+            Platform = buildFile.Platform,
+            CollectedAtUtc = buildFile.CollectedAtUtc,
+            Matches = buildFile.Matches,
             Builds = tally.Export(keep, minimum),
         };
+
+        Write(outPath, JsonSerializer.Serialize(file, RiotBuildJson.Default.RiotBuildFile));
+        Console.WriteLine($"{file.Builds.Count} Champion-Lanes, {new FileInfo(outPath).Length / 1024:N0} KB → {outPath}");
+
+        var metaPath = options.GetValueOrDefault("meta-out", string.Empty);
+        var situationalPath = options.GetValueOrDefault("situational-out", string.Empty);
+        if (metaPath.Length == 0 && situationalPath.Length == 0)
+            return 0;
+
+        using var http = new HttpClient();
+        var version = await LatestVersionAsync(http, ct);
+        var champions = RiotMetaExport.ParseDataDragon(
+            await http.GetStringAsync($"{DataDragon}/cdn/{version}/data/en_US/champion.json", ct));
+
+        if (situationalPath.Length > 0)
+        {
+            var situational = new RiotSituationalTally();
+            situational.Add(situationalCounts);
+            var classOf = champions.Where(c => c.Tags.Count > 0).ToDictionary(c => c.Id, c => c.Tags[0]);
+            var situationalFile = situational.File(patch, buildFile.Platform, buildFile.CollectedAtUtc, classOf);
+            Write(situationalPath, JsonSerializer.Serialize(situationalFile, RiotSituationalJson.Default.RiotSituationalFile));
+            Console.WriteLine($"Situativ: {situationalFile.Rows.Count:N0} Champion-Zeilen, {situationalFile.Classes.Count:N0} Klassen-Zeilen, {new FileInfo(situationalPath).Length / 1024:N0} KB → {situationalPath}");
+        }
+
+        if (metaPath.Length > 0)
+        {
+            var meta = new RiotMetaTally();
+            meta.Add(metaCounts);
+
+            var snapshot = RiotMetaExport.Build(meta.Rows(), champions, patch, tier, buildFile.Platform, buildFile.CollectedAtUtc, DateTimeOffset.UtcNow);
+            Write(metaPath, JsonSerializer.Serialize(snapshot, MetaJson.Default.MetaSnapshot));
+            Console.WriteLine(
+                $"Meta: {snapshot.Games:N0} Spiele, {snapshot.LaneStats.Count} Lane-Zeilen, {snapshot.Matchups.Count:N0} Duelle, "
+                + $"{snapshot.Synergies.Count:N0} Duos, Duell-Linie {snapshot.CompleteDuelSlope:0.00} / {snapshot.CompleteDuelOffset:+0.000;-0.000;0.000}"
+                + $"aus {snapshot.CompleteDuelSample:N0}, {new FileInfo(metaPath).Length / 1024:N0} KB → {metaPath}");
+        }
+
+        return 0;
+
+        static void Write(string path, string text)
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(path));
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+            File.WriteAllText(path, text);
+        }
+    }
+
+    private static MayhemOptions? MayhemOptionsFrom(Dictionary<string, string> options)
+    {
+        var riotId = options.GetValueOrDefault("riot-id") is { Length: > 0 } given ? given : Environment.GetEnvironmentVariable("RIOT_ID")?.Trim() ?? string.Empty;
+        if (!riotId.Contains('#'))
+            return null;
+
+        return new MayhemOptions
+        {
+            SeedRiotId = riotId,
+            Queues = [.. options.GetValueOrDefault("queues", "2400")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(queue => int.Parse(queue, CultureInfo.InvariantCulture))],
+            Duration = TimeSpan.FromMinutes(double.Parse(options.GetValueOrDefault("minutes", "30"), CultureInfo.InvariantCulture)),
+        };
+    }
+
+    private static async Task<int> MayhemAsync(Dictionary<string, string> options, CancellationToken ct)
+    {
+        var key = ReadKey(options);
+        var mayhem = MayhemOptionsFrom(options);
+        if (key is null || mayhem is null)
+        {
+            Console.Error.WriteLine(key is null ? "Kein Schlüssel: RIOT_API_KEY setzen oder --key-file angeben." : "Keine Riot-ID: --riot-id \"Name#TAG\" oder RIOT_ID setzen.");
+            return key is null ? 2 : 0;
+        }
+
+        var statePath = options.GetValueOrDefault("state", Path.Combine("build", "mayhem-state.json.gz"));
+        using var http = new HttpClient();
+        var catalog = await LatestItemsAsync(http, ct);
+        Console.WriteLine($"Mayhem · Patch {catalog.Version} · Queues {string.Join(", ", mayhem.Queues)} · Laufzeit {mayhem.Duration.TotalMinutes:0.#} min.");
+
+        var state = MayhemState.Load(statePath);
+        using var api = new RiotApiClient(key);
+        var collector = new MayhemCollector(api, catalog, mayhem, line => Console.WriteLine($"{DateTime.Now:HH:mm:ss} {line}"));
+        var report = await collector.RunAsync(state, s => s.Save(statePath), ct);
+        Console.WriteLine(
+            $"Fertig: {report.Counted} Mayhem-Spiele gezählt, {report.Skipped} übersprungen, {report.Requests} Abrufe "
+            + $"({report.Throttled}× gedrosselt) in {report.Elapsed:h\\:mm\\:ss}. Bestand: {state.Tally.Games:N0} Spiele → {statePath}");
+        return 0;
+    }
+
+    private static async Task<int> QueuesAsync(Dictionary<string, string> options, CancellationToken ct)
+    {
+        var key = ReadKey(options);
+        var mayhem = MayhemOptionsFrom(options);
+        if (key is null || mayhem is null)
+            return Usage();
+
+        using var http = new HttpClient();
+        var catalog = await LatestItemsAsync(http, ct);
+        using var api = new RiotApiClient(key);
+        var collector = new MayhemCollector(api, catalog, mayhem);
+        var games = int.Parse(options.GetValueOrDefault("games", "20"), CultureInfo.InvariantCulture);
+        foreach (var (queue, count) in (await collector.RecentQueuesAsync(games, ct)).OrderByDescending(q => q.Value))
+            Console.WriteLine($"Queue {queue,5}: {count,3} Spiele  {QueueKinds.FromId(queue).Display()}");
+        return 0;
+    }
+
+    private static int ExportMayhem(Dictionary<string, string> options)
+    {
+        if (!options.TryGetValue("out", out var outPath) || outPath.Length == 0)
+            return Usage();
+
+        var statePath = options.GetValueOrDefault("state", Path.Combine("build", "mayhem-state.json.gz"));
+        var keep = int.Parse(options.GetValueOrDefault("keep", "6"), CultureInfo.InvariantCulture);
+        var minimum = int.Parse(options.GetValueOrDefault("min-games", "3"), CultureInfo.InvariantCulture);
+        var enough = int.Parse(options.GetValueOrDefault("min-patch-games", "500"), CultureInfo.InvariantCulture);
+        var state = MayhemState.Load(statePath);
+
+        var source = state.Tally.Games < enough && state.Previous is { } previous && previous.Games > state.Tally.Games ? previous : state.Tally;
+        if (source.Games == 0)
+        {
+            Console.WriteLine("Noch keine Mayhem-Spiele gezählt — keine mayhem.json.");
+            return 0;
+        }
+
+        var tally = new RiotMayhemTally();
+        tally.Add(source);
+        var file = tally.Export(source.Patch, source.Platform, source.CollectedAtUtc, keep, minimum);
 
         var directory = Path.GetDirectoryName(Path.GetFullPath(outPath));
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
-
-        File.WriteAllText(outPath, JsonSerializer.Serialize(file, RiotBuildJson.Default.RiotBuildFile));
-        Console.WriteLine($"{file.Builds.Count} Champion-Lanes, {new FileInfo(outPath).Length / 1024:N0} KB → {outPath}");
+        File.WriteAllText(outPath, JsonSerializer.Serialize(file, RiotMayhemJson.Default.RiotMayhemFile));
+        Console.WriteLine($"Mayhem: {file.Games:N0} Spiele, {file.Champions.Count} Champions, {file.Augments.Count:N0} Augment-Zeilen, {new FileInfo(outPath).Length / 1024:N0} KB → {outPath}");
         return 0;
     }
 
@@ -114,7 +263,7 @@ internal static class RiotCommand
 
         var statePath = options.GetValueOrDefault("state", Path.Combine("build", "riot-state.json.gz"));
         var minutes = double.Parse(options.GetValueOrDefault("minutes", "30"), CultureInfo.InvariantCulture);
-        var tiers = options.GetValueOrDefault("tiers", "gold,platinum")
+        var tiers = options.GetValueOrDefault("tiers", "platinum")
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(tier => tier.ToLowerInvariant())
             .ToList();
@@ -123,13 +272,20 @@ internal static class RiotCommand
         var catalog = await LatestItemsAsync(http, ct);
         Console.WriteLine($"Patch {catalog.Version}, {catalog.Count} Items. Ränge: {string.Join(", ", tiers)}. Laufzeit {minutes:0.#} min.");
 
+        // Class and CC data for the situational items; the traits file sits in the repository.
+        var champions = RiotMetaExport.ParseDataDragon(
+            await http.GetStringAsync($"{DataDragon}/cdn/{catalog.Version}/data/en_US/champion.json", ct));
+        var traits = TraitTable.Load(options.GetValueOrDefault("traits", Path.Combine("data", "champion_traits.json")));
+        Console.WriteLine($"{champions.Count} Champions, {traits.Count} mit Trait-Daten.");
+
         var state = CollectorState.Load(statePath);
         using var api = new RiotApiClient(key);
         var collector = new RiotCollector(
             api,
             catalog,
             new CollectorOptions { Tiers = tiers, Duration = TimeSpan.FromMinutes(minutes) },
-            line => Console.WriteLine($"{DateTime.Now:HH:mm:ss} {line}"));
+            line => Console.WriteLine($"{DateTime.Now:HH:mm:ss} {line}"),
+            new ChampionStatics(champions.ToDictionary(champion => champion.Id), traits));
 
         var report = await collector.RunAsync(state, s => s.Save(statePath), ct);
 

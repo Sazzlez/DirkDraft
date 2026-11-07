@@ -28,8 +28,37 @@ public sealed record ParticipantBuild(
     int Boots,
     IReadOnlyList<int> Items,
     int SupportChoice,
-    string SkillOrder)
+    string SkillOrder,
+    int TeamId = 0,
+    long PhysicalDamage = 0,
+    long MagicDamage = 0,
+    long TrueDamage = 0,
+    IReadOnlyList<int>? Augments = null,
+    IReadOnlyList<long>? ItemTimesMs = null,
+    long BootsTimeMs = 0)
 {
+    /// <summary>When each of <see cref="Items"/> was bought, ms into the game; empty without a timeline.</summary>
+    public IReadOnlyList<long> ItemTimes => ItemTimesMs ?? [];
+
+    /// <summary>
+    /// The finished items and boots owned at a moment — what an enemy's inventory looked like when
+    /// someone else bought. Sales are left out: a finished item is rarely sold, and the live game view
+    /// sees the same picture.
+    /// </summary>
+    public IEnumerable<int> OwnedAt(long timeMs)
+    {
+        if (Boots > 0 && BootsTimeMs <= timeMs)
+            yield return Boots;
+        for (var i = 0; i < Items.Count && i < ItemTimes.Count; i++)
+        {
+            if (ItemTimes[i] <= timeMs)
+                yield return Items[i];
+        }
+    }
+
+    /// <summary>The augments picked, in order (Mayhem); empty elsewhere.</summary>
+    public IReadOnlyList<int> PickedAugments => Augments ?? [];
+
     /// <summary>
     /// The order the three basic abilities were maxed in, e.g. <c>QEW</c>: by the point at which
     /// each got its fifth rank, an ability never maxed after the ones that were, those by points.
@@ -72,7 +101,36 @@ public sealed record ParticipantBuild(
 /// Whether the game says anything about builds: Solo/Duo, at least fifteen minutes, not ended by
 /// an early surrender. A remake or a four-minute surrender is a game nobody finished building in.
 /// </param>
-public sealed record MatchReading(string Patch, long CreatedAtMs, int QueueId, bool Counts, IReadOnlyList<ParticipantBuild> Participants);
+/// <param name="Bans">
+/// The champions banned in the game, each once (both teams may ban the same one); empty when the
+/// match carries no ban list.
+/// </param>
+public sealed record MatchReading(
+    string Patch,
+    long CreatedAtMs,
+    int QueueId,
+    bool Counts,
+    IReadOnlyList<ParticipantBuild> Participants,
+    IReadOnlyList<int>? Bans = null,
+    IReadOnlyDictionary<int, long[]>? TeamGold = null)
+{
+    public IReadOnlyList<int> BannedChampions => Bans ?? [];
+
+    /// <summary>
+    /// Gold lead over the enemy team at a moment, from the timeline's minute frames (the last frame at
+    /// or before it); 0 without frames.
+    /// </summary>
+    public long GoldLead(int teamId, long timeMs)
+    {
+        if (TeamGold is null || !TeamGold.TryGetValue(teamId, out var own))
+            return 0;
+        var enemy = TeamGold.Where(pair => pair.Key != teamId).Select(pair => pair.Value).FirstOrDefault();
+        if (enemy is null || own.Length == 0)
+            return 0;
+        var minute = (int)Math.Clamp(timeMs / 60_000, 0, Math.Min(own.Length, enemy.Length) - 1);
+        return own[minute] - enemy[minute];
+    }
+}
 
 /// <summary>
 /// Reads Riot's MATCH-V5 match and timeline answers into <see cref="ParticipantBuild"/>s. The match
@@ -130,12 +188,16 @@ public static class RiotMatchReader
         {
             var lane = Lanes.FromLcu(Text(participant, "teamPosition"));
             var championId = Int(participant, "championId");
-            if (lane == Lane.Unknown || championId <= 0)
+            // Mayhem has no lanes; everywhere else a player without one is a broken record.
+            if (championId <= 0 || (lane == Lane.Unknown && !IsMayhem(queue)))
                 continue;
 
             var id = Int(participant, "participantId");
             var own = events.Where(e => e.ParticipantId == id).ToList();
             var purchases = Purchases(own);
+            var boots = purchases.FirstOrDefault(p => items.IsBoots(p.ItemId));
+            // First purchase of each finished item, in order, with its time.
+            var finished = purchases.Where(p => items.IsFinished(p.ItemId)).DistinctBy(p => p.ItemId).ToList();
 
             var finalItems = Enumerable.Range(0, 7).Select(slot => Int(participant, $"item{slot}")).Where(item => item > 0).ToList();
 
@@ -146,16 +208,52 @@ public static class RiotMatchReader
                 Runes: Runes(participant),
                 Spells: [.. new[] { Int(participant, "summoner1Id"), Int(participant, "summoner2Id") }.Where(spell => spell > 0).Order()],
                 Starters: [.. purchases.Where(p => p.Timestamp <= StartingWindowMs && !items.IsTrinket(p.ItemId)).Select(p => p.ItemId).Order()],
-                Boots: purchases.Select(p => p.ItemId).FirstOrDefault(items.IsBoots),
-                Items: [.. purchases.Select(p => p.ItemId).Where(items.IsFinished).Distinct()],
+                Boots: boots?.ItemId ?? 0,
+                Items: [.. finished.Select(p => p.ItemId)],
                 // The quest item is handed over, not bought, so the end-of-game inventory is the
                 // one place it reliably shows up.
                 SupportChoice: finalItems.FirstOrDefault(items.IsSupportChoice),
-                SkillOrder: SkillOrder(own)));
+                SkillOrder: SkillOrder(own),
+                // Riot numbers the blue side 1 to 5 and the red side 6 to 10; the explicit team id
+                // wins where the match carries one.
+                TeamId: Int(participant, "teamId") is > 0 and var team ? team : id <= 5 ? 100 : 200,
+                PhysicalDamage: Long(participant, "physicalDamageDealtToChampions"),
+                MagicDamage: Long(participant, "magicDamageDealtToChampions"),
+                TrueDamage: Long(participant, "trueDamageDealtToChampions"),
+                Augments: [.. Enumerable.Range(1, 6).Select(slot => Int(participant, $"playerAugment{slot}")).Where(augment => augment > 0)],
+                ItemTimesMs: [.. finished.Select(p => p.Timestamp)],
+                BootsTimeMs: boots?.Timestamp ?? 0));
         }
 
-        return new MatchReading(patch, created, queue, counts, participants);
+        return new MatchReading(patch, created, queue, counts, participants, Bans(info), TeamGold(timeline.RootElement, info));
     }
+
+    /// <summary>Every champion banned in the game, once — a ban by both teams is still one ban.</summary>
+    private static List<int> Bans(JsonElement info)
+    {
+        var bans = new List<int>();
+        if (!info.TryGetProperty("teams", out var teams) || teams.ValueKind != JsonValueKind.Array)
+            return bans;
+
+        foreach (var team in teams.EnumerateArray())
+        {
+            if (!team.TryGetProperty("bans", out var list) || list.ValueKind != JsonValueKind.Array)
+                continue;
+
+            foreach (var ban in list.EnumerateArray())
+            {
+                // -1 is "no ban" (a missed turn); anything below 1 is no champion.
+                var champion = Int(ban, "championId");
+                if (champion > 0 && !bans.Contains(champion))
+                    bans.Add(champion);
+            }
+        }
+
+        return bans;
+    }
+
+    private static long Long(JsonElement element, string property)
+        => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var number) ? Math.Max(0, number) : 0;
 
     private static (string Patch, long CreatedAtMs, int QueueId, bool Counts) Header(JsonElement info)
     {
@@ -168,8 +266,19 @@ public static class RiotMatchReader
             && participants.ValueKind == JsonValueKind.Array
             && participants.EnumerateArray().Any(p => p.TryGetProperty("gameEndedInEarlySurrender", out var e) && e.ValueKind == JsonValueKind.True);
 
-        return (patch, created, queue, queue == RankedSoloQueue && duration >= MinimumDurationSeconds && !earlySurrender && patch.Length > 0);
+        var longEnough = queue == RankedSoloQueue ? duration >= MinimumDurationSeconds
+            : IsMayhem(queue) && duration >= MinimumMayhemSeconds;
+        return (patch, created, queue, longEnough && !earlySurrender && patch.Length > 0);
     }
+
+    /// <summary>ARAM Mayhem's queue ids, as <see cref="QueueKinds"/> knows them.</summary>
+    public static bool IsMayhem(int queueId) => QueueKinds.FromId(queueId) == QueueKind.AramMayhem;
+
+    /// <summary>
+    /// Ten minutes: a Mayhem game is short by design, and below this it was a remake or a stomp
+    /// nobody finished building in.
+    /// </summary>
+    public const int MinimumMayhemSeconds = 10 * 60;
 
     /// <summary>
     /// Every purchase that stood, in order. An undo takes back the most recent purchase of that
@@ -228,6 +337,49 @@ public static class RiotMatchReader
             => style.TryGetProperty("selections", out var selections)
                 ? [.. selections.EnumerateArray().Select(s => Int(s, "perk")).Where(perk => perk > 0)]
                 : [];
+    }
+
+    /// <summary>
+    /// Each team's total gold per minute frame. Every player is counted, also those without a lane
+    /// (who are left out of the build rows): the lead is the team's, not the laners'.
+    /// </summary>
+    private static Dictionary<int, long[]>? TeamGold(JsonElement timeline, JsonElement info)
+    {
+        if (!timeline.TryGetProperty("info", out var timelineInfo) || !timelineInfo.TryGetProperty("frames", out var frames) || frames.ValueKind != JsonValueKind.Array)
+            return null;
+
+        var teamOf = new Dictionary<string, int>(StringComparer.Ordinal);
+        if (info.TryGetProperty("participants", out var participants) && participants.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var participant in participants.EnumerateArray())
+            {
+                var id = Int(participant, "participantId");
+                var team = Int(participant, "teamId") is > 0 and var t ? t : id <= 5 ? 100 : 200;
+                teamOf[id.ToString(System.Globalization.CultureInfo.InvariantCulture)] = team;
+            }
+        }
+
+        var count = frames.GetArrayLength();
+        if (count == 0 || teamOf.Count == 0)
+            return null;
+
+        var gold = teamOf.Values.Distinct().ToDictionary(team => team, _ => new long[count]);
+        var index = 0;
+        foreach (var frame in frames.EnumerateArray())
+        {
+            if (frame.TryGetProperty("participantFrames", out var players) && players.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var player in players.EnumerateObject())
+                {
+                    if (teamOf.TryGetValue(player.Name, out var team) && player.Value.TryGetProperty("totalGold", out var total) && total.TryGetInt64(out var value))
+                        gold[team][index] += value;
+                }
+            }
+
+            index++;
+        }
+
+        return gold;
     }
 
     private static List<TimelineEvent> Events(JsonElement timeline)

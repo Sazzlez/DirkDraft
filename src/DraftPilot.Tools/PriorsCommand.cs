@@ -33,14 +33,19 @@ internal static class PriorsCommand
 
     public static int Run(string[] args)
     {
-        var snapshot = new SnapshotStore().Load();
+        // --snapshot reads a file (e.g. the collector's meta.json) instead of the app's stored one.
+        var fileIndex = Array.FindIndex(args, arg => arg.Equals("--snapshot", StringComparison.OrdinalIgnoreCase));
+        var snapshot = fileIndex >= 0 && fileIndex + 1 < args.Length
+            ? System.Text.Json.JsonSerializer.Deserialize(File.ReadAllText(args[fileIndex + 1]), MetaJson.Default.MetaSnapshot)
+            : new SnapshotStore().Load();
         if (snapshot is null)
         {
-            Console.Error.WriteLine("Kein Snapshot vorhanden. Erst 'update' ausführen.");
+            Console.Error.WriteLine("Kein Snapshot vorhanden. Erst 'update' ausführen oder --snapshot angeben.");
             return 1;
         }
 
         var repetitions = args.Length > 1 && int.TryParse(args[1], out var parsed) && parsed > 0 ? parsed : 200;
+        var complete = snapshot.Source == "riot";
 
         // The baselines the next data update would write. This file may predate them, and the
         // experiment has to shrink towards what the app will actually shrink towards.
@@ -80,9 +85,14 @@ internal static class PriorsCommand
         // The stored edges are the three most notable opponents per list — a selection — and both
         // halves of a selected row share it. This test therefore cannot see the selection effect and
         // reads far too low a weight for them; guidecheck measures it against unselected lists.
-        Console.WriteLine("Achtung Matchup: Die gespeicherten Duelle sind eine AUSWAHL (die auffälligsten Gegner),");
-        Console.WriteLine("und beide Hälften einer ausgewählten Zeile teilen diese Auswahl. Das Optimum unten ist");
-        Console.WriteLine("deshalb zu niedrig; maßgeblich ist 'guidecheck' gegen die vollständigen Listen.");
+        // Own data counts every duel; there is no selection for the halves to share.
+        if (!complete)
+        {
+            Console.WriteLine("Achtung Matchup: Die gespeicherten Duelle sind eine AUSWAHL (die auffälligsten Gegner),");
+            Console.WriteLine("und beide Hälften einer ausgewählten Zeile teilen diese Auswahl. Das Optimum unten ist");
+            Console.WriteLine("deshalb zu niedrig; maßgeblich ist 'guidecheck' gegen die vollständigen Listen.");
+        }
+
         Report("Matchup", matchups, Shrinkage.MatchupPrior, repetitions);
         Report("Synergie", synergies, Shrinkage.SynergyPrior, repetitions);
 

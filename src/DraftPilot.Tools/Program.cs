@@ -112,6 +112,9 @@ try
         case "riot":
             return await RiotCommand.RunAsync(args, lifetime.Token);
 
+        case "golden":
+            return GoldenCommand.Run(args);
+
         default:
             Console.Error.WriteLine($"Unbekannter Befehl: {args[0]}");
             PrintUsage();

@@ -69,7 +69,9 @@ public sealed class ItemCatalog
                     Purchasable: !item.TryGetProperty("gold", out var g) || !g.TryGetProperty("purchasable", out var p) || p.ValueKind != JsonValueKind.False,
                     Tags: Strings(item, "tags"),
                     From: Ids(item, "from"),
-                    Into: Ids(item, "into"));
+                    Into: Ids(item, "into"),
+                    Armor: Stat(item, "FlatArmorMod"),
+                    MagicResist: Stat(item, "FlatSpellBlockMod"));
             }
         }
 
@@ -121,5 +123,28 @@ public sealed class ItemCatalog
     private static List<int> Ids(JsonElement item, string property)
         => [.. Strings(item, property).Select(text => int.TryParse(text, out var id) ? id : 0).Where(id => id > 0)];
 
-    private sealed record Entry(string Name, int Gold, bool Purchasable, List<string> Tags, List<int> From, List<int> Into);
+    /// <summary>Armor the item gives (Data Dragon stats.FlatArmorMod), 0 when unknown.</summary>
+    public int Armor(int id) => _items.TryGetValue(id, out var entry) ? entry.Armor : 0;
+
+    /// <summary>Magic resist the item gives (stats.FlatSpellBlockMod), 0 when unknown.</summary>
+    public int MagicResist(int id) => _items.TryGetValue(id, out var entry) ? entry.MagicResist : 0;
+
+    /// <summary>Whether the item heals its owner from damage dealt: Riot's LifeSteal or SpellVamp tag.</summary>
+    public bool IsSustain(int id)
+        => _items.TryGetValue(id, out var entry)
+            && entry.Tags.Any(tag => tag.Equals("LifeSteal", StringComparison.OrdinalIgnoreCase) || tag.Equals("SpellVamp", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>What counts of an enemy's inventory for the situations: finished items and boots.</summary>
+    public bool CountsForSituation(int id) => IsFinished(id) || IsBoots(id);
+
+    private static int Stat(JsonElement item, string name)
+        => item.TryGetProperty("stats", out var stats)
+            && stats.ValueKind == JsonValueKind.Object
+            && stats.TryGetProperty(name, out var value)
+            && value.ValueKind == JsonValueKind.Number
+            && value.TryGetDouble(out var number)
+                ? (int)Math.Round(number)
+                : 0;
+
+    private sealed record Entry(string Name, int Gold, bool Purchasable, List<string> Tags, List<int> From, List<int> Into, int Armor, int MagicResist);
 }
