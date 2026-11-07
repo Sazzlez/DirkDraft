@@ -11,7 +11,8 @@ namespace DraftPilot.Core.Data;
 public static class RiotGames
 {
     public const string Format =
-        "[5 × Blau, 5 × Rot, Blau gewinnt (1/0), Dauer in vollen Minuten, Gold-Vorsprung Blau nach 15 Minuten]; " +
+        "[5 × Blau, 5 × Rot, Blau gewinnt (1/0), Dauer in vollen Minuten, Gold-Vorsprung Blau nach 15 Minuten, " +
+        "Platz des befragten Spielers (0–9, −1 keiner), seine Mastery-Punkte auf dem Champion]; " +
         "je Spieler Champion × 8 + Lane + 1 (Lane −1 unbekannt, 0 Top, 1 Jungle, 2 Mid, 3 ADC, 4 Support), " +
         "je Seite nach Lane sortiert. Dauer und Gold 0, wo unbekannt.";
 
@@ -19,22 +20,33 @@ public static class RiotGames
     public const long EarlyLeadAtMs = 15 * 60_000;
 
     /// <summary>
-    /// One game as thirteen numbers (<see cref="Format"/>); null when it does not split into two
+    /// One game as fifteen numbers (<see cref="Format"/>); null when it does not split into two
     /// sides of five. Duration and the early lead let the measurement tell early from late
-    /// line-ups — what a champion is worth depends on when the game is decided.
+    /// line-ups — what a champion is worth depends on when the game is decided. The mastery of one
+    /// player (<paramref name="masteryIndex"/> into <see cref="MatchReading.Participants"/>, −1 for
+    /// none) lets it tell a champion's strength from the experience of the players who pick it.
     /// </summary>
-    public static int[]? Encode(MatchReading game)
+    public static int[]? Encode(MatchReading game, int masteryIndex = -1, int masteryPoints = 0)
     {
         var sides = game.Participants.GroupBy(player => player.TeamId).OrderBy(side => side.Key).ToList();
         if (sides.Count != 2 || sides.Any(side => side.Count() != 5))
             return null;
 
-        var line = new int[13];
+        var asked = masteryIndex >= 0 && masteryIndex < game.Participants.Count ? game.Participants[masteryIndex] : null;
+        var line = new int[15];
+        line[13] = -1;
         var index = 0;
         foreach (var side in sides)
         {
             foreach (var player in side.OrderBy(player => (int)player.Lane).ThenBy(player => player.ChampionId))
+            {
+                if (ReferenceEquals(player, asked))
+                {
+                    line[13] = index;
+                    line[14] = Math.Max(0, masteryPoints);
+                }
                 line[index++] = player.ChampionId * 8 + (int)player.Lane + 1;
+            }
         }
 
         line[10] = sides[0].First().Win ? 1 : 0;

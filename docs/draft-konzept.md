@@ -128,15 +128,41 @@ Unter jedem Vorschlag die Teile in Punkten, damit klar ist, warum er oben steht.
 „Meta +1,2 · Lane +1,8 · Botlane 2v2 +0,9 · Team +0,4 · Comp −0,3“. Oben im Draft steht die Chance des
 ganzen Teams („Dein Draft: 52 % → mit Nami 54 %“). Die Begründungszeilen bleiben eine Zeile je Grund.
 
-## 5. Fahrplan
+## 5. Über das Fundament hinaus (Phase 4, vom Nutzer gewünscht am 07.11.2026)
+
+1. **Winrates gehören auch den Spielern.** Seltene, schwere Champions haben hohe Winrates, weil sie
+   fast nur ihre Mains spielen. Der Sammler fragt deshalb in jedem vierten Spiel einen Spieler nach
+   seiner Mastery auf seinem Champion, und zwar den mit dem seltensten Champion. Das kostet etwa ein
+   Zehntel der Spiele pro Stunde. Daraus wird gemessen, wie viel der Winrate auf Erfahrung zurückgeht,
+   und die Zahl wird für einen durchschnittlichen Spieler korrigiert.
+2. **Vorausschau im Draft:** Bewertet wird auch, was nach deinem Pick wahrscheinlich noch kommt: ob
+   dein Lane-Partner noch einen guten Partner findet, Picks für mehrere Lanes, verbleibende Counter.
+   Gerechnet wird mit Pickraten und den gemessenen Teilen. Prüfen lässt es sich nur an der Logik,
+   weil die Spieldaten keine Pick-Reihenfolge enthalten.
+3. **Runen, Zauber und Start passend zum Matchup:** Der Sammler zählt je Champion, Lane und
+   Lane-Gegner Keystone, Nebenbaum, den Zauber neben Blitz und die Startitems. Gezeigt wird, was gegen
+   genau diesen Gegner deutlich öfter genommen wird, wie bei den situativen Items.
+4. *(Benachbarte Ränge als Vorwissen — nicht gewünscht.)*
+5. **Lane-Zuordnung der Gegner** an den echten Lanes der Spiel-Zeilen prüfen und nachstellen.
+6. **Patchtag:** Champions, deren Werte sich laut Data Dragon geändert haben, bekommen am Patchtag
+   breitere Fehlerbalken. Wie viel breiter, wird beim nächsten Patchwechsel gemessen.
+7. **Erfolgskontrolle:** In den Spiel-Zeilen wird geprüft, ob Spieler, deren Champion das Modell im
+   jeweiligen Draft weit oben gesehen hätte, wirklich öfter gewinnen.
+
+Die Daten für 1 und 3 sammelt der Sammler seit dem 07.11.2026 (Phase 1c). 5, 6 und 7 brauchen nur die
+Spiel-Zeilen. Alles zusammen kommt mit 2.1.
+
+## 6. Fahrplan
 
 | Phase | Was | Wann |
 |---|---|---|
 | 1 | Sammler: Gegner-Paare über alle Lanes (`versus`, darin Botlane-Kreuz und Jungle gegen Laner), je Spiel eine Zeile (zehn Champions mit Lane, Sieger, Dauer, Gold nach 15 Minuten). Die App rechnet noch wie heute. | **erledigt 07.11.2026** — zählt ab dem Lauf, der in der Nacht auf den 08.11. startet |
 | 1b | Sammler behält die Spiel-Zeilen der letzten drei Patches (für Synergien und Counter über Patches) | **erledigt 07.11.2026** |
+| 1c | Sammler: Mastery-Stichprobe in der Spiel-Zeile (Punkt 1), Runen, Zauber und Start je Lane-Gegner (Punkt 3) | **erledigt 07.11.2026** |
 | 2 | Messen: A, B und C an Prüfspielen vergleichen; Glättungen, Paar-Arten je Lane, Comp-Merkmale, früh/spät; dazu, wie viel der beste Pick gegenüber dem Durchschnitt bringt. Ergebnis in `docs/modellpruefung.md` | nach 5–7 Tagen Sammeln (~150.000 Spiele) |
-| 3 | Bestes Modell in Sammler-Export und App, Anzeige der Teile, Team-Chance, Tests, Release 2.1 | nach Phase 2, Release nur mit deinem OK |
+| 3 | Bestes Modell in Sammler-Export und App, Anzeige der Teile, Team-Chance, dazu Phase 4 (Punkte 1–3, 5–7), Tests, Release 2.1 | nach Phase 2, Release nur mit deinem OK |
 
 Bleibt wie es ist: Daten nur aus eigener Zählung, keine Namen anderer Spieler, kein automatisches
-Picken oder Bannen, Pool und Verlauf bleiben draußen. Keine zusätzlichen Riot-Abfragen: Alles kommt
-aus den Spielen, die der Sammler ohnehin liest.
+Picken oder Bannen, Pool und Verlauf bleiben draußen. Zusätzliche Riot-Abfragen nur für die
+Mastery-Stichprobe (eine in jedem vierten Spiel); alles andere kommt aus den Spielen, die der Sammler
+ohnehin liest.

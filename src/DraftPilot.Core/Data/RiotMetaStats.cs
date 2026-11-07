@@ -290,6 +290,9 @@ public sealed class RiotMetaTally
 
     private static DamageType DamageOf(ChampionCount count) => DamageOf(count.Physical, count.Magic);
 
+    /// <summary>Games counted so far for the champion on that lane.</summary>
+    public int LaneGames(int championId, Lane lane) => _lanes.TryGetValue((championId, lane), out var count) ? count.Games : 0;
+
     /// <summary>The champion's damage type as counted so far; Unknown before its first game.</summary>
     public DamageType DamageOfChampion(int championId)
         => _champions.TryGetValue(championId, out var count) ? DamageOf(count) : DamageType.Unknown;

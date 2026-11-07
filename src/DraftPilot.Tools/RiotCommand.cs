@@ -40,7 +40,7 @@ internal static class RiotCommand
             riot collect [--minutes 30] [--tiers platinum] [--state build/riot-state.json.gz] [--key-file datei]
             riot show <champion> <lane> [--tier platinum] [--state build/riot-state.json.gz]
             riot status [--state build/riot-state.json.gz]
-            riot export --out builds.json [--meta-out meta.json] [--situational-out situational.json] [--games-out games.json.gz] [--tier platinum] [--keep 6] [--min-games 3]
+            riot export --out builds.json [--meta-out meta.json] [--situational-out situational.json] [--games-out games.json.gz] [--matchups-out matchups.json.gz] [--tier platinum] [--keep 6] [--min-games 3]
                         [--min-patch-games 2000] [--state build/riot-state.json.gz]
             riot aram [--queues 450] [--tiers platinum] [--minutes 30] [--state build/aram-state.json.gz] [--key-file datei]
             riot queues --riot-id "Name#TAG" [--games 20] [--key-file datei]
@@ -117,6 +117,28 @@ internal static class RiotCommand
                 JsonSerializer.Serialize(gzip, gamesFile, RiotGamesJson.Default.RiotGamesFile);
             }
             Console.WriteLine($"Spiel-Liste: {string.Join(", ", gamesFile.Patches.Select(p => $"{p.Games.Count:N0} Spiele von Patch {p.Patch}"))}, {new FileInfo(gamesPath).Length / 1024:N0} KB → {gamesPath}");
+        }
+
+        // What players take against each lane opponent, this patch — not published yet (run artifact).
+        var matchupsPath = options.GetValueOrDefault("matchups-out", string.Empty);
+        if (matchupsPath.Length > 0)
+        {
+            var matchupFile = new RiotMatchupFile
+            {
+                Patch = state.Patch,
+                Platform = state.Platform,
+                CollectedAtUtc = state.Tally.CollectedAtUtc,
+                Rows = state.Matchups ?? [],
+            };
+            var directory = Path.GetDirectoryName(Path.GetFullPath(matchupsPath));
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+            using (var stream = File.Create(matchupsPath))
+            using (var gzip = new System.IO.Compression.GZipStream(stream, System.IO.Compression.CompressionLevel.Optimal))
+            {
+                JsonSerializer.Serialize(gzip, matchupFile, RiotMatchupJson.Default.RiotMatchupFile);
+            }
+            Console.WriteLine($"Matchup-Builds: {matchupFile.Rows.Count:N0} Zeilen von Patch {matchupFile.Patch}, {new FileInfo(matchupsPath).Length / 1024:N0} KB → {matchupsPath}");
         }
 
         // Early in a patch the new count is thin; until it has enough games the previous patch's

@@ -154,7 +154,8 @@ public sealed class RiotMetaTests
         var line = RiotGames.Encode(Game(blueWins: false, red: [21, 22, 23, 24, 25]));
 
         Assert.NotNull(line);
-        Assert.Equal(13, line.Length);
+        Assert.Equal(15, line.Length);
+        Assert.Equal((-1, 0), (line[13], line[14]));           // nobody asked about
         Assert.Equal((1, Lane.Top), RiotGames.Decode(line[0]));
         Assert.Equal((5, Lane.Support), RiotGames.Decode(line[4]));
         Assert.Equal((24, Lane.Adc), RiotGames.Decode(line[8]));
@@ -173,6 +174,52 @@ public sealed class RiotMetaTests
         var lopsided = Game(blueWins: true);
         var four = new MatchReading(lopsided.Patch, 0, 420, true, [.. lopsided.Participants.Skip(1)]);
         Assert.Null(RiotGames.Encode(four));
+    }
+
+    [Fact]
+    public void AGameLine_MarksTheAskedPlayerByHisPlaceInTheLine()
+    {
+        // Red listed support first: the asked player (participant 5, red support) sorts to place 9.
+        var game = Game(blueWins: true, red: [15, 11, 12, 13, 14], redLanes: [Lane.Support, Lane.Top, Lane.Jungle, Lane.Mid, Lane.Adc]);
+
+        var line = RiotGames.Encode(game, masteryIndex: 5, masteryPoints: 123_456)!;
+
+        Assert.Equal((15, Lane.Support), RiotGames.Decode(line[9]));
+        Assert.Equal(9, line[13]);
+        Assert.Equal(123_456, line[14]);
+        Assert.Equal(123_456, RiotMatchReader.MasteryPoints("""{"championId":15,"championLevel":7,"championPoints":123456}"""));
+        Assert.Null(RiotMatchReader.MasteryPoints("{}"));
+    }
+
+    [Fact]
+    public void MatchupBuilds_CountKeystoneTreeSpellAndStartAgainstTheLaneOpponent()
+    {
+        static ParticipantBuild Player(int champion, Lane lane, bool win, int team, int keystone, int spell, int starter)
+            => new(champion, lane, win, [8000, keystone, 1, 2, 3, 8400, 4, 5, 0, 0, 0], [4, spell], [starter, 2003], 0, [], 0, string.Empty, team);
+        var players = new List<ParticipantBuild>();
+        for (var i = 0; i < 5; i++)
+            players.Add(Player(1 + i, Lanes.All[i], true, 100, keystone: 8010, spell: 14, starter: 1054));
+        for (var i = 0; i < 5; i++)
+            players.Add(Player(11 + i, Lanes.All[i], false, 200, keystone: 8005, spell: 12, starter: 1055));
+        var tally = new RiotMatchupTally();
+        tally.Add(new MatchReading("16.22", 0, 420, true, players));
+        tally.Add(new MatchReading("16.22", 0, 420, true, players));
+
+        var rows = tally.Export();
+
+        // Top 1 against 11: keystone 8010, tree 8400, Ignite (Flash left out), Doran's Shield and a potion.
+        var mine = rows.Where(r => r[0] == 1 && r[2] == 11).ToList();
+        Assert.Equal(5, mine.Count);
+        Assert.Contains(mine, r => r[3] == RiotMatchupTally.Keystone && r[4] == 8010 && r[5] == 2 && r[6] == 2);
+        Assert.Contains(mine, r => r[3] == RiotMatchupTally.SecondaryTree && r[4] == 8400);
+        Assert.Contains(mine, r => r[3] == RiotMatchupTally.Spell && r[4] == 14);
+        Assert.DoesNotContain(mine, r => r[3] == RiotMatchupTally.Spell && r[4] == RiotMatchupTally.Flash);
+        Assert.Contains(mine, r => r[3] == RiotMatchupTally.Starter && r[4] == 1054);
+        Assert.Contains(rows, r => r[0] == 11 && r[2] == 1 && r[4] == 8005 && r[6] == 0);
+
+        var again = new RiotMatchupTally();
+        again.Add(rows);
+        Assert.Equivalent(rows, again.Export(), strict: true);
     }
 
     [Fact]

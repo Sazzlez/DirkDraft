@@ -107,18 +107,18 @@ jobs:
       - name: Exportieren
         if: steps.key.outputs.present == 'true'
         run: |
-          dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export --state "$STATE" --tier "$TIERS" --out publish/builds.json --meta-out publish/meta.json --situational-out publish/situational.json --games-out private/games.json.gz
+          dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export --state "$STATE" --tier "$TIERS" --out publish/builds.json --meta-out publish/meta.json --situational-out publish/situational.json --games-out private/games.json.gz --matchups-out private/matchups.json.gz
           dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export-aram --state "$ARAM_STATE" --out publish/aram.json
 
-      # The counted games themselves (ten champions and a result each, no players, no match ids), for
-      # measuring the draft model (docs/draft-konzept.md). Not published: an artifact of the run, kept
-      # a week; each run's file holds the whole patch so far.
+      # The counted games themselves (ten champions and a result each, no players, no match ids) and
+      # the matchup builds, for measuring the draft model (docs/draft-konzept.md). Not published: an
+      # artifact of the run, kept a week; each run's files hold everything counted so far.
       - name: Spiel-Liste sichern
         if: steps.key.outputs.present == 'true' && hashFiles('private/games.json.gz') != ''
         uses: actions/upload-artifact@v4
         with:
           name: games
-          path: private/games.json.gz
+          path: private/
           retention-days: 7
           compression-level: 0
 

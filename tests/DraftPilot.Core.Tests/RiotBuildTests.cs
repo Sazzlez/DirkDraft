@@ -248,6 +248,8 @@ public class RiotBuildTests
                 "/lol/match/v5/matches/EUW1_300" => Ok(WithPlayers(current, "r")),
                 _ when path.EndsWith("/timeline", StringComparison.Ordinal) => Ok(Timeline),
                 "/lol/match/v5/matches/EUW1_200" => Ok(old),
+                _ when path.StartsWith("/lol/champion-mastery/v4/champion-masteries/by-puuid/r", StringComparison.Ordinal)
+                    => Ok("""{"championLevel":5,"championPoints":4321}"""),
                 _ => new HttpResponseMessage(HttpStatusCode.NotFound),
             };
         });
@@ -257,7 +259,7 @@ public class RiotBuildTests
         var saves = 0;
 
         using var stop = new CancellationTokenSource();
-        var collector = new RiotCollector(api, Items, new CollectorOptions { Tiers = ["gold"], Duration = TimeSpan.FromMinutes(1), MaxPages = 1 });
+        var collector = new RiotCollector(api, Items, new CollectorOptions { Tiers = ["gold"], Duration = TimeSpan.FromMinutes(1), MaxPages = 1, MasteryEvery = 2 });
         var report = await collector.RunAsync(state, _ => saves++, stop.Token);
 
         Assert.Equal(2, report.Counted);                       // EUW1_100 once, however often it is listed, and the lead's EUW1_300
@@ -271,19 +273,26 @@ public class RiotBuildTests
         Assert.Equal(10, state.Tally.Builds.Count);
         Assert.Equal(2, state.Meta.Matches);
         Assert.Equal(2, state.Games.Count);                     // one line per counted game, for measuring the model
-        Assert.All(state.Games, line => Assert.Equal(13, line.Length));
+        Assert.All(state.Games, line => Assert.Equal(15, line.Length));
+        // The second counted game (the lead's) had one player asked about, by his place in the line.
+        Assert.Equal(-1, state.Games[0][13]);
+        Assert.InRange(state.Games[1][13], 0, 9);
+        Assert.Equal(4321, state.Games[1][14]);
+        Assert.Single(handler.Paths, path => path.Contains("/champion-mastery/", StringComparison.Ordinal));
+        Assert.NotEmpty(state.Matchups);
 
         // The player with two games this season was never asked about.
-        Assert.DoesNotContain(handler.Paths, path => path.Contains("/by-puuid/p2/", StringComparison.Ordinal));
+        Assert.DoesNotContain(handler.Paths, path => path.Contains("/matches/by-puuid/p2/", StringComparison.Ordinal));
 
         // All ten of p1's game were asked as leads; nobody from the lead's own game was.
-        Assert.Equal(10, handler.Paths.Count(path => path.Contains("/by-puuid/q", StringComparison.Ordinal)));
-        Assert.DoesNotContain(handler.Paths, path => path.Contains("/by-puuid/r", StringComparison.Ordinal));
+        Assert.Equal(10, handler.Paths.Count(path => path.Contains("/matches/by-puuid/q", StringComparison.Ordinal)));
+        Assert.DoesNotContain(handler.Paths, path => path.Contains("/matches/by-puuid/r", StringComparison.Ordinal));
 
         // Nothing that names a player is in what gets stored.
         var stored = System.Text.Json.JsonSerializer.Serialize(state, CollectorJson.Default.CollectorState);
         Assert.DoesNotContain("\"p1\"", stored);
         Assert.DoesNotContain("\"q2\"", stored);
+        Assert.DoesNotContain("\"r1\"", stored);
     }
 
     [Fact]

@@ -30,6 +30,13 @@ public sealed record CollectorOptions
 
     /// <summary>Stop after this many league pages even with time left; null for no limit.</summary>
     public int? MaxPages { get; init; }
+
+    /// <summary>
+    /// In every n-th counted game one player is asked about (champion mastery, one request): the one on
+    /// the rarest champion so far, where a win rate is most likely carried by its mains. 4 costs about
+    /// a tenth of the games per hour; 0 asks nobody.
+    /// </summary>
+    public int MasteryEvery { get; init; } = 4;
 }
 
 public sealed record CollectorReport(int Counted, int Skipped, int Requests, int Throttled, TimeSpan Elapsed);
@@ -77,6 +84,9 @@ public sealed class CollectorState
     /// </summary>
     public List<int[]> Games { get; set; } = [];
 
+    /// <summary>What players take against each lane opponent, see <see cref="RiotMatchupTally"/>; this patch only.</summary>
+    public List<int[]> Matchups { get; set; } = [];
+
     /// <summary>
     /// The game lines of the patches before, newest first, at most <see cref="OlderPatchesKept"/>.
     /// Synergies and counters hang on the champions' kits more than on the patch, so the measurement
@@ -116,6 +126,7 @@ public sealed class CollectorState
         Meta = new RiotMetaCounts();
         Situational = [];
         Games = [];
+        Matchups = [];
     }
 
     public static CollectorState Load(string path)
@@ -229,6 +240,8 @@ public sealed class RiotCollector(
                 entry is not null && statics!.Traits.For(entry.Key).HasHardCc);
         }
         var games = new List<int[]>(state.Games);
+        var matchups = new RiotMatchupTally();
+        matchups.Add(state.Matchups ?? []);
         var seen = new HashSet<long>(state.Seen);
         var matches = new Dictionary<string, int>(state.Tally.Matches, StringComparer.OrdinalIgnoreCase);
 
@@ -259,6 +272,7 @@ public sealed class RiotCollector(
             state.Meta = meta.Export();
             state.Situational = situational.Export();
             state.Games = games;
+            state.Matchups = matchups.Export();
             save(state);
         }
 
@@ -340,7 +354,26 @@ public sealed class RiotCollector(
                     foreach (var participant in reading.Participants)
                         tally.Add(participant, tier);
                     meta.Add(reading);
-                    if (RiotGames.Encode(reading) is { } line)
+                    matchups.Add(reading);
+
+                    var (masteryIndex, masteryPoints) = (-1, 0);
+                    if (options.MasteryEvery > 0 && (counted + 1) % options.MasteryEvery == 0)
+                    {
+                        var puuids = RiotMatchReader.PlayerIds(matchJson);
+                        if (puuids.Count == reading.Participants.Count)
+                        {
+                            // The rarest champion on its lane so far; the first of equals.
+                            var rarest = Enumerable.Range(0, reading.Participants.Count)
+                                .MinBy(i => meta.LaneGames(reading.Participants[i].ChampionId, reading.Participants[i].Lane));
+                            var sampled = reading.Participants[rarest];
+                            var masteryJson = await api.GetAsync(options.Platform,
+                                $"/lol/champion-mastery/v4/champion-masteries/by-puuid/{Uri.EscapeDataString(puuids[rarest])}/by-champion/{sampled.ChampionId}", ct).ConfigureAwait(false);
+                            if (masteryJson is not null && RiotMatchReader.MasteryPoints(masteryJson) is { } points)
+                                (masteryIndex, masteryPoints) = (rarest, points);
+                        }
+                    }
+
+                    if (RiotGames.Encode(reading, masteryIndex, masteryPoints) is { } line)
                         games.Add(line);
                     if (statics is not null)
                         situational.Add(reading, Profile, items);
