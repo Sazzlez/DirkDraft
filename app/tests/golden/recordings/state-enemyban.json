@@ -1,0 +1,1287 @@
+{
+  "kind": "recording",
+  "name": "state-enemyban.jsonl",
+  "frames": [
+    {
+      "line": 0,
+      "isNewDraft": true,
+      "frame": {
+        "state": {
+          "isActive": true,
+          "phase": "planning",
+          "queue": "unknown",
+          "usesLanes": true,
+          "localCellId": 0,
+          "allies": [
+            {
+              "cellId": 0,
+              "index": 0,
+              "isAlly": true,
+              "lockedChampionId": 122,
+              "hoverChampionId": 0,
+              "assignedLane": "top",
+              "effectiveChampionId": 122,
+              "isLocked": true
+            },
+            {
+              "cellId": 1,
+              "index": 1,
+              "isAlly": true,
+              "lockedChampionId": 64,
+              "hoverChampionId": 0,
+              "assignedLane": "jungle",
+              "effectiveChampionId": 64,
+              "isLocked": true
+            },
+            {
+              "cellId": 2,
+              "index": 2,
+              "isAlly": true,
+              "lockedChampionId": 103,
+              "hoverChampionId": 0,
+              "assignedLane": "mid",
+              "effectiveChampionId": 103,
+              "isLocked": true
+            },
+            {
+              "cellId": 3,
+              "index": 3,
+              "isAlly": true,
+              "lockedChampionId": 222,
+              "hoverChampionId": 0,
+              "assignedLane": "adc",
+              "effectiveChampionId": 222,
+              "isLocked": true
+            },
+            {
+              "cellId": 4,
+              "index": 4,
+              "isAlly": true,
+              "lockedChampionId": 412,
+              "hoverChampionId": 0,
+              "assignedLane": "support",
+              "effectiveChampionId": 412,
+              "isLocked": true
+            }
+          ],
+          "enemies": [
+            {
+              "cellId": 5,
+              "index": 0,
+              "isAlly": false,
+              "lockedChampionId": 24,
+              "hoverChampionId": 0,
+              "assignedLane": "unknown",
+              "effectiveChampionId": 24,
+              "isLocked": true
+            },
+            {
+              "cellId": 6,
+              "index": 1,
+              "isAlly": false,
+              "lockedChampionId": 234,
+              "hoverChampionId": 0,
+              "assignedLane": "unknown",
+              "effectiveChampionId": 234,
+              "isLocked": true
+            },
+            {
+              "cellId": 7,
+              "index": 2,
+              "isAlly": false,
+              "lockedChampionId": 134,
+              "hoverChampionId": 0,
+              "assignedLane": "unknown",
+              "effectiveChampionId": 134,
+              "isLocked": true
+            },
+            {
+              "cellId": 8,
+              "index": 3,
+              "isAlly": false,
+              "lockedChampionId": 0,
+              "hoverChampionId": 0,
+              "assignedLane": "unknown",
+              "effectiveChampionId": 0,
+              "isLocked": false
+            },
+            {
+              "cellId": 9,
+              "index": 4,
+              "isAlly": false,
+              "lockedChampionId": 0,
+              "hoverChampionId": 0,
+              "assignedLane": "unknown",
+              "effectiveChampionId": 0,
+              "isLocked": false
+            }
+          ],
+          "allyBans": [],
+          "enemyBans": [],
+          "unavailable": [
+            24,
+            64,
+            103,
+            122,
+            134,
+            222,
+            234,
+            412
+          ],
+          "turn": {
+            "cellId": 7,
+            "isAlly": false,
+            "isLocalPlayer": false,
+            "action": "ban"
+          },
+          "bench": [],
+          "benchEnabled": false,
+          "rerollsRemaining": 0
+        },
+        "target": {
+          "cellId": 0,
+          "action": "ban",
+          "isFollowingTurn": false
+        },
+        "predictions": {
+          "enemies": [
+            {
+              "cellId": 5,
+              "championId": 24,
+              "lane": "top",
+              "confidence": 0.9739996078415973,
+              "probabilities": [
+                0.9739996078415973,
+                0.0036993587217706634,
+                0.001013562194171645,
+                0.010301661712152663,
+                0.010985809530306387
+              ],
+              "isManual": false,
+              "isUncertain": false
+            },
+            {
+              "cellId": 6,
+              "championId": 234,
+              "lane": "jungle",
+              "confidence": 0.9764779363970313,
+              "probabilities": [
+                0.0014395736844062114,
+                0.9764779363970313,
+                0.0010036566647957021,
+                0.01020069638358083,
+                0.010878136870184026
+              ],
+              "isManual": false,
+              "isUncertain": false
+            },
+            {
+              "cellId": 7,
+              "championId": 134,
+              "lane": "mid",
+              "confidence": 0.9173024843303959,
+              "probabilities": [
+                0.00036248440095496145,
+                0.00029314615325546294,
+                0.9173024843303959,
+                0.07214738640800865,
+                0.00989449870738404
+              ],
+              "isManual": false,
+              "isUncertain": false
+            },
+            {
+              "cellId": 8,
+              "championId": 0,
+              "lane": "adc",
+              "confidence": 0.453675127748128,
+              "probabilities": [
+                0.01209916703652009,
+                0.00976477936397032,
+                0.040340148405317834,
+                0.453675127748128,
+                0.4841207774460621
+              ],
+              "isManual": false,
+              "isUncertain": true
+            },
+            {
+              "cellId": 9,
+              "championId": 0,
+              "lane": "support",
+              "confidence": 0.4841207774460621,
+              "probabilities": [
+                0.01209916703652009,
+                0.00976477936397032,
+                0.040340148405317834,
+                0.453675127748128,
+                0.4841207774460621
+              ],
+              "isManual": false,
+              "isUncertain": true
+            }
+          ],
+          "allies": [
+            {
+              "cellId": 0,
+              "championId": 122,
+              "lane": "top",
+              "confidence": 1,
+              "probabilities": [
+                1,
+                0,
+                0,
+                0,
+                0
+              ],
+              "isManual": false,
+              "isUncertain": false
+            },
+            {
+              "cellId": 1,
+              "championId": 64,
+              "lane": "jungle",
+              "confidence": 1,
+              "probabilities": [
+                0,
+                1,
+                0,
+                0,
+                0
+              ],
+              "isManual": false,
+              "isUncertain": false
+            },
+            {
+              "cellId": 2,
+              "championId": 103,
+              "lane": "mid",
+              "confidence": 1,
+              "probabilities": [
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "isManual": false,
+              "isUncertain": false
+            },
+            {
+              "cellId": 3,
+              "championId": 222,
+              "lane": "adc",
+              "confidence": 1,
+              "probabilities": [
+                0,
+                0,
+                0,
+                1,
+                0
+              ],
+              "isManual": false,
+              "isUncertain": false
+            },
+            {
+              "cellId": 4,
+              "championId": 412,
+              "lane": "support",
+              "confidence": 1,
+              "probabilities": [
+                0,
+                0,
+                0,
+                0,
+                1
+              ],
+              "isManual": false,
+              "isUncertain": false
+            }
+          ]
+        },
+        "picks": {
+          "cellId": 0,
+          "lane": "top",
+          "action": "pick",
+          "tied": 4,
+          "decimals": 0,
+          "items": [
+            {
+              "championId": 86,
+              "name": "Garen",
+              "score": 0.5511628740287156,
+              "uncertainty": 0.03923476104117221,
+              "uncertaintyPoints": 0.9808690260293053,
+              "reasons": [
+                {
+                  "text": "A-Tier auf Toplane",
+                  "tone": "neutral",
+                  "hint": "OP.GGs eigene Einstufung f\u00FCr Toplane, von OP (st\u00E4rkste) \u00FCber S bis D (schw\u00E4chste). Z\u00E4hlt nicht in die Prozentzahl: sie mischt Winrate und Pickrate, und die Winrate steckt schon drin."
+                },
+                {
+                  "text": "55 % WR gegen Jax",
+                  "tone": "pro",
+                  "hint": "Gemessen auf Toplane: 57,0 % gegen Jax aus 2.259 Games. Gez\u00E4hlt wird 55,0 % \u2014 ein einzelnes Duell \u00FCber so wenige Games ist zum gro\u00DFen Teil Zufall, deshalb r\u00FCckt die Zahl zu dem, was die Lane-St\u00E4rke beider Champs ohnehin erwarten l\u00E4sst. 50 % w\u00E4re ausgeglichen.\n\nStammt aus OP.GGs Liste der auff\u00E4lligsten Gegner. Solche Werte sind eine Auswahl der Extreme und fallen bei neuer Messung erfahrungsgem\u00E4\u00DF deutlich zur Mitte zur\u00FCck \u2014 auch das steckt in der gez\u00E4hlten Zahl."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "laneStrength",
+                  "logOdds": 0.015075569325894751,
+                  "points": 0.3768892331473688,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Lane-St\u00E4rke"
+                },
+                {
+                  "kind": "laneMatchup",
+                  "logOdds": 0.17641888325615573,
+                  "points": 4.410472081403894,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Matchup"
+                },
+                {
+                  "kind": "enemyTeam",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Enemy-Team"
+                },
+                {
+                  "kind": "synergy",
+                  "logOdds": 0.01387583649937388,
+                  "points": 0.346895912484347,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Synergie"
+                },
+                {
+                  "kind": "composition",
+                  "logOdds": 0,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Teamcomp"
+                }
+              ]
+            },
+            {
+              "championId": 27,
+              "name": "Singed",
+              "score": 0.5401280936721067,
+              "uncertainty": 0.04293409375203553,
+              "uncertaintyPoints": 1.0733523438008883,
+              "reasons": [
+                {
+                  "text": "53,2 % WR auf Toplane",
+                  "tone": "pro",
+                  "hint": "Aus 4.427 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+                },
+                {
+                  "text": "S-Tier auf Toplane",
+                  "tone": "neutral",
+                  "hint": "OP.GGs eigene Einstufung f\u00FCr Toplane, von OP (st\u00E4rkste) \u00FCber S bis D (schw\u00E4chste). Z\u00E4hlt nicht in die Prozentzahl: sie mischt Winrate und Pickrate, und die Winrate steckt schon drin."
+                },
+                {
+                  "text": "56 % WR gegen Jax",
+                  "tone": "pro",
+                  "hint": "Gemessen auf Toplane: 58,0 % gegen Jax aus 376 Games. Gez\u00E4hlt wird 55,9 % \u2014 ein einzelnes Duell \u00FCber so wenige Games ist zum gro\u00DFen Teil Zufall, deshalb r\u00FCckt die Zahl zu dem, was die Lane-St\u00E4rke beider Champs ohnehin erwarten l\u00E4sst. 50 % w\u00E4re ausgeglichen.\n\nStammt aus OP.GGs Liste der auff\u00E4lligsten Gegner. Solche Werte sind eine Auswahl der Extreme und fallen bei neuer Messung erfahrungsgem\u00E4\u00DF deutlich zur Mitte zur\u00FCck \u2014 auch das steckt in der gez\u00E4hlten Zahl. Abgeleitet aus der Gegenrichtung \u2014 gemessen wurde Jax gegen diesen Champ."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "laneStrength",
+                  "logOdds": 0.1295038146765825,
+                  "points": 3.2375953669145625,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Lane-St\u00E4rke"
+                },
+                {
+                  "kind": "laneMatchup",
+                  "logOdds": 0.03135452105555396,
+                  "points": 0.783863026388849,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Matchup"
+                },
+                {
+                  "kind": "enemyTeam",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Enemy-Team"
+                },
+                {
+                  "kind": "synergy",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Synergie"
+                },
+                {
+                  "kind": "composition",
+                  "logOdds": 0,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Teamcomp"
+                }
+              ]
+            },
+            {
+              "championId": 36,
+              "name": "Dr. Mundo",
+              "score": 0.5377237080501714,
+              "uncertainty": 0.04264510406726764,
+              "uncertaintyPoints": 1.066127601681691,
+              "reasons": [
+                {
+                  "text": "54 % WR gegen Jax",
+                  "tone": "pro",
+                  "hint": "Gemessen auf Toplane: 58,0 % gegen Jax aus 775 Games. Gez\u00E4hlt wird 53,8 % \u2014 ein einzelnes Duell \u00FCber so wenige Games ist zum gro\u00DFen Teil Zufall, deshalb r\u00FCckt die Zahl zu dem, was die Lane-St\u00E4rke beider Champs ohnehin erwarten l\u00E4sst. 50 % w\u00E4re ausgeglichen.\n\nStammt aus OP.GGs Liste der auff\u00E4lligsten Gegner. Solche Werte sind eine Auswahl der Extreme und fallen bei neuer Messung erfahrungsgem\u00E4\u00DF deutlich zur Mitte zur\u00FCck \u2014 auch das steckt in der gez\u00E4hlten Zahl."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "laneStrength",
+                  "logOdds": 0.017338089411674293,
+                  "points": 0.43345223529185734,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Lane-St\u00E4rke"
+                },
+                {
+                  "kind": "laneMatchup",
+                  "logOdds": 0.1270485922257692,
+                  "points": 3.17621480564423,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Matchup"
+                },
+                {
+                  "kind": "enemyTeam",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Enemy-Team"
+                },
+                {
+                  "kind": "synergy",
+                  "logOdds": 0.006795445946533185,
+                  "points": 0.16988614866332963,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Synergie"
+                },
+                {
+                  "kind": "composition",
+                  "logOdds": 0,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Teamcomp"
+                }
+              ]
+            },
+            {
+              "championId": 74,
+              "name": "Heimerdinger",
+              "score": 0.5366911524401844,
+              "uncertainty": 0.0489143096032808,
+              "uncertaintyPoints": 1.22285774008202,
+              "reasons": [
+                {
+                  "text": "53 % WR gegen Jax",
+                  "tone": "pro",
+                  "hint": "Gemessen auf Toplane: 59,0 % gegen Jax aus 338 Games. Gez\u00E4hlt wird 53,3 % \u2014 ein einzelnes Duell \u00FCber so wenige Games ist zum gro\u00DFen Teil Zufall, deshalb r\u00FCckt die Zahl zu dem, was die Lane-St\u00E4rke beider Champs ohnehin erwarten l\u00E4sst. 50 % w\u00E4re ausgeglichen.\n\nStammt aus OP.GGs Liste der auff\u00E4lligsten Gegner. Solche Werte sind eine Auswahl der Extreme und fallen bei neuer Messung erfahrungsgem\u00E4\u00DF deutlich zur Mitte zur\u00FCck \u2014 auch das steckt in der gez\u00E4hlten Zahl."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "laneStrength",
+                  "logOdds": 0.04997681688076287,
+                  "points": 1.2494204220190719,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Lane-St\u00E4rke"
+                },
+                {
+                  "kind": "laneMatchup",
+                  "logOdds": 0.07532860299224929,
+                  "points": 1.8832150748062322,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Matchup"
+                },
+                {
+                  "kind": "enemyTeam",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Enemy-Team"
+                },
+                {
+                  "kind": "synergy",
+                  "logOdds": 0.021723484994535424,
+                  "points": 0.5430871248633856,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Synergie"
+                },
+                {
+                  "kind": "composition",
+                  "logOdds": 0,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Teamcomp"
+                }
+              ]
+            },
+            {
+              "championId": 133,
+              "name": "Quinn",
+              "score": 0.5343552492395164,
+              "uncertainty": 0.04136035050298049,
+              "uncertaintyPoints": 1.0340087625745122,
+              "reasons": [
+                {
+                  "text": "52,1 % WR auf Toplane",
+                  "tone": "pro",
+                  "hint": "Aus 1.713 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+                },
+                {
+                  "text": "ihre Backline steht frei",
+                  "tone": "pro",
+                  "hint": "Im gegnerischen Team steht bisher niemand vorne, der Schaden abfangen kann. Ein Champ, der gezielt auf die hinteren Reihen geht, kommt dort ohne Umweg hin."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "laneStrength",
+                  "logOdds": 0.08515345490622814,
+                  "points": 2.1288363726557034,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Lane-St\u00E4rke"
+                },
+                {
+                  "kind": "laneMatchup",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Matchup"
+                },
+                {
+                  "kind": "enemyTeam",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Enemy-Team"
+                },
+                {
+                  "kind": "synergy",
+                  "logOdds": 0.004484417639433286,
+                  "points": 0.11211044098583214,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Synergie"
+                },
+                {
+                  "kind": "composition",
+                  "logOdds": 0.048,
+                  "points": 1.2,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Teamcomp"
+                }
+              ]
+            },
+            {
+              "championId": 127,
+              "name": "Lissandra",
+              "score": 0.5315716367738732,
+              "uncertainty": 0.04993263978133194,
+              "uncertaintyPoints": 1.2483159945332984,
+              "reasons": [
+                {
+                  "text": "53,2 % WR auf Toplane",
+                  "tone": "pro",
+                  "hint": "Aus 1.132 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "laneStrength",
+                  "logOdds": 0.1295877479138156,
+                  "points": 3.2396936978453903,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Lane-St\u00E4rke"
+                },
+                {
+                  "kind": "laneMatchup",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Matchup"
+                },
+                {
+                  "kind": "enemyTeam",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Enemy-Team"
+                },
+                {
+                  "kind": "synergy",
+                  "logOdds": -0.003132960268319629,
+                  "points": -0.07832400670799072,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Synergie"
+                },
+                {
+                  "kind": "composition",
+                  "logOdds": 0,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Teamcomp"
+                }
+              ]
+            },
+            {
+              "championId": 80,
+              "name": "Pantheon",
+              "score": 0.528257993964545,
+              "uncertainty": 0.021933763201105363,
+              "uncertaintyPoints": 0.5483440800276341,
+              "reasons": [
+                {
+                  "text": "ihre Backline steht frei",
+                  "tone": "pro",
+                  "hint": "Im gegnerischen Team steht bisher niemand vorne, der Schaden abfangen kann. Ein Champ, der gezielt auf die hinteren Reihen geht, kommt dort ohne Umweg hin."
+                },
+                {
+                  "text": "Earlygame gegen ein Scaling-Team",
+                  "tone": "pro",
+                  "hint": "Mindestens die H\u00E4lfte der aufgedeckten Gegner wird erst im sp\u00E4ten Spiel gef\u00E4hrlich. Dieser Champ ist umgekehrt fr\u00FCh am st\u00E4rksten \u2014 er kann das Spiel entscheiden, bevor ihre Kurve greift."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "laneStrength",
+                  "logOdds": 0.02515255053658428,
+                  "points": 0.628813763414607,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Lane-St\u00E4rke"
+                },
+                {
+                  "kind": "laneMatchup",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Matchup"
+                },
+                {
+                  "kind": "enemyTeam",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Enemy-Team"
+                },
+                {
+                  "kind": "synergy",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Synergie"
+                },
+                {
+                  "kind": "composition",
+                  "logOdds": 0.08800000000000001,
+                  "points": 2.2,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Teamcomp"
+                }
+              ]
+            },
+            {
+              "championId": 10,
+              "name": "Kayle",
+              "score": 0.5272333315932141,
+              "uncertainty": 0.02708490331309124,
+              "uncertaintyPoints": 0.677122582827281,
+              "reasons": [
+                {
+                  "text": "52,2 % WR auf Toplane",
+                  "tone": "pro",
+                  "hint": "Aus 5.382 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+                },
+                {
+                  "text": "A-Tier auf Toplane",
+                  "tone": "neutral",
+                  "hint": "OP.GGs eigene Einstufung f\u00FCr Toplane, von OP (st\u00E4rkste) \u00FCber S bis D (schw\u00E4chste). Z\u00E4hlt nicht in die Prozentzahl: sie mischt Winrate und Pickrate, und die Winrate steckt schon drin."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "laneStrength",
+                  "logOdds": 0.0889904668880113,
+                  "points": 2.2247616722002825,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Lane-St\u00E4rke"
+                },
+                {
+                  "kind": "laneMatchup",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Matchup"
+                },
+                {
+                  "kind": "enemyTeam",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Enemy-Team"
+                },
+                {
+                  "kind": "synergy",
+                  "logOdds": 0.020050772799682207,
+                  "points": 0.5012693199920552,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Synergie"
+                },
+                {
+                  "kind": "composition",
+                  "logOdds": 0,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Teamcomp"
+                }
+              ]
+            }
+          ]
+        },
+        "bans": {
+          "cellId": 0,
+          "lane": "top",
+          "action": "ban",
+          "tied": 0,
+          "decimals": 1,
+          "items": [
+            {
+              "championId": 89,
+              "name": "Leona",
+              "score": 2.0085627821485597,
+              "uncertainty": 0,
+              "uncertaintyPoints": 0,
+              "reasons": [
+                {
+                  "text": "stark auf Support",
+                  "tone": "pro",
+                  "hint": "Support ist die Lane, auf der dieser Champ gerade am gef\u00E4hrlichsten ist und auf der ihn der Gegner am ehesten spielt: 52,0 % Winrate aus 17.540 Games."
+                },
+                {
+                  "text": "in 9 % der Games gebannt",
+                  "tone": "neutral",
+                  "hint": "So oft bannen andere diesen Champ. Ein hoher Wert hei\u00DFt: viele halten ihn f\u00FCr gef\u00E4hrlich \u2014 aber vielleicht bannt ihn ohnehin jemand anders."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "banStrength",
+                  "logOdds": 0.08038577021295684,
+                  "points": 2.009644255323921,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "St\u00E4rke allgemein"
+                },
+                {
+                  "kind": "banLaneThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr auf Lane"
+                },
+                {
+                  "kind": "banTeamThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr f\u00FCrs Team"
+                },
+                {
+                  "kind": "banPopularity",
+                  "logOdds": 1,
+                  "points": 0,
+                  "isGate": true,
+                  "gate": 1,
+                  "label": "Pick- und Banrate"
+                }
+              ]
+            },
+            {
+              "championId": 29,
+              "name": "Twitch",
+              "score": 1.9744078843571198,
+              "uncertainty": 0,
+              "uncertaintyPoints": 0,
+              "reasons": [
+                {
+                  "text": "schl\u00E4gt unseren Jinx",
+                  "tone": "pro",
+                  "hint": "Im direkten Matchup gewinnt dieser Champ 55,0 % gegen Jinx, der bei uns schon gepickt ist. Aus 2.671 Games; gez\u00E4hlt wird 53,5 %, weil ein einzelnes Duell \u00FCber so wenige Games zum gro\u00DFen Teil Zufall ist."
+                },
+                {
+                  "text": "in 7 % der Games gebannt",
+                  "tone": "neutral",
+                  "hint": "So oft bannen andere diesen Champ. Ein hoher Wert hei\u00DFt: viele halten ihn f\u00FCr gef\u00E4hrlich \u2014 aber vielleicht bannt ihn ohnehin jemand anders."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "banStrength",
+                  "logOdds": 0.036576415209990255,
+                  "points": 0.9144103802497564,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "St\u00E4rke allgemein"
+                },
+                {
+                  "kind": "banLaneThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr auf Lane"
+                },
+                {
+                  "kind": "banTeamThreat",
+                  "logOdds": 0.07931732040320749,
+                  "points": 1.9829330100801874,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr f\u00FCrs Team"
+                },
+                {
+                  "kind": "banPopularity",
+                  "logOdds": 0.682217134265113,
+                  "points": 0,
+                  "isGate": true,
+                  "gate": 0.682217134265113,
+                  "label": "Pick- und Banrate"
+                }
+              ]
+            },
+            {
+              "championId": 498,
+              "name": "Xayah",
+              "score": 1.5379795535582517,
+              "uncertainty": 0,
+              "uncertaintyPoints": 0,
+              "reasons": [
+                {
+                  "text": "in 9 % der Games gepickt",
+                  "tone": "neutral",
+                  "hint": "So oft wird dieser Champ gespielt. Je h\u00E4ufiger, desto wahrscheinlicher nimmt ihn der Gegner, wenn du ihn nicht bannst."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "banStrength",
+                  "logOdds": 0.07271549410654533,
+                  "points": 1.8178873526636334,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "St\u00E4rke allgemein"
+                },
+                {
+                  "kind": "banLaneThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr auf Lane"
+                },
+                {
+                  "kind": "banTeamThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr f\u00FCrs Team"
+                },
+                {
+                  "kind": "banPopularity",
+                  "logOdds": 0.8463985237330418,
+                  "points": 0,
+                  "isGate": true,
+                  "gate": 0.8463985237330418,
+                  "label": "Pick- und Banrate"
+                }
+              ]
+            },
+            {
+              "championId": 53,
+              "name": "Blitzcrank",
+              "score": 1.4232950304542302,
+              "uncertainty": 0,
+              "uncertaintyPoints": 0,
+              "reasons": [
+                {
+                  "text": "in 16 % der Games gebannt",
+                  "tone": "neutral",
+                  "hint": "So oft bannen andere diesen Champ. Ein hoher Wert hei\u00DFt: viele halten ihn f\u00FCr gef\u00E4hrlich \u2014 aber vielleicht bannt ihn ohnehin jemand anders."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "banStrength",
+                  "logOdds": 0.05694718612055396,
+                  "points": 1.423679653013849,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "St\u00E4rke allgemein"
+                },
+                {
+                  "kind": "banLaneThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr auf Lane"
+                },
+                {
+                  "kind": "banTeamThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr f\u00FCrs Team"
+                },
+                {
+                  "kind": "banPopularity",
+                  "logOdds": 1,
+                  "points": 0,
+                  "isGate": true,
+                  "gate": 1,
+                  "label": "Pick- und Banrate"
+                }
+              ]
+            },
+            {
+              "championId": 12,
+              "name": "Alistar",
+              "score": 1.2120493542198287,
+              "uncertainty": 0,
+              "uncertaintyPoints": 0,
+              "reasons": [
+                {
+                  "text": "in 7 % der Games gepickt",
+                  "tone": "neutral",
+                  "hint": "So oft wird dieser Champ gespielt. Je h\u00E4ufiger, desto wahrscheinlicher nimmt ihn der Gegner, wenn du ihn nicht bannst."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "banStrength",
+                  "logOdds": 0.06965377607148776,
+                  "points": 1.741344401787194,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "St\u00E4rke allgemein"
+                },
+                {
+                  "kind": "banLaneThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr auf Lane"
+                },
+                {
+                  "kind": "banTeamThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr f\u00FCrs Team"
+                },
+                {
+                  "kind": "banPopularity",
+                  "logOdds": 0.6963236851997403,
+                  "points": 0,
+                  "isGate": true,
+                  "gate": 0.6963236851997403,
+                  "label": "Pick- und Banrate"
+                }
+              ]
+            },
+            {
+              "championId": 112,
+              "name": "Viktor",
+              "score": 1.1791888971005349,
+              "uncertainty": 0,
+              "uncertaintyPoints": 0,
+              "reasons": [
+                {
+                  "text": "stark auf Botlane",
+                  "tone": "pro",
+                  "hint": "Botlane ist die Lane, auf der dieser Champ gerade am gef\u00E4hrlichsten ist und auf der ihn der Gegner am ehesten spielt: 52,3 % Winrate aus 3.220 Games."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "banStrength",
+                  "logOdds": 0.09020611899602127,
+                  "points": 2.2551529749005317,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "St\u00E4rke allgemein"
+                },
+                {
+                  "kind": "banLaneThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr auf Lane"
+                },
+                {
+                  "kind": "banTeamThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr f\u00FCrs Team"
+                },
+                {
+                  "kind": "banPopularity",
+                  "logOdds": 0.5232409527389537,
+                  "points": 0,
+                  "isGate": true,
+                  "gate": 0.5232409527389537,
+                  "label": "Pick- und Banrate"
+                }
+              ]
+            },
+            {
+              "championId": 201,
+              "name": "Braum",
+              "score": 1.1395720724941574,
+              "uncertainty": 0,
+              "uncertaintyPoints": 0,
+              "reasons": [
+                {
+                  "text": "in 7 % der Games gebannt",
+                  "tone": "neutral",
+                  "hint": "So oft bannen andere diesen Champ. Ein hoher Wert hei\u00DFt: viele halten ihn f\u00FCr gef\u00E4hrlich \u2014 aber vielleicht bannt ihn ohnehin jemand anders."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "banStrength",
+                  "logOdds": 0.06611315781965077,
+                  "points": 1.6528289454912692,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "St\u00E4rke allgemein"
+                },
+                {
+                  "kind": "banLaneThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr auf Lane"
+                },
+                {
+                  "kind": "banTeamThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr f\u00FCrs Team"
+                },
+                {
+                  "kind": "banPopularity",
+                  "logOdds": 0.6897187574753102,
+                  "points": 0,
+                  "isGate": true,
+                  "gate": 0.6897187574753102,
+                  "label": "Pick- und Banrate"
+                }
+              ]
+            },
+            {
+              "championId": 17,
+              "name": "Teemo",
+              "score": 1.0406025532504017,
+              "uncertainty": 0,
+              "uncertaintyPoints": 0,
+              "reasons": [
+                {
+                  "text": "in 16 % der Games gebannt",
+                  "tone": "neutral",
+                  "hint": "So oft bannen andere diesen Champ. Ein hoher Wert hei\u00DFt: viele halten ihn f\u00FCr gef\u00E4hrlich \u2014 aber vielleicht bannt ihn ohnehin jemand anders."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "banStrength",
+                  "logOdds": 0.05263275242814886,
+                  "points": 1.3158188107037216,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "St\u00E4rke allgemein"
+                },
+                {
+                  "kind": "banLaneThreat",
+                  "logOdds": 0.005194609719935435,
+                  "points": 0.1298652429983859,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr auf Lane"
+                },
+                {
+                  "kind": "banTeamThreat",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Gefahr f\u00FCrs Team"
+                },
+                {
+                  "kind": "banPopularity",
+                  "logOdds": 0.72,
+                  "points": 0,
+                  "isGate": true,
+                  "gate": 0.72,
+                  "label": "Pick- und Banrate"
+                }
+              ]
+            }
+          ]
+        },
+        "hover": null,
+        "comp": {
+          "allies": {
+            "count": 5,
+            "physicalShare": 0.6,
+            "magicShare": 0.4,
+            "frontlineCount": 2,
+            "rangedCount": 3,
+            "maxEngage": 2,
+            "maxPeel": 2,
+            "totalCrowdControl": 9,
+            "lateScalingCount": 1,
+            "traitsKnown": 5,
+            "traitCoverage": 1,
+            "findings": []
+          },
+          "enemies": {
+            "count": 3,
+            "physicalShare": 0.5,
+            "magicShare": 0.5,
+            "frontlineCount": 0,
+            "rangedCount": 1,
+            "maxEngage": 1,
+            "maxPeel": 1,
+            "totalCrowdControl": 6,
+            "lateScalingCount": 2,
+            "traitsKnown": 3,
+            "traitCoverage": 1,
+            "findings": [
+              {
+                "issue": "noFrontline",
+                "text": "kein Frontline",
+                "severity": 0.8
+              }
+            ]
+          }
+        },
+        "balance": {
+          "allyWinRate": 0.5120727691675035,
+          "ratedChampions": 8,
+          "contestedLanes": 0,
+          "isComparable": true,
+          "hasData": true
+        },
+        "laneMatchups": [
+          {
+            "lane": "top",
+            "allyId": 122,
+            "enemyId": 24,
+            "winRate": null,
+            "play": 0,
+            "isInferred": false,
+            "measured": null
+          },
+          {
+            "lane": "jungle",
+            "allyId": 64,
+            "enemyId": 234,
+            "winRate": null,
+            "play": 0,
+            "isInferred": false,
+            "measured": null
+          },
+          {
+            "lane": "mid",
+            "allyId": 103,
+            "enemyId": 134,
+            "winRate": null,
+            "play": 0,
+            "isInferred": false,
+            "measured": null
+          },
+          {
+            "lane": "adc",
+            "allyId": 222,
+            "enemyId": 0,
+            "winRate": null,
+            "play": 0,
+            "isInferred": false,
+            "measured": null
+          },
+          {
+            "lane": "support",
+            "allyId": 412,
+            "enemyId": 0,
+            "winRate": null,
+            "play": 0,
+            "isInferred": false,
+            "measured": null
+          }
+        ],
+        "aramBench": null
+      }
+    }
+  ]
+}
