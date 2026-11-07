@@ -4,8 +4,8 @@ using Xunit;
 
 namespace DraftPilot.Core.Tests;
 
-/// <summary>DirkDraft's own ARAM Mayhem count: lane-less players, augments, and stored tallies.</summary>
-public sealed class RiotMayhemTests
+/// <summary>DirkDraft's own ARAM count (plain ARAM as Mayhem's stand-in): lane-less players and stored tallies.</summary>
+public sealed class RiotAramTests
 {
     private static readonly ItemCatalog Items = ItemCatalog.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Riot", "item.json")));
 
@@ -14,42 +14,42 @@ public sealed class RiotMayhemTests
          "participants":[{{{participants}}}]}}
         """;
 
-    private const string Mayhem = """
-        {"participantId":1,"championId":7,"teamPosition":"","win":true,"playerAugment1":101,"playerAugment2":202,"playerAugment3":0},
-        {"participantId":6,"championId":8,"teamPosition":"","win":false,"playerAugment1":101}
+    private const string Aram = """
+        {"participantId":1,"championId":7,"teamPosition":"","win":true},
+        {"participantId":6,"championId":8,"teamPosition":"","win":false}
         """;
 
     [Theory]
-    [InlineData(2400, 900, true)]
-    [InlineData(2400, 500, false)]  // a remake or a stomp
-    [InlineData(450, 900, false)]   // plain ARAM is not Mayhem
+    [InlineData(450, 900, true)]
+    [InlineData(450, 500, false)]   // a remake or a stomp
+    [InlineData(2400, 900, true)]   // Mayhem would count too, if Riot ever handed it out
     [InlineData(420, 899, false)]   // Solo/Duo needs fifteen minutes
     [InlineData(420, 1000, true)]
+    [InlineData(1700, 1000, false)] // Arena is neither
     public void WhatCounts_DependsOnQueueAndLength(int queue, int duration, bool counts)
-        => Assert.Equal(counts, RiotMatchReader.ReadHeader(Match(queue, duration, Mayhem)).Counts);
+        => Assert.Equal(counts, RiotMatchReader.ReadHeader(Match(queue, duration, Aram)).Counts);
 
     [Fact]
-    public void MayhemPlayers_AreReadWithoutALane_AndWithTheirAugments()
+    public void AramPlayers_AreReadWithoutALane()
     {
-        var reading = RiotMatchReader.Read(Match(2400, 900, Mayhem), """{"info":{"frames":[]}}""", Items);
+        var reading = RiotMatchReader.Read(Match(450, 900, Aram), """{"info":{"frames":[]}}""", Items);
 
         Assert.Equal(2, reading.Participants.Count);
         Assert.All(reading.Participants, p => Assert.Equal(Lane.Unknown, p.Lane));
-        Assert.Equal([101, 202], reading.Participants[0].PickedAugments);
     }
 
     [Fact]
     public void RankedPlayersWithoutALane_AreStillSkipped()
     {
-        var reading = RiotMatchReader.Read(Match(420, 1000, Mayhem), """{"info":{"frames":[]}}""", Items);
+        var reading = RiotMatchReader.Read(Match(420, 1000, Aram), """{"info":{"frames":[]}}""", Items);
         Assert.Empty(reading.Participants);
     }
 
     [Fact]
-    public void TheTally_CountsChampionsAugmentsAndBuilds()
+    public void TheTally_CountsChampionsAndBuilds()
     {
-        var reading = RiotMatchReader.Read(Match(2400, 900, Mayhem), """{"info":{"frames":[]}}""", Items);
-        var tally = new RiotMayhemTally();
+        var reading = RiotMatchReader.Read(Match(450, 900, Aram), """{"info":{"frames":[]}}""", Items);
+        var tally = new RiotAramTally();
         tally.Add(reading);
         tally.Add(reading);
 
@@ -58,25 +58,24 @@ public sealed class RiotMayhemTests
         Assert.Equal(2, file.Games);
         var seven = Assert.Single(file.Champions, c => c.ChampionId == 7);
         Assert.Equal((2, 2), (seven.Games, seven.Wins));
-        var shared = file.Augments.Where(a => a.AugmentId == 101).ToList();
-        Assert.Equal(2, shared.Count); // one row per champion
-        Assert.Equal(2, Assert.Single(shared, a => a.ChampionId == 8).Games);
+        var eight = Assert.Single(file.Champions, c => c.ChampionId == 8);
+        Assert.Equal((2, 0), (eight.Games, eight.Wins));
         var build = Assert.Single(file.Builds, b => b.ChampionId == 7);
-        Assert.Equal((Lane.Unknown, RiotMayhemTally.Tier, 2), (build.Lane, build.Tier, build.Games));
+        Assert.Equal((Lane.Unknown, RiotAramTally.Tier, 2), (build.Lane, build.Tier, build.Games));
     }
 
     [Fact]
     public void AStoredTally_AddsUp()
     {
-        var reading = RiotMatchReader.Read(Match(2400, 900, Mayhem), """{"info":{"frames":[]}}""", Items);
-        var once = new RiotMayhemTally();
+        var reading = RiotMatchReader.Read(Match(450, 900, Aram), """{"info":{"frames":[]}}""", Items);
+        var once = new RiotAramTally();
         once.Add(reading);
 
-        var merged = new RiotMayhemTally();
+        var merged = new RiotAramTally();
         merged.Add(once.Export("16.22", "euw1", DateTimeOffset.UnixEpoch, keep: 5));
         merged.Add(once.Export("16.22", "euw1", DateTimeOffset.UnixEpoch, keep: 5));
 
-        var twice = new RiotMayhemTally();
+        var twice = new RiotAramTally();
         twice.Add(reading);
         twice.Add(reading);
 

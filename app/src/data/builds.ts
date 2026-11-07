@@ -15,6 +15,17 @@ const viewLane = (lane: RiotBuildPlan['lane']): Lane | null => {
 const option = (o: PlanOption | undefined): ItemOption | null =>
   o ? { items: o.ids.map((id) => ({ id, name: itemName(id) })), stats: sampleText(o.winRate, o.games) } : null;
 
+/** The ARAM build (aram.json), for ARAM and — as its stand-in — Mayhem. */
+export function aramBuild(plan: RiotBuildPlan, champion: ChampionRef, mayhem: boolean): BuildView {
+  return {
+    ...buildFromRiot(plan, champion, null),
+    lane: null,
+    title: champion.name,
+    source: `ARAM-Build · ${sampleText(plan.winRate, plan.games)}`,
+    caveat: mayhem ? 'Aus normalem ARAM gezählt — Mayhem-Spiele gibt Riot nicht heraus, Augments verändern den Build.' : null,
+  };
+}
+
 export function buildFromRiot(plan: RiotBuildPlan, champion: ChampionRef, opponent: ChampionRef | null): BuildView {
   const lane = viewLane(plan.lane);
   const asked = plan.inPlaceOf === null ? null : viewLane(plan.inPlaceOf);

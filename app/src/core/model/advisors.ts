@@ -189,9 +189,9 @@ function aramReasons(stat: AramStat, shrunk: number, isOwn: boolean, rounded: bo
             `Nach Glättung über die Stichprobe: ${netPercent(shrunk, 1)}.`,
         )
       : neutral(
-          `${netPercent(stat.winRate, 1)} WR in Mayhem aus ${netN0(stat.play)} Games`,
-          'Unsere eigene Zählung für diesen Champion in ARAM Mayhem. ' +
-            `Nach Glättung über die Stichprobe: ${netPercent(shrunk, 1)}.`,
+          `${netPercent(stat.winRate, 1)} WR in ARAM aus ${netN0(stat.play)} Games`,
+          'Unsere eigene Zählung für diesen Champion in normalem ARAM — auch in Mayhem, denn Mayhem-Spiele ' +
+            `gibt Riot nicht heraus. Nach Glättung über die Stichprobe: ${netPercent(shrunk, 1)}.`,
         ),
   );
   return reasons;

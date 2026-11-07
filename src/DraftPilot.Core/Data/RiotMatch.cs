@@ -188,8 +188,8 @@ public static class RiotMatchReader
         {
             var lane = Lanes.FromLcu(Text(participant, "teamPosition"));
             var championId = Int(participant, "championId");
-            // Mayhem has no lanes; everywhere else a player without one is a broken record.
-            if (championId <= 0 || (lane == Lane.Unknown && !IsMayhem(queue)))
+            // ARAM has no lanes; everywhere else a player without one is a broken record.
+            if (championId <= 0 || (lane == Lane.Unknown && !IsAram(queue)))
                 continue;
 
             var id = Int(participant, "participantId");
@@ -267,18 +267,22 @@ public static class RiotMatchReader
             && participants.EnumerateArray().Any(p => p.TryGetProperty("gameEndedInEarlySurrender", out var e) && e.ValueKind == JsonValueKind.True);
 
         var longEnough = queue == RankedSoloQueue ? duration >= MinimumDurationSeconds
-            : IsMayhem(queue) && duration >= MinimumMayhemSeconds;
+            : IsAram(queue) && duration >= MinimumAramSeconds;
         return (patch, created, queue, longEnough && !earlySurrender && patch.Length > 0);
     }
 
-    /// <summary>ARAM Mayhem's queue ids, as <see cref="QueueKinds"/> knows them.</summary>
-    public static bool IsMayhem(int queueId) => QueueKinds.FromId(queueId) == QueueKind.AramMayhem;
+    /// <summary>
+    /// The Howling Abyss: plain ARAM and ARAM Mayhem, as <see cref="QueueKinds"/> knows them — no lanes,
+    /// short games. Riot's API hides Mayhem games (403, measured 07.11.2026), so in practice the collector
+    /// counts plain ARAM as Mayhem's stand-in.
+    /// </summary>
+    public static bool IsAram(int queueId) => QueueKinds.FromId(queueId) is QueueKind.Aram or QueueKind.AramMayhem;
 
     /// <summary>
-    /// Ten minutes: a Mayhem game is short by design, and below this it was a remake or a stomp
+    /// Ten minutes: an ARAM game is short by design, and below this it was a remake or a stomp
     /// nobody finished building in.
     /// </summary>
-    public const int MinimumMayhemSeconds = 10 * 60;
+    public const int MinimumAramSeconds = 10 * 60;
 
     /// <summary>
     /// Every purchase that stood, in order. An undo takes back the most recent purchase of that

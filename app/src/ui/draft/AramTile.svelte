@@ -1,9 +1,11 @@
 <script lang="ts">
-  import type { AramView } from '../../core/view';
+  import type { AramView, BuildView } from '../../core/view';
   import Icon from '../Icon.svelte';
   import Tile from '../Tile.svelte';
+  import RuneRow from '../build/RuneRow.svelte';
+  import ImportButton from '../build/ImportButton.svelte';
 
-  let { aram }: { aram: AramView } = $props();
+  let { aram, build = null }: { aram: AramView; build?: BuildView | null } = $props();
 </script>
 
 <Tile title="Behalten oder tauschen?" sub="{aram.rerolls} {aram.rerolls === 1 ? 'Reroll' : 'Rerolls'}" main>
@@ -22,6 +24,18 @@
     </div>
   {/each}
   <p class="foot">{aram.note} Getauscht wird nichts automatisch.</p>
+
+  {#if build}
+    <div class="card">
+      <div class="head">
+        <b>Build für {build.champion.name}</b>
+        <span class="spells">{#each build.spells as id (id)}<Icon kind="spell" {id} size={22} />{/each}</span>
+      </div>
+      {#if build.runes}<RuneRow runes={build.runes} />{/if}
+      <ImportButton {build} />
+      {#if build.caveat}<p class="caveat">{build.caveat}</p>{/if}
+    </div>
+  {/if}
 </Tile>
 
 <style>
@@ -92,6 +106,31 @@
 
   .foot {
     margin: 10px 0 0;
+    font-size: 11px;
+    color: var(--fg3);
+  }
+
+  .card {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: var(--r-m);
+    background: var(--card);
+  }
+
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .spells {
+    display: flex;
+    gap: 4px;
+  }
+
+  .caveat {
+    margin: 8px 2px 0;
     font-size: 11px;
     color: var(--fg3);
   }

@@ -2,20 +2,20 @@
 // show. Pure state and computation — the events come in through live/bridge.ts, so a test can feed
 // recorded sessions and get the screen the window would show.
 //
-// Left out on the user's word (07.11.2026): a postgame and "Mein Pool". Not yet here: Mayhem builds.
+// Left out on the user's word (07.11.2026): a postgame and "Mein Pool".
 
 import { DraftEngine } from '../core/engine';
 import { gameModel, championIdOf, enemyItemsOf, type LiveGameData } from '../core/game';
-import { aramStatsFrom } from '../core/mayhem';
+import { aramBuildFile, aramStatsFrom } from '../core/aram';
 import { Lane, laneFromKey } from '../core/model/lane';
 import { MetaLookup } from '../core/model/metaLookup';
 import { TraitTable } from '../core/model/traits';
 import { momentOf, type GameflowPhase } from '../core/moment';
-import { riotPlan, type RiotBuildPlan } from '../core/riotBuilds';
+import { aramPlan, riotPlan, type RiotBuildPlan } from '../core/riotBuilds';
 import { SituationTracker, situationalSuggestions, situationsOf } from '../core/situational';
 import { LANE_NAMES, type BuildView, type ChampionRef, type DataStatus, type Lane as ViewLane, type ViewModel } from '../core/view';
 import { assets } from '../data/assets';
-import { buildFromRiot } from '../data/builds';
+import { aramBuild, buildFromRiot } from '../data/builds';
 import { gameView } from '../data/gameView';
 import { GoldenAdapter, type GoldenFrame } from '../data/golden';
 import { dataLine, type DataSet } from '../data/remote';
@@ -35,10 +35,16 @@ export interface ImportPlan {
   currentSpells: [number, number];
 }
 
+/** Which builds apply: lane builds (builds.json) or the ARAM count (aram.json, also for Mayhem). */
+type Mode = 'lanes' | 'aram' | 'mayhem';
+
+const modeOf = (queue: string): Mode => (queue === 'aramMayhem' ? 'mayhem' : queue === 'aram' ? 'aram' : 'lanes');
+
 interface Picked {
   championId: number;
   lane: Lane;
   opponentId: number;
+  mode: Mode;
 }
 
 export class LiveSession {
@@ -71,8 +77,8 @@ export class LiveSession {
     this.adapter = new GoldenAdapter(set.meta.champions);
     this.engine = new DraftEngine(set.meta, {
       traits: this.traits,
-      aramStats: set.mayhem ? aramStatsFrom(set.mayhem) : undefined,
-      aramRounded: !set.mayhem,
+      aramStats: set.aram ? aramStatsFrom(set.aram) : undefined,
+      aramRounded: !set.aram,
     });
     // New numbers arrive only while idle (core/refresh), but a kept session is re-evaluated anyway.
     if (this.session) this.onSession(this.session);
@@ -184,13 +190,17 @@ export class LiveSession {
     const myChampion = me?.champion ?? null;
     const lane = me?.lane ?? null;
     const opponent = lane ? (board.enemies.find((slot) => slot.lane === lane)?.champion ?? null) : null;
-    const build = myChampion ? this.buildFor(myChampion, lane, opponent) : null;
+    const mode = modeOf(frame.state.queue);
+    const build = myChampion ? this.buildFor(myChampion, lane, opponent, mode) : null;
     const side: ViewModel['side'] = [];
     let main: ViewModel['main'];
 
     if (moment === 'aramBench') {
       const aram = this.adapter.aram(frame);
-      main = aram ? { kind: 'aram', aram, build: null } : { kind: 'none' };
+      const note = this.data.aram
+        ? 'Winrates aus unserer Zählung normaler ARAM-Spiele — Mayhem-Spiele gibt Riot nicht heraus.'
+        : 'Noch keine ARAM-Zahlen geladen.';
+      main = aram ? { kind: 'aram', aram: { ...aram, note }, build } : { kind: 'none' };
       side.push({ kind: 'comp', comp: this.adapter.comp(frame) });
     } else if (moment === 'locked' || moment === 'loading') {
       main = myChampion ? { kind: 'matchup', matchup: this.adapter.matchup(frame, myChampion, lane ?? 'top'), build } : { kind: 'none' };
@@ -219,12 +229,12 @@ export class LiveSession {
   /** The import button's input for the build on screen, or null when there is nothing to write. */
   importPlan(): ImportPlan | null {
     const frame = this.frame?.state.isActive ? this.frame : null;
-    if (!frame || !this.data?.builds) return null;
+    if (!frame) return null;
     const board = this.adapter.board(frame, null);
     const me = board.allies.find((slot) => slot.isMe);
     if (!me?.champion) return null;
     const lane = me.lane ? laneFromKey(me.lane) : Lane.Unknown;
-    const plan = this.planFor(me.champion.id, lane);
+    const plan = this.planFor(me.champion.id, lane, modeOf(frame.state.queue));
     if (!plan) return null;
     const opponent = me.lane ? board.enemies.find((slot) => slot.lane === me.lane)?.champion : null;
     return {
@@ -289,19 +299,21 @@ export class LiveSession {
     const locked = frame.state.allies.find((slot) => slot.cellId === frame.state.localCellId)?.lockedChampionId ?? 0;
     if (!me || !locked) return;
     const opponent = me.lane ? board.enemies.find((slot) => slot.lane === me.lane)?.champion?.id ?? 0 : 0;
-    this.picked = { championId: locked, lane: me.lane ? laneFromKey(me.lane) : Lane.Unknown, opponentId: opponent };
+    this.picked = { championId: locked, lane: me.lane ? laneFromKey(me.lane) : Lane.Unknown, opponentId: opponent, mode: modeOf(frame.state.queue) };
   }
 
-  private planFor(championId: number, lane: Lane): RiotBuildPlan | null {
+  private planFor(championId: number, lane: Lane, mode: Mode = 'lanes'): RiotBuildPlan | null {
+    if (mode !== 'lanes') return this.data?.aram ? aramPlan(aramBuildFile(this.data.aram), championId) : null;
     const builds = this.data?.builds;
     if (!builds || !this.meta) return null;
     const asked = lane === Lane.Unknown ? this.meta.mainLane(championId) : lane;
     return riotPlan(builds, championId, asked);
   }
 
-  private buildFor(champion: ChampionRef, lane: ViewLane | null, opponent: ChampionRef | null): BuildView | null {
-    const plan = this.planFor(champion.id, lane ? laneFromKey(lane) : Lane.Unknown);
-    return plan ? buildFromRiot(plan, champion, opponent) : null;
+  private buildFor(champion: ChampionRef, lane: ViewLane | null, opponent: ChampionRef | null, mode: Mode): BuildView | null {
+    const plan = this.planFor(champion.id, lane ? laneFromKey(lane) : Lane.Unknown, mode);
+    if (!plan) return null;
+    return mode === 'lanes' ? buildFromRiot(plan, champion, opponent) : aramBuild(plan, champion, mode === 'mayhem');
   }
 
   private pickedBuild(): BuildView | null {
@@ -309,8 +321,9 @@ export class LiveSession {
     if (!p) return null;
     const champion = this.adapter.champion(p.championId);
     if (!champion) return null;
-    const plan = this.planFor(p.championId, p.lane);
-    return plan ? buildFromRiot(plan, champion, this.adapter.champion(p.opponentId)) : null;
+    const plan = this.planFor(p.championId, p.lane, p.mode);
+    if (!plan) return null;
+    return p.mode === 'lanes' ? buildFromRiot(plan, champion, this.adapter.champion(p.opponentId)) : aramBuild(plan, champion, p.mode === 'mayhem');
   }
 
   private gameMoment(base: ViewModel): ViewModel {
@@ -325,7 +338,10 @@ export class LiveSession {
     const me = game.allPlayers?.find((p) => p.riotId && p.riotId === game.activePlayer?.riotId);
     const championId = me ? championIdOf(me, meta) : (this.picked?.championId ?? 0);
     const lane = this.picked?.championId === championId ? this.picked.lane : Lane.Unknown;
-    const plan = championId ? this.planFor(championId, lane) : null;
+    // The game's own word for the mode: ARAM, or KIWI for Mayhem.
+    const gameMode = game.gameData?.gameMode;
+    const mode: Mode = gameMode === 'KIWI' ? 'mayhem' : gameMode === 'ARAM' ? 'aram' : 'lanes';
+    const plan = championId ? this.planFor(championId, lane, mode) : null;
     const model = gameModel(game, meta, plan, items);
     if (!model) {
       return { ...base, build, emptyText: 'Sobald das Spiel läuft: nächster Kauf gegen dein Gold, der nächste Skillpunkt und was die Gegner bauen.' };
@@ -335,7 +351,8 @@ export class LiveSession {
     const totals = enemyItemsOf(model.enemies.flatMap((e) => e.items), items);
     const situations = this.situations.update(situationsOf(enemyIds, meta, this.traits, totals));
     const owned = new Set((me?.items ?? []).map((i) => i.itemID));
-    const situational = this.data?.situational
+    // Situational items are counted per lane on the Rift; on the Howling Abyss there is nothing to say.
+    const situational = this.data?.situational && mode === 'lanes'
       ? situationalSuggestions(this.data.situational, meta, championId, plan?.lane ?? lane, situations, owned, 3)
       : null;
 

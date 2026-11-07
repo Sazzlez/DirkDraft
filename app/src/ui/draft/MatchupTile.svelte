@@ -4,27 +4,9 @@
   import Icon from '../Icon.svelte';
   import Tile from '../Tile.svelte';
   import RuneRow from '../build/RuneRow.svelte';
-  import { importLabel } from '../../core/loadout';
-  import { runImport } from '../../live/bridge';
+  import ImportButton from '../build/ImportButton.svelte';
 
   let { matchup, build }: { matchup: MatchupView; build: BuildView | null } = $props();
-
-  const label = $derived(importLabel(!!build?.runes, (build?.spells.length ?? 0) >= 2));
-
-  let busy = $state(false);
-  let result = $state<string | null>(null);
-
-  async function take() {
-    busy = true;
-    result = null;
-    try {
-      result = await runImport();
-    } catch (e) {
-      result = `Fehlgeschlagen: ${String(e)}`;
-    } finally {
-      busy = false;
-    }
-  }
 </script>
 
 <Tile title="Dein Matchup" sub={LANE_NAMES[matchup.lane]} main>
@@ -45,11 +27,7 @@
   {#if build}
     <div class="card">
       {#if build.runes}<RuneRow runes={build.runes} />{/if}
-      <button class="primary" onclick={take} disabled={busy}>
-        <svg viewBox="0 0 16 16"><path d="M8 2v8m0 0 3-3m-3 3L5 7M3 13h10" /></svg>
-        {busy ? 'Wird übernommen …' : label}
-      </button>
-      {#if result}<p class="result" role="status">{result}</p>{/if}
+      <ImportButton {build} />
     </div>
 
     <div class="kit">
@@ -129,39 +107,6 @@
     padding: 12px;
     border-radius: var(--r-m);
     background: var(--card);
-  }
-
-  .primary {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    width: 100%;
-    height: 32px;
-    margin-top: 12px;
-    border-radius: 9px;
-    background: var(--blue);
-    color: #fff;
-    font-weight: 600;
-  }
-
-  .primary:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-
-  .result {
-    margin: 8px 2px 0;
-    font-size: 11.5px;
-    color: var(--fg2);
-  }
-
-  .primary svg {
-    width: 13px;
-    height: 13px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.6;
   }
 
   .kit {

@@ -19,7 +19,7 @@ Der Nutzer hat nach dem Auftrag entschieden (06.11.2026):
 | M4: OP.GG-Abrufe, Snapshot-Update, Draft-Abrufe | **Keine OP.GG-Daten mehr.** Alles aus dem eigenen Riot-Sammler („Nimm direkt die neue Schnittstelle statt OP.GG“) | Die App lädt eine fertige Datei vom Branch `data` (GitHub). Im Draft wird nichts mehr geholt. |
 | „Draft-Abrufe automatisch … höchstens 16 pro Draft“ | entfällt mangels Abrufen | Nur noch: Datei laden, Data-Dragon-Bilder, Update-Prüfung. |
 | „Matchup-Build nach meistgespielt; ohne Gegner nach Winrate“ | **Unser Build, je Slot die beste Winrate** (Wilson-Untergrenze), auch bei bekanntem Gegner | Matchup-genaue Builds aus eigenen Daten, sobald je Paarung genug Spiele vorliegen; sonst Lane-Build mit Hinweis (wie 1.5 seit `6f85945`). |
-| „Solo/Duo, Flex und ARAM getrennte Bestände“ | Sammler: **Solo/Duo in Platin, EUW**; Flex nutzt diese Zahlen; **ARAM Mayhem** eigene Zählung | Flex trägt einen Hinweis „Zahlen aus Solo/Duo“. Mayhem braucht einen Startpunkt (offene Frage 3). |
+| „Solo/Duo, Flex und ARAM getrennte Bestände“ | Sammler: **Solo/Duo in Platin, EUW**; Flex nutzt diese Zahlen; **ARAM** eigene Zählung (normales ARAM, auch für Mayhem) | Flex trägt einen Hinweis „Zahlen aus Solo/Duo“. Mayhem-Spiele gibt die Riot-API nicht heraus (403, 07.11.2026) — normales ARAM steht dafür, so beschriftet; keine Augments. |
 | Stärke-Kurve aus OP.GG `game_lengths` | entfällt als Quelle | Aus eigenen Spielen (`gameDuration` je Champion/Lane, mit Spielzahl je Abschnitt) — die Messbedingung „erst prüfen, ob stabil“ bleibt. |
 
 Unverändert gilt das gemessene **Modell** (Glättung, Gleichauf, Fehlerbalken, Comp-Regeln). Mit
@@ -141,9 +141,8 @@ Punkte = Log-Odds × 25.
 - **Glättung:** Lane 300, Duell 1.000, Duo 750 (Duo zur Paar-Linie, Steigung ≈ 0,4, ab 100 Paaren);
   Spiegelkanten exaktes Komplement. **2.0:** auf eigenen Daten nachmessen (Abschnitt 0).
 - **ARAM-Bank:** Prior 400 zu 0,5, Rundungsvarianz 0,01²/12, leer ohne Zahl für den eigenen.
-- **Augmente:** Grobkörnigkeits-Filter 170 × k/n mit n ≤ 40, Median-Beliebtheit — **2.0:** mit
-  eigenen Mayhem-Daten echte Winrate mit Spielzahl statt OP.GG-Wert; Regeln für dünne Zeilen wie
-  überall (unter 50 Spielen keine Prozentzahl).
+- **Augmente:** Grobkörnigkeits-Filter 170 × k/n mit n ≤ 40, Median-Beliebtheit (1.5, OP.GG) — **2.0:**
+  keine Augment-Liste: Mayhem-Spiele sind über die Riot-API nicht zu bekommen, normales ARAM hat keine.
 - **Build-Auswahl:** Wilson-Untergrenze z = 1,96; Skill-Plan auf 18 erweitert, abgeleitete Stufen
   markiert.
 
@@ -155,7 +154,7 @@ gesperrt; Draft-Abrufe (Counter, vollständige Duell-Listen, Build, Augmente, AR
 Build-Cache je Patch/Champion/Lane/Gegner/Variante, 14 Tage.
 
 **2.0:** eine Datei vom Riot-Sammler (Branch `data`, `builds.json` heute; wird erweitert um
-Lane-Zahlen, Banns, Duelle, Duos, Schadensart, Mayhem) — Format so geschnitten, dass der TS-Kern
+Lane-Zahlen, Banns, Duelle, Duos, Schadensart, ARAM) — Format so geschnitten, dass der TS-Kern
 dieselben Strukturen wie `MetaSnapshot` bekommt. Laden beim Start und auf Knopfdruck
 („Daten aktualisieren“ = Datei holen, Sekunden statt Minuten). Data Dragon bleibt für Bilder und
 Namen, Update-Prüfung bei GitHub bleibt. Vorhandene `snapshot.json` (OP.GG) wird gelesen, bis die

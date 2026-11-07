@@ -157,6 +157,16 @@ export function riotPlan(file: RiotBuildFile, championId: number, lane: Lane): R
     stats = best;
   }
 
+  return planOf(file, championId, stats, inPlaceOf);
+}
+
+/** The ARAM plan: aram.json counts its builds without a lane (lane -1, tier "aram"). */
+export function aramPlan(file: RiotBuildFile, championId: number): RiotBuildPlan | null {
+  const stats = merged(file, championId, Lane.Unknown);
+  return stats ? planOf(file, championId, stats, null) : null;
+}
+
+function planOf(file: RiotBuildFile, championId: number, stats: ChampionBuildStats, inPlaceOf: Lane | null): RiotBuildPlan {
   const late = [stats.fourth, stats.fifth, stats.sixth].map((options) => ranked(options)[0]).filter((o): o is PlanOption => !!o);
 
   return {

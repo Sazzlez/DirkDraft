@@ -25,7 +25,7 @@
     {:else if main.kind === 'matchup'}
       <MatchupTile matchup={main.matchup} build={main.build} />
     {:else if main.kind === 'aram'}
-      <AramTile aram={main.aram} />
+      <AramTile aram={main.aram} build={main.build} />
     {:else if main.kind === 'lobby'}
       <LobbyTile title={main.title} lines={main.lines} text={view.emptyText} />
     {/if}

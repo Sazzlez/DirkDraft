@@ -1,14 +1,14 @@
 # Eigene Daten (M4)
 
 DirkDraft 2.0 liest keine OP.GG-Daten mehr. Alle Zahlen kommen aus Spielen, die der Sammler mit
-einem Riot-Schlüssel selbst zählt, und liegen als drei Dateien im Branch `data`:
+einem Riot-Schlüssel selbst zählt, und liegen als vier Dateien im Branch `data`:
 
 | Datei | Inhalt | Quelle |
 |---|---|---|
 | `meta.json` | Lane-Winrate, Pick-, Bann- und Rollenrate je Champion und Lane; jedes Duell (beide Richtungen); jedes Duo; Schadensart; Grundlinien und Duell-Linie | Solo/Duo, Platin, EUW |
 | `builds.json` | Runen, Spells, Start, Schuhe, Kern, Items 4–6, Support-Item, Skill-Reihenfolge je Champion und Lane | dieselben Spiele |
 | `situational.json` | Stiefel und Items 4–6 je Champion, Lane und Gegner-Lage (viel AD, viel AP, 2+ Tanks, viel harte Kontrolle), mit dem Gesamtwert des Platzes zum Vergleich; dazu dieselben Zahlen je Klasse | dieselben Spiele |
-| `mayhem.json` | Winrate je Champion (Bank), Builds, Augments je Champion | ARAM Mayhem |
+| `aram.json` | Winrate je Champion (Bank), ARAM-Builds — auch für Mayhem | normales ARAM (Queue 450), Spieler aus den Platin-Ranglisten |
 
 `meta.json` hat das Format, das das Modell schon immer gelesen hat (`MetaSnapshot`), mit drei neuen
 Feldern: `source: "riot"`, `platform`, `games`. Daran erkennt die App, dass die Duelle vollständig
@@ -32,7 +32,7 @@ OP.GG. Tiers gibt es keine — das war OP.GGs eigene Einstufung.
   werden nicht vorgeschlagen; höchstens drei.
 
 Flex nutzt die Solo/Duo-Zahlen. Beim Patchwechsel bleibt der alte Bestand als Rückfall
-veröffentlicht, bis der neue Patch 2.000 Spiele hat (Mayhem: 500); die App sieht am Patch, dass die
+veröffentlicht, bis der neue Patch 2.000 Spiele hat (ARAM: 500); die App sieht am Patch, dass die
 Zahlen hinterherhinken.
 
 In keiner Datei stehen Spielernamen, PUUIDs oder Match-IDs. Die Spielerlisten, über die der Sammler
@@ -43,17 +43,20 @@ neue Spiele findet, leben nur im Speicher eines Laufs.
 Im Repository unter *Settings → Secrets and variables → Actions*:
 
 - `RIOT_API_KEY` — der Personal Key. Ohne ihn tut der Workflow nichts.
-- `RIOT_ID` — eine Riot-ID im Format `Name#TAG`, die ARAM Mayhem spielt (deine). Von ihr aus folgt
-  der Mayhem-Sammler den Mitspielern. Ohne sie gibt es keine `mayhem.json`, der Rest läuft.
+- `RIOT_ID` wird nicht mehr gebraucht (darf stehen bleiben).
 
-Stand 07.11.2026 läuft Mayhem unter **2400** (`gameMode` `KIWI`, „ARAM: Chaos“), gelesen aus dem
-Client während einer Runde. Falls Riot das ändert:
+**Warum normales ARAM statt Mayhem:** Mayhem läuft unter Queue **2400** (`gameMode` `KIWI`,
+„ARAM: Chaos“), aber die Riot-API gibt diese Spiele nicht heraus — sie stehen in keiner Spielliste,
+und ein direkter Abruf eines bekannten Mayhem-Spiels antwortet **403** (gemessen 07.11.2026, gleicher
+Schlüssel, Ranked-Spiel daneben abrufbar). Normale ARAM-Spiele (450) sind abrufbar. Der Sammler zählt
+deshalb normales ARAM als Stellvertreter (Nutzerentscheid); die App sagt das an der Bank und am Build.
+Augments gibt es so keine. Die Queues der eigenen letzten Spiele zeigt:
 
 ```
 dotnet run --project src/DraftPilot.Tools -- riot queues --riot-id "Name#TAG" --key-file build/riot-key.txt
 ```
 
-zeigt die Queues der letzten Spiele; die passende Zahl gehört dann als `--queues` in den Workflow.
+(Die Riot-API listet dabei nur, was sie herausgibt.)
 
 ## Lokal
 

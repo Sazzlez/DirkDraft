@@ -8,7 +8,7 @@ import { LiveSession } from '../../src/live/session';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/^﻿/, '');
 const snapshot = JSON.parse(read('../golden/snapshot.json')) as MetaSnapshot;
-const data: DataSet = { meta: snapshot, builds: null, mayhem: null, situational: null, fresh: true, changed: false, problems: [] };
+const data: DataSet = { meta: snapshot, builds: null, aram: null, situational: null, fresh: true, changed: false, problems: [] };
 const sessions = (name: string) =>
   read(`../recordings/${name}.jsonl`)
     .split(/\r?\n/)

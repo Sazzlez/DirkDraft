@@ -2,15 +2,16 @@
 #   builds.json - builds per champion and lane (Platinum, Solo/Duo)
 #   meta.json   - the draft model's numbers: lane rates, duels, duos, bans, damage types (same games)
 #   situational.json - boots and items four to six per enemy situation (AD/AP-heavy, tanks, CC)
-#   mayhem.json - ARAM Mayhem: win rate per champion, builds, augments (only with RIOT_ID set)
+#   aram.json   - plain ARAM: win rate per champion for the bench, builds. It stands in for ARAM
+#                 Mayhem, whose games Riot's API does not hand out (403, measured 07.11.2026).
 #
 # One key for everybody: the Riot key lives only in the repository secret RIOT_API_KEY, never in
 # the code or the app. Each run collects for about five and a half hours (the hosted runner allows
 # six), keeps its progress in the Actions cache - not public - and publishes the files as the only
 # files of the branch "data", from where every DirkDraft downloads them. They hold counts per
-# champion, lane and rank; no player names, PUUIDs or match ids. Mayhem has no league lists to
-# draw players from, so it starts at the Riot ID in the secret RIOT_ID and follows the players of
-# each counted game; that list stays in memory for the run.
+# champion, lane and rank; no player names, PUUIDs or match ids. The ARAM count draws its first
+# players from the Platinum league lists and follows the players of each counted game; that list
+# stays in memory for the run.
 name: Daten sammeln
 
 on:
@@ -22,8 +23,8 @@ on:
       minutes:
         description: 'Sammelzeit Ranked in Minuten'
         default: '270'
-      mayhem_minutes:
-        description: 'Sammelzeit Mayhem in Minuten (nur mit RIOT_ID)'
+      aram_minutes:
+        description: 'Sammelzeit ARAM in Minuten'
         default: '60'
 
 # Never two collectors on one state: the second would count the same games again.
@@ -40,9 +41,8 @@ jobs:
     timeout-minutes: 355
     env:
       RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
-      RIOT_ID: ${{ secrets.RIOT_ID }}
       STATE: riot-state.json.gz
-      MAYHEM_STATE: mayhem-state.json.gz
+      ARAM_STATE: aram-state.json.gz
       TIERS: platinum
 
     steps:
@@ -71,7 +71,7 @@ jobs:
         with:
           path: |
             ${{ env.STATE }}
-            ${{ env.MAYHEM_STATE }}
+            ${{ env.ARAM_STATE }}
           key: riot-state-${{ github.run_id }}
           restore-keys: riot-state-
 
@@ -81,29 +81,28 @@ jobs:
           dotnet run --project src/DraftPilot.Tools -c Release --
           riot collect --minutes "${{ inputs.minutes || '270' }}" --tiers "$TIERS" --state "$STATE"
 
-      # Without RIOT_ID the command says so and does nothing.
-      - name: Mayhem sammeln
+      - name: ARAM sammeln
         if: always() && steps.key.outputs.present == 'true'
         run: >
           dotnet run --project src/DraftPilot.Tools -c Release --
-          riot mayhem --minutes "${{ inputs.mayhem_minutes || '60' }}" --state "$MAYHEM_STATE"
+          riot aram --minutes "${{ inputs.aram_minutes || '60' }}" --tiers "$TIERS" --state "$ARAM_STATE"
 
       # Also after a failed collect: the states are saved every hundred (fifty) games, and what was
       # counted before the failure is still counted.
       - name: Stand sichern
-        if: always() && steps.key.outputs.present == 'true' && hashFiles(env.STATE, env.MAYHEM_STATE) != ''
+        if: always() && steps.key.outputs.present == 'true' && hashFiles(env.STATE, env.ARAM_STATE) != ''
         uses: actions/cache/save@v4
         with:
           path: |
             ${{ env.STATE }}
-            ${{ env.MAYHEM_STATE }}
+            ${{ env.ARAM_STATE }}
           key: riot-state-${{ github.run_id }}
 
       - name: Exportieren
         if: steps.key.outputs.present == 'true'
         run: |
           dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export --state "$STATE" --tier "$TIERS" --out publish/builds.json --meta-out publish/meta.json --situational-out publish/situational.json
-          dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export-mayhem --state "$MAYHEM_STATE" --out publish/mayhem.json
+          dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export-aram --state "$ARAM_STATE" --out publish/aram.json
 
       # One commit, force-pushed: the branch holds the current files and no history of old ones.
       - name: Veroeffentlichen
@@ -116,6 +115,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add builds.json meta.json situational.json
-          if [ -f mayhem.json ]; then git add mayhem.json; fi
+          if [ -f aram.json ]; then git add aram.json; fi
           git commit -q -m "Daten $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data

@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-const NAMES: [&str; 4] = ["meta.json", "builds.json", "mayhem.json", "situational.json"];
+const NAMES: [&str; 4] = ["meta.json", "builds.json", "aram.json", "situational.json"];
 
 /// The file for a name the page may use: one of NAMES, or one of them plus ".etag".
 pub fn path_for(name: &str) -> Option<PathBuf> {
