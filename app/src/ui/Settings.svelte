@@ -4,6 +4,7 @@
   import { fly, fade } from 'svelte/transition';
   import Segment from './Segment.svelte';
   import { changeSetting, settings, type AppSettings } from '../live/settings.svelte';
+  import { canGlass, glassNow } from '../platform/shell';
 
   let { onClose }: { onClose: () => void } = $props();
 
@@ -43,6 +44,15 @@
           <input type="checkbox" role="switch" checked={settings[row.key]} onchange={(e) => void changeSetting(row.key, e.currentTarget.checked)} />
         </label>
       {/each}
+      {#if canGlass}
+        <label class="row">
+          <span class="text">
+            <b>Glas-Effekt</b>
+            <small>{settings.glassEffect === glassNow ? 'Windows 11 scheint durch das Fenster (Mica). Aus: deckend wie unter Windows 10.' : 'Wirkt beim nächsten Start von DirkDraft.'}</small>
+          </span>
+          <input type="checkbox" role="switch" checked={settings.glassEffect} onchange={(e) => void changeSetting('glassEffect', e.currentTarget.checked)} />
+        </label>
+      {/if}
     </div>
   </section>
 

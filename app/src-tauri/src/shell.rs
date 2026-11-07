@@ -17,7 +17,7 @@ use tauri::{
     window::{Color, Effect, EffectsBuilder},
     AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
-use tauri_plugin_window_state::StateFlags;
+use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 use crate::settings::{self, Settings};
 
@@ -69,9 +69,13 @@ pub fn run() {
         })
         .setup(move |app| {
             crate::client::start(app.handle(), lockfile.clone());
-            let window = create_window(app.handle())?;
+            let glass = app.state::<ShellState>().flag(settings::GLASS_EFFECT);
+            let window = create_window(app.handle(), glass)?;
             create_tray(app.handle())?;
             let state = app.state::<ShellState>();
+            if let Ok(settings) = state.settings.lock() {
+                adopt_legacy_place(app.handle(), &window, &settings);
+            }
             window.set_always_on_top(state.flag(settings::KEEP_ON_TOP))?;
             window.show()?;
             Ok(())
@@ -85,6 +89,9 @@ pub fn run() {
                 // stale instance forever.
                 WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
+                    // The plugin writes the place only when the app exits; whoever puts the window
+                    // in the tray and shuts the PC down would lose it. Kept here as 1.5 did.
+                    let _ = app.save_window_state(StateFlags::SIZE | StateFlags::POSITION);
                     if state.flag(settings::TRAY_HINT_SHOWN) {
                         let _ = window.hide();
                     } else {
@@ -208,13 +215,16 @@ fn shell_minimize(window: WebviewWindow, state: State<'_, ShellState>) -> Result
     window.minimize().map_err(|e| e.to_string())
 }
 
-fn create_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-    let glass = mica_available();
+fn create_window(app: &AppHandle, wanted: bool) -> tauri::Result<WebviewWindow> {
+    let available = mica_available();
+    let glass = available && wanted;
 
-    // The page reads this before its first paint and draws its background to match.
+    // The page reads this before its first paint and draws its background to match; canGlass
+    // tells the settings sheet whether the glass switch means anything on this Windows.
     let marker = format!(
-        "window.__DIRKDRAFT_SHELL__ = {{ glass: '{}' }};",
-        if glass { "mica" } else { "none" }
+        "window.__DIRKDRAFT_SHELL__ = {{ glass: '{}', canGlass: {} }};",
+        if glass { "mica" } else { "none" },
+        available
     );
 
     let builder = WebviewWindowBuilder::new(app, MAIN, WebviewUrl::default())
@@ -238,6 +248,46 @@ fn create_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     };
 
     builder.build()
+}
+
+/// 1.5 kept the window's place in settings.json (windowLeft/Top/Width/Height, in WPF's device
+/// independent pixels at the primary monitor's scale; NaN = never placed). The first 2.0 start takes
+/// it over; from then on the window-state plugin keeps it in its own file. A place on a monitor that
+/// is gone is dropped (the window stays centred), a size larger than the monitor is cut to it.
+fn adopt_legacy_place(app: &AppHandle, window: &WebviewWindow, settings: &Settings) {
+    let Ok(dir) = app.path().app_config_dir() else { return };
+    if dir.join(tauri_plugin_window_state::DEFAULT_FILENAME).exists() {
+        return;
+    }
+    let Some(place) = legacy_place(settings) else { return };
+    let Ok(Some(primary)) = window.primary_monitor() else { return };
+    let monitors = window.available_monitors().unwrap_or_default();
+    let scale = primary.scale_factor();
+    let (x, y, w, h) = (place.0 * scale, place.1 * scale, place.2 * scale, place.3 * scale);
+
+    // The monitor the stored place mostly lies on (its centre), if it is still attached.
+    let centre = (x + w / 2.0, y + h / 2.0);
+    let host = monitors.iter().find(|m| {
+        let (p, s) = (m.position(), m.size());
+        centre.0 >= p.x as f64 && centre.0 < p.x as f64 + s.width as f64 && centre.1 >= p.y as f64 && centre.1 < p.y as f64 + s.height as f64
+    });
+    let area = host.unwrap_or(&primary);
+    let (max_w, max_h) = (area.size().width as f64, area.size().height as f64);
+    let size = tauri::PhysicalSize::new(w.min(max_w).max(340.0 * scale) as u32, h.min(max_h).max(560.0 * scale) as u32);
+    let _ = window.set_size(size);
+    if host.is_some() {
+        let p = area.position();
+        let left = x.clamp(p.x as f64, p.x as f64 + max_w - size.width as f64);
+        let top = y.clamp(p.y as f64, p.y as f64 + max_h - size.height as f64);
+        let _ = window.set_position(tauri::PhysicalPosition::new(left as i32, top as i32));
+    }
+}
+
+/// The 1.5 place (left, top, width, height in device-independent pixels), if it was ever set.
+fn legacy_place(settings: &Settings) -> Option<(f64, f64, f64, f64)> {
+    let width = settings.number("windowWidth").filter(|w| *w > 0.0)?;
+    let height = settings.number("windowHeight").filter(|h| *h > 0.0)?;
+    Some((settings.number("windowLeft")?, settings.number("windowTop")?, width, height))
 }
 
 /// Mica exists from Windows 11 (build 22000). On Windows 10 the effect silently does nothing and a

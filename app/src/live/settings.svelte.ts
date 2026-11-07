@@ -14,6 +14,8 @@ export interface AppSettings {
   showUnowned: boolean;
   /** The key Flash goes on when spells are taken over. */
   flashKey: 'D' | 'F';
+  /** Mica on Windows 11; read by the shell at start. */
+  glassEffect: boolean;
 }
 
 /** 1.5's defaults, and F for Flash (user's rule). */
@@ -24,6 +26,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   keepOnTop: false,
   showUnowned: false,
   flashKey: 'F',
+  glassEffect: true,
 };
 
 export const settings = $state<AppSettings>({ ...DEFAULT_SETTINGS });

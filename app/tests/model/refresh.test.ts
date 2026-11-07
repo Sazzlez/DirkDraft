@@ -1,7 +1,7 @@
 // Automatic data refresh: only while idle, never a swap under a running draft or game.
 
 import { describe, expect, it } from 'vitest';
-import { DataRefresher, REFRESH_INTERVAL_MS } from '../../src/core/refresh';
+import { DataRefresher, FIRST_RETRY_MS, REFRESH_INTERVAL_MS } from '../../src/core/refresh';
 import { emptySnapshot } from '../../src/core/model/metaLookup';
 import type { DataSet } from '../../src/data/remote';
 
@@ -124,5 +124,20 @@ describe('automatic data refresh', () => {
     h.refresher.start(set('kept'));
     await h.refresher.onPhase('Lobby', 0);
     expect(h.applied).toEqual(['kept']);
+  });
+
+  it('without any numbers, a failed first download is tried again after a minute', async () => {
+    let online = false;
+    const h = harness(() => (online ? set('new') : null));
+    await h.refresher.onPhase(null, 0);
+    expect(h.downloads()).toBe(1);
+    await h.refresher.tick(FIRST_RETRY_MS - 1);
+    expect(h.downloads()).toBe(1);
+    online = true;
+    await h.refresher.tick(FIRST_RETRY_MS);
+    expect(h.applied).toEqual(['new']);
+    // From then on the half-hour rhythm.
+    await h.refresher.tick(FIRST_RETRY_MS * 2);
+    expect(h.downloads()).toBe(2);
   });
 });

@@ -104,6 +104,13 @@ export class LiveSession {
     return this.data !== null;
   }
 
+  /** The last download found no usable numbers (offline, GitHub down): said while there are none. */
+  private dataFailed = false;
+
+  setDataFailed(failed: boolean): void {
+    this.dataFailed = failed;
+  }
+
   onStatus(status: ClientStatus): void {
     this.status = status;
     if (!status.clientRunning) {
@@ -195,7 +202,13 @@ export class LiveSession {
     };
 
     if (!this.data) {
-      return { ...base, main: { kind: 'none' }, emptyText: 'Die Zahlen werden geladen — beim allerersten Start dauert das einen Moment.' };
+      return {
+        ...base,
+        main: { kind: 'none' },
+        emptyText: this.dataFailed
+          ? 'Die Zahlen ließen sich nicht laden — keine Verbindung zu GitHub? DirkDraft versucht es jede Minute neu.'
+          : 'Die Zahlen werden geladen — beim allerersten Start dauert das einen Moment.',
+      };
     }
 
     if (moment === 'game') return this.gameMoment(base);

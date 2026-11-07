@@ -16,6 +16,12 @@ export const isIdle = (phase: string | null): boolean => phase === null || IDLE.
 /** How often an idle client looks for new data; the collector publishes every six hours. */
 export const REFRESH_INTERVAL_MS = 30 * 60 * 1000;
 
+/**
+ * Without any numbers yet (first start, offline): try again after a minute, not after half an hour —
+ * the window has nothing to show until a download works.
+ */
+export const FIRST_RETRY_MS = 60 * 1000;
+
 export class DataRefresher {
   private phase: string | null = null;
   private pending: DataSet | null = null;
@@ -50,7 +56,8 @@ export class DataRefresher {
     // The one exception: with no numbers at all there is nothing a download could change under the
     // draft — without it a first start in champ select would show nothing for the whole game.
     const allowed = isIdle(this.phase) || !this.hasData;
-    if (!allowed || now - this.lastAttempt < this.intervalMs) return Promise.resolve();
+    const wait = this.hasData ? this.intervalMs : Math.min(this.intervalMs, FIRST_RETRY_MS);
+    if (!allowed || now - this.lastAttempt < wait) return Promise.resolve();
     this.lastAttempt = now;
     this.running = this.refresh().finally(() => {
       this.running = null;

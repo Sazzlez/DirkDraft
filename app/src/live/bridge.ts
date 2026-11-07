@@ -101,7 +101,13 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
 
   // The files live with the shell; the webview's fetch revalidates with its own HTTP cache.
   const refresher = new DataRefresher(
-    () => loadDataSet(browserFetcher, shellCache),
+    async () => {
+      // A failed download is only worth a word while there are no numbers at all.
+      const set = await loadDataSet(browserFetcher, shellCache).catch(() => null);
+      session.setDataFailed(!set);
+      if (!set) render();
+      return set;
+    },
     (set) => void apply(set),
   );
   refresher.start(await loadKept(shellCache));

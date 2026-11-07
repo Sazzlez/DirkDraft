@@ -40,6 +40,14 @@ impl Settings {
         self.get(key).and_then(Value::as_bool).unwrap_or(default)
     }
 
+    /// A number as 1.5 wrote it: a JSON number, or a string (.NET writes NaN as "NaN"); None for
+    /// anything not finite.
+    pub fn number(&self, key: &str) -> Option<f64> {
+        let value = self.get(key)?;
+        let number = value.as_f64().or_else(|| value.as_str().and_then(|s| s.trim().parse::<f64>().ok()))?;
+        number.is_finite().then_some(number)
+    }
+
     pub fn text(&self, key: &str) -> Option<String> {
         self.get(key).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()).map(str::to_string)
     }
@@ -63,6 +71,7 @@ impl Settings {
             "autoHideAfterChampSelect": self.flag(AUTO_HIDE_AFTER_CHAMP_SELECT.0, AUTO_HIDE_AFTER_CHAMP_SELECT.1),
             "keepOnTop": self.flag(KEEP_ON_TOP.0, KEEP_ON_TOP.1),
             "showUnowned": self.flag(SHOW_UNOWNED.0, SHOW_UNOWNED.1),
+            "glassEffect": self.flag(GLASS_EFFECT.0, GLASS_EFFECT.1),
             "flashKey": if self.text(FLASH_KEY).as_deref() == Some("D") { "D" } else { "F" },
         })
     }
@@ -106,13 +115,17 @@ pub const LOCKFILE_PATH: &str = "lockfilePath";
 pub const SHOW_UNOWNED: (&str, bool) = ("showUnowned", false);
 /// 2.0: the key Flash goes on when spells are taken over ("D" or "F", default F).
 pub const FLASH_KEY: &str = "flashKey";
+/// 2.0: Mica behind the window on Windows 11 (read at start). Off = the opaque Windows 10 look —
+/// the way out should the transparent window misbehave on someone's machine.
+pub const GLASS_EFFECT: (&str, bool) = ("glassEffect", true);
 
-const FLAGS: [&str; 5] = [
+const FLAGS: [&str; 6] = [
     AUTO_SHOW_ON_CHAMP_SELECT.0,
     AUTO_SHOW_ON_GAME_START.0,
     AUTO_HIDE_AFTER_CHAMP_SELECT.0,
     KEEP_ON_TOP.0,
     SHOW_UNOWNED.0,
+    GLASS_EFFECT.0,
 ];
 
 #[cfg(test)]
@@ -162,6 +175,20 @@ mod tests {
         assert!(settings.set_from_page("poolAdded", serde_json::json!([122, 86])).is_err());
         assert!(settings.set_from_page("lockfilePath", Value::from("C:\\x")).is_err());
         assert!(settings.set_from_page("trayHintShown", Value::from(false)).is_err());
+    }
+
+    #[test]
+    fn reads_1_5_window_numbers_and_skips_nan() {
+        let values = serde_json::from_str::<Value>(r#"{"windowLeft": 812.5, "WindowTop": "40", "windowWidth": "NaN", "windowHeight": null}"#)
+            .unwrap()
+            .as_object()
+            .cloned()
+            .unwrap();
+        let settings = Settings { path: None, values, writable: false };
+        assert_eq!(settings.number("windowLeft"), Some(812.5));
+        assert_eq!(settings.number("windowTop"), Some(40.0));
+        assert_eq!(settings.number("windowWidth"), None);
+        assert_eq!(settings.number("windowHeight"), None);
     }
 
     #[test]
