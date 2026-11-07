@@ -27,7 +27,7 @@
   </div>
 
   <div class="right" data-tauri-drag-region>
-    <span class="pill" title="Aktualisiert sich von selbst — nie während Draft oder Spiel" data-tauri-drag-region>
+    <span class="pill" title="{view.data.text} — aktualisiert sich von selbst, nie während Draft oder Spiel" data-tauri-drag-region>
       <span class="dot-small" class:stale={view.data.stale}></span>
       <span class="num">{view.data.text}</span>
     </span>
@@ -148,6 +148,16 @@
     font: var(--t-caption);
     white-space: nowrap;
     cursor: default;
+    /* The data line can be long ("Patch 16.22 · Platin · 6.185 Spiele · vor 5 Std."): it gives way
+       to the area switch instead of running under it. */
+    min-width: 0;
+    flex: 0 1 auto;
+    overflow: hidden;
+  }
+
+  .pill .num {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .dot-small {

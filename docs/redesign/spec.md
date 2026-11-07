@@ -100,10 +100,11 @@ CC ≥ 6 → Tenacity, nur ab drei aufgedeckten Gegnern, nie umsortierend.
   DraftPilot) werden ersetzt, eine fremde nur nach Nachfrage mit Namen (älteste löschbare), Abbruch
   ohne Löschen, wenn mehr als ein Platz fehlt; 4+2+3 Perks.
   **2.0 neu (Nutzerwunsch 07.11.2026):** derselbe Klick setzt die Beschwörerzauber —
-  `PATCH /lol-champ-select/v1/session/my-selection` (`spell1Id`, `spell2Id`). Die Plätze folgen dem
-  Spieler (`core/loadout.ts`): ein schon gewählter Zauber bleibt auf seiner Taste, Flash kommt dorthin,
-  wo der Spieler es zuletzt hatte, erst dann gilt die Reihenfolge der Daten; schon gewählt = nichts
-  schreiben. Knopf „Runen und Zauber übernehmen“.
+  `PATCH /lol-champ-select/v1/session/my-selection` (`spell1Id`, `spell2Id`). **Flash immer auf F**
+  (Nutzervorgabe 07.11.2026; umstellbar auf D erst mit der Einstellungsseite), auch wenn es vorher
+  auf D lag (`core/loadout.ts`); ein anderer schon gewählter Zauber bleibt auf seiner Taste, erst dann
+  gilt die Reihenfolge der Daten; schon so gesetzt = nichts schreiben. Knopf „Runen und Zauber
+  übernehmen“.
 - **Queues:** 420 Solo/Duo, 440 Flex, 400/430/490/480 Normal/Swiftplay, 700/720 Clash, 830–890
   Bots, 450 ARAM, 2400/2410/2450/3270/3280 Mayhem, 1700/1710/1750 Arena, 900/1900/1020/1300/1400
   rotierend; Custom-Kennung nur bei unbekannter ID. Keine Lanes in ARAM, Mayhem, Arena, rotierend.

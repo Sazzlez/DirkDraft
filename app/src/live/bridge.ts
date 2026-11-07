@@ -1,10 +1,10 @@
 // Wires the shell's events (src-tauri/src/client.rs) into the live session and hands the UI a fresh
 // ViewModel after every change. Also owns the data refresh (core/refresh: every 30 min, never in
-// champ select or a game) and the import button's round trip.
+// champ select or a game) and the import button's round trip (Flash always on F).
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { flashSlotOf, spellSlots } from '../core/loadout';
+import { DEFAULT_FLASH_SLOT, spellSlots } from '../core/loadout';
 import { DataRefresher } from '../core/refresh';
 import type { ViewModel } from '../core/view';
 import { loadAssets } from '../data/assets';
@@ -29,29 +29,8 @@ const session = new LiveSession();
 let notify: (view: ViewModel) => void = () => {};
 let ticker: ReturnType<typeof setInterval> | null = null;
 
-const FLASH_SLOT_KEY = 'dirkdraft:flashSlot';
-
 function render(): void {
   notify(session.view());
-}
-
-function rememberFlashSlot(): void {
-  const slot = flashSlotOf(session.importPlan()?.currentSpells ?? [0, 0]);
-  if (slot === null) return;
-  try {
-    localStorage.setItem(FLASH_SLOT_KEY, String(slot));
-  } catch {
-    // Without storage the next import uses the data's order; nothing else depends on it.
-  }
-}
-
-function storedFlashSlot(): 0 | 1 | null {
-  try {
-    const value = localStorage.getItem(FLASH_SLOT_KEY);
-    return value === '0' ? 0 : value === '1' ? 1 : null;
-  } catch {
-    return null;
-  }
 }
 
 async function apply(set: DataSet): Promise<void> {
@@ -83,7 +62,6 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   });
   await listen<string | null>('client://session', (e) => {
     session.onSession(e.payload);
-    rememberFlashSlot();
     render();
   });
   await listen<string | null>('game://live', (e) => {
@@ -116,7 +94,8 @@ export async function runImport(): Promise<string> {
   const plan = session.importPlan();
   if (!plan) return 'Für diesen Champion gibt es noch keinen Build zum Übernehmen.';
 
-  const spells = spellSlots(plan.spells, plan.currentSpells, flashSlotOf(plan.currentSpells) ?? storedFlashSlot());
+  // Flash on F (user's rule); a settings switch for D comes with the settings page.
+  const spells = spellSlots(plan.spells, plan.currentSpells, DEFAULT_FLASH_SLOT);
   const runes = plan.runes;
   const request = {
     page: runes
