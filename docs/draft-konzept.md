@@ -1,116 +1,139 @@
-# Draft-Konzept: Was ein Pick wert ist (Entwurf, 07.11.2026)
+# Draft-Konzept: Was ein Pick wert ist (Entwurf 2, 07.11.2026)
 
-Ziel: Jeder Vorschlag im Draft ist eine Zahl, die geschätzte Winrate deines Teams mit diesem Pick,
-gerechnet aus allem, was im Draft schon feststeht. Dazu gehören Meta-Stärke, Counter, Lane- und
-Team-Synergien und die Team-Comp. Jeder Teil ist **gemessen**, aus unseren eigenen Spielen, mit
-Fehlerbalken. Kein Teil hat ein geschätztes Gewicht.
+**Ziel:** Auf jeder Lane steht oben der Champion, mit dem dein Team das Spiel am wahrscheinlichsten
+gewinnt — als Einzelspieler auf der Lane und als Team. Die Zahl dahinter ist die geschätzte Winrate
+nach allem, was im Draft feststeht. Jeder Teil davon ist an unseren eigenen Spielen gemessen, keiner
+ist geschätzt.
 
-## 1. Wie 2.0.0 heute rechnet
+## 1. Was der Draft kann — und was nicht
 
-Jeder Teil verschiebt die Winrate (auf der Log-Odds-Skala), die Teile werden addiert. Jeder Teil zählt
-nur das, was er **über die anderen hinaus** erklärt. Ein Duell zählt also nur, soweit es mehr ist als
-die Lane-Stärke der beiden Champions.
+Ehrlich vorweg, damit die Erwartung stimmt:
 
-| Teil | Was gezählt wird | Gewicht | Grundlage |
+- **Der Draft entscheidet einen Teil des Spiels, nicht das Spiel.** Erfahrungsgemäß sagen die zehn
+  Champions allein den Sieger in Solo/Duo nur zu etwa 55–60 % richtig voraus. Den Rest machen Spieler,
+  Form und Spielverlauf aus. Wie viel es bei uns in Platin genau ist, misst Phase 2.
+- **Der beste Pick gegenüber einem durchschnittlichen** bringt typischerweise ein paar Prozentpunkte,
+  bei einem echten Counter mehr. Das klingt wenig, ist über viele Spiele aber viel: +3 Punkte Winrate
+  sind auf Dauer ein deutlicher Aufstieg.
+- **Wie gut jemand einen Champion beherrscht, sieht das Modell nicht.** Es rechnet für einen
+  durchschnittlichen Platin-Spieler, der den Champion spielt. Ein Champion, den man kaum kennt,
+  verliert erfahrungsgemäß spürbar häufiger, als die Zahl sagt.
+
+Gerade deshalb muss jeder Teil gemessen sein. Bei Effekten von wenigen Punkten verdrängt ein
+geschätztes Gewicht schnell einen besseren Vorschlag.
+
+## 2. Wie 2.0.0 heute rechnet
+
+Fünf Teile verschieben die Winrate und werden addiert. Jeder zählt nur, was er über die anderen
+hinaus erklärt:
+
+| Teil | Was | Gewicht | Grundlage |
 |---|---|---|---|
-| Meta-Stärke | Winrate des Champions auf deiner Lane, geglättet (800 Spiele) | 1 | gemessen |
-| Lane-Counter | Duell gegen den wahrscheinlichen Lane-Gegner, geglättet (1.000) | 1 | gemessen |
-| Gegnerteam | Duelle gegen die übrigen Gegner, gemittelt | 0,35 | **geschätzt** |
-| Synergie | alle Paare mit Mitspielern, gemittelt, geglättet (750) | 0,6 | Glättung gemessen, Gewicht **geschätzt** |
-| Team-Comp | 7 Regeln (AP/AD, Frontline, Engage, Peel, CC, nur Melee) | höchstens ±4 Punkte | **keine Daten dahinter** |
-| Offene Counter | Champions, die dich auf deiner Lane noch kontern können | nur als Text | — |
+| Meta-Stärke | Winrate auf der Lane, geglättet (800) | 1 | gemessen |
+| Lane-Counter | Duell gegen den Lane-Gegner, geglättet (1.000) | 1 | gemessen |
+| Gegnerteam | Duelle gegen die übrigen Gegner, gemittelt | 0,35 | geschätzt |
+| Synergie | alle Paare mit Mitspielern, gemittelt (Glättung 750) | 0,6 | geschätzt |
+| Team-Comp | 7 Regeln (AP/AD, Frontline, Engage, Peel, CC, nur Melee) | ≤ ±4 Punkte | keine Daten |
 
-### Schwachstellen
+Schwachstellen:
+- Drei Gewichte sind geschätzt.
+- Gegner außerhalb der eigenen Lane werden aus Lane-Duellen geborgt und fehlen meist ganz.
+- Die Botlane wird als zwei getrennte 1-gegen-1-Lanes gerechnet.
+- Jungle-Einfluss auf die Lanes gibt es nicht.
+- Synergien werden gemittelt, statt zu zählen.
+- Die Comp-Regeln haben keine Zahlen dahinter.
+- Die Pick-Reihenfolge fehlt in der Zahl.
 
-1. **Drei Gewichte sind geschätzt** (0,35 · 0,6 · Comp). Im Code steht selbst: Abgleich mit echten
-   Spielen ist offen.
-2. **Die Botlane wird wie zwei getrennte 1-gegen-1-Lanes gerechnet.** ADC gegen gegnerischen Support
-   und Support gegen gegnerischen ADC zählt der Sammler gar nicht. Für einen Support wie Blitzcrank
-   gegen einen ADC ohne Flucht fehlt damit genau das Wichtigste.
-3. **Der Lane-Partner ist einer von vier Mitspielern.** Das Botlane-Duo zählt so viel wie Top + Support.
-   Und weil gemittelt wird, verwässert jeder weitere Mitspieler ein starkes Duo.
-4. **Gegner außerhalb der Lane** werden aus Lane-Duellen geschätzt: Gegen den gegnerischen ADC sucht
-   das Modell ein Duell auf irgendeiner Lane. Für einen Support findet es da meist nichts.
-5. **Comp-Regeln haben keine Zahlen.** Ob „kein Engage“ in Platin wirklich Spiele kostet, ist nicht
-   gemessen.
-6. **Die Pick-Reihenfolge fehlt in der Zahl.** Ein früher Pick, der leicht zu kontern ist, steht genauso
-   da wie ein sicherer. Das Risiko steht nur als Text daneben.
+## 3. Was auf welcher Lane zählt
 
-## 2. Das Konzept
+Die Spieldaten zeigen nur, wer gegen wen und mit wem gewonnen hat. Daraus lässt sich messen, welche
+Beziehungen auf welcher Lane wie viel wiegen. Was ich erwarte (Vermutung, Phase 2 misst es):
 
-### Grundsatz: Gewichte aus echten Spielen messen
+| Lane | Counter | Synergie | Team-Comp |
+|---|---|---|---|
+| **Top** | Lane-Duell wiegt am meisten (Insel-Lane, harte Counter); dazu: wie gefährdet gegen den gegnerischen Jungler | Jungle + Top (Ganks, Dive) | Frontline oder Splitpush, je nach Team |
+| **Jungle** | Jungle-Duell (Invade, Clear); wie gut die eigenen Ganks gegen die gegnerischen Laner gehen | Jungle + Laner mit Kontrolle und Lane-Druck (Mid, Bot, Top) | Engage, früh oder spät |
+| **Mid** | Lane-Duell (starke Counter); dazu der gegnerische Jungler | Jungle + Mid (2 gegen 2 in der Mitte), Mid + Support (Roams) | oft die AP-Quelle des Teams |
+| **ADC** | Botlane 2 gegen 2: ADC-Duell **und** gegnerischer Support | ADC + Support, das stärkste Paar im Spiel | braucht Schutz (Peel, Frontline) |
+| **Support** | Botlane 2 gegen 2: Support-Duell **und** gegnerischer ADC (Engage gegen ADC ohne Flucht) | Support + ADC; Support + Jungle/Mid (Roams) | Engage oder Peel, je nach Team |
 
-Der Sammler legt zusätzlich **je gezähltem Spiel die zehn Champions mit Lane und den Sieger** ab, ohne
-Namen und ohne IDs, etwa 20 Bytes pro Spiel, im nicht öffentlichen Bestand, je Patch. Daraus lässt sich
-für jeden Teil prüfen, wie gut er den Sieger vorhersagt:
+Für alle Lanes gleich: Meta-Stärke im aktuellen Patch, Team-Comp beider Seiten und ob das Team früh
+oder spät gewinnt.
 
-- Die Spiele werden geteilt: An 80 % werden die Tabellen gezählt (Lanes, Duelle, Duos …), an den
-  übrigen 20 % wird geprüft. So schaut kein Spiel seine eigene Antwort ab.
-- Die Gewichte der Teile werden per logistischer Regression an den 80 % bestimmt und an den 20 %
-  bestätigt (Log-Loss gegenüber „nur Meta-Stärke“).
-- **Ein Teil, der an den Prüfspielen nichts verbessert, bekommt Gewicht 0.** Er darf dann als
-  Hinweis stehen, aber die Zahl nicht verschieben.
+## 4. Das Konzept: ein gemeinsames Modell für alle Lanes
 
-Neue Riot-Abfragen kostet das nicht: Alles kommt aus denselben Spieldaten, die der Sammler schon liest.
+Statt fünf einzeln gerechneter Teile ein **einziges Modell, das an allen gezählten Spielen gelernt
+wird**:
 
-### Die Teile
+> Winrate von Blau = Meta-Stärke aller zehn Champions auf ihren Lanes
+> + Synergie jedes Paars im selben Team (nach Paar-Art: Botlane-Duo, Jungle + Mid, …)
+> + Counter jedes Paars über die Teams hinweg (nach Paar-Art: Lane-Duell, Botlane-Kreuz, Jungle gegen Laner, …)
+> + Team-Comp beider Seiten (gemessene Merkmale)
 
-**1. Meta-Stärke** bleibt die Basis: Winrate auf der Lane, geglättet. Die Glättung wird mit mehr Spielen
-neu gemessen. Pickrate macht einen Champion nicht stärker; sie zählt nur für die Sicherheit
-(Fehlerbalken), nicht als Bonus.
+**Warum das besser ist:**
+1. **Keine Doppelzählung, keine geschätzten Gewichte.** Alles wird gemeinsam an echten Ergebnissen
+   bestimmt. Jede Paar-Art bekommt die Stärke, die sie in Platin tatsächlich hat.
+2. **Alle Lanes nach denselben Regeln,** aber jede mit ihren eigenen Beziehungen (Tabelle oben).
+3. **Auch seltene Paare bekommen eine sinnvolle Zahl.** Jeder Champion bekommt wenige Merkmale, die
+   das Modell selbst lernt, etwa „Engage“, „ohne Flucht“ oder „spät stark“. Ein Paar mit wenigen
+   Spielen erbt dann, was ähnliche Paare zeigen. Blitzcrank gegen einen seltenen ADC ohne Flucht sieht
+   aus wie Blitzcrank gegen andere ADCs ohne Flucht. Heute fällt so ein Paar auf „neutral“ zurück.
+   Fachlich ist das eine Faktorisierung: dasselbe Prinzip, mit dem Empfehlungssysteme seltene
+   Kombinationen schätzen.
+4. **Erklärbar bleibt es:** Jede Zahl zerfällt in Beiträge einzelner Champions und Paare, die
+   Begründungszeilen bleiben („+1,5 gegen Jinx“, „starkes Botlane-Duo mit Nami“).
 
-**2. Lane-Counter**
-- Top, Jungle, Mid: Duell gegen den Lane-Gegner wie heute.
-- **Botlane als 2 gegen 2:** vier Duelle — ADC↔ADC, Support↔Support, ADC↔gegnerischer Support,
-  Support↔gegnerischer ADC. Der Sammler zählt die beiden Kreuz-Duelle neu dazu. Jedes der vier
-  bekommt ein gemessenes Gewicht. Zu erwarten: Duelle gleicher Rolle wiegen am meisten, die
-  Kreuz-Duelle weniger, aber spürbar.
+**Absicherung:** Gelernt wird an 80 % der Spiele, geprüft an den übrigen 20 %. Das gemeinsame Modell
+ersetzt das heutige nur, wenn es an den Prüfspielen den Sieger messbar besser vorhersagt **und** gut
+kalibriert ist („55 %“ gewinnt wirklich etwa 55 %). Phase 2 vergleicht drei Stufen:
+**A** heute · **B** heutige Teile mit gemessenen Gewichten und Paar-Arten · **C** gemeinsames Modell.
+Ausgeliefert wird die beste.
 
-**3. Gegnerteam:** Statt Lane-Duelle zu borgen, zählt der Sammler „gegen wen im selben Spiel“ für alle
-25 Gegner-Paare, mit Lanes, wie er es bei Duos schon tut. Das Gewicht wird gemessen und ersetzt die 0,35.
+### Mehr aus denselben Spielen holen
 
-**4. Lane-Synergie:** Paare bekommen einen Typ mit eigenem Gewicht: **Botlane-Duo** (ADC + Support),
-**Jungle + Mid**, **Jungle + Top**, **Jungle + Botlane**. Der Sammler zählt alle Paare schon mit Lanes,
-hier ändert sich nur die Rechnung in der App. Begründung im Vorschlag: „starkes Botlane-Duo mit Nami“.
+- **Meta-Stärke ohne Neustart je Patch:** Stärke ändert sich mit Patches, aber gemessen nur um etwa
+  einen halben Punkt pro Patch, außer bei Buffs und Nerfs. Der alte Patch dient als Vorwissen, der
+  neue korrigiert. Dann sind die Zahlen schon am Patchtag brauchbar, statt einen Tag lang dünn.
+- **Synergien und Counter über mehrere Patches:** Ob Blitzcrank ADCs ohne Flucht bestraft, hängt am
+  Kit, nicht am Patch. Diese Beziehungen werden über die letzten drei Patches gelernt, mit mehr
+  Gewicht auf dem neuesten. Das verdreifacht die Daten genau dort, wo sie am dünnsten sind. Dafür muss
+  der Sammler die Spiel-Zeilen der letzten drei Patches behalten (Phase 1b).
+- **Früh oder spät:** Die Spiel-Zeilen tragen Spieldauer und Gold-Vorsprung nach 15 Minuten. Daraus
+  lässt sich messen, welche Champions früh und welche spät gewinnen, und ob ein Team mit zu wenig
+  Spätphase gegen ein spät starkes Team verliert.
 
-**5. Team-Synergie:** alle übrigen Paare, **addiert statt gemittelt**, mit eigenem, gemessenem (kleinem)
-Gewicht. Dann verwässert ein dritter Mitspieler kein starkes Duo mehr.
+### Team-Comp, gemessen
 
-**6. Team-Comp:** Jede Regel wird an den Spielen gemessen: Wie oft gewinnen Teams **mit** der Lücke
-(zum Beispiel ohne AP-Schaden, ohne Frontline, ohne Engage) gegenüber Teams ohne sie? Regeln mit
-messbarem Effekt zählen mit der gemessenen Größe. Die anderen bleiben als Hinweis („kein Engage“),
-ohne die Zahl zu verschieben.
+Jedes Merkmal wird an den Spielen geprüft, gegeben die Champions: Anteil AP-Schaden, Frontline, harte
+Kontrolle, Engage, Peel, Reichweite, früh oder spät stark. Dazu das Zusammenspiel mit dem gegnerischen
+Team, soweit es sich zeigt. Merkmale ohne messbaren Effekt verschieben die Zahl nicht und bleiben
+höchstens Hinweis.
 
-**7. Pick-Reihenfolge:** Ist dein Lane-Gegner noch offen, zählt das **erwartete Duell gegen die
-Champions, die der Gegner auf deiner Lane noch nehmen kann**, gewichtet danach, wie oft sie dort
-gespielt werden. So gewinnen früh sichere Picks mit wenigen harten Countern, und spät der direkte
-Counter. Dass der Gegner bewusst kontert, zeigen die Spieldaten nicht (Riot gibt die Pick-Reihenfolge
-nicht heraus). Der schlimmste Fall bleibt deshalb Text: „2 offene Counter: …“.
+### Pick-Reihenfolge
 
-**8. Banns** nutzen dieselben Teile umgekehrt, wie heute.
+- **Lane-Gegner noch offen:** Es zählt das erwartete Duell gegen die Champions, die der Gegner auf
+  deiner Lane noch nehmen kann, gewichtet nach Platin-Pickrate. Früh gewinnen so sichere Picks, spät
+  der gezielte Counter.
+- **Bewusstes Kontern** zeigen die Spieldaten nicht, weil Riot die Pick-Reihenfolge nicht herausgibt.
+  Der schlimmste Fall bleibt deshalb als Text stehen („2 offene Counter: …“).
+- **Banns** aus demselben Modell: gebannt wird, was die Winrate deines Teams am meisten drücken würde,
+  wenn der Gegner es nimmt, gewichtet nach Pick-Wahrscheinlichkeit.
 
 ### Anzeige
 
 Unter jedem Vorschlag die Teile in Punkten, damit klar ist, warum er oben steht. Zum Beispiel
-„Meta +1,2 · Counter +2,0 · Botlane-Duo +0,8 · Comp −0,5“. Die Begründungszeilen bleiben wie
-gewohnt eine Zeile je Grund.
+„Meta +1,2 · Lane +1,8 · Botlane 2v2 +0,9 · Team +0,4 · Comp −0,3“. Oben im Draft steht die Chance des
+ganzen Teams („Dein Draft: 52 % → mit Nami 54 %“). Die Begründungszeilen bleiben eine Zeile je Grund.
 
-## 3. Fahrplan
+## 5. Fahrplan
 
 | Phase | Was | Wann |
 |---|---|---|
-| 1 | Sammler: Spiel-Liste je Patch, Gegner-Paare auf anderen Lanes (darin die Botlane-Kreuz-Duelle). Die App rechnet noch wie heute; 2.0.0 übergeht das neue Feld. | **erledigt 07.11.2026** — zählt ab dem ersten Lauf mit diesem Stand |
-| 2 | Messen: Glättungen, Gewichte aller Teile, Comp-Regeln — Ergebnis in `docs/modellpruefung.md` | nach 5–7 Tagen Sammeln (~150.000 Spiele) |
-| 3 | Modell mit den gemessenen Gewichten, Anzeige der Teile, Tests, Release 2.1 | nach Phase 2, Release nur mit deinem OK |
+| 1 | Sammler: Gegner-Paare über alle Lanes (`versus`, darin Botlane-Kreuz und Jungle gegen Laner), je Spiel eine Zeile (zehn Champions mit Lane, Sieger, Dauer, Gold nach 15 Minuten). Die App rechnet noch wie heute. | **erledigt 07.11.2026** — zählt ab dem Lauf, der in der Nacht auf den 08.11. startet |
+| 1b | Sammler behält die Spiel-Zeilen der letzten drei Patches (für Synergien und Counter über Patches) | klein; vor dem nächsten Patchwechsel |
+| 2 | Messen: A, B und C an Prüfspielen vergleichen; Glättungen, Paar-Arten je Lane, Comp-Merkmale, früh/spät; dazu, wie viel der beste Pick gegenüber dem Durchschnitt bringt. Ergebnis in `docs/modellpruefung.md` | nach 5–7 Tagen Sammeln (~150.000 Spiele) |
+| 3 | Bestes Modell in Sammler-Export und App, Anzeige der Teile, Team-Chance, Tests, Release 2.1 | nach Phase 2, Release nur mit deinem OK |
 
 Bleibt wie es ist: Daten nur aus eigener Zählung, keine Namen anderer Spieler, kein automatisches
-Picken oder Bannen. Pool und Verlauf bleiben draußen.
-
-### Was ich erwarte (Vermutung, nicht gemessen)
-
-- Das **Botlane-Duo** und die **Botlane-Kreuz-Duelle** werden für Supports und ADCs der größte Gewinn
-  sein: Heute fehlt dort die halbe Lane.
-- **Team-Synergien** außerhalb der Lanes sind in Solo/Duo vermutlich klein. 1.5 maß über alle Paare
-  ±1,8 Punkte um die Erwartung.
-- Von den **Comp-Regeln** bleiben wohl nur wenige mit Gewicht (zum Beispiel einseitiger Schaden).
-  Das ist gut so: Eine Regel, die nichts vorhersagt, verdrängt heute bessere Vorschläge.
+Picken oder Bannen, Pool und Verlauf bleiben draußen. Keine zusätzlichen Riot-Abfragen: Alles kommt
+aus den Spielen, die der Sammler ohnehin liest.
