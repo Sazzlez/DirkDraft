@@ -23,7 +23,7 @@ import {
   SYNERGY_DAMPING,
   tierName,
 } from './scoreModel';
-import { LANE_PRIOR, MATCHUP_PRIOR, SYNERGY_PRIOR } from './shrinkage';
+import { MATCHUP_PRIOR, SYNERGY_PRIOR } from './shrinkage';
 import type { TraitTable } from './traits';
 import type { RecommendationTarget } from './turnTracker';
 
@@ -393,7 +393,7 @@ export class Recommender {
     const stat = this.meta.laneStat(championId, lane);
     if (!stat) return null;
     const logOdds = logit(stat.winRate);
-    budget.add(logitVariance(stat.winRate, stat.play, LANE_PRIOR, this.meta.laneTarget) + this.laneDrift());
+    budget.add(logitVariance(stat.winRate, stat.play, this.meta.lanePrior, this.meta.laneTarget) + this.laneDrift());
 
     if (winRateDelta(stat) > 0.015) {
       reasons.push(
@@ -458,7 +458,7 @@ export class Recommender {
     const mainLane = this.meta.mainLane(championId);
     const main = mainLane === Lane.Unknown ? null : this.meta.laneStat(championId, mainLane);
     if (!main) return null;
-    budget.add(logitVariance(main.winRate, main.play, LANE_PRIOR, this.meta.laneTarget) + this.laneDrift());
+    budget.add(logitVariance(main.winRate, main.play, this.meta.lanePrior, this.meta.laneTarget) + this.laneDrift());
     const logOdds = logit(main.winRate);
     if (mainLane !== seatLane && logOdds > 0.08) {
       reasons.push(
@@ -528,7 +528,7 @@ export class Recommender {
 
   private opponentLaneVariance(opponentId: number, lane: Lane): number {
     const stat = this.meta.laneStat(opponentId, lane);
-    return stat ? logitVariance(stat.winRate, stat.play, LANE_PRIOR, this.meta.laneTarget) : 0;
+    return stat ? logitVariance(stat.winRate, stat.play, this.meta.lanePrior, this.meta.laneTarget) : 0;
   }
 
   private offLaneMatchupLogOdds(

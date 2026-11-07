@@ -15,6 +15,7 @@ import {
   termVerdict,
 } from '../core/format';
 import { momentOf, type DraftFacts } from '../core/moment';
+import { queueDisplay, type QueueKind } from '../core/model/queue';
 import { extendSkills } from '../core/skillplan';
 import {
   LANES,
@@ -119,15 +120,10 @@ export interface SnapshotChampion {
   name: string;
 }
 
-const MODES: Record<string, string> = {
-  rankedSolo: 'Ranked Solo/Duo',
-  rankedFlex: 'Ranked Flex',
-  aram: 'ARAM',
-  aramMayhem: 'ARAM Mayhem*',
-  normalDraft: 'Normal Draft',
-  swiftplay: 'Swiftplay',
-  custom: 'Custom',
-  unknown: 'Ranked Solo/Duo',
+/** Where a mode's numbers come from when they are not its own (data from Solo/Duo and plain ARAM). */
+const MODE_NOTES: Partial<Record<QueueKind, string>> = {
+  rankedFlex: 'Zahlen aus Solo/Duo',
+  aramMayhem: 'Zahlen aus normalem ARAM',
 };
 
 export function toLane(value: string | null | undefined): Lane | null {
@@ -233,8 +229,9 @@ export class GoldenAdapter {
       myTurn: !planning && !!turn?.isLocalPlayer,
       // ARAM has no bans and no pick order to walk through — only the timer.
       steps: s.usesLanes ? steps(frame) : [],
-      mode: MODES[s.queue] ?? 'Ranked Solo/Duo',
-      modeNote: s.queue === 'aramMayhem' ? 'Mayhem nutzt die ARAM-Zahlen derselben Karte.' : null,
+      // Every queue by its name; an unknown one says nothing rather than "Ranked Solo/Duo".
+      mode: queueDisplay(s.queue as QueueKind),
+      modeNote: MODE_NOTES[s.queue as QueueKind] ?? null,
       usesLanes: s.usesLanes,
       bench: s.queue === 'aram' || s.queue === 'aramMayhem'
         ? s.bench.map((id) => this.champion(id)).filter((c): c is ChampionRef => !!c)

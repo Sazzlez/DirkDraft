@@ -12,14 +12,14 @@
 <section class="board" aria-label="Draft-Board">
   <div class="phaseline">
     <Clock seconds={board.seconds} total={board.total} turn={board.turnText} mine={board.myTurn} steps={board.steps} compact />
-    <span class="mode">{board.mode}</span>
+    <span class="mode">{board.mode}{#if board.modeNote}<span class="note">{' · '}{board.modeNote}</span>{/if}</span>
   </div>
 
   <div class="grid">
     <TeamColumn side="ally" title="Dein Team" slots={board.allies} bans={board.allyBans} usesLanes={board.usesLanes} onSeat={chooseSeat} onLane={chooseLane} />
     <div class="clock">
       <Clock seconds={board.seconds} total={board.total} turn={board.turnText} mine={board.myTurn} steps={board.steps} />
-      <span class="mode" title={board.modeNote ?? ''}>{board.mode}</span>
+      <span class="mode">{board.mode}{#if board.modeNote}<span class="note">{board.modeNote}</span>{/if}</span>
     </div>
     {#if board.bench}
       <div class="bench">
@@ -95,6 +95,15 @@
   .mode {
     font-size: 11px;
     color: var(--fg2);
+    text-align: center;
+  }
+
+  .clock .mode .note {
+    display: block;
+  }
+
+  .note {
+    color: var(--orange);
   }
 
   .bench-head {

@@ -228,13 +228,26 @@ export class LiveSession {
     const side: ViewModel['side'] = [];
     let main: ViewModel['main'];
 
+    let emptyText: string | null = null;
     if (moment === 'aramBench') {
       const aram = this.adapter.aram(frame);
       const note = this.data.aram
         ? 'Winrates aus unserer Zählung normaler ARAM-Spiele — Mayhem-Spiele gibt Riot nicht heraus.'
         : 'Noch keine ARAM-Zahlen geladen.';
-      main = aram ? { kind: 'aram', aram: { ...aram, note }, build } : { kind: 'none' };
+      if (aram) {
+        main = { kind: 'aram', aram: { ...aram, note }, build };
+      } else {
+        // 1.5's rule: without a number for the own champion there is nothing to compare the bench to.
+        main = { kind: 'lobby', title: 'Behalten oder tauschen?', lines: [] };
+        emptyText = this.data.aram
+          ? `Für ${myChampion?.name ?? 'deinen Champion'} gibt es noch keine ARAM-Zahlen — ohne sie lässt sich die Bank nicht vergleichen.`
+          : 'Die ARAM-Zahlen sind noch nicht geladen.';
+      }
       side.push({ kind: 'comp', comp: this.adapter.comp(frame) });
+    } else if (!frame.state.usesLanes) {
+      // Arena and rotating modes: no lanes, so no list and no build (spec, Momente).
+      main = { kind: 'lobby', title: board.mode || 'Kein Modus mit Lanes', lines: [] };
+      emptyText = `${board.mode || 'Dieser Modus'} hat keine Lanes. Unsere Zahlen stammen von Summoner’s Rift — deshalb gibt es hier keine Vorschläge und keinen Build.`;
     } else if (moment === 'locked' || moment === 'loading') {
       main = myChampion ? { kind: 'matchup', matchup: this.adapter.matchup(frame, myChampion, lane ?? 'top'), build } : { kind: 'none' };
       side.push({ kind: 'verdict', lines: this.adapter.verdictLines(frame) });
@@ -259,7 +272,7 @@ export class LiveSession {
       main = { kind: 'none' };
     }
 
-    return { ...base, board, main, side, build };
+    return { ...base, board, main, side, build, emptyText };
   }
 
   /** A click on an ally seat: its list until the clock passes to someone else (1.5's TurnTracker). */

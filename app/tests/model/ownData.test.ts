@@ -26,6 +26,16 @@ function ownMeta(): MetaLookup {
 }
 
 describe('own data in the model', () => {
+  it('shrinks lane rows with the weight measured on our own count (800), OP.GG rows with 300', () => {
+    const own = ownMeta();
+    expect(own.lanePrior).toBe(800);
+    // 52 % over 5.000 games, pulled towards the lane target with 800 pseudo games.
+    const target = own.laneTarget;
+    expect(own.laneStat(1, Lane.Top)!.winRate).toBeCloseTo((0.52 * 5000 + target * 800) / 5800, 12);
+    const opgg = new MetaBuilder().champion(1, 'Aatrox').inLane(1, Lane.Top, { winRate: 0.52, play: 5000 }).build();
+    expect(opgg.lanePrior).toBe(300);
+  });
+
   it('reads every duel as measured and complete', () => {
     const meta = ownMeta();
     const view = meta.matchup(1, 2, Lane.Top)!;

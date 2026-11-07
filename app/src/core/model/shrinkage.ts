@@ -5,6 +5,16 @@
 export const LANE_PRIOR = 300;
 
 /**
+ * Lane win rates from our own count (meta.json with source "riot"). Measured with Tools -- priors on
+ * the collector's file of 07.11.2026 (Platin, 6.185 games, median 149 per lane row): held-out loss
+ * lowest at 800 (split-half, 400 splits), moment estimate 851 (true spread 1,71 points) — and 1.5
+ * already found 600–932 on OP.GG's Gold rows. κ belongs to the population, not to the sample size,
+ * so it holds as the count grows. OP.GG files keep 300: the golden parity with 1.5 is measured there,
+ * and at their 29.000 games a row the weight changes nothing (docs/modellpruefung.md, Messung 10).
+ */
+export const OWN_LANE_PRIOR = 800;
+
+/**
  * Matchup win rates. Measured against complete duel lists (Tools -- guidecheck, 2026-10-08): the
  * weight under which a notable duel best predicts the complete one is 1.000 (MSE 12,4 against 20,5
  * at 150), and the complete lists' own split-half test bottoms out at 1.000 too. Beyond both lane

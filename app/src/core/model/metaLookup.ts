@@ -4,7 +4,7 @@
 
 import { ALL_LANES, Lane, LANE_COUNT } from './lane';
 import { clamp, logit, sigmoid } from './scoreModel';
-import { confidence, LANE_PRIOR, MATCHUP_PRIOR, shrink, SYNERGY_PRIOR } from './shrinkage';
+import { confidence, LANE_PRIOR, MATCHUP_PRIOR, OWN_LANE_PRIOR, shrink, SYNERGY_PRIOR } from './shrinkage';
 import { expectedLogit, fitSynergyLine, type SynergyLine } from './synergyLine';
 
 export const DamageType = { Unknown: 0, Physical: 1, Magic: 2, Mixed: 3 } as const;
@@ -148,6 +148,9 @@ export class MetaLookup {
   /** How many patches the data trails the client; set by whoever loaded it. */
   patchesBehind = 0;
 
+  /** The lane rows' prior weight: measured per source (shrinkage.ts). */
+  readonly lanePrior: number;
+
   private readonly indexById = new Map<number, number>();
   private readonly laneStats: (LaneView | null)[];
   private readonly rolePriors: Float64Array;
@@ -156,8 +159,9 @@ export class MetaLookup {
   private readonly synergies: Map<number, SynergyView>;
   private readonly liveMatchups = new Map<number, MatchupView>();
 
-  constructor(snapshot: MetaSnapshot) {
+  constructor(snapshot: MetaSnapshot, options: { lanePrior?: number } = {}) {
     this.snapshot = snapshot;
+    this.lanePrior = options.lanePrior ?? (snapshot.source === 'riot' ? OWN_LANE_PRIOR : LANE_PRIOR);
     this.champions = [...snapshot.champions];
     this.champions.forEach((c, i) => this.indexById.set(c.id, i));
 
@@ -374,7 +378,7 @@ export class MetaLookup {
       const slot = stat.lane * count + index;
 
       this.laneStats[slot] = {
-        winRate: shrink(stat.winRate, stat.play, LANE_PRIOR, this.laneTarget),
+        winRate: shrink(stat.winRate, stat.play, this.lanePrior, this.laneTarget),
         pickRate: rate(stat.pickRate),
         banRate: rate(stat.banRate),
         roleRate: rate(stat.roleRate),

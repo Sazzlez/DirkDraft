@@ -133,6 +133,39 @@ describe('LiveSession', () => {
     expect(live.view().board?.steps.every((s) => s.state === 'done')).toBe(true);
   });
 
+  it('Arena and rotating modes: no list, a word why; ARAM without numbers: no empty bench', () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    const last = sessions('state-myturn').filter((r) => r.session).at(-1)!.session!;
+    live.onSession({ ...last, queueId: 1700 });
+    const arena = live.view();
+    expect(arena.board!.mode).toBe('Arena');
+    expect(arena.main.kind).toBe('lobby');
+    expect(arena.emptyText).toMatch(/keine Lanes/);
+
+    const bench = sessions('state-aram-bench').filter((r) => r.session).at(-1)!.session!;
+    live.onSession(bench);
+    const aram = live.view();
+    expect(aram.moment).toBe('aramBench');
+    expect(aram.main.kind).toBe('lobby');
+    expect(aram.emptyText).toMatch(/ARAM-Zahlen/);
+  });
+
+  it('names every queue and says where Flex numbers come from', () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    const last = sessions('state-myturn').filter((r) => r.session).at(-1)!.session!;
+    live.onSession({ ...last, queueId: 440 });
+    expect(live.view().board!.mode).toBe('Ranked Flex');
+    expect(live.view().board!.modeNote).toBe('Zahlen aus Solo/Duo');
+    live.onSession({ ...last, queueId: 430 });
+    expect(live.view().board!.mode).toBe('Normal Blind');
+  });
+
   it('says "Planung" while the first ban is only marked in progress', () => {
     const live = new LiveSession();
     live.setData(data);
