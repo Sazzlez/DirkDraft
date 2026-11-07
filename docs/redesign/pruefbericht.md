@@ -86,7 +86,7 @@ je Slot τ = 0, Beliebtheit vs. Winrate ohne einheitliches Muster, Stiefelkäufe
 
 | Punkt | Stand |
 |---|---|
-| `npx vitest run` | grün, 518 Tests (23 neu), 7 übersprungen (OP.GG-Fälle) |
+| `npx vitest run` | grün, 524 Tests (29 neu, davon einer gegen den echten Ranked-Draft), 7 übersprungen (OP.GG-Fälle) |
 | `npm run check` | 0 Fehler, 0 Warnungen |
 | `cargo test` | grün, 24 Tests (3 neu) |
 | `dotnet test` | grün, 636 Tests |
@@ -95,15 +95,15 @@ je Slot τ = 0, Beliebtheit vs. Winrate ohne einheitliches Muster, Stiefelkäufe
 | `tauri dev` | echtes Fenster gegen den laufenden Client (Leerlauf), Log geprüft |
 | Beta-Paket | `release.ps1 -PackId DirkDraft-Beta` für 2.0.0 und 2.0.1: Installer 10,1 MB (1.5: 78 MB), Vollpaket 6,1 MB, Delta 2.0.0 → 2.0.1 0,96 MB, WebView2-Bootstrap drin, Kanal `beta`, kein Upload; je ca. 5 Minuten |
 | Update-Test | **offen, braucht dein OK** — sicherer Weg in `docs/redesign/migration.md` |
-| Live-Durchlauf (Custom Game) | **offen, braucht dich** |
+| Live-Durchlauf | **zwei echte Solo/Duo-Spiele** (07.11., Support; Release-Build lief mit, Fenster nur beobachtet, „Übernehmen“ hat der Spieler selbst geklickt): Planung → Banns → Picks → Finalisierung → Ladebildschirm → Spiel durchgängig richtig; „Runen und Zauber übernommen.“ beide Male; Teammate-Klick und „weitere“ funktionierten; Spielansicht mit nächstem Kauf, Skillpunkt und Gegner-Items stimmte. Behoben aus dem Test: Zeilengrund „ist Ranged“, „Teammate 3 bannt“ bei gleichzeitigen Banns, „Warten“ im Ladebildschirm, geratene Lanes auf leeren Gegnerplätzen, leere Hinweis-Kachel. Der Draft ist als geschwärzter Testfall `live-ranked.jsonl` im Repo. Nicht gesehen: Custom „Abwechselnde Wahl“, Blind Pick, ARAM, eine Lage mit situativem Vorschlag. |
 | Windows 11 / Mica | **offen** — hier nicht testbar (Windows 10); Schalter zum Abschalten eingebaut |
 | Sammler | Lauf 42367242351 sammelt noch (Ranked bis ca. 15:45 UTC, dann ARAM, Veröffentlichung mit `aram.json` gegen 16:45 UTC). Die geplanten Läufe (06:23, 12:23 UTC) sind **beide nicht angesprungen**, obwohl der Workflow aktiv, das Repo öffentlich und kein Fork ist. Die App läuft mit und ohne `aram.json` (geprüft gegen die echten Dateien). |
 
 ## Offen und Empfehlung
 
-1. **Live-Durchlauf mit dir** (Custom Game, „Freie Wahl“ mit Bots; dazu einmal „Abwechselnde Wahl“
-   für die Schrittleiste): Board, Vorschläge, Lane-Menü, Teammate-Klick, Übernehmen (Runen + Zauber,
-   Blitz auf F), Ladebildschirm, Spielansicht mit „Für dieses Spiel“, Einblend-Automatik.
+1. **Live-Durchlauf:** Ranked ist in zwei Spielen durch. Offen: ein kurzer Blick auf Blind Pick oder
+   ARAM, das Lane-Menü, Blitz auf F bei einem Champion mit Blitz auf D vorher, und ein Spiel mit
+   situativem Vorschlag in „Für dieses Spiel“.
 2. **Update-Test** an einer Probe-Installation (DirkDraft-Beta, Kanal beta) 2.0.0 → 2.0.1, und der
    Schritt 1.5 → 2.0 unter einer Test-ID — beides installiert nichts an deinem DirkDraft, braucht aber
    dein OK (siehe migration.md).
@@ -112,7 +112,8 @@ je Slot τ = 0, Beliebtheit vs. Winrate ohne einheitliches Muster, Stiefelkäufe
    das braucht eine Änderung an `master` und damit dein OK.
 4. **Ein Freund mit Windows 11** sollte die Beta einmal starten (Mica).
 
-**Empfehlung:** 2.0 ist nach dieser Prüfung technisch bereit für die Probe, aber noch **nicht** für die
-Auslieferung. Ausliefern, sobald Punkt 1 und 2 ohne Befund durch sind; Punkt 4 kann parallel als Beta
+**Empfehlung:** 2.0 ist nach dieser Prüfung technisch bereit für die Probe und hat zwei echte Ranked-Spiele
+ohne Ausfall begleitet, ist aber noch **nicht** für die Auslieferung freigegeben. Ausliefern, sobald der
+Update-Test (Punkt 2) ohne Befund durch ist und die Reste aus Punkt 1 gesehen sind; Punkt 4 kann parallel als Beta
 laufen. Der Weg dann: `redesign/board` nach `master` mergen, aus dem Haupt-Checkout
 `release.ps1 -Version 2.0.0` (Kanal `win`, Delta gegen 1.5 aus `build\Releases`).
