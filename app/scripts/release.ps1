@@ -10,7 +10,10 @@
     the version bump as "Release X.Y.Z", tags vX.Y.Z and pushes, like the 1.x script.
 
     -PackId DirkDraft-Beta packs a separate app (own folder, own shortcut "DirkDraft Beta") for
-    trying a build without touching any installed DirkDraft - and never uploads.
+    trying a build without touching any installed DirkDraft - and never uploads. It also packs on
+    the channel "beta": Velopack's update check does not look at the package id, only at the
+    channel's feed, so a beta on "win" would take a later real release as its own update. Nothing
+    publishes "beta"; a probe install finds updates only where DIRKDRAFT_UPDATE_SOURCE points.
 
     Kept ASCII-only: Windows PowerShell 5.1 reads a .ps1 without byte-order mark as ANSI.
 
@@ -47,6 +50,8 @@ function Use-NativeErrors {
 
 $beta = $PackId -ne 'DirkDraft'
 if ($beta) { $NoUpload = $true }
+# The real channel is Velopack's default on Windows, the one 1.x was packed and reads on.
+$channel = if ($beta) { 'beta' } else { 'win' }
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $app = Join-Path $root 'app'
@@ -109,6 +114,7 @@ $vpkArgs = @(
     '--packDir', $publishDir,
     '--mainExe', 'DirkDraft.exe',
     '--packTitle', $(if ($beta) { 'DirkDraft Beta' } else { 'DirkDraft' }),
+    '--channel', $channel,
     '--packAuthors', 'mirko',
     '--icon', (Join-Path $tauri 'icons\icon.ico'),
     # Windows 10 without Edge's WebView2: the installer fetches it first.
@@ -121,7 +127,7 @@ Write-Host 'Packe Installer'
 Use-NativeErrors { & vpk @vpkArgs }
 if ($LASTEXITCODE -ne 0) { throw "vpk pack ist fehlgeschlagen (Exitcode $LASTEXITCODE)." }
 
-$setup = Join-Path $releaseDir "$PackId-win-Setup.exe"
+$setup = Join-Path $releaseDir "$PackId-$channel-Setup.exe"
 if (-not (Test-Path -LiteralPath $setup)) { throw "Erwartete Datei fehlt: $setup" }
 $setupMb = [Math]::Round((Get-Item -LiteralPath $setup).Length / 1MB, 1)
 Write-Host "Installer: $setup ($setupMb MB)"

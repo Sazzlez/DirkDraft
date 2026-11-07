@@ -37,8 +37,9 @@ Das Fenster passt sich der Breite an: breit ab 1.100 Pixeln, mittel ab 720, schm
 passt es neben den Client. X legt es in den Infobereich (Rechtsklick auf das Symbol: Öffnen ·
 Beenden); bei Champ Select und Spielstart kommt es von selbst, ohne den Fokus zu nehmen.
 
-**Einstellungen** (Zahnrad): Ein- und Ausblenden, immer im Vordergrund, Blitz auf D oder F (Standard
-F), auch nicht gekaufte Champions vorschlagen. Gespeichert in `%APPDATA%\DraftPilot\settings.json`.
+**Einstellungen** (Zahnrad): Ein- und Ausblenden, immer im Vordergrund, Glas-Effekt (Windows 11),
+Blitz auf D oder F (Standard F), auch nicht gekaufte Champions vorschlagen. Gespeichert in
+`%APPDATA%\DraftPilot\settings.json`.
 
 ## Woher die Zahlen kommen
 
@@ -86,5 +87,8 @@ Eine Version veröffentlichen (aus dem Haupt-Checkout auf `master`):
 ```
 
 Das Skript trägt die Version ein, testet, baut (`tauri build`), packt mit `vpk` unter der Paket-ID
-`DirkDraft` (dieselbe wie 1.x), checkt „Release X.Y.Z" ein, setzt den Tag, schiebt und lädt hoch.
-Voraussetzungen: `dotnet tool install -g vpk`, GitHub CLI mit `gh auth login`.
+`DirkDraft` (dieselbe wie 1.x, Kanal `win`), checkt „Release X.Y.Z" ein, setzt den Tag, schiebt und
+lädt hoch. Die Probe (`-PackId DirkDraft-Beta`) packt eine eigene App auf dem Kanal `beta` und lädt
+nie hoch; ihr Update lässt sich mit `DIRKDRAFT_UPDATE_SOURCE=<Ordner>` gegen einen lokalen Feed testen
+(`docs/redesign/migration.md`). Voraussetzungen: `dotnet tool install -g vpk` (1.2.0, wie 1.x),
+GitHub CLI mit `gh auth login`.

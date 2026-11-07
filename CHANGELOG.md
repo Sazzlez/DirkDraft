@@ -18,8 +18,8 @@ Fenster:
   Klick hält bis zum nächsten Moment.
 - **Einstellungen** hinter dem Zahnrad: bei Champ Select und Spielstart einblenden, nach dem Draft
   ausblenden, immer im Vordergrund, Blitz-Taste, auch nicht gekaufte Champions vorschlagen. Alles
-  wird sofort gespeichert, in derselben Datei wie bisher.
-- Unter Windows 11 mit Glas-Effekt (Mica), unter Windows 10 deckend.
+  wird sofort gespeichert, in derselben Datei wie bisher; der Fensterplatz aus 1.x wird übernommen.
+- Unter Windows 11 mit Glas-Effekt (Mica, in den Einstellungen abschaltbar), unter Windows 10 deckend.
 
 Zahlen:
 
@@ -27,9 +27,14 @@ Zahlen:
   Duo, EUW) über die offizielle Riot-API und veröffentlicht daraus Lane-Winrates, alle Duelle, Duos,
   Banns, Schadensarten und Builds. DirkDraft holt sie von selbst alle 30 Minuten — **nie während
   Draft oder Spiel**; der Knopf „Daten aktualisieren" entfällt. Das Modell selbst ist unverändert:
-  auf denselben Zahlen rechnet 2.0 auf neun Nachkommastellen genau wie 1.5.
+  auf denselben Zahlen rechnet 2.0 auf neun Nachkommastellen genau wie 1.5. Neu gemessen auf den eigenen Zahlen
+  ist nur die Glättung der Lane-Winrates (800 statt 300 Pseudospiele): Ohne sie standen Champions
+  mit 30 Spielen oben, weil die eigenen Zahlen pro Lane noch dünn sind.
 - **Builds aus diesen Spielen:** je Champion und Lane die Wahl mit der besten Winrate, die ihre
-  Spiele hergeben (Runen, Zauber, Start, Schuhe, Kern, spätere Items, Skill-Reihenfolge).
+  Spiele hergeben (Runen, Zauber, Start, Schuhe, Kern, spätere Items, Skill-Reihenfolge,
+  Support-Item). Solange die Zahlen zwischen zwei Optionen keinen messbaren Unterschied tragen —
+  heute in jedem Slot so —, steht die meistgespielte vorn statt eines Glückstreffers aus acht
+  Spielen. Zu wenige Spiele auf einer Lane: Build der Hauptlane, mit Hinweis.
 - **ARAM und Mayhem:** Die Bank „Behalten oder tauschen?" rechnet mit unserer eigenen ARAM-Zählung,
   dazu ein ARAM-Build. Mayhem-Spiele gibt die Riot-API nicht heraus, deshalb stehen dort die Zahlen
   aus normalem ARAM — die App sagt das dazu. Eine Augment-Liste gibt es deshalb nicht mehr.
@@ -38,6 +43,13 @@ Draft:
 
 - Vorschläge stehen wie gewohnt mit Begründung, Gleichauf-Gruppe und Fehlerbalken; dazu „Dein
   Hover", Banns mit Grund, Draft-Chance, Comp-Vergleich und „Dem Gegner fehlt noch".
+- **Klick auf einen Teammate** zeigt seine Vorschläge, bis die Uhr weiterzieht — wie in 1.x. **Lanes
+  von Hand:** ein Klick auf die Lane eines Gegners (oder eines Verbündeten ohne feste Position, etwa
+  im Blind Pick) setzt sie fest oder gibt sie mit „automatisch" an die Schätzung zurück.
+- Die Schrittleiste unter der Uhr folgt der echten Zugfolge (Ranked, Turnier-Draft, Blind Pick);
+  jeder Modus steht mit seinem Namen da, Flex mit „Zahlen aus Solo/Duo".
+- Spielt der Client schon den nächsten Patch, während die Zahlen noch vom alten sind, sagt der Draft
+  das und rechnet mit entsprechend breiteren Fehlerbalken.
 - **Nur Champions, die du spielen kannst** (besitzt oder gerade gratis) — abschaltbar.
 - **„Runen und Zauber übernehmen"**: derselbe Klick setzt jetzt auch die Beschwörerzauber. **Blitz
   kommt immer auf F** (in den Einstellungen auf D umstellbar), auch wenn er vorher auf D lag.
@@ -50,7 +62,8 @@ Spiel:
   ihrer Schadensart. Namen anderer Spieler erreichen die Anzeige nie.
 - **„Für dieses Spiel"**: bis zu drei Items, die Spieler deines Champions gegen genau diese Gegner
   deutlich öfter kaufen als sonst — als Alternative neben deinem Build, nie als Ersatz, und sie
-  folgen den Items der Gegner bis zum Ende des Spiels.
+  folgen den Items der Gegner bis zum Ende des Spiels. Was schon im Build steht, wird nicht noch
+  einmal vorgeschlagen; Stiefel nur, solange noch keine gekauft sind.
 
 Unter der Haube: das Programm ist ein Bruchteil so groß wie bisher (rund 10 statt 78 MB); die Verbindung zum Client prüft
 weiter Riots Zertifikat; außer Runen und Zaubern auf deinen Klick schreibt DirkDraft nichts in den

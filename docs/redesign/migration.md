@@ -22,8 +22,12 @@ Velopack kann jede Windows-Anwendung verpacken, nicht nur .NET, und hat ein offi
    Update-Prüfung nutzt den `UpdateManager` des Crates gegen die GitHub-Releases.
 3. Eine installierte 1.5 sieht 2.0 als ganz normales Update: **„Version 2.0.0 ist da“ → Jetzt
    aktualisieren.** Kein zweiter Installer, kein zweiter Programmordner, die Verknüpfungen bleiben.
-4. 2.0 liest `settings.json`, `snapshot.json` und den Build-Cache an den alten Orten (Formate
-   kompatibel), Fensterposition und Einstellungen gehen also nicht verloren.
+4. 2.0 liest `settings.json` am alten Ort (Format kompatibel, unbekannte Schlüssel bleiben stehen).
+   Den Fensterplatz (`windowLeft/Top/Width/Height`) übernimmt der erste 2.0-Start, danach hält ihn
+   das window-state-Plugin (`%APPDATA%\com.sazzlez.dirkdraft\.window-state.json`). Die Zahlen
+   kommen nicht mehr aus `snapshot.json` (OP.GG), sondern aus dem eigenen Sammler; ihre Kopie liegt
+   unter `%LOCALAPPDATA%\DraftPilot\data\2.0`. Die 1.x-Dateien daneben (`snapshot.json`, Bilder,
+   Build-Cache) stören nicht und werden nicht gelöscht.
 5. Neue Nutzer laden wie bisher `DirkDraft-win-Setup.exe` — dann rund 10–15 MB statt 78 MB.
 
 **Vor dem Release getestet**, nicht angenommen (Spike gleich in M1, Abnahme in M6):
@@ -35,6 +39,29 @@ Velopack kann jede Windows-Anwendung verpacken, nicht nur .NET, und hat ein offi
 **Ausprobieren ohne die Freunde zu treffen:** Vorab-Versionen unter eigener Paket-ID
 (`DirkDraft-Beta`, eigener Ordner, eigene Verknüpfung) oder als Velopack-Kanal `beta`; 1.x-Kopien
 prüfen nur den Standardkanal und sehen davon nichts.
+
+## Stand der Prüfung (07.11.2026)
+
+- **Werkzeuge:** 1.5 nutzt Velopack 1.2.0 (C#), `vpk` ist 1.2.0, der Rust-Crate 1.2.x — eine Linie.
+  1.x ist auf dem Standardkanal `win` gepackt; `release.ps1` packt das echte 2.0 dort auch.
+- **Paket-ID wird beim Update nicht geprüft:** Velopacks Update-Prüfung liest nur den Feed des Kanals
+  und vergleicht Versionen. Eine Probe unter `DirkDraft-Beta` auf `win` nähme deshalb ein späteres
+  echtes Release als eigenes Update. Die Beta packt `release.ps1` daher zusätzlich auf dem Kanal
+  `beta`, den nie jemand hochlädt.
+- **Probe-Quelle:** `DIRKDRAFT_UPDATE_SOURCE` (Ordner oder http(s)-Adresse) lässt die Update-Prüfung
+  von 2.0 einen lokalen Feed lesen statt GitHub — nur für Probe-Installationen; ohne die Variable
+  bleibt es GitHub.
+- **Sicherer Testweg (nur mit OK, installiert nichts am echten DirkDraft):**
+  1. `release.ps1 -Version 2.0.0 -PackId DirkDraft-Beta`, dann `-Version 2.0.1` → `build\Releases-beta`.
+  2. `DirkDraft-Beta-beta-Setup.exe` installieren (eigener Ordner `%LOCALAPPDATA%\DirkDraft-Beta`,
+     eigene Verknüpfung „DirkDraft Beta“), mit `DIRKDRAFT_UPDATE_SOURCE=…\build\Releases-beta`
+     starten: Pill „Version 2.0.1 ist da“ → Klick → Neustart in 2.0.1, Einstellungen und Fensterplatz
+     bleiben. Danach über „Apps & Features“ wieder entfernen.
+  3. 1.5 → 2.0 ohne die echte Installation: die 1.5-Dateien (`build\Releases\DirkDraft-1.5.0-full.nupkg`)
+     unter einer Test-ID als 1.5.0 neu packen, installieren, dann mit dem `Update.exe` dieser
+     Test-Installation das 2.0.0-Paket derselben Test-ID anwenden. Das prüft genau den Schritt, den
+     „Jetzt aktualisieren“ in 1.5 auslöst (Dateien ersetzen, Haken, Neustart); die Anzeige „Version
+     2.0.0 ist da“ in 1.5 ist Velopacks Standard-Feed und unverändert.
 
 ## Alternative (nur falls der Spike scheitert)
 

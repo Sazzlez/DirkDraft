@@ -18,16 +18,16 @@ Der Nutzer hat nach dem Auftrag entschieden (06.11.2026):
 |---|---|---|
 | M4: OP.GG-Abrufe, Snapshot-Update, Draft-Abrufe | **Keine OP.GG-Daten mehr.** Alles aus dem eigenen Riot-Sammler („Nimm direkt die neue Schnittstelle statt OP.GG“) | Die App lädt eine fertige Datei vom Branch `data` (GitHub). Im Draft wird nichts mehr geholt. |
 | „Draft-Abrufe automatisch … höchstens 16 pro Draft“ | entfällt mangels Abrufen | Nur noch: Datei laden, Data-Dragon-Bilder, Update-Prüfung. |
-| „Matchup-Build nach meistgespielt; ohne Gegner nach Winrate“ | **Unser Build, je Slot die beste Winrate** (Wilson-Untergrenze), auch bei bekanntem Gegner | Matchup-genaue Builds aus eigenen Daten, sobald je Paarung genug Spiele vorliegen; sonst Lane-Build mit Hinweis (wie 1.5 seit `6f85945`). |
+| „Matchup-Build nach meistgespielt; ohne Gegner nach Winrate“ | **Unser Build, je Slot die beste Winrate**, die seine Spiele hergeben, auch bei bekanntem Gegner | Lane-Build aus eigenen Daten. Wie viel eine Winrate „hergibt“, misst die Datei selbst (Prüfung 07.11.2026, `docs/modellpruefung.md` Messung 11): Heute trägt kein Slot einen messbaren Unterschied zwischen Optionen, also gewinnt die meistgespielte; mit mehr Daten folgt dieselbe Regel den Winrates. Die Wilson-Untergrenze von 1.5 wählte auf dünnen Daten Zufallstreffer. |
 | „Solo/Duo, Flex und ARAM getrennte Bestände“ | Sammler: **Solo/Duo in Platin, EUW**; Flex nutzt diese Zahlen; **ARAM** eigene Zählung (normales ARAM, auch für Mayhem) | Flex trägt einen Hinweis „Zahlen aus Solo/Duo“. Mayhem-Spiele gibt die Riot-API nicht heraus (403, 07.11.2026) — normales ARAM steht dafür, so beschriftet; keine Augments. |
 | Stärke-Kurve aus OP.GG `game_lengths` | entfällt als Quelle | Aus eigenen Spielen (`gameDuration` je Champion/Lane, mit Spielzahl je Abschnitt) — die Messbedingung „erst prüfen, ob stabil“ bleibt. |
 
-Unverändert gilt das gemessene **Modell** (Glättung, Gleichauf, Fehlerbalken, Comp-Regeln). Mit
+Unverändert gilt das gemessene **Modell** (Gleichauf, Fehlerbalken, Comp-Regeln). Mit
 eigenen, vollständigen Daten fallen zwei OP.GG-Korrekturen von selbst auf neutral: der
 Auswahl-Versatz der Counter-Listen (`MatchupBaseline` → 0, es gibt keine Auswahl mehr) und die
 Duell-Linie fürs Standard-Bracket (`CompleteDuelSlope` → 1, alles kommt aus einem Bracket). Die
-Glättungsgewichte (1.000 Duelle, 750 Duos, 300 Lane) werden auf den neuen Daten nachgemessen
-(`Tools -- priors`-Verfahren), bevor sie gelten.
+Glättungsgewichte sind auf den neuen Daten nachgemessen (`Tools -- priors`, 07.11.2026, Messung 10):
+Lane 800 statt 300 für eigene Dateien, Duelle 1.000 und Duos 750 bleiben.
 
 ---
 
@@ -139,12 +139,16 @@ Punkte = Log-Odds × 25.
 - **Fehler:** `ErrorBudget` (Varianzsumme), Gleichauf unter **1 σ**, deutlich ab **3 σ**,
   Nachkommastelle 0 ab 0,5 Punkten Median-Fehler.
 - **Glättung:** Lane 300, Duell 1.000, Duo 750 (Duo zur Paar-Linie, Steigung ≈ 0,4, ab 100 Paaren);
-  Spiegelkanten exaktes Komplement. **2.0:** auf eigenen Daten nachmessen (Abschnitt 0).
+  Spiegelkanten exaktes Komplement. **2.0:** auf eigenen Daten gemessen — Lane **800** für Dateien mit
+  `source: "riot"`, OP.GG-Dateien behalten 300 (Golden-Parität); Duell und Duo unverändert.
 - **ARAM-Bank:** Prior 400 zu 0,5, Rundungsvarianz 0,01²/12, leer ohne Zahl für den eigenen.
 - **Augmente:** Grobkörnigkeits-Filter 170 × k/n mit n ≤ 40, Median-Beliebtheit (1.5, OP.GG) — **2.0:**
   keine Augment-Liste: Mayhem-Spiele sind über die Riot-API nicht zu bekommen, normales ARAM hat keine.
-- **Build-Auswahl:** Wilson-Untergrenze z = 1,96; Skill-Plan auf 18 erweitert, abgeleitete Stufen
-  markiert.
+- **Build-Auswahl:** 1.5 Wilson-Untergrenze z = 1,96. **2.0 (eigene Daten):** Winrate je Option zur
+  Rate ihres Slots geglättet, κ je Slot aus der Datei gemessen (ohne messbare Streuung κ = ∞, dann
+  entscheidet die Spielzahl); gleiche Zauberpaare und Runenseiten zusammengefasst; Items 4–6 ohne
+  Kern-Items und ohne Dubletten; Lane-Zeile unter 30 Spielen oder ohne Kern → Hauptlane mit Hinweis.
+  Skill-Plan auf 18 erweitert, abgeleitete Stufen markiert.
 
 ## 5. Daten
 
@@ -173,9 +177,20 @@ Auto-Hover/-Pick/-Bann/-Accept, Runen und Beschwörerzauber nur auf Klick als ei
 die eigene Datendatei, Data Dragon und die Update-Prüfung.
 
 **Einstellungen (2.0):** Blatt über dem Inhalt (Zahnrad in der Titelleiste, schmal im Menü): bei
-Champ Select / Spielstart einblenden, nach dem Draft ausblenden, immer im Vordergrund, Blitz auf D
-oder F (Standard F), auch nicht gekaufte Champions vorschlagen. Gespeichert sofort in 1.5s
-`settings.json` (neue Schlüssel `flashKey`; `showUnowned` wie 1.5).
+Champ Select / Spielstart einblenden, nach dem Draft ausblenden, immer im Vordergrund, Glas-Effekt
+(nur Windows 11, wirkt beim nächsten Start), Blitz auf D oder F (Standard F), auch nicht gekaufte
+Champions vorschlagen. Gespeichert sofort in 1.5s `settings.json` (neue Schlüssel `flashKey`,
+`glassEffect`; `showUnowned` wie 1.5). Der Fensterplatz aus 1.5 (`windowLeft/Top/Width/Height`)
+wird beim ersten 2.0-Start übernommen, danach hält ihn das window-state-Plugin.
+
+**Board (2.0):** Die Schrittleiste liest die Zugfolge aus den Aktionen der Session (Turnier-Draft
+„Bann 1 · Pick 1–3 · Bann 2 · Pick 4–5“, Ranked und „Abwechselnde Wahl“ „Banns · Picks“, Blind
+„Picks“, jeweils „Finalisierung“); in der Planung steht „Planung“. Klick auf einen Verbündeten zeigt
+dessen Liste, bis die Uhr weiterzieht (auch nach dem eigenen Lock). Lanes von Gegnern und von
+Verbündeten ohne zugewiesene Position lassen sich von Hand setzen (Menü mit den fünf Lanes und
+„automatisch“; eine Lane, ein Platz). Jede Queue steht mit ihrem Namen da; Flex sagt „Zahlen aus
+Solo/Duo“, Mayhem „Zahlen aus normalem ARAM“. Liegen die Zahlen einen Patch hinter dem Client, nennt
+ein Hinweis beide Patches und die Lane-Fehlerbalken wachsen (3,7·10⁻⁴ je Patch).
 
 ## 7. Responsiv (2.0)
 

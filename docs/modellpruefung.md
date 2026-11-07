@@ -229,3 +229,87 @@ beiträgt.
 - **Der Datenstand altert.** Das Fenster meldet den Patchwechsel, und der Fehlerbalken wächst mit
   ihm. Aktualisieren ist ein Knopfdruck. Am ersten Tag eines Patches sind die Zahlen dünner, aber
   beschreiben das richtige Spiel.
+
+---
+
+# Nachtrag 2.0 (2026-11-07): dieselben Fragen auf den eigenen Daten
+
+Seit 2.0 kommen alle Zahlen aus dem eigenen Sammler (Riot-API, Solo/Duo, Platin, EUW). Gemessen auf
+den Dateien des Branches `data` vom 07.11.2026 (Stand 05:20 UTC): `meta.json` und `builds.json` aus
+**6.185 Spielen**, Patch 16.22. Die Experimente liegen nicht im Repository; `priors` ist das
+bekannte Werkzeug, die übrigen Rechnungen sind kurze Skripte gegen dieselben Dateien.
+
+## 10. Glättung auf eigenen Daten (`Tools -- priors 400 --snapshot meta.json`)
+
+| | Zeilen | Median Spiele | Halbierung | Momente | vorher | jetzt |
+|---|---:|---:|---:|---:|---:|---:|
+| Lane | 294 | 149 | **800** (−0,018 % Log-Loss ggü. 300) | 851 (τ = 1,71 Pkt.) | 300 | **800** |
+| Duell | 767 Paare | 14 | ∞ (−0,002 %) | ∞ (τ = 0) | 1.000 | 1.000 |
+| Duo, zur Paar-Erwartung | 251 Paare | 36 | ∞ (−0,405 % ggü. −0,402 % bei 800) | ∞ (τ = 0) | 750 | 750 |
+
+- **Lane:** Beide Verfahren finden rund 800 — und schon 1.5 maß auf OP.GGs Gold-Zeilen 600 bis 932.
+  κ beschreibt die wahre Streuung der Champions, nicht die Stichprobe, und gilt deshalb auch, wenn die
+  Datei wächst. Wirkung, gemessen als Rangtest (200 zufällige Teilungen: Top 5 je Lane auf der einen
+  Hälfte gewählt, Winrate in der anderen): κ 0 → 49,86 %, 300 → 50,18 %, **800 → 50,27 %**. Mit 300
+  standen Champions mit 28 bis 44 Spielen in den Top 5 (Neeko und Gragas Mid, Vel'Koz Platz 1 Bot),
+  mit 800 führen Champions mit Hunderten Spielen. Das Gewicht 800 gilt nur für eigene Dateien
+  (`source: "riot"`, `shrinkage.ts`); OP.GG-Dateien behalten 300 — dort ist die Golden-Parität mit
+  1.5 gemessen, und bei 29.000 Spielen je Zeile ist die Wirkung null.
+- **Duelle und Duos:** Bei 14 bzw. 36 Spielen im Median ist über die Erwartung hinaus kein Signal
+  messbar. Die Gewichte halten beide klein, wie es sein soll; sie bleiben.
+- Pick- und Bann-Raten haben dieselbe Skala wie bei OP.GG (Pick je Lane summiert ≈ 1,9, Bann über
+  alle Champions ≈ 9,3) — das Bann-Tor gilt unverändert.
+
+## 11. Build-Auswahl (`builds.json`, 683 Zeilen)
+
+Die Regel aus 1.5, „je Slot die beste Wilson-Untergrenze“, wählte auf den eigenen Daten Zufall:
+Caitlyn bekam eine Runenseite mit **8 Spielen und 8 Siegen** (Untergrenze 68 %) statt der Seite mit
+469 Spielen, Jinx einen Start mit 5 Spielen, Lee Sin Runen mit 9.
+
+- **Wahre Streuung zwischen Optionen eines Slots** (Momentenschätzung über alle Zeilen ab 30
+  Spielen, Optionen ab 5): **τ = 0,00 in jedem Slot** — Runen (1.047 Optionen), Zauber (594), Start
+  (689), Stiefel (790), Kern (920), viertes Item (716), Skill-Reihenfolge (760), Skill-Maximierung
+  (514), Support-Item (131). Jeder Winrate-Unterschied zwischen den Optionen ist hier Stichproben-
+  rauschen.
+- **Beliebtheit gegen Winrate** (gepoolt, relativ zur Rate des Slots, ohne Auswahl): Kein
+  einheitliches Muster. Seltene Optionen (< 3 % des Slots) liegen bei Runen +3,2, Start +2,8,
+  Skill-Reihenfolge +3,1, aber bei Zaubern −3,3 und Skill-Maximierung −3,9 Punkte, jeweils über 600
+  bis 900 Spiele (≈ 1,8 σ). Eine feste Strafe für seltene Builds ließe sich damit nicht begründen.
+- **Verworfen:** ein Halbierungstest für Builds. Beide Hälften einer Stichprobe teilen deren Glück —
+  eine 8/8-Option ist in beiden Hälften 4/4 —, der Test belohnt also genau die Zufallstreffer, die er
+  finden soll.
+
+**Geändert (`riotBuilds.ts`):** Jede Option wird zur Rate ihres Slots gezogen, mit κ = μ(1−μ)/τ² − 1
+aus der Datei selbst (ab 100 Optionen je Slot; darunter oder ohne messbare Streuung κ = ∞). Gleiche
+Schätzungen entscheidet die Spielzahl. Heute heißt das: die meistgespielte Option; sobald die Daten
+echte Unterschiede tragen, folgt dieselbe Regel ihnen. Dazu:
+
+- Gleiche Builds zählen als einer: ein Zauberpaar in beiden Tastenfolgen, eine Runenseite unabhängig
+  von der Reihenfolge der Nebenrunen (z. B. bei Ahri getrennt gezählt).
+- Items 4 bis 6 wiederholen weder den Kern noch einander (vorher 34 Zeilen mit Dubletten, 75 mit
+  einem Kern-Item).
+- Lane-Zeilen unter 30 Spielen oder ohne Kern nehmen die Hauptlane mit Hinweis (vorher hatten 374
+  von 683 Zeilen gar keinen Kern im Plan; ihr Median: 3 Spiele).
+
+## 12. Situative Items (`situational.json`)
+
+- Stichproben sind plausibel: Stahlkappen gegen viel AD, Merkurs gegen viel AP, Randuins bei Darius
+  gegen AD, Naturgewalt bei Garen gegen AP, Schutzengel und Blutdürster bei Schützen gegen viel
+  Rüstung.
+- **Stiefel nur für Lagen der Aufstellung:** Von 57.533 gezählten Stiefelkäufen fielen 0,2 % in
+  „Rüstung“, 0,0 % in „Magieresistenz“ und 2,9 % in „Heilung“ — die Gegner bauen diese Werte erst,
+  wenn Stiefel längst gekauft sind. Was dort zählt, sind späte Wechsel (Jinx: „Stiefel der
+  Wendigkeit 13,5-mal so oft gegen Heilung“). Bei Items 4–6 fallen 40,6 % der Käufe in „Rüstung“ —
+  dort ist das Signal echt.
+- Items aus dem eigenen Build sind keine Alternative zu ihm (vorher: Kai'Sa „Terminus“, Jinx
+  „Klinge der Unendlichkeit“, beide im Kern).
+
+## Was offen bleibt (2.0)
+
+- **ARAM:** Die erste `aram.json` kommt mit dem Lauf vom 07.11. nachmittags; eine lokale Probe hatte
+  157 Spiele (Median 8 je Champion). Das ARAM-Gewicht (400) ist aus 1.5 übernommen und erst mit
+  einigen Tausend Spielen nachzumessen. Bis dahin liegt die Bank meist gleichauf — das Fenster sagt es.
+- **Builds:** Mit wachsender Datenmenge die Streuung je Slot erneut messen; die Regel stellt sich
+  selbst ein, aber ob Runen- und Kern-Unterschiede je messbar werden, ist offen.
+- **Drei Gewichte bleiben Schätzungen** (übrige Gegner 0,35, Duo-Dämpfung 0,6, Comp 0,16), wie in
+  1.5 — kalibrierbar erst an Spielausgängen.

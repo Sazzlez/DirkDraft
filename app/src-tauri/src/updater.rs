@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use serde::Serialize;
 use tauri::{AppHandle, State};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
-use velopack::sources::GithubSource;
+use velopack::sources::{FileSource, GithubSource, HttpSource, UpdateSource};
 use velopack::{UpdateCheck, UpdateInfo, UpdateManager};
 
 /// Where every installed copy looks; the same feed 1.5 reads, so 1.5 sees 2.0 as a normal update.
@@ -28,8 +28,18 @@ pub struct UpdateStatus {
     available: Option<String>,
 }
 
+/// Points the check at a local Releases folder or an http(s) feed instead of GitHub, so an update
+/// can be tried end to end on a probe install (docs/redesign/migration.md). Unset — as on every
+/// user's machine — it is the GitHub feed 1.5 reads.
+const SOURCE_OVERRIDE: &str = "DIRKDRAFT_UPDATE_SOURCE";
+
 fn manager() -> Result<UpdateManager, String> {
-    UpdateManager::new(GithubSource::new(REPO, None, false), None, None).map_err(|e| e.to_string())
+    let source: Box<dyn UpdateSource> = match std::env::var(SOURCE_OVERRIDE) {
+        Ok(url) if url.starts_with("http://") || url.starts_with("https://") => Box::new(HttpSource::new(url)),
+        Ok(path) if !path.trim().is_empty() => Box::new(FileSource::new(path.trim())),
+        _ => Box::new(GithubSource::new(REPO, None, false)),
+    };
+    UpdateManager::new_boxed(source, None, None).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

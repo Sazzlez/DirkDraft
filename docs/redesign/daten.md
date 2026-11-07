@@ -28,12 +28,23 @@ OP.GG. Tiers gibt es keine — das war OP.GGs eigene Einstufung.
 - *Sicherung:* Die Winrate mit dem Item gegen die anderen Wahlen des Platzes, verglichen nur innerhalb
   desselben Spielstands beim Kauf (vorne/ausgeglichen/hinten, ±1.500 Gold Team-Vorsprung aus der
   Timeline). Messbar schlechter (1,5 Standardfehler darunter) heißt: kein Vorschlag.
-- Angezeigt als Alternative neben dem Plan, nie als Ersatz; Items aus dem Plan oder im Inventar
-  werden nicht vorgeschlagen; höchstens drei.
+- *Stiefel* nur für die Lagen der Aufstellung (AD, AP, Tanks, harte Kontrolle): Die Item-Lagen
+  entstehen erst, wenn Stiefel längst gekauft sind (0,2 % / 0,0 % / 2,9 % der Stiefelkäufe, gemessen
+  07.11.2026). Mit gekauften Stiefeln keine Stiefel-Vorschläge mehr.
+- Angezeigt als Alternative neben dem Plan, nie als Ersatz; Items aus dem Plan (Stiefel, Kern,
+  Items 4–6) oder im Inventar werden nicht vorgeschlagen; höchstens drei.
+- Dateiformat Version 2 (`RiotSituationalFile.CurrentVersion`): Zeilen `[Champion, Lane, Slot, Lage,
+  Spielstand, Item, Spiele, Siege]`, Item 0 = Summe des Platzes.
 
 Flex nutzt die Solo/Duo-Zahlen. Beim Patchwechsel bleibt der alte Bestand als Rückfall
-veröffentlicht, bis der neue Patch 2.000 Spiele hat (ARAM: 500); die App sieht am Patch, dass die
-Zahlen hinterherhinken.
+veröffentlicht, bis der neue Patch 2.000 Spiele hat (ARAM: 500); die App fragt den Client nach seinem
+Patch, nennt im Draft beide Patches und verbreitert die Lane-Fehlerbalken je Patch Rückstand.
+
+**Builds** aus `builds.json`: je Slot die Option mit der besten Winrate, die ihre Spiele hergeben —
+zur Rate des Slots geglättet, mit einem Gewicht, das die Datei selbst misst (wahre Streuung der
+Optionen über alle Zeilen). Auf den ersten 6.185 Spielen war diese Streuung in jedem Slot null; dann
+entscheidet die Spielzahl. Gleiche Zauberpaare (beide Tastenfolgen) und Runenseiten (Nebenrunen in
+beliebiger Reihenfolge) zählen als eine Option. Details: `docs/modellpruefung.md`, Messungen 10–12.
 
 In keiner Datei stehen Spielernamen, PUUIDs oder Match-IDs. Die Spielerlisten, über die der Sammler
 neue Spiele findet, leben nur im Speicher eines Laufs.
