@@ -236,6 +236,8 @@ export interface BuildView {
   boots: ItemOption | null;
   core: ItemOption | null;
   late: ItemRef[];
+  /** The support item upgrade most played (supports only). */
+  support: ItemOption | null;
   alsoStart: ItemOption[];
   alsoBoots: ItemOption[];
   alsoCore: ItemOption[];

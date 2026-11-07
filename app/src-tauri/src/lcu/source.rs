@@ -29,6 +29,8 @@ const SESSION: &str = "/lol-champ-select/v1/session";
 const GAMEFLOW: &str = "/lol-gameflow/v1/gameflow-phase";
 const LOCKFILE_TICK: Duration = Duration::from_millis(500);
 const LOCKFILE_GRACE: Duration = Duration::from_millis(1500);
+/// How often a missing League installation is looked for again.
+const LOCATE_RETRY: Duration = Duration::from_secs(10);
 
 /// Phases that positively mean champion select is not running. A list of known values on purpose:
 /// an unknown or empty phase leaves the board alone instead of throwing away a working draft.
@@ -94,10 +96,22 @@ struct Source<F: Fn(Update)> {
 }
 
 pub async fn run(explicit_lockfile: Option<PathBuf>, out: impl Fn(Update) + Send + 'static) {
-    let lockfile = explicit_lockfile.or_else(|| install::locate().map(|dir| install::lockfile(&dir)));
-    let Some(lockfile) = lockfile.filter(|path| path.parent().is_some_and(|dir| dir.is_dir())) else {
-        out(Update::Status(NOT_FOUND));
-        return;
+    // League may be installed, or its drive attached, while DirkDraft runs: look again every few
+    // seconds instead of giving up for the whole session. Said once, not on every look.
+    let mut said = false;
+    let lockfile = loop {
+        let found = explicit_lockfile
+            .clone()
+            .or_else(|| install::locate().map(|dir| install::lockfile(&dir)))
+            .filter(|path| path.parent().is_some_and(|dir| dir.is_dir()));
+        if let Some(path) = found {
+            break path;
+        }
+        if !said {
+            out(Update::Status(NOT_FOUND));
+            said = true;
+        }
+        tokio::time::sleep(LOCATE_RETRY).await;
     };
     out(Update::Status(OFFLINE));
 

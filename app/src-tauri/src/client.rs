@@ -49,6 +49,15 @@ pub fn start(app: &AppHandle, lockfile: Option<std::path::PathBuf>) {
             Update::Status(status) => {
                 if let Ok(mut s) = state.snapshot.lock() {
                     s.status = status;
+                    // A closed client has no phase: a page that reloads now must not see the last
+                    // game still running, and the game poller stops asking.
+                    if !status.client_running {
+                        s.phase = None;
+                        s.session = None;
+                    }
+                }
+                if !status.client_running {
+                    let _ = phase_tx.send(String::new());
                 }
                 let _ = handle.emit("client://status", status);
             }

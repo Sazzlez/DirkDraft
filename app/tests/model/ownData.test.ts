@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { Lane } from '../../src/core/model/lane';
 import { MetaLookup } from '../../src/core/model/metaLookup';
 import { termHint } from '../../src/core/model/recommender';
-import { riotPlan, type BuildCount, type ChampionBuildStats, type RiotBuildFile } from '../../src/core/riotBuilds';
+import { riotPlan, slotWeights, type BuildCount, type ChampionBuildStats, type RiotBuildFile } from '../../src/core/riotBuilds';
 import { MetaBuilder } from './helpers';
 
 function ownMeta(): MetaLookup {
@@ -94,19 +94,70 @@ const file = (builds: ChampionBuildStats[]): RiotBuildFile => ({
   builds,
 });
 
+const core = [count([1, 2, 3], 40, 20)];
+
 describe('builds from own data', () => {
-  it('takes the best win rate its games can vouch for', () => {
+  it('without a measurable spread between options, the most played one leads — a perfect thin record does not', () => {
     const plan = riotPlan(
       file([
         stats(122, Lane.Top, 400, {
-          boots: [count([3047], 13, 8), count([3111], 113, 55), count([3006], 60, 31)],
+          core,
+          boots: [count([3047], 8, 8), count([3111], 113, 55), count([3006], 60, 31)],
+          runes: [count([8000, 8010, 9111, 9104, 8299, 8400, 8473, 8242, 5005, 5008, 5001], 9, 9), count([8200, 8230, 8275, 8234, 8236, 8000, 9104, 9111, 5005, 5008, 5001], 180, 88)],
         }),
       ]),
       122,
       Lane.Top,
     )!;
-    // 13 games at 62 % lose to 60 at 52 % and 113 at 49 % on the Wilson bound.
+    // The Wilson bound used to rank 8 of 8 (lower bound 68 %) above 113 games at 49 %.
     expect(plan.boots.map((o) => o.ids[0])).toEqual([3111, 3006]);
+    expect(plan.runes!.games).toBe(180);
+  });
+
+  it('follows the rates once the file shows options truly differ', () => {
+    // Sixty rows where option B wins 60 % over hundreds of games and A 40 %: a spread no noise explains.
+    const rows = [...Array(60)].map((_, i) =>
+      stats(1000 + i, Lane.Top, 1000, { core, boots: [count([3047], 600, 240), count([3111], 400, 240)] }),
+    );
+    const f = file(rows);
+    expect(Number.isFinite(slotWeights(f).boots)).toBe(true);
+    expect(riotPlan(f, 1000, Lane.Top)!.boots[0]!.ids).toEqual([3111]);
+  });
+
+  it('counts a spell pair and a rune page once, whatever their order', () => {
+    const page = (a: number, b: number) => [8100, 8112, 8139, 8140, 8106, 8200, a, b, 5005, 5008, 5001];
+    const plan = riotPlan(
+      file([
+        stats(103, Lane.Mid, 300, {
+          core,
+          spells: [count([4, 14], 70, 35), count([14, 4], 50, 25), count([4, 12], 100, 50)],
+          runes: [count(page(8226, 8210), 60, 30), count(page(8210, 8226), 50, 25), count(page(8233, 8236), 80, 40)],
+        }),
+      ]),
+      103,
+      Lane.Mid,
+    )!;
+    expect(plan.spells!.ids).toEqual([4, 14]);
+    expect(plan.spells!.games).toBe(120);
+    // The most played spelling keeps its order for the client.
+    expect(plan.runes!.ids).toEqual(page(8226, 8210));
+    expect(plan.runes!.games).toBe(110);
+  });
+
+  it('never repeats a core item or an earlier slot in items four to six', () => {
+    const plan = riotPlan(
+      file([
+        stats(157, Lane.Mid, 300, {
+          core: [count([3153, 3031, 3036], 100, 50)],
+          fourth: [count([3036], 60, 30), count([3026], 40, 20)],
+          fifth: [count([3026], 50, 25), count([3072], 20, 10)],
+          sixth: [count([3026], 9, 5), count([3072], 8, 4)],
+        }),
+      ]),
+      157,
+      Lane.Mid,
+    )!;
+    expect(plan.late.map((o) => o.ids[0])).toEqual([3026, 3072]);
   });
 
   it('drops thin alternatives but never the best option', () => {
@@ -114,10 +165,16 @@ describe('builds from own data', () => {
     expect(plan.core).toHaveLength(1);
   });
 
-  it('shows the main lane when the asked lane has no games', () => {
-    const plan = riotPlan(file([stats(122, Lane.Top, 900), stats(122, Lane.Mid, 40)]), 122, Lane.Jungle)!;
-    expect(plan.lane).toBe(Lane.Top);
-    expect(plan.inPlaceOf).toBe(Lane.Jungle);
+  it('shows the main lane when the asked lane has no games or too few', () => {
+    const f = file([stats(122, Lane.Top, 900, { core }), stats(122, Lane.Mid, 40, { core }), stats(122, Lane.Jungle, 12, { core })]);
+    const none = riotPlan(f, 122, Lane.Support)!;
+    expect(none.lane).toBe(Lane.Top);
+    expect(none.inPlaceOf).toBe(Lane.Support);
+    const thin = riotPlan(f, 122, Lane.Jungle)!;
+    expect(thin.lane).toBe(Lane.Top);
+    expect(thin.inPlaceOf).toBe(Lane.Jungle);
+    // 40 games with a core are a plan of their own.
+    expect(riotPlan(f, 122, Lane.Mid)!.lane).toBe(Lane.Mid);
   });
 
   it('sums the brackets of one champion and lane', () => {

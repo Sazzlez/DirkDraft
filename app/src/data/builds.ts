@@ -59,6 +59,7 @@ export function buildFromRiot(plan: RiotBuildPlan, champion: ChampionRef, oppone
     boots: option(plan.boots[0]),
     core: option(plan.core[0]),
     late: plan.late.flatMap((o) => o.ids.map((id) => ({ id, name: itemName(id) }))),
+    support: option(plan.supportChoice ?? undefined),
     alsoStart: plan.starters.slice(1).map((o) => option(o)!),
     alsoBoots: plan.boots.slice(1).map((o) => option(o)!),
     alsoCore: plan.core.slice(1).map((o) => option(o)!),
