@@ -18,12 +18,16 @@
   <Board board={view.board} />
 {/if}
 
+{#if view.board && view.data.chip}
+  <p class="chip" role="note">{view.data.chip}</p>
+{/if}
+
 <div class="tiles" class:solo={view.side.length === 0}>
   <div class="main">
     {#if main.kind === 'picks' || main.kind === 'bans'}
       <PickTile tile={main.tile} />
     {:else if main.kind === 'matchup'}
-      <MatchupTile matchup={main.matchup} build={main.build} />
+      <MatchupTile matchup={main.matchup} build={main.build} canImport={view.canImport} />
     {:else if main.kind === 'aram'}
       <AramTile aram={main.aram} build={main.build} />
     {:else if main.kind === 'lobby'}
@@ -57,15 +61,25 @@
     align-items: start;
   }
 
+  .chip {
+    margin: 0 20px 12px;
+    padding: 6px 12px;
+    border-radius: var(--r-m);
+    background: var(--orange-wash);
+    color: var(--orange);
+    font: var(--t-caption);
+  }
+
   .tiles.solo {
     grid-template-columns: minmax(0, 1fr);
     max-width: 640px;
     margin: 0 auto;
   }
 
+  /* auto-fit: two tiles share the row instead of leaving a third column empty (medium width). */
   .side {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     gap: 12px;
   }
 
@@ -76,6 +90,10 @@
   }
 
   @container app (max-width: 719px) {
+    .chip {
+      margin: 0 12px 10px;
+    }
+
     .tiles {
       padding: 0 12px 12px;
       gap: 10px;

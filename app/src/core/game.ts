@@ -49,15 +49,37 @@ export interface ItemInfo {
   tags?: string[];
   armor?: number;
   magicResist?: number;
+  /** The item this one transforms from (Muramana from Manamune, Seraph's from Archangel's). */
+  specialRecipe?: number;
 }
+
+/** Basic boots; every finished pair is built from them. */
+export const BASIC_BOOTS = 1001;
 
 const hasTag = (info: ItemInfo | undefined, tag: string): boolean =>
   !!info?.tags?.some((t) => t.toLowerCase() === tag.toLowerCase());
 
-/** ItemCatalog.IsBoots: a finished pair, built from basic boots. */
-export function isBoots(id: number, items: ReadonlyMap<number, ItemInfo>): boolean {
-  const info = items.get(id);
-  return hasTag(info, 'Boots') && (info?.from.includes(1001) ?? false);
+/**
+ * A pair of boots past the basic ones: built from basic boots, directly or through another pair.
+ * The tier-3 upgrades (Gunmetal Greaves from Berserker's, …) come from a pair, not from 1001, and
+ * Data Dragon leaves some of them without the Boots tag — the recipe is what they share.
+ */
+export function isBoots(id: number, items: ReadonlyMap<number, ItemInfo>, depth = 0): boolean {
+  if (id === BASIC_BOOTS || depth > 4) return false;
+  const from = items.get(id)?.from ?? [];
+  return from.includes(BASIC_BOOTS) || from.some((f) => isBoots(f, items, depth + 1));
+}
+
+/**
+ * Whether the plan's item counts as owned: the item itself, what it transformed into (Muramana for
+ * Manamune) or an upgrade built from it (the tier-3 boots for their pair).
+ */
+export function ownsItem(id: number, owned: readonly number[], items: ReadonlyMap<number, ItemInfo>): boolean {
+  if (owned.includes(id)) return true;
+  return owned.some((o) => {
+    const info = items.get(o);
+    return info?.specialRecipe === id || (isBoots(o, items) && isBoots(id, items) && (info?.from.includes(id) ?? false));
+  });
 }
 
 /** ItemCatalog.IsFinished: an end point of the shop, not a component, boots or consumable. */
@@ -120,6 +142,8 @@ export interface GameModel {
   nextBuy: NextBuy | null;
   /** The next skill point by the plan, and whether it can be spent now. */
   nextSkill: { key: Skill; level: number; now: boolean } | null;
+  /** Skill points already spent (Q + W + E + R levels). */
+  skillPoints: number;
   enemies: EnemyView[];
   /** Share of the enemy champions dealing mainly physical (magic) damage. */
   enemyPhysical: number;
@@ -183,14 +207,12 @@ export function remainingCost(itemId: number, owned: number[], items: ReadonlyMa
   return Math.max(0, cost);
 }
 
-/** Basic boots; every finished pair is built from them. */
-export const BASIC_BOOTS = 1001;
-
 function pathOf(plan: RiotBuildPlan | null, owned: readonly number[], gameTime: number, items: ReadonlyMap<number, ItemInfo>): PathStep[] {
   if (!plan) return [];
-  const has = (id: number) => owned.includes(id);
-  // Any finished pair fills the boots slot: whoever chose other boots is not told to buy a second pair.
-  const hasBoots = owned.some((id) => items.get(id)?.from.includes(BASIC_BOOTS) ?? false);
+  const has = (id: number) => ownsItem(id, owned, items);
+  // Any pair past the basic boots fills the boots slot: whoever chose other boots is not told to buy
+  // a second pair.
+  const hasBoots = owned.some((id) => isBoots(id, items));
   const steps: PathStep[] = [];
   if (gameTime <= START_WINDOW_SECONDS) for (const id of plan.starters[0]?.ids ?? []) steps.push({ slot: 'Start', itemId: id, owned: has(id) });
   for (const id of plan.boots[0]?.ids ?? []) steps.push({ slot: 'Schuhe', itemId: id, owned: has(id) || hasBoots });
@@ -292,6 +314,7 @@ export function gameModel(
     path: steps,
     nextBuy: nextBuyOf(steps, owned, gold, items),
     nextSkill: plan ? nextSkillOf(plan.skillOrder, data) : null,
+    skillPoints: (['Q', 'W', 'E', 'R'] as const).reduce((n, k) => n + (data.activePlayer?.abilities?.[k]?.abilityLevel ?? 0), 0),
     enemies,
     enemyPhysical: shares.physical,
     enemyMagic: shares.magic,

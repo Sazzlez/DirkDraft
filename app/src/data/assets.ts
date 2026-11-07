@@ -63,6 +63,7 @@ export function loadAssets(patch: string, language = 'de_DE'): Promise<AssetName
       into?: string[];
       tags?: string[];
       stats?: Record<string, number>;
+      specialRecipe?: number;
     };
     for (const [id, item] of Object.entries(items.data) as [string, RawItem][]) {
       names.items.set(Number(id), item.name);
@@ -74,6 +75,7 @@ export function loadAssets(patch: string, language = 'de_DE'): Promise<AssetName
         tags: item.tags ?? [],
         armor: Math.round(item.stats?.FlatArmorMod ?? 0),
         magicResist: Math.round(item.stats?.FlatSpellBlockMod ?? 0),
+        specialRecipe: item.specialRecipe ? Number(item.specialRecipe) : undefined,
       });
     }
     for (const s of Object.values(spells.data) as { key: string; id: string; name: string }[])

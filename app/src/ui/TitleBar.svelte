@@ -3,9 +3,7 @@
   import Segment from './Segment.svelte';
   import { hideToTray, minimize, onTrayHint } from '../platform/shell';
   import { changeSetting, settings } from '../live/settings.svelte';
-  import { applyUpdate, checkForUpdate, update } from '../live/update.svelte';
-
-  void checkForUpdate();
+  import { applyUpdate, update } from '../live/update.svelte';
 
   let {
     view,
@@ -30,6 +28,9 @@
   }
 </script>
 
+<!-- The narrow menu closes on any click outside it, like every menu does. -->
+<svelte:window onclick={(e) => { if (menuOpen && !(e.target as Element | null)?.closest('.popover, .menu')) menuOpen = false; }} />
+
 <!-- Tauri drags by the element under the mouse, not its parent: every passive part carries the mark. -->
 <header class="bar" data-tauri-drag-region>
   <div class="left" data-tauri-drag-region>
@@ -50,12 +51,14 @@
         disabled={update.busy}
         title={update.error ? `Fehlgeschlagen: ${update.error}` : 'Lädt das Update, installiert es und startet DirkDraft neu.'}
       >
-        {update.busy ? 'Wird aktualisiert …' : update.error ? 'Update erneut versuchen' : `Version ${update.available} ist da · Jetzt aktualisieren`}
+        <span class="long">{update.busy ? 'Wird aktualisiert …' : update.error ? 'Update erneut versuchen' : `Version ${update.available} ist da · Jetzt aktualisieren`}</span>
+        <span class="short">{update.busy ? 'Aktualisiert …' : update.error ? 'Erneut versuchen' : `Update ${update.available}`}</span>
       </button>
     {/if}
     <span class="pill" title="{view.data.text} — aktualisiert sich von selbst, nie während Draft oder Spiel" data-tauri-drag-region>
       <span class="dot-small" class:stale={view.data.stale}></span>
-      <span class="num">{view.data.text}</span>
+      <span class="num long">{view.data.text}</span>
+      <span class="num short">{view.data.short}</span>
     </span>
     <button class="ctl menu" aria-label="Menü" onclick={() => (menuOpen = !menuOpen)}>
       <svg viewBox="0 0 20 20"><circle cx="5" cy="10" r="1.3" /><circle cx="10" cy="10" r="1.3" /><circle cx="15" cy="10" r="1.3" /></svg>
@@ -327,9 +330,22 @@
     color: #fff;
   }
 
+  .short {
+    display: none;
+  }
+
   @container app (max-width: 1099px) {
     .status .text {
       display: none;
+    }
+
+    /* Medium: the long data line and the update label would push each other off; both shorten. */
+    .long {
+      display: none;
+    }
+
+    .short {
+      display: inline;
     }
 
     .status {

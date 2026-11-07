@@ -44,7 +44,9 @@
     display: grid;
     grid-template-columns: max-content auto auto;
     justify-content: space-between;
-    gap: 8px 14px;
+    /* Two side tiles share the wide side column (about 180 px inside each): label and two rows of
+       five dots have to fit there without running over the tile's edge. */
+    gap: 8px 8px;
     align-items: center;
     font-size: 12px;
   }
@@ -60,12 +62,12 @@
 
   .dots {
     display: flex;
-    gap: 3px;
+    gap: 2px;
   }
 
   .dots i {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--track);
   }

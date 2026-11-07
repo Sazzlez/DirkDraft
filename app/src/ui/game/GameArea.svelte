@@ -45,7 +45,7 @@
     {#if game.nextSkill}
       <section class="next-skill">
         <span class="key">{game.nextSkill.key}</span>
-        <span>Nächster Skillpunkt, auf Stufe {game.nextSkill.level}</span>
+        <span>{game.nextSkill.now ? 'Jetzt skillen' : `Nächster Skillpunkt, auf Stufe ${game.nextSkill.level}`}</span>
       </section>
     {/if}
   </div>
@@ -70,7 +70,7 @@
       {#if build}
         <div class="skills">
           <span class="k">Skills · Stufe {game.level}</span>
-          <SkillGrid skills={build.skills} current={game.level} />
+          <SkillGrid skills={build.skills} taken={game.skillPoints} next={game.nextSkill?.level ?? null} />
         </div>
       {/if}
     </Tile>

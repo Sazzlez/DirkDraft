@@ -6,11 +6,12 @@
     turn,
     mine,
     steps,
+    total = null,
     compact = false,
-  }: { seconds: number | null; turn: string; mine: boolean; steps: PhaseStep[]; compact?: boolean } = $props();
+  }: { seconds: number | null; total?: number | null; turn: string; mine: boolean; steps: PhaseStep[]; compact?: boolean } = $props();
 
-  // A pick or ban step lasts 30 s in ranked; the ring shows what is left of it.
-  const fraction = $derived(seconds === null ? 0 : Math.max(0, Math.min(1, seconds / 30)));
+  // The ring shows what is left of the step: its length from the client, else a ranked pick's 30 s.
+  const fraction = $derived(seconds === null ? 0 : Math.max(0, Math.min(1, seconds / (total && total > 0 ? total : 30))));
   const r = 26;
   const circumference = 2 * Math.PI * r;
 </script>

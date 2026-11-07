@@ -70,9 +70,14 @@
     transform: scale(1.12);
   }
 
+  /* Riot draws rune icons for a dark ground: a dark disc in both themes keeps them legible. */
   .rune {
     border-radius: 50%;
     background: rgba(0, 0, 0, 0.35);
+  }
+
+  :global(:root[data-theme='light']) .rune {
+    background: rgba(28, 28, 34, 0.85);
   }
 
   .rune img {

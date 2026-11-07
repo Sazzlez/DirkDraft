@@ -18,7 +18,10 @@ import { assets } from '../data/assets';
 import { aramBuild, buildFromRiot } from '../data/builds';
 import { gameView } from '../data/gameView';
 import { GoldenAdapter, type GoldenFrame } from '../data/golden';
-import { dataLine, type DataSet } from '../data/remote';
+import { dataLine, dataLineShort, type DataSet } from '../data/remote';
+import { draftStateFrom } from '../core/model/draftState';
+import { patchesBetween, patchLine } from '../core/model/patchVersion';
+import { draftSteps } from '../core/steps';
 
 export interface ClientStatus {
   leagueFound: boolean;
@@ -62,7 +65,12 @@ export class LiveSession {
   private frame: GoldenFrame | null = null;
   /** The last frame of a running draft: the loading screen still shows the matchup. */
   private lastActive: GoldenFrame | null = null;
-  private noBans = false;
+  /** The session behind lastActive: the step line reads the draft's order from it. */
+  private lastSession: Record<string, unknown> | null = null;
+  /** The patch the client runs ("16.23.1"), for the data's lag; null until the client said. */
+  private clientPatch: string | null = null;
+  /** This app's version and a newer one on GitHub, for the lobby (live/update). */
+  private version: { current: string | null; available: string | null } = { current: null, available: null };
   private game: LiveGameData | null = null;
   private readonly situations = new SituationTracker();
   /** The own pick of the last draft, for the build and the game after it. */
@@ -80,8 +88,16 @@ export class LiveSession {
       aramStats: set.aram ? aramStatsFrom(set.aram) : undefined,
       aramRounded: !set.aram,
     });
-    // New numbers arrive only while idle (core/refresh), but a kept session is re-evaluated anyway.
-    if (this.session) this.onSession(this.session);
+    this.applyPatchLag();
+    // New numbers arrive only while idle (core/refresh), but a kept session is re-evaluated anyway —
+    // the first start may swap them in during a draft, and the new engine must keep its filter.
+    if (this.session) {
+      this.onSession(this.session, this.sessionAt);
+      if (!this.showUnowned && this.selectable && this.frame?.state.isActive) {
+        this.engine.setSelectable(new Set(this.selectable));
+        this.onSession(this.session, this.sessionAt);
+      }
+    }
   }
 
   get hasData(): boolean {
@@ -90,7 +106,12 @@ export class LiveSession {
 
   onStatus(status: ClientStatus): void {
     this.status = status;
-    if (!status.clientRunning) this.phase = null;
+    if (!status.clientRunning) {
+      this.phase = null;
+      // A client that comes back may have patched in the meantime: asked again on reconnect.
+      this.clientPatch = null;
+      this.applyPatchLag();
+    }
   }
 
   onPhase(phase: string): void {
@@ -98,7 +119,10 @@ export class LiveSession {
     const playing = (p: string | null) => p === 'GameStart' || p === 'InProgress' || p === 'Reconnect';
     if (playing(phase) && !playing(this.phase)) this.situations.reset();
     // Back in the lobby or the queue: the last draft is over for good.
-    if (phase === 'Lobby' || phase === 'Matchmaking' || phase === 'None') this.lastActive = null;
+    if (phase === 'Lobby' || phase === 'Matchmaking' || phase === 'None') {
+      this.lastActive = null;
+      this.lastSession = null;
+    }
     this.phase = phase;
   }
 
@@ -112,8 +136,7 @@ export class LiveSession {
     this.frame = frame as unknown as GoldenFrame;
     if (parsed && frame.state.isActive) {
       this.lastActive = this.frame;
-      // The session says so itself: bans.numBans is 0 in blind pick.
-      this.noBans = (parsed.bans as { numBans?: number } | undefined)?.numBans === 0;
+      this.lastSession = parsed;
       this.rememberPick();
     }
   }
@@ -151,6 +174,10 @@ export class LiveSession {
     // up then. Until the game's own API has the players, it is the loading screen.
     const gameAnswers = !!this.game?.activePlayer && (this.game.allPlayers?.length ?? 0) > 0;
     if (moment === 'game' && !gameAnswers && this.lastActive) moment = 'loading';
+    // After the own lock the matchup leads; a click on a teammate asks for that seat's list instead,
+    // until the clock moves on (1.5's slot click).
+    const manual = this.engine?.manualSeat ?? null;
+    if (moment === 'locked' && active && active.state.phase !== 'finalization' && manual !== null && manual !== active.state.localCellId) moment = 'teammate';
     // The session ends when the loading screen starts; the matchup stays on screen through it.
     const frame = active ?? (moment === 'loading' ? this.lastActive : null);
     const base: ViewModel = {
@@ -164,6 +191,7 @@ export class LiveSession {
       game: null,
       emptyText: null,
       sampleNote: null,
+      canImport: !!active,
     };
 
     if (!this.data) {
@@ -181,12 +209,17 @@ export class LiveSession {
       };
     }
 
-    const board = this.adapter.board(frame, active ? this.secondsLeft(now) : null);
-    if (this.withoutBans()) board.steps = [
-      { label: 'Picks', state: frame.state.phase === 'finalization' || !active ? 'done' : 'now' },
-      { label: 'Finalisierung', state: !active ? 'done' : frame.state.phase === 'finalization' ? 'now' : 'next' },
-    ];
+    const clock = active ? this.clock(now) : null;
+    const board = this.adapter.board(frame, clock?.left ?? null);
+    board.total = clock?.total ?? null;
+    // The draft's own order (tournament, ranked/draft, blind); after the session, every step is done.
+    board.steps = frame.state.usesLanes ? draftSteps(active ? this.session : this.lastSession, !active) : [];
+    // Seats can be chosen only while the draft runs; the loading screen is a look back.
+    if (!active) for (const slot of board.allies) slot.canTarget = false;
     const me = board.allies.find((slot) => slot.isMe) ?? null;
+    // Whose list the main tile shows: the clock's seat or a seat the user clicked (TurnTracker).
+    const target = frame.target ? board.allies.find((slot) => slot.cellId === frame.target!.cellId) ?? null : null;
+    const forMe = !target || target.isMe;
     const myChampion = me?.champion ?? null;
     const lane = me?.lane ?? null;
     const opponent = lane ? (board.enemies.find((slot) => slot.lane === lane)?.champion ?? null) : null;
@@ -208,15 +241,18 @@ export class LiveSession {
       side.push({ kind: 'chance', chance: this.adapter.chance(frame) });
       side.push({ kind: 'comp', comp: this.adapter.comp(frame) });
     } else if (moment === 'banning' && frame.bans) {
-      main = { kind: 'bans', tile: this.adapter.pickTile(frame.bans, frame, 'Banns für dich') };
+      main = { kind: 'bans', tile: this.adapter.pickTile(frame.bans, frame, forMe ? 'Banns für dich' : `Banns für ${target!.label}`) };
       side.push({ kind: 'openRoles', roles: this.adapter.openRoles(frame) });
       side.push({ kind: 'chance', chance: this.adapter.chance(frame) });
       side.push({ kind: 'comp', comp: this.adapter.comp(frame) });
     } else if (frame.picks) {
       const set = frame.picks;
-      const who = moment === 'teammate' ? 'Picks für deinen Teammate' : moment === 'planning' ? 'Planung' : 'Picks für dich';
+      const who = moment === 'planning' && forMe ? 'Planung' : forMe ? 'Picks für dich' : `Picks für ${target!.label}`;
       const laneName = set.lane in LANE_NAMES ? ` · ${LANE_NAMES[set.lane as ViewLane]}` : '';
-      main = { kind: 'picks', tile: this.adapter.pickTile(set, frame, `${who}${laneName}`) };
+      const tile = this.adapter.pickTile(set, frame, `${who}${laneName}`);
+      // "Dein Hover" ranks the own hover on the own lane; over a teammate's list it would mislead.
+      if (!forMe) tile.hover = null;
+      main = { kind: 'picks', tile };
       side.push({ kind: 'chance', chance: this.adapter.chance(frame) });
       side.push({ kind: 'comp', comp: this.adapter.comp(frame) });
     } else {
@@ -226,16 +262,48 @@ export class LiveSession {
     return { ...base, board, main, side, build };
   }
 
+  /** A click on an ally seat: its list until the clock passes to someone else (1.5's TurnTracker). */
+  selectSeat(cellId: number): void {
+    if (!this.engine || !this.session || !this.frame?.state.isActive) return;
+    this.engine.selectSeat(cellId, draftStateFrom(this.session));
+    this.onSession(this.session, this.sessionAt);
+  }
+
+  /** The lane picker on a seat: a lane by hand, or null to give it back to the prediction. */
+  setManualLane(cellId: number, lane: ViewLane | null): void {
+    if (!this.engine || !this.session || !this.frame?.state.isActive) return;
+    this.engine.setManualLane(cellId, lane ? laneFromKey(lane) : Lane.Unknown, draftStateFrom(this.session));
+    this.onSession(this.session, this.sessionAt);
+  }
+
+  /** The client's game version (lol-patch), asked once per connection. */
+  setClientPatch(version: string | null): void {
+    if (this.clientPatch === version) return;
+    this.clientPatch = version;
+    this.applyPatchLag();
+    if (this.session) this.onSession(this.session, this.sessionAt);
+  }
+
+  get hasClientPatch(): boolean {
+    return this.clientPatch !== null;
+  }
+
+  /** This app's version and a newer release, for the lobby. */
+  setVersion(current: string | null, available: string | null): void {
+    this.version = { current, available };
+  }
+
   /** The import button's input for the build on screen, or null when there is nothing to write. */
-  importPlan(): ImportPlan | null {
+  importPlan(): ImportPlan | string {
+    // Spells exist only in champion select, and the page is named after this draft's matchup.
     const frame = this.frame?.state.isActive ? this.frame : null;
-    if (!frame) return null;
+    if (!frame) return 'Übernehmen geht nur im Champ Select.';
     const board = this.adapter.board(frame, null);
     const me = board.allies.find((slot) => slot.isMe);
-    if (!me?.champion) return null;
+    if (!me?.champion) return 'Erst einen Champion hovern oder locken.';
     const lane = me.lane ? laneFromKey(me.lane) : Lane.Unknown;
     const plan = this.planFor(me.champion.id, lane, modeOf(frame.state.queue));
-    if (!plan) return null;
+    if (!plan) return `Für ${me.champion.name} gibt es noch keinen Build.`;
     const opponent = me.lane ? board.enemies.find((slot) => slot.lane === me.lane)?.champion : null;
     return {
       title: opponent ? `${me.champion.name} vs ${opponent.name}` : me.champion.name,
@@ -257,30 +325,52 @@ export class LiveSession {
   }
 
   private dataStatus(now: number): DataStatus {
-    if (!this.data) return { text: 'Noch keine Daten', stale: true, chip: null };
-    return { text: dataLine(this.data.meta, new Date(now)), stale: !this.data.fresh && this.data.problems.length > 0, chip: null };
+    if (!this.data) return { text: 'Noch keine Daten', short: 'Noch keine Daten', stale: true, chip: null };
+    const behind = this.patchesBehind();
+    // Right after a patch the collector keeps the old numbers until the new patch has enough games.
+    const chip =
+      behind > 0
+        ? `Zahlen von Patch ${patchLine(this.data.meta.patch) || this.data.meta.patch}, der Client spielt ${patchLine(this.clientPatch)} — die Fehlerbalken sind entsprechend breiter.`
+        : null;
+    return { text: dataLine(this.data.meta, new Date(now)), short: dataLineShort(this.data.meta, new Date(now)), stale: (!this.data.fresh && this.data.problems.length > 0) || behind > 0, chip };
+  }
+
+  private patchesBehind(): number {
+    return this.data && this.clientPatch ? patchesBetween(this.data.meta.patch, this.clientPatch) : 0;
+  }
+
+  /** The lane error bars widen with every patch the data trails the client (1.5, Messung 7). */
+  private applyPatchLag(): void {
+    const behind = this.patchesBehind();
+    if (this.engine) this.engine.meta.patchesBehind = behind;
+    if (this.meta) this.meta.patchesBehind = behind;
   }
 
   private lobbyLines(): { label: string; value: string; tone: 'good' | 'warn' | 'bad' | 'neutral' }[] {
     const c = this.connection();
     const meta = this.data?.meta;
-    return [
+    const lines: { label: string; value: string; tone: 'good' | 'warn' | 'bad' | 'neutral' }[] = [
       { label: 'League-Client', value: c.text, tone: c.state === 'ok' ? 'good' : c.state === 'warn' ? 'warn' : 'neutral' },
       { label: 'Daten', value: meta ? `Patch ${meta.patch} · ${meta.champions.length} Champions` : 'noch keine', tone: meta ? 'good' : 'warn' },
     ];
-  }
-
-  /** Blind pick and other modes without bans (kept through the loading screen). */
-  private withoutBans(): boolean {
-    return this.noBans;
+    const { current, available } = this.version;
+    if (current) {
+      lines.push(
+        available
+          ? { label: 'Version', value: `${current} · ${available} ist da`, tone: 'warn' }
+          : { label: 'Version', value: current, tone: 'neutral' },
+      );
+    }
+    return lines;
   }
 
   /** Seconds left in the current champion select step, counted down from the session's timer. */
-  private secondsLeft(now: number): number | null {
-    const timer = this.session?.timer as { adjustedTimeLeftInPhase?: number } | undefined;
+  private clock(now: number): { left: number; total: number | null } | null {
+    const timer = this.session?.timer as { adjustedTimeLeftInPhase?: number; totalTimeInPhase?: number } | undefined;
     const left = timer?.adjustedTimeLeftInPhase;
     if (typeof left !== 'number' || left <= 0) return null;
-    return Math.max(0, Math.round((left - (now - this.sessionAt)) / 1000));
+    const total = typeof timer?.totalTimeInPhase === 'number' && timer.totalTimeInPhase > 0 ? Math.round(timer.totalTimeInPhase / 1000) : null;
+    return { left: Math.max(0, Math.round((left - (now - this.sessionAt)) / 1000)), total };
   }
 
   private currentSpells(): [number, number] {

@@ -15,7 +15,7 @@ import {
   type DraftState,
   type TurnAction,
 } from './model/draftState';
-import { laneFromKey, laneKey, type Lane } from './model/lane';
+import { Lane, laneFromKey, laneKey } from './model/lane';
 import { isUncertain, LanePredictor, SeatPriors, type LanePredictionResult } from './model/lanePredictor';
 import { MetaLookup, type MetaSnapshot } from './model/metaLookup';
 import { isAram, usesLanes, type QueueKind } from './model/queue';
@@ -157,6 +157,24 @@ export class DraftEngine {
     return this.selectable !== null;
   }
 
+  /** Lanes the user fixed by hand (1.5's lane picker), by cell; they hold until the draft ends. */
+  private readonly manualLanes = new Map<number, Lane>();
+
+  /**
+   * Fixes a seat's lane by hand, or gives it back to the prediction (Lane.Unknown). One lane, one
+   * seat: the same lane pinned on another seat of that team would contradict and collapse every
+   * prediction, so the other pin goes (1.5's SetManualLane).
+   */
+  setManualLane(cellId: number, lane: Lane, state: DraftState): void {
+    if (lane === Lane.Unknown) {
+      this.manualLanes.delete(cellId);
+      return;
+    }
+    const team = state.allies.some((slot) => slot.cellId === cellId) ? state.allies : state.enemies;
+    for (const slot of team) if (slot.cellId !== cellId && this.manualLanes.get(slot.cellId) === lane) this.manualLanes.delete(slot.cellId);
+    this.manualLanes.set(cellId, lane);
+  }
+
   /**
    * One session update from the client (the parsed /lol-champ-select/v1/session, or null outside
    * champ select). A new draft resets the turn tracker: the session went active, fewer champions
@@ -167,7 +185,10 @@ export class DraftEngine {
     const progress = state.unavailable.size;
     const isNewDraft = state.isActive && (!this.wasActive || progress < this.lastProgress || state.localCellId !== this.lastLocal);
     if (isNewDraft) this.turns.reset();
-    if (isNewDraft || !state.isActive) this.selectable = null;
+    if (isNewDraft || !state.isActive) {
+      this.selectable = null;
+      this.manualLanes.clear();
+    }
     this.wasActive = state.isActive;
     this.lastProgress = progress;
     this.lastLocal = state.localCellId;
@@ -176,6 +197,11 @@ export class DraftEngine {
     const mine = localSlot(state);
     const hover = mine && !isLocked(mine) && mine.hoverChampionId > 0 ? mine.hoverChampionId : 0;
     return { isNewDraft, state, frame: this.evaluate(state, target, hover) };
+  }
+
+  /** The seat a click chose, while it holds; null when the list follows the clock. */
+  get manualSeat(): number | null {
+    return this.turns.manualSeat;
   }
 
   /** A manual click on an ally seat; holds until the clock passes to someone else. */
@@ -190,8 +216,9 @@ export class DraftEngine {
   evaluate(state: DraftState, target: RecommendationTarget | null, hover: number): DraftFrame {
     const meta = this.meta;
     const predictor = new LanePredictor(meta, this.seats);
-    const enemyPredictions = predictor.predict(state.enemies);
-    const allyPredictions = predictor.predict(state.allies);
+    const manual = this.manualLanes.size > 0 ? this.manualLanes : null;
+    const enemyPredictions = predictor.predict(state.enemies, manual);
+    const allyPredictions = predictor.predict(state.allies, manual);
     const comp = new CompAnalyzer(meta, this.traits);
     const recommender = new Recommender(meta, this.traits);
 

@@ -4,20 +4,21 @@
   import Icon from '../Icon.svelte';
   import Clock from './Clock.svelte';
   import TeamColumn from './TeamColumn.svelte';
+  import { chooseLane, chooseSeat } from '../../live/bridge';
 
   let { board }: { board: BoardView } = $props();
 </script>
 
 <section class="board" aria-label="Draft-Board">
   <div class="phaseline">
-    <Clock seconds={board.seconds} turn={board.turnText} mine={board.myTurn} steps={board.steps} compact />
+    <Clock seconds={board.seconds} total={board.total} turn={board.turnText} mine={board.myTurn} steps={board.steps} compact />
     <span class="mode">{board.mode}</span>
   </div>
 
   <div class="grid">
-    <TeamColumn side="ally" title="Dein Team" slots={board.allies} bans={board.allyBans} usesLanes={board.usesLanes} />
+    <TeamColumn side="ally" title="Dein Team" slots={board.allies} bans={board.allyBans} usesLanes={board.usesLanes} onSeat={chooseSeat} onLane={chooseLane} />
     <div class="clock">
-      <Clock seconds={board.seconds} turn={board.turnText} mine={board.myTurn} steps={board.steps} />
+      <Clock seconds={board.seconds} total={board.total} turn={board.turnText} mine={board.myTurn} steps={board.steps} />
       <span class="mode" title={board.modeNote ?? ''}>{board.mode}</span>
     </div>
     {#if board.bench}
@@ -33,16 +34,22 @@
         </div>
       </div>
     {:else}
-      <TeamColumn side="enemy" title="Gegner" slots={board.enemies} bans={board.enemyBans} usesLanes={board.usesLanes} />
+      <TeamColumn side="enemy" title="Gegner" slots={board.enemies} bans={board.enemyBans} usesLanes={board.usesLanes} onLane={chooseLane} />
     {/if}
   </div>
 
   <div class="strip" aria-label="Fünf gegen fünf">
     <div class="side">
       {#each board.allies as slot (slot.cellId)}
-        <span class="mini" class:me={slot.isMe} title="{slot.label}{slot.lane ? ` · ${LANE_NAMES[slot.lane]}` : ''}">
-          <Icon kind="champion" champion={slot.champion} size={32} dim={slot.hovering} ring={slot.isMe ? 'me' : slot.isTarget ? 'target' : null} />
-        </span>
+        {#if slot.canTarget}
+          <button class="mini" class:me={slot.isMe} aria-pressed={slot.isTarget} onclick={() => chooseSeat(slot.cellId)} title="{slot.label}{slot.lane ? ` · ${LANE_NAMES[slot.lane]}` : ''} — Vorschläge für diesen Platz">
+            <Icon kind="champion" champion={slot.champion} size={32} dim={slot.hovering} ring={slot.isMe ? 'me' : slot.isTarget ? 'target' : null} />
+          </button>
+        {:else}
+          <span class="mini" class:me={slot.isMe} title="{slot.label}{slot.lane ? ` · ${LANE_NAMES[slot.lane]}` : ''}">
+            <Icon kind="champion" champion={slot.champion} size={32} dim={slot.hovering} ring={slot.isMe ? 'me' : slot.isTarget ? 'target' : null} />
+          </span>
+        {/if}
       {/each}
     </div>
     {#if board.bench}

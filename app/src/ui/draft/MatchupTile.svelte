@@ -6,7 +6,7 @@
   import RuneRow from '../build/RuneRow.svelte';
   import ImportButton from '../build/ImportButton.svelte';
 
-  let { matchup, build }: { matchup: MatchupView; build: BuildView | null } = $props();
+  let { matchup, build, canImport }: { matchup: MatchupView; build: BuildView | null; canImport: boolean } = $props();
 </script>
 
 <Tile title="Dein Matchup" sub={LANE_NAMES[matchup.lane]} main>
@@ -20,14 +20,14 @@
     </span>
     <span class="value">
       <b class="num tone-{matchup.tone === 'neutral' ? 'neutral' : matchup.tone}">{matchup.value ?? '—'}</b>
-      <small>{matchup.verdict}</small>
+      {#if matchup.value !== null}<small>{matchup.verdict}</small>{/if}
     </span>
   </div>
 
   {#if build}
     <div class="card">
       {#if build.runes}<RuneRow runes={build.runes} />{/if}
-      <ImportButton {build} />
+      {#if canImport}<ImportButton {build} />{/if}
     </div>
 
     <div class="kit">

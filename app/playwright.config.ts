@@ -10,6 +10,9 @@ export default defineConfig({
   testDir: './tests/shots',
   outputDir: './test-results',
   fullyParallel: true,
+  // The first page of every worker waits for Vite to transform the app on a cold server and for
+  // Data Dragon's pictures; 30 s was too short for those four, never for the rest.
+  timeout: 90_000,
   reporter: 'list',
   use: {
     baseURL: 'http://localhost:5173',

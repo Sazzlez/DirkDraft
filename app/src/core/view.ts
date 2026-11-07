@@ -68,9 +68,15 @@ export interface SlotView {
   /** Lane confidence 0..1, shown only when below the 60 % threshold. */
   laneConfidence: number | null;
   laneUncertain: boolean;
+  /** Set by hand (lane picker); a manual lane is no guess. */
+  laneManual: boolean;
   isMe: boolean;
   /** The seat the main tile currently advises. */
   isTarget: boolean;
+  /** An ally seat a click can make the target (until the clock moves on), as in 1.5. */
+  canTarget: boolean;
+  /** The lane can be set by hand: enemies, and allies without an assigned position (blind, custom). */
+  laneEditable: boolean;
   /** Ally hover that cannot work: "gebannt", "schon gepickt". */
   warning: string | null;
 }
@@ -87,6 +93,8 @@ export interface BoardView {
   enemyBans: ChampionRef[];
   /** Seconds left in the current step; null when the client sends none. */
   seconds: number | null;
+  /** The step's full length in seconds, for the ring; null: 30 s, a ranked pick. */
+  total: number | null;
   /** "Du pickst", "Teammate 3 pickt", "Gegner bannen", "Finalisierung". */
   turnText: string;
   myTurn: boolean;
@@ -243,7 +251,10 @@ export interface GameView {
   title: string;
   nextBuy: { item: ItemRef; cost: number; affordable: boolean; then: ItemRef | null } | null;
   path: { slot: string; items: (ItemRef & { owned: boolean; next: boolean })[] }[];
-  nextSkill: { key: 'Q' | 'W' | 'E' | 'R'; level: number } | null;
+  /** The plan's next point; `now`: a point is open right now (level above the points spent). */
+  nextSkill: { key: 'Q' | 'W' | 'E' | 'R'; level: number; now: boolean } | null;
+  /** Points spent so far: the skill grid marks that many levels as taken. */
+  skillPoints: number;
   enemies: { champion: ChampionRef; items: ItemRef[]; damage: 'physisch' | 'magisch' | 'gemischt' }[];
   hints: { title: string; detail: string; tone: Tone }[];
   draftLine: string | null;
@@ -277,8 +288,10 @@ export interface AramView {
 }
 
 export interface DataStatus {
-  /** "Patch 16.22 · Platin · vor 2 h" */
+  /** "Patch 16.22 · Platin · 6.185 Spiele · vor 2 Std." */
   text: string;
+  /** "Patch 16.22 · vor 2 Std." — the pill where the title bar is tight (medium width). */
+  short: string;
   stale: boolean;
   /** Present when the data needs a word: older patch, other queue. */
   chip: string | null;
@@ -298,6 +311,8 @@ export interface ViewModel {
   emptyText: string | null;
   /** Shown above everything when the scene is sample data, never in a live session. */
   sampleNote: string | null;
+  /** Runes and spells can be taken over now: champion select is running (spells exist only there). */
+  canImport: boolean;
 }
 
 export type MainTile =

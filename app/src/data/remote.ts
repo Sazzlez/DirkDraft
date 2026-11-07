@@ -193,6 +193,12 @@ export function dataLine(meta: MetaSnapshot, now: Date): string {
   return parts.join(' · ');
 }
 
+/** "Patch 16.22 · vor 3 Std." where the full line has no room. */
+export function dataLineShort(meta: MetaSnapshot, now: Date): string {
+  const asOf = Date.parse(meta.dataAsOfUtc ?? meta.builtAtUtc);
+  return Number.isFinite(asOf) ? `Patch ${meta.patch} · ${age(now.getTime() - asOf)}` : `Patch ${meta.patch}`;
+}
+
 function age(ms: number): string {
   const minutes = Math.max(0, Math.round(ms / 60000));
   if (minutes < 60) return minutes <= 1 ? 'gerade eben' : `vor ${minutes} Min.`;

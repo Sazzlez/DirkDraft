@@ -59,7 +59,7 @@
           {/if}
         {:else if area === 'build'}
           {#if view.build}
-            <BuildArea build={view.build} />
+            <BuildArea build={view.build} canImport={view.canImport} />
           {:else}
             <EmptyState title="Noch kein Build" text="Sobald du einen Champion hoverst oder lockst, steht hier sein Build." />
           {/if}

@@ -190,8 +190,11 @@ export class GoldenAdapter {
         lane: s.usesLanes ? lane : null,
         laneConfidence: !g.isAlly && prediction && shown ? prediction.confidence : null,
         laneUncertain: !g.isAlly && !!shown && !!prediction?.isUncertain,
+        laneManual: !!prediction?.isManual && !toLane(g.assignedLane),
         isMe,
         isTarget: frame.target?.cellId === g.cellId,
+        canTarget: g.isAlly && s.isActive && s.usesLanes,
+        laneEditable: s.isActive && s.usesLanes && !toLane(g.assignedLane) && (g.isAlly || !!shown),
         warning: allyHoverBlocked ? 'gebannt' : null,
       };
     };
@@ -204,13 +207,16 @@ export class GoldenAdapter {
       return g.cellId === s.localCellId ? 'Du' : g.isAlly ? `Teammate ${g.index + 1}` : `Gegner ${g.index + 1}`;
     };
 
-    const turnText = !turn
-      ? s.phase === 'finalization'
-        ? 'Finalisierung'
-        : s.phase === 'planning'
-          ? 'Planung'
+    // Planning first: the client already marks the first ban as "in progress" while the players
+    // only show their intent, and "Du bannst" there would send them to the ban button too early.
+    const planning = s.phase === 'planning';
+    const turnText = planning
+      ? 'Planung'
+      : !turn
+        ? s.phase === 'finalization'
+          ? 'Finalisierung'
           : 'Warten'
-      : turn.isLocalPlayer
+        : turn.isLocalPlayer
         ? turn.action === 'ban'
           ? 'Du bannst'
           : 'Du pickst'
@@ -222,8 +228,9 @@ export class GoldenAdapter {
       allyBans: s.allyBans.map((id) => this.champion(id)).filter((c): c is ChampionRef => !!c),
       enemyBans: s.enemyBans.map((id) => this.champion(id)).filter((c): c is ChampionRef => !!c),
       seconds,
+      total: null,
       turnText,
-      myTurn: !!turn?.isLocalPlayer,
+      myTurn: !planning && !!turn?.isLocalPlayer,
       // ARAM has no bans and no pick order to walk through — only the timer.
       steps: s.usesLanes ? steps(frame) : [],
       mode: MODES[s.queue] ?? 'Ranked Solo/Duo',
@@ -379,19 +386,19 @@ export class GoldenAdapter {
   }
 }
 
-/** The phase timeline from what has happened so far (ban and lock counts). */
+/**
+ * The phase timeline of a stored frame, which has no action groups to read: the ranked order (one
+ * round of bans, then the picks). A live session reads the real order instead (core/steps.ts).
+ */
 function steps(frame: GoldenFrame): PhaseStep[] {
   const s = frame.state;
-  const bans = s.allyBans.length + s.enemyBans.length;
   const locks = [...s.allies, ...s.enemies].filter((slot) => slot.lockedChampionId).length;
-  const labels = ['Bann 1', 'Pick 1–3', 'Bann 2', 'Pick 4–5', 'Finalisierung'];
+  const labels = ['Banns', 'Picks', 'Finalisierung'];
   let now: number;
   if (s.phase === 'planning') now = -1;
-  else if (s.phase === 'finalization') now = 4;
-  else if (bans < 6 && locks === 0) now = 0;
-  else if (locks < 6) now = 1;
-  else if (bans < 10) now = 2;
-  else now = 3;
+  else if (s.phase === 'finalization') now = 2;
+  else if (locks === 0 && s.turn?.action !== 'pick') now = 0;
+  else now = 1;
   return labels.map((label, i) => ({ label, state: i < now ? 'done' : i === now ? 'now' : 'next' }));
 }
 
@@ -468,7 +475,7 @@ export function buildFromPlan(plan: GoldenPlan, champion: ChampionRef, opponent:
     lane,
     title: opponent ? `${champion.name} vs ${opponent.name}` : `${champion.name} · ${lane ? LANE_NAMES[lane] : ''}`,
     source: opponent ? 'Matchup-Build' : 'Bester Build der Lane',
-    caveat: opponent ? null : 'Kein Matchup bekannt — bester Build der Lane',
+    caveat: null,
     runes: runes
       ? {
           keystone: runes.primaryRuneIds[0] ?? 0,

@@ -21,6 +21,11 @@ export class TurnTracker {
     this.manualTurnCellId = state.turn?.cellId ?? null;
   }
 
+  /** The seat a click chose, while that choice still holds (it ends when the clock moves on). */
+  get manualSeat(): number | null {
+    return this.manualCellId;
+  }
+
   reset(): void {
     this.manualCellId = null;
     this.manualTurnCellId = null;

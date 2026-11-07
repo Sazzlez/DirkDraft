@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { ChampionRef, SlotView } from '../../core/view';
-  import { LANE_NAMES } from '../../core/view';
+  import type { ChampionRef, Lane, SlotView } from '../../core/view';
+  import { LANES, LANE_NAMES } from '../../core/view';
   import { percent } from '../../core/format';
   import Icon from '../Icon.svelte';
 
@@ -10,8 +10,30 @@
     slots,
     bans,
     usesLanes,
-  }: { side: 'ally' | 'enemy'; title: string; slots: SlotView[]; bans: ChampionRef[]; usesLanes: boolean } = $props();
+    onSeat,
+    onLane,
+  }: {
+    side: 'ally' | 'enemy';
+    title: string;
+    slots: SlotView[];
+    bans: ChampionRef[];
+    usesLanes: boolean;
+    /** A click on an ally seat: its list until the clock moves on (1.5's slot click). */
+    onSeat?: (cellId: number) => void;
+    /** The lane picker: a lane by hand, or null for "automatisch". */
+    onLane?: (cellId: number, lane: Lane | null) => void;
+  } = $props();
+
+  /** The seat whose lane menu is open. */
+  let menuFor = $state<number | null>(null);
+
+  function setLane(cellId: number, lane: Lane | null) {
+    menuFor = null;
+    onLane?.(cellId, lane);
+  }
 </script>
+
+<svelte:window onclick={(e) => { if (menuFor !== null && !(e.target as Element | null)?.closest('.lanepick')) menuFor = null; }} />
 
 <div class="team {side}">
   <div class="head">
@@ -28,17 +50,54 @@
   <div class="slots">
     {#each slots as slot (slot.cellId)}
       <div class="slot" class:me={slot.isMe} class:target={slot.isTarget && !slot.isMe} class:open={!slot.champion}>
-        <span class="avatar">
-          <Icon kind="champion" champion={slot.champion} size={48} dim={slot.hovering} />
-          {#if slot.hovering}<span class="badge">Hover</span>{/if}
-        </span>
-        <span class="name">{slot.champion?.name ?? 'offen'}</span>
-        <span class="who">{slot.label}</span>
-        {#if usesLanes && slot.lane}
-          <span class="lane" class:warn={slot.laneUncertain}>
-            {LANE_NAMES[slot.lane]}{#if slot.laneConfidence !== null}<span class="conf num" class:only-uncertain={!slot.laneUncertain}>{percent(slot.laneConfidence, 0)}</span>{/if}
+        {#snippet face()}
+          <span class="avatar">
+            <Icon kind="champion" champion={slot.champion} size={48} dim={slot.hovering} />
+            {#if slot.hovering}<span class="badge">Hover</span>{/if}
           </span>
-          {#if slot.laneUncertain}<button class="fix">ändern</button>{/if}
+          <span class="name">{slot.champion?.name ?? 'offen'}</span>
+          <span class="who">{slot.label}</span>
+        {/snippet}
+        {#if slot.canTarget && onSeat}
+          <button
+            class="face"
+            onclick={() => onSeat(slot.cellId)}
+            aria-pressed={slot.isTarget}
+            title={slot.isTarget ? `Die Vorschläge gelten ${slot.isMe ? 'dir' : slot.label}` : `Vorschläge für ${slot.isMe ? 'dich' : slot.label} zeigen`}
+          >
+            {@render face()}
+          </button>
+        {:else}
+          <span class="face">{@render face()}</span>
+        {/if}
+        {#if usesLanes && (slot.lane || slot.laneEditable)}
+          <span class="lanepick">
+            {#if slot.laneEditable && onLane}
+              <button
+                class="lane edit"
+                class:warn={slot.laneUncertain}
+                class:manual={slot.laneManual}
+                onclick={() => (menuFor = menuFor === slot.cellId ? null : slot.cellId)}
+                aria-haspopup="menu"
+                aria-expanded={menuFor === slot.cellId}
+                title={slot.laneManual ? 'Von dir festgelegt' : 'Lane ändern'}
+              >
+                {slot.lane ? LANE_NAMES[slot.lane] : 'Lane?'}{#if slot.laneConfidence !== null && !slot.laneManual}<span class="conf num" class:only-uncertain={!slot.laneUncertain}>{percent(slot.laneConfidence, 0)}</span>{/if}<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 4 5 6.5 7.5 4" /></svg>
+              </button>
+              {#if menuFor === slot.cellId}
+                <span class="menu" role="menu">
+                  {#each LANES as lane (lane)}
+                    <button role="menuitemradio" aria-checked={slot.laneManual && slot.lane === lane} class:on={slot.laneManual && slot.lane === lane} onclick={() => setLane(slot.cellId, lane)}>{LANE_NAMES[lane]}</button>
+                  {/each}
+                  <button role="menuitemradio" aria-checked={!slot.laneManual} class:on={!slot.laneManual} onclick={() => setLane(slot.cellId, null)}>automatisch</button>
+                </span>
+              {/if}
+            {:else if slot.lane}
+              <span class="lane" class:warn={slot.laneUncertain}>
+                {LANE_NAMES[slot.lane]}{#if slot.laneConfidence !== null}<span class="conf num" class:only-uncertain={!slot.laneUncertain}>{percent(slot.laneConfidence, 0)}</span>{/if}
+              </span>
+            {/if}
+          </span>
         {/if}
         {#if slot.warning}<span class="warning">{slot.warning}</span>{/if}
       </div>
@@ -69,6 +128,7 @@
   }
 
   .slot {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -82,6 +142,19 @@
 
   .slot:hover {
     background: var(--card-hover);
+  }
+
+  .face {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  button.face {
+    border-radius: var(--r-m);
   }
 
   .avatar {
@@ -152,19 +225,79 @@
     color: var(--fg3);
   }
 
+  .lanepick {
+    position: relative;
+    max-width: 100%;
+  }
+
+  .lane.edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    padding: 0 3px;
+    border-radius: 5px;
+  }
+
+  .lane.edit:hover {
+    background: var(--card-strong);
+    color: var(--fg);
+  }
+
+  .lane.edit svg {
+    width: 9px;
+    height: 9px;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    opacity: 0.7;
+  }
+
   .lane.warn {
     color: var(--orange);
+  }
+
+  .lane.manual {
+    color: var(--blue);
   }
 
   .conf {
     margin-left: 0.35em;
   }
 
-  .fix {
-    margin-top: 2px;
-    font-size: 11px;
-    font-weight: 600;
+  .menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 116px;
+    padding: 5px;
+    border-radius: var(--r-m);
+    background: var(--popover);
+    -webkit-backdrop-filter: blur(30px);
+    backdrop-filter: blur(30px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), var(--edge);
+    text-align: left;
+  }
+
+  .menu button {
+    padding: 5px 9px;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+
+  .menu button.on {
     color: var(--blue);
+    font-weight: 600;
+  }
+
+  .menu button:hover {
+    background: var(--blue);
+    color: #fff;
   }
 
   .warning {

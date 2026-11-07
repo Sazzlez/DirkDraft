@@ -14,8 +14,11 @@ const DAMAGE: Record<number, GameView['enemies'][number]['damage']> = {
   [DamageType.Mixed]: 'gemischt',
 };
 
-/** A clear majority before a damage type is worth a hint; a 3:2 split is no reason to itemise. */
-export const DAMAGE_HINT_SHARE = 0.6;
+/**
+ * A clear majority before a damage type is worth a hint; a 3:2 split (0.6) is no reason to itemise.
+ * 1.5's threshold, the same as the draft verdict's "Viel AD/AP beim Gegner".
+ */
+export const DAMAGE_HINT_SHARE = 0.65;
 
 function clock(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
@@ -78,7 +81,8 @@ export function gameView(
         }
       : null,
     path,
-    nextSkill: model.nextSkill ? { key: model.nextSkill.key, level: model.nextSkill.level } : null,
+    nextSkill: model.nextSkill ? { key: model.nextSkill.key, level: model.nextSkill.level, now: model.nextSkill.now } : null,
+    skillPoints: model.skillPoints,
     enemies: model.enemies.map((e) => ({
       champion: champion(e.championId) ?? { id: e.championId, key: '', name: `#${e.championId}` },
       items: e.items.map(item),

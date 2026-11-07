@@ -15,6 +15,7 @@ import { gameView } from './gameView';
 import { SITUATION, SLOT } from '../core/situational';
 import { assets } from './assets';
 import { GoldenAdapter, buildFromPlan, type GoldenFrame, type GoldenPlan } from './golden';
+import { draftSteps } from '../core/steps';
 
 export interface Scene {
   id: string;
@@ -44,6 +45,9 @@ interface Sources {
 
 let sources: Promise<Sources> | null = null;
 
+/** The recorded session behind a played frame: the step line reads the draft's real order from it. */
+const sessionOf = new WeakMap<object, unknown>();
+
 async function json<T>(path: string): Promise<T> {
   const response = await fetch(path);
   if (!response.ok) throw new Error(`${path}: ${response.status}`);
@@ -57,8 +61,8 @@ async function text(path: string): Promise<string> {
 }
 
 /** A recording played through the TS model, one frame per session line, like the window would. */
-function play(engine: DraftEngine, recording: string): { frames: { frame?: GoldenFrame }[] } {
-  const frames: { frame?: GoldenFrame }[] = [];
+function play(engine: DraftEngine, recording: string): { frames: { frame?: GoldenFrame; session?: unknown }[] } {
+  const frames: { frame?: GoldenFrame; session?: unknown }[] = [];
   for (const line of recording.split(/\r?\n/)) {
     if (line.trim() === '') continue;
     let record: Record<string, unknown>;
@@ -68,7 +72,9 @@ function play(engine: DraftEngine, recording: string): { frames: { frame?: Golde
       continue;
     }
     if (typeof record.phase === 'string') continue;
-    frames.push({ frame: engine.update(record.session ?? null).frame });
+    const frame = engine.update(record.session ?? null).frame;
+    sessionOf.set(frame, record.session ?? null);
+    frames.push({ frame });
   }
   return { frames };
 }
@@ -104,7 +110,7 @@ const lastActive = (r: { frames: { frame?: GoldenFrame }[] }, predicate: (f: Gol
   return frame;
 };
 
-const DATA = { text: 'Patch 16.22 · alle Ränge · vor 1 Tag', stale: false, chip: null };
+const DATA = { text: 'Patch 16.22 · alle Ränge · vor 1 Tag', short: 'Patch 16.22 · vor 1 Tag', stale: false, chip: null };
 const CONNECTED = { state: 'ok' as const, text: 'verbunden' };
 const SAMPLE = 'Beispiel aus einer Aufzeichnung (1.5-Modell, Patch 16.22) — keine Live-Daten.';
 
@@ -133,11 +139,12 @@ export async function sceneView(id: string): Promise<ViewModel> {
         game: null,
         emptyText: 'Das Fenster füllt sich von selbst, sobald ein Champ Select beginnt.',
         sampleNote: null,
+        canImport: false,
       };
 
     case 'planning': {
       const frame = lastActive(s.recordings.get('live-tournament-draft')!, (f) => !!f.hover);
-      return draftScene(a, frame, 'planning', 24, s.plans, 'Planung · Turnier-Draft');
+      return draftScene(a, frame, 'planning', 24, s.plans, 'Planung');
     }
     case 'banning': {
       const frame = lastActive(s.recordings.get('state-myban')!);
@@ -180,6 +187,7 @@ function draftScene(
   title: string,
 ): ViewModel {
   const board = a.board(frame, seconds);
+  if (sessionOf.has(frame) && board.usesLanes) board.steps = draftSteps(sessionOf.get(frame));
   const me = board.allies.find((slot) => slot.isMe)!;
   const myChampion = me.champion;
   const side: ViewModel['side'] = [];
@@ -226,6 +234,7 @@ function draftScene(
     game: null,
     emptyText: null,
     sampleNote: SAMPLE,
+    canImport: moment !== 'loading',
   };
 }
 
@@ -287,7 +296,7 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
       { itemId: 3111, slot: SLOT.Boots, situation: SITUATION.HardCc, timesMoreOften: 1.9, winRate: 0.524, otherRate: 0.509, games: 5120 },
       { itemId: 3036, slot: SLOT.Late, situation: SITUATION.EnemyArmor, timesMoreOften: 3.4, winRate: 0.518, otherRate: 0.507, games: 1380 },
     ]),
-    sample: 'Beispieldaten — die Spielansicht liest ab M3 die Live-Client-Schnittstelle.',
+    sample: 'Beispieldaten — im Spiel liest die Ansicht Riots Live-Client-Schnittstelle.',
   };
   return {
     moment: 'game',
@@ -300,5 +309,6 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
     game,
     emptyText: null,
     sampleNote: game.sample,
+    canImport: false,
   };
 }

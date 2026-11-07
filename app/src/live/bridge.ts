@@ -2,16 +2,18 @@
 // ViewModel after every change. Also owns the data refresh (core/refresh: every 30 min, never in
 // champ select or a game) and the import button's round trip (Flash on the key from the settings).
 
+import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { spellSlots } from '../core/loadout';
 import { DataRefresher } from '../core/refresh';
-import type { ViewModel } from '../core/view';
+import type { Lane, ViewModel } from '../core/view';
 import { loadAssets } from '../data/assets';
 import { browserFetcher, loadDataSet, loadKept, type DataSet } from '../data/remote';
 import { inShell, shellCache } from '../platform/shell';
 import { LiveSession, type ClientStatus } from './session';
 import { loadSettings, onSettings, settings } from './settings.svelte';
+import { checkForUpdate, update } from './update.svelte';
 
 interface Snapshot {
   status: ClientStatus;
@@ -56,6 +58,29 @@ function askSelectable(): void {
     });
 }
 
+let patchAsked = false;
+
+/**
+ * Asks the client which patch it runs, once per connection: data from an older patch widen the
+ * error bars and get a word in the draft. A client still starting answers nothing; the next
+ * status or phase event asks again.
+ */
+function askPatch(): void {
+  if (!session.status?.clientRunning || session.hasClientPatch || patchAsked) return;
+  patchAsked = true;
+  invoke<string | null>('client_game_version')
+    .then((version) => {
+      if (version) {
+        session.setClientPatch(version);
+        render();
+      }
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      patchAsked = false;
+    });
+}
+
 async function apply(set: DataSet): Promise<void> {
   await loadAssets(set.meta.patch).catch(() => undefined);
   session.setData(set);
@@ -84,11 +109,13 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   await listen<ClientStatus>('client://status', (e) => {
     session.onStatus(e.payload);
     if (!e.payload.clientRunning) void refresher.onPhase(null, Date.now());
+    askPatch();
     render();
   });
   await listen<string>('client://phase', (e) => {
     session.onPhase(e.payload);
     void refresher.onPhase(e.payload, Date.now());
+    askPatch();
     render();
   });
   await listen<string | null>('client://session', (e) => {
@@ -111,7 +138,15 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   }
   if (snapshot.game) session.onGame(snapshot.game);
   void refresher.onPhase(snapshot.status.clientRunning ? snapshot.phase : null, Date.now());
+  askPatch();
   render();
+
+  // The version for the lobby; the title bar's pill reads the same check (live/update).
+  void (async () => {
+    await checkForUpdate();
+    session.setVersion(update.current ?? (await getVersion().catch(() => null)), update.available);
+    render();
+  })();
 
   // The champion select clock counts down between events; the refresher checks whether it is due.
   ticker ??= setInterval(() => {
@@ -124,10 +159,10 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
  * The import button: rune page and spells for the build on screen. Asks before a foreign rune page
  * has to go (by its name) and writes nothing until the user agreed.
  */
-export async function runImport(): Promise<string> {
+export async function runImport(confirm: (pageName: string) => Promise<boolean>): Promise<string> {
   if (!inShell) return 'Übernehmen geht nur in der App mit laufendem Client.';
   const plan = session.importPlan();
-  if (!plan) return 'Für diesen Champion gibt es noch keinen Build zum Übernehmen.';
+  if (typeof plan === 'string') return plan;
 
   const spells = spellSlots(plan.spells, plan.currentSpells, settings.flashKey === 'D' ? 0 : 1);
   const runes = plan.runes;
@@ -143,15 +178,29 @@ export async function runImport(): Promise<string> {
     spells,
     replace: null as string | null,
   };
-  if (!request.page && !request.spells) return 'Runen und Zauber sind schon so gesetzt.';
+  if (!request.page && !request.spells) {
+    return runes ? 'Runen und Zauber sind schon so gesetzt.' : 'Für diesen Build liegen keine Runen vor; die Zauber sind schon so gesetzt.';
+  }
 
   let outcome = await invoke<ImportOutcome>('client_import', { request });
   if (outcome.confirm) {
-    const agreed = window.confirm(
-      `Alle Runenseiten-Plätze sind belegt. Für die neue Seite müsste deine Seite „${outcome.confirm}“ gelöscht werden.\n\nLöschen und Runen übernehmen?`,
-    );
-    if (!agreed) return 'Abgebrochen — keine Seite gelöscht.';
+    // Asked inside the window (live/ImportButton), by the page's own name; nothing is written before.
+    if (!(await confirm(outcome.confirm))) return 'Abgebrochen — keine Seite gelöscht.';
     outcome = await invoke<ImportOutcome>('client_import', { request: { ...request, replace: outcome.confirm } });
   }
   return outcome.message;
+}
+
+/** A click on an ally seat on the board. */
+export function chooseSeat(cellId: number): void {
+  if (!inShell) return;
+  session.selectSeat(cellId);
+  render();
+}
+
+/** The lane picker on a seat; null gives the lane back to the prediction. */
+export function chooseLane(cellId: number, lane: Lane | null): void {
+  if (!inShell) return;
+  session.setManualLane(cellId, lane);
+  render();
 }

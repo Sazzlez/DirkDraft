@@ -19,6 +19,11 @@ const ITEMS = new Map<number, ItemInfo>([
   [3047, { total: 1100, from: [1001] }],
   [3111, { total: 1100, from: [1001] }],
   [1055, { total: 450, from: [] }],
+  // Tier-3 boots: built from a pair, not from 1001, and without the Boots tag (Data Dragon 16.22).
+  [3174, { total: 1200, from: [3047], tags: ['Armor'] }],
+  // Manamune turns into Muramana, which has no recipe of its own, only specialRecipe.
+  [3004, { total: 2900, from: [3133] }],
+  [3042, { total: 2900, from: [], purchasable: false, specialRecipe: 3004 }],
 ]);
 
 const meta = new MetaBuilder()
@@ -63,6 +68,25 @@ function game(overrides: { gold?: number; items?: number[]; time?: number; level
     gameData: { gameTime: overrides.time ?? 600 },
   };
 }
+
+describe('items that changed shape', () => {
+  it('upgraded tier-3 boots fill the boots slot and the planned pair counts as owned', () => {
+    const model = gameModel(game({ items: [3174], gold: 5000, time: 900 }), meta, plan, ITEMS)!;
+    expect(model.path.find((s) => s.slot === 'Schuhe')!.owned).toBe(true);
+    expect(model.nextBuy!.itemId).toBe(3071);
+  });
+
+  it('a transformed item (Muramana) stands for the planned one (Manamune)', () => {
+    const tear = { ...plan, boots: [], core: [option([3004])] };
+    const model = gameModel(game({ items: [3042], gold: 5000, time: 900 }), meta, tear, ITEMS)!;
+    expect(model.path.find((s) => s.itemId === 3004)!.owned).toBe(true);
+    expect(model.nextBuy).toBeNull();
+  });
+
+  it('counts spent skill points for the grid', () => {
+    expect(gameModel(game({ abilities: { Q: 3, W: 1, E: 2, R: 1 } }), meta, plan, ITEMS)!.skillPoints).toBe(7);
+  });
+});
 
 describe('next buy', () => {
   it('subtracts owned components like the shop does', () => {
