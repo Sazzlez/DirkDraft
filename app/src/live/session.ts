@@ -12,6 +12,8 @@ import { Lane, laneFromKey } from '../core/model/lane';
 import { MetaLookup } from '../core/model/metaLookup';
 import { TraitTable } from '../core/model/traits';
 import { momentOf, type GameflowPhase } from '../core/moment';
+import { PickRecorder, addToHistory, postgameModel, type HistoryEntry, type PickRecord, type PostgameModel } from '../core/postgame';
+import { postgameView } from '../data/postgameView';
 import { riotPlan, type RiotBuildPlan } from '../core/riotBuilds';
 import { SituationTracker, situationalSuggestions, situationsOf } from '../core/situational';
 import { LANE_NAMES, type BuildView, type ChampionRef, type DataStatus, type Lane as ViewLane, type ViewModel } from '../core/view';
@@ -63,6 +65,35 @@ export class LiveSession {
   /** The own pick of the last draft, for the build and the game after it. */
   private picked: Picked | null = null;
 
+  private readonly recorder = new PickRecorder();
+  /** Where the own pick stood in the suggestions when it was locked. */
+  private pickRecord: PickRecord | null = null;
+  private history: HistoryEntry[] = [];
+  private postgame: PostgameModel | null = null;
+  private endRecorded = true;
+
+  /** The stored history (newest first), from the last sessions. */
+  setHistory(history: HistoryEntry[]): void {
+    this.history = history;
+  }
+
+  /** Whether the client's result for the game just played is still to be read. */
+  get needsEndOfGame(): boolean {
+    return !this.endRecorded && (this.phase === 'WaitingForStats' || this.phase === 'PreEndOfGame' || this.phase === 'EndOfGame');
+  }
+
+  /** The game's result: postgame on screen, one more history entry. Returns the new history to keep. */
+  onEndOfGame(end: { championId: number; win: boolean; items: number[] }, now = Date.now()): HistoryEntry[] {
+    if (this.endRecorded) return this.history;
+    this.endRecorded = true;
+    const record = this.pickRecord?.championId === end.championId ? this.pickRecord : null;
+    const lane = this.picked?.championId === end.championId ? this.picked.lane : Lane.Unknown;
+    const plannedCore = this.planFor(end.championId, lane)?.core[0]?.ids ?? [];
+    this.postgame = postgameModel(end.championId, record, { win: end.win, items: end.items }, plannedCore, (id) => this.adapter.champion(id)?.name ?? `#${id}`);
+    this.history = addToHistory(this.history, { championId: end.championId, win: end.win, fromTop3: record?.fromTop3 ?? null, at: now });
+    return this.history;
+  }
+
   setData(set: DataSet): void {
     this.data = set;
     this.meta = new MetaLookup(set.meta);
@@ -86,7 +117,14 @@ export class LiveSession {
   }
 
   onPhase(phase: string): void {
-    if (phase === 'GameStart' && this.phase !== 'GameStart') this.situations.reset();
+    // A new game: also when the app starts in the middle of one (no GameStart seen).
+    const playing = (p: string | null) => p === 'GameStart' || p === 'InProgress' || p === 'Reconnect';
+    if (playing(phase) && !playing(this.phase)) {
+      this.situations.reset();
+      // A new game: its result is the one to read at the end.
+      this.endRecorded = false;
+      this.postgame = null;
+    }
     // Back in the lobby or the queue: the last draft is over for good.
     if (phase === 'Lobby' || phase === 'Matchmaking' || phase === 'None') this.lastActive = null;
     this.phase = phase;
@@ -105,6 +143,10 @@ export class LiveSession {
       // The session says so itself: bans.numBans is 0 in blind pick.
       this.noBans = (parsed.bans as { numBans?: number } | undefined)?.numBans === 0;
       this.rememberPick();
+      const record = this.recorder.observe(frame, now);
+      if (record) this.pickRecord = record;
+    } else {
+      this.recorder.reset();
     }
   }
 
@@ -154,6 +196,8 @@ export class LiveSession {
         ...base,
         main: { kind: 'lobby', title: 'Wartet auf das nächste Champ Select', lines: this.lobbyLines() },
         build: this.pickedBuild(),
+        // The last game's result stays in the game area until the next one.
+        postgame: this.postgame ? this.postgameView(now) : null,
         emptyText: 'Das Fenster füllt sich von selbst, sobald ein Champ Select beginnt.',
       };
     }
@@ -243,6 +287,12 @@ export class LiveSession {
     ];
   }
 
+  private postgameView(now: number): ViewModel['postgame'] {
+    if (!this.postgame) return null;
+    const ref = (id: number) => this.adapter.champion(id) ?? { id, key: '', name: `#${id}` };
+    return postgameView(this.postgame, this.history, ref, new Date(now));
+  }
+
   /** Blind pick and other modes without bans (kept through the loading screen). */
   private withoutBans(): boolean {
     return this.noBans;
@@ -300,6 +350,9 @@ export class LiveSession {
     const meta = this.meta!;
     const game = this.game;
     const build = this.pickedBuild();
+    if (base.moment === 'postgame' && this.postgame) {
+      return { ...base, build, postgame: this.postgameView(Date.now()) };
+    }
     if (!game) {
       return {
         ...base,

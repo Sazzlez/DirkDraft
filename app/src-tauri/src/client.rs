@@ -11,6 +11,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::watch;
 
+use crate::lcu::end_of_game;
 use crate::lcu::http::Lcu;
 use crate::lcu::import::{self, ImportOutcome, ImportRequest};
 use crate::lcu::source::{self, ClientStatus, Update};
@@ -106,6 +107,14 @@ pub async fn client_game_version(state: State<'_, ClientState>) -> Result<Option
     }
     let build: Option<serde_json::Value> = lcu.get_json("/system/v1/builds").await;
     Ok(build.and_then(|b| b.get("version").and_then(|v| v.as_str()).map(str::to_string)))
+}
+
+/// The game just played (champion, win, final items), once the end-of-game screen has it.
+#[tauri::command]
+pub async fn client_end_of_game(state: State<'_, ClientState>) -> Result<Option<end_of_game::EndOfGame>, String> {
+    let lcu = state.lcu().ok_or("Client nicht verbunden")?;
+    let block: Option<serde_json::Value> = lcu.get_json("/lol-end-of-game/v1/eog-stats-block").await;
+    Ok(block.as_ref().and_then(end_of_game::read))
 }
 
 /// The import button: rune page and/or spells, on the user's click only.

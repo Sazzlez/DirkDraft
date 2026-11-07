@@ -2,6 +2,7 @@
 // Reads, a pushed event stream, and one write path (runes and spells, on click).
 
 pub mod credentials;
+pub mod end_of_game;
 pub mod http;
 pub mod import;
 pub mod install;

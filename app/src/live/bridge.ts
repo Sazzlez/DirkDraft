@@ -5,6 +5,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { DEFAULT_FLASH_SLOT, spellSlots } from '../core/loadout';
+import type { HistoryEntry } from '../core/postgame';
 import { DataRefresher } from '../core/refresh';
 import type { ViewModel } from '../core/view';
 import { loadAssets } from '../data/assets';
@@ -31,6 +32,49 @@ let ticker: ReturnType<typeof setInterval> | null = null;
 
 function render(): void {
   notify(session.view());
+}
+
+const HISTORY_KEY = 'dirkdraft:history';
+
+function loadHistory(): HistoryEntry[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]') as unknown;
+    return Array.isArray(parsed) ? (parsed as HistoryEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(history: HistoryEntry[]): void {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // The postgame still shows; only the list of earlier games is not kept.
+  }
+}
+
+let endAsked = false;
+
+/**
+ * Reads the result once the end-of-game screen has it. It takes the client a few seconds after the
+ * game closes to fill the block, so this asks every two seconds for half a minute.
+ */
+async function askEndOfGame(): Promise<void> {
+  if (!session.needsEndOfGame || endAsked) return;
+  endAsked = true;
+  try {
+    for (let attempt = 0; attempt < 15 && session.needsEndOfGame; attempt++) {
+      const end = await invoke<{ championId: number; win: boolean; items: number[] } | null>('client_end_of_game').catch(() => null);
+      if (end) {
+        saveHistory(session.onEndOfGame(end));
+        render();
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  } finally {
+    endAsked = false;
+  }
 }
 
 let selectableAsked = false;
@@ -71,6 +115,7 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
     (set) => void apply(set),
   );
   refresher.start(await loadKept(browserCache));
+  session.setHistory(loadHistory());
 
   await listen<ClientStatus>('client://status', (e) => {
     session.onStatus(e.payload);
@@ -80,6 +125,7 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   await listen<string>('client://phase', (e) => {
     session.onPhase(e.payload);
     void refresher.onPhase(e.payload, Date.now());
+    void askEndOfGame();
     render();
   });
   await listen<string | null>('client://session', (e) => {

@@ -126,6 +126,34 @@ describe('LiveSession', () => {
     expect(live.needsSelectable).toBe(true);
   });
 
+  it('records the result once and keeps it in the game area until the next game', () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    for (const record of sessions('state-nachlock')) live.onSession(record.session ?? null);
+    live.onSession(null);
+    expect(live.needsEndOfGame).toBe(false);
+    live.onPhase('GameStart');
+    live.onPhase('InProgress');
+    expect(live.needsEndOfGame).toBe(false);
+    live.onPhase('EndOfGame');
+    expect(live.needsEndOfGame).toBe(true);
+
+    const history = live.onEndOfGame({ championId: 122, win: true, items: [3071, 3047] }, Date.UTC(2026, 10, 7, 12));
+    expect(history).toHaveLength(1);
+    expect(live.needsEndOfGame).toBe(false);
+    expect(live.onEndOfGame({ championId: 122, win: false, items: [] })).toHaveLength(1);
+
+    const view = live.view();
+    expect(view.moment).toBe('postgame');
+    expect(view.postgame?.result).toBe('Sieg');
+    live.onPhase('Lobby');
+    expect(live.view().postgame?.result).toBe('Sieg');
+    live.onPhase('GameStart');
+    expect(live.view().postgame).toBeNull();
+  });
+
   it('shows the game from the live client', () => {
     const live = new LiveSession();
     live.setData(data);
