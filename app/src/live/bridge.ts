@@ -87,10 +87,18 @@ async function apply(set: DataSet): Promise<void> {
   render();
 }
 
+/** One line into the shell's log file (logfile.rs); never names, never throws. */
+function logLine(level: 'info' | 'warn' | 'error', message: string): void {
+  void invoke('shell_log', { level, message }).catch(() => undefined);
+}
+
 /** Starts listening; `onView` receives every new screen. Only in the shell. */
 export async function startLive(onView: (view: ViewModel) => void): Promise<void> {
   if (!inShell) return;
   notify = onView;
+  // Script errors would otherwise vanish with the release build's closed developer tools.
+  window.addEventListener('error', (e) => logLine('error', `${e.message} (${e.filename}:${e.lineno})`));
+  window.addEventListener('unhandledrejection', (e) => logLine('error', `Unbehandelt: ${String(e.reason)}`));
 
   onSettings((s) => {
     session.setShowUnowned(s.showUnowned);
@@ -105,6 +113,8 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
       // A failed download is only worth a word while there are no numbers at all.
       const set = await loadDataSet(browserFetcher, shellCache).catch(() => null);
       session.setDataFailed(!set);
+      if (!set) logLine('warn', 'Daten: keine brauchbare meta.json (offline?)');
+      else for (const problem of set.problems) logLine('warn', `Daten: ${problem}`);
       if (!set) render();
       return set;
     },

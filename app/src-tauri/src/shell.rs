@@ -48,6 +48,12 @@ impl ShellState {
 
 pub fn run() {
     let settings = Settings::load();
+    log::info!(
+        "DirkDraft {} startet · Windows-Build {} · Glas {}",
+        env!("CARGO_PKG_VERSION"),
+        windows_build(),
+        if mica_available() && settings.flag(settings::GLASS_EFFECT.0, settings::GLASS_EFFECT.1) { "an" } else { "aus" }
+    );
     let lockfile = settings.text(settings::LOCKFILE_PATH).map(std::path::PathBuf::from);
 
     tauri::Builder::default()
@@ -129,11 +135,28 @@ pub fn run() {
             crate::updater::update_apply,
             settings_get,
             settings_set,
+            crate::logfile::shell_log,
             shell_set_pinned,
             shell_minimize,
         ])
         .run(tauri::generate_context!())
-        .expect("DirkDraft konnte nicht starten");
+        .unwrap_or_else(|error| {
+            // Most often: no WebView2 runtime. Said in the log before the process goes.
+            log::error!("Start fehlgeschlagen: {error}");
+            log::logger().flush();
+            panic!("DirkDraft konnte nicht starten: {error}");
+        });
+}
+
+fn windows_build() -> u32 {
+    #[cfg(windows)]
+    {
+        windows_version::OsVersion::current().build
+    }
+    #[cfg(not(windows))]
+    {
+        0
+    }
 }
 
 /// A minimise right after the game start is the game's doing, not the user's.

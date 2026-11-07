@@ -7,6 +7,7 @@
 mod client;
 mod data;
 mod lcu;
+mod logfile;
 mod settings;
 mod shell;
 mod updater;
@@ -17,5 +18,6 @@ fn main() {
     // returns at once.
     velopack::VelopackApp::build().run();
 
+    logfile::init();
     shell::run();
 }

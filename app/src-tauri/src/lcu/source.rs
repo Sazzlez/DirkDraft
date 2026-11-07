@@ -105,9 +105,11 @@ pub async fn run(explicit_lockfile: Option<PathBuf>, out: impl Fn(Update) + Send
             .or_else(|| install::locate().map(|dir| install::lockfile(&dir)))
             .filter(|path| path.parent().is_some_and(|dir| dir.is_dir()));
         if let Some(path) = found {
+            log::info!("League gefunden{}", if explicit_lockfile.is_some() { " (lockfilePath aus den Einstellungen)" } else { "" });
             break path;
         }
         if !said {
+            log::warn!("League nicht gefunden — neuer Versuch alle {} s", LOCATE_RETRY.as_secs());
             out(Update::Status(NOT_FOUND));
             said = true;
         }
@@ -156,6 +158,7 @@ pub async fn run(explicit_lockfile: Option<PathBuf>, out: impl Fn(Update) + Send
 
 impl<F: Fn(Update)> Source<F> {
     fn connect(&mut self, credentials: Credentials) {
+        log::info!("Client gestartet, verbinde");
         self.tear_down();
         self.generation += 1;
         let generation = self.generation;
@@ -180,6 +183,7 @@ impl<F: Fn(Update)> Source<F> {
     }
 
     fn disconnect(&mut self) {
+        log::info!("Client beendet");
         self.tear_down();
         self.end_session();
         (self.out)(Update::Status(OFFLINE));
@@ -239,6 +243,7 @@ impl<F: Fn(Update)> Source<F> {
     fn socket(&mut self, event: SocketEvent) {
         match event {
             SocketEvent::Up => {
+                log::info!("Ereignis-Socket verbunden");
                 (self.out)(Update::Status(ClientStatus { league_found: true, client_running: true, socket_connected: true }));
                 // Every (re)connect reseeds: it repaints after a drop during finalization, where no
                 // further session events would come.
@@ -248,6 +253,7 @@ impl<F: Fn(Update)> Source<F> {
                 }
             }
             SocketEvent::Down => {
+                log::warn!("Ereignis-Socket getrennt — verbinde neu, der Draft bleibt");
                 // Deliberately NOT ending the session (see the head of this file).
                 self.socket_delivered_session = false;
                 self.socket_delivered_phase = false;

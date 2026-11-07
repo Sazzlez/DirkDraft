@@ -50,8 +50,16 @@ pub async fn update_check(state: State<'_, UpdaterState>) -> Result<UpdateStatus
         let current = manager.get_current_version_as_string();
         let available = match manager.check_for_updates() {
             Ok(UpdateCheck::UpdateAvailable(info)) => Some(*info),
-            _ => None,
+            Ok(_) => None,
+            Err(error) => {
+                log::warn!("Update-Prüfung fehlgeschlagen: {error}");
+                None
+            }
         };
+        log::info!(
+            "Update-Prüfung: installiert {current}, neu {}",
+            available.as_ref().map(|i| i.TargetFullRelease.Version.as_str()).unwrap_or("keine")
+        );
         (true, Some(current), available)
     })
     .await
@@ -71,11 +79,16 @@ pub async fn update_apply(app: AppHandle, state: State<'_, UpdaterState>) -> Res
     let info = state.pending.lock().map_err(|e| e.to_string())?.clone().ok_or("Kein Update bereit")?;
     // The restart ends the process without the usual exit: keep size and place first.
     let _ = app.save_window_state(StateFlags::SIZE | StateFlags::POSITION);
-    tauri::async_runtime::spawn_blocking(move || {
+    log::info!("Update auf {} startet", info.TargetFullRelease.Version);
+    let result = tauri::async_runtime::spawn_blocking(move || {
         let manager = manager()?;
         manager.download_updates(&info, None).map_err(|e| e.to_string())?;
         manager.apply_updates_and_restart(&info).map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if let Err(error) = &result {
+        log::error!("Update fehlgeschlagen: {error}");
+    }
+    result
 }

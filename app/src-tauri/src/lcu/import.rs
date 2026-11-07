@@ -166,7 +166,10 @@ pub async fn run(lcu: &Lcu, request: ImportRequest) -> ImportOutcome {
         }
     }
 
-    outcome(&done, &problems)
+    let result = outcome(&done, &problems);
+    // The message names no player; a foreign page's name is not in it either (that one only in the question).
+    log::info!("Übernehmen: {}", result.message);
+    result
 }
 
 /// The page itself: own pages out, the agreed foreign one out, the new one in as the current page.
