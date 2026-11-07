@@ -286,6 +286,34 @@ public class RiotBuildTests
         Assert.DoesNotContain("\"q2\"", stored);
     }
 
+    [Fact]
+    public void ANewPatch_KeepsTheGameLinesOfTheLastThreePatches()
+    {
+        static List<int[]> Lines(int count) => [.. Enumerable.Range(0, count).Select(i => new int[13])];
+        var state = new CollectorState
+        {
+            Patch = "16.21",
+            Platform = "euw1",
+            Meta = new RiotMetaCounts { Matches = 3 },
+            Games = Lines(3),
+            OlderGames = [new PatchGames { Patch = "16.20", Games = Lines(2) }, new PatchGames { Patch = "16.19", Games = Lines(1) }],
+        };
+
+        state.StartPatch("16.22", "euw1");
+
+        Assert.Equal("16.22", state.Patch);
+        Assert.Empty(state.Games);
+        Assert.Equal(["16.21", "16.20"], state.OlderGames.Select(older => older.Patch));   // 16.19 falls out
+        Assert.Equal(3, state.OlderGames[0].Games.Count);
+        Assert.Equal("16.21", state.Previous!.Patch);
+
+        // Another region is another population: nothing of it is kept.
+        state.Games = Lines(4);
+        state.StartPatch("16.22", "na1");
+        Assert.Empty(state.OlderGames);
+        Assert.Null(state.Previous);
+    }
+
     private static HttpResponseMessage Ok(string body, string? appLimit = null)
     {
         var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };

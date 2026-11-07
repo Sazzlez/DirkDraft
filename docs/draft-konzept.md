@@ -130,7 +130,7 @@ ganzen Teams („Dein Draft: 52 % → mit Nami 54 %“). Die Begründungszeilen 
 | Phase | Was | Wann |
 |---|---|---|
 | 1 | Sammler: Gegner-Paare über alle Lanes (`versus`, darin Botlane-Kreuz und Jungle gegen Laner), je Spiel eine Zeile (zehn Champions mit Lane, Sieger, Dauer, Gold nach 15 Minuten). Die App rechnet noch wie heute. | **erledigt 07.11.2026** — zählt ab dem Lauf, der in der Nacht auf den 08.11. startet |
-| 1b | Sammler behält die Spiel-Zeilen der letzten drei Patches (für Synergien und Counter über Patches) | klein; vor dem nächsten Patchwechsel |
+| 1b | Sammler behält die Spiel-Zeilen der letzten drei Patches (für Synergien und Counter über Patches) | **erledigt 07.11.2026** |
 | 2 | Messen: A, B und C an Prüfspielen vergleichen; Glättungen, Paar-Arten je Lane, Comp-Merkmale, früh/spät; dazu, wie viel der beste Pick gegenüber dem Durchschnitt bringt. Ergebnis in `docs/modellpruefung.md` | nach 5–7 Tagen Sammeln (~150.000 Spiele) |
 | 3 | Bestes Modell in Sammler-Export und App, Anzeige der Teile, Team-Chance, Tests, Release 2.1 | nach Phase 2, Release nur mit deinem OK |
 

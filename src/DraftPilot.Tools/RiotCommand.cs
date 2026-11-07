@@ -96,18 +96,17 @@ internal static class RiotCommand
 
         var state = CollectorState.Load(statePath);
 
-        // The counted games of the current patch, for measuring the draft model — never the previous
-        // patch's, and never published (the workflow keeps the file as a run artifact).
+        // The counted games of the current patch and the two before it, for measuring the draft
+        // model — never published (the workflow keeps the file as a run artifact).
         var gamesPath = options.GetValueOrDefault("games-out", string.Empty);
         if (gamesPath.Length > 0)
         {
             var gamesFile = new RiotGamesFile
             {
-                Patch = state.Patch,
                 Platform = state.Platform,
                 Tier = tier,
                 CollectedAtUtc = state.Tally.CollectedAtUtc,
-                Games = state.Games,
+                Patches = [new PatchGames { Patch = state.Patch, Games = state.Games }, .. state.OlderGames ?? []],
             };
             var directory = Path.GetDirectoryName(Path.GetFullPath(gamesPath));
             if (!string.IsNullOrEmpty(directory))
@@ -117,7 +116,7 @@ internal static class RiotCommand
             {
                 JsonSerializer.Serialize(gzip, gamesFile, RiotGamesJson.Default.RiotGamesFile);
             }
-            Console.WriteLine($"Spiel-Liste: {gamesFile.Games.Count:N0} Spiele von Patch {gamesFile.Patch}, {new FileInfo(gamesPath).Length / 1024:N0} KB → {gamesPath}");
+            Console.WriteLine($"Spiel-Liste: {string.Join(", ", gamesFile.Patches.Select(p => $"{p.Games.Count:N0} Spiele von Patch {p.Patch}"))}, {new FileInfo(gamesPath).Length / 1024:N0} KB → {gamesPath}");
         }
 
         // Early in a patch the new count is thin; until it has enough games the previous patch's

@@ -47,15 +47,21 @@ public static class RiotGames
     public static (int ChampionId, Lane Lane) Decode(int player) => (player / 8, (Lane)(player % 8 - 1));
 }
 
+/// <summary>The game lines of one patch.</summary>
+public sealed class PatchGames
+{
+    public string Patch { get; set; } = string.Empty;
+
+    public List<int[]> Games { get; set; } = [];
+}
+
 /// <summary>
-/// The games of one patch as the collector hands them to the measurement: an artifact of the run,
-/// never published, never read by the app.
+/// The game lines the collector hands to the measurement — the current patch and up to two before
+/// it: an artifact of the run, never published, never read by the app.
 /// </summary>
 public sealed class RiotGamesFile
 {
     public int Version { get; set; } = 1;
-
-    public string Patch { get; set; } = string.Empty;
 
     public string Platform { get; set; } = string.Empty;
 
@@ -66,7 +72,8 @@ public sealed class RiotGamesFile
     /// <summary>How a line reads, for whoever opens the file.</summary>
     public string Format { get; set; } = RiotGames.Format;
 
-    public List<int[]> Games { get; set; } = [];
+    /// <summary>Newest first: the patch being counted, then the ones before it.</summary>
+    public List<PatchGames> Patches { get; set; } = [];
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, WriteIndented = false)]

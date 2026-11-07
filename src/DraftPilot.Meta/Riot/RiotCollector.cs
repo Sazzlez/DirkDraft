@@ -68,17 +68,55 @@ public sealed class CollectorState
     /// <summary>Situational item counts of the same games, see <see cref="RiotSituationalTally"/>.</summary>
     public List<int[]> Situational { get; set; } = [];
 
+    /// <summary>Patches whose game lines are kept besides the current one.</summary>
+    public const int OlderPatchesKept = 2;
+
     /// <summary>
     /// The counted games of this patch, one line each (<see cref="RiotGames.Encode"/>): for measuring
-    /// what each part of the draft model predicts. Not kept for the previous patch.
+    /// what each part of the draft model predicts.
     /// </summary>
     public List<int[]> Games { get; set; } = [];
+
+    /// <summary>
+    /// The game lines of the patches before, newest first, at most <see cref="OlderPatchesKept"/>.
+    /// Synergies and counters hang on the champions' kits more than on the patch, so the measurement
+    /// learns them over three patches; strength it takes from the current one.
+    /// </summary>
+    public List<PatchGames> OlderGames { get; set; } = [];
 
     /// <summary>
     /// The last patch's counts, kept when a new patch starts. For the first day of a patch the new
     /// count is too thin to stand on; the previous patch's numbers, marked as such, beat an empty file.
     /// </summary>
     public PreviousPatch? Previous { get; set; }
+
+    /// <summary>
+    /// Starts counting a new patch (or platform). The counts of the patch that ends become
+    /// <see cref="Previous"/> and its game lines move to the front of <see cref="OlderGames"/> — both
+    /// only for the same platform and only when it counted something: a bracket or region switch is
+    /// a different population, not an older version of this one.
+    /// </summary>
+    public void StartPatch(string patch, string platform)
+    {
+        var samePopulation = Patch.Length > 0 && Platform == platform;
+        Previous = samePopulation && Meta.Matches > 0
+            ? new PreviousPatch { Patch = Patch, Tally = Tally, Meta = Meta, Situational = Situational }
+            : null;
+
+        var ending = samePopulation && Games.Count > 0 ? new[] { new PatchGames { Patch = Patch, Games = Games } } : [];
+        OlderGames = samePopulation
+            ? [.. ending.Concat((OlderGames ?? []).Where(older => older.Patch != Patch && older.Patch != patch)).Take(OlderPatchesKept)]
+            : [];
+
+        Patch = patch;
+        Platform = platform;
+        OldPatchLatestMs = 0;
+        Seen = [];
+        Tally = new RiotBuildFile();
+        Meta = new RiotMetaCounts();
+        Situational = [];
+        Games = [];
+    }
 
     public static CollectorState Load(string path)
     {
@@ -171,19 +209,7 @@ public sealed class RiotCollector(
         {
             log?.Invoke(state.Patch.Length == 0 ? $"Neuer Bestand für Patch {patch}." : $"Patch {state.Patch} → {patch}: Zählung beginnt neu.");
 
-            // Kept only for the same platform and only when it counted something: a bracket or region
-            // switch is a different population, not an older version of this one.
-            state.Previous = state.Patch.Length > 0 && state.Platform == options.Platform && state.Meta.Matches > 0
-                ? new PreviousPatch { Patch = state.Patch, Tally = state.Tally, Meta = state.Meta, Situational = state.Situational }
-                : null;
-            state.Patch = patch;
-            state.Platform = options.Platform;
-            state.OldPatchLatestMs = 0;
-            state.Seen = [];
-            state.Tally = new RiotBuildFile();
-            state.Meta = new RiotMetaCounts();
-            state.Situational = [];
-            state.Games = [];
+            state.StartPatch(patch, options.Platform);
         }
 
         var tally = new RiotBuildTally();
