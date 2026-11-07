@@ -1,7 +1,10 @@
 // The window around the app. In the Tauri shell the title bar's buttons act on the real window; in
 // the browser (preview, screenshots) the same calls do nothing, so the UI never asks where it runs.
 
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import type { DataCache } from '../data/remote';
 
 declare global {
   interface Window {
@@ -22,15 +25,45 @@ export function markShell(root: HTMLElement = document.documentElement): void {
   root.dataset.glass = window.__DIRKDRAFT_SHELL__?.glass ?? 'none';
 }
 
+/** Minimised by hand: nothing brings the window back on its own until the user does. */
 export async function minimize(): Promise<void> {
-  if (inShell) await getCurrentWindow().minimize();
+  if (inShell) await invoke('shell_minimize');
 }
 
-/** X: into the tray, as in 1.5. Quitting is the tray's job. */
+/** X: the same way as Alt+F4 — into the tray, with a word the first time (shell.rs). */
 export async function hideToTray(): Promise<void> {
-  if (inShell) await getCurrentWindow().hide();
+  if (inShell) await getCurrentWindow().close();
 }
 
+/** The pin, remembered as keepOnTop in the settings 1.5 already had. */
 export async function setPinned(on: boolean): Promise<void> {
-  if (inShell) await getCurrentWindow().setAlwaysOnTop(on);
+  if (inShell) await invoke('shell_set_pinned', { on });
 }
+
+export async function isPinned(): Promise<boolean> {
+  if (!inShell) return false;
+  return (await invoke<{ keepOnTop: boolean }>('shell_settings')).keepOnTop;
+}
+
+/** The first close into the tray: the page shows the hint until the window goes. */
+export function onTrayHint(show: () => void): void {
+  if (inShell) void listen('shell://tray-hint', show);
+}
+
+/** The data files, kept by the shell (%LOCALAPPDATA%\DraftPilot\data\2.0). */
+export const shellCache: DataCache = {
+  async read(name) {
+    try {
+      return await invoke<string | null>('data_read', { name });
+    } catch {
+      return null;
+    }
+  },
+  async write(name, text) {
+    try {
+      await invoke('data_write', { name, text });
+    } catch {
+      // A full disk costs the offline copy, not the data in hand.
+    }
+  },
+};

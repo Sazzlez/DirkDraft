@@ -9,8 +9,8 @@ import type { HistoryEntry } from '../core/postgame';
 import { DataRefresher } from '../core/refresh';
 import type { ViewModel } from '../core/view';
 import { loadAssets } from '../data/assets';
-import { browserCache, browserFetcher, loadDataSet, loadKept, type DataSet } from '../data/remote';
-import { inShell } from '../platform/shell';
+import { browserFetcher, loadDataSet, loadKept, type DataSet } from '../data/remote';
+import { inShell, shellCache } from '../platform/shell';
 import { LiveSession, type ClientStatus } from './session';
 
 interface Snapshot {
@@ -34,11 +34,11 @@ function render(): void {
   notify(session.view());
 }
 
-const HISTORY_KEY = 'dirkdraft:history';
+const HISTORY_FILE = 'history.json';
 
-function loadHistory(): HistoryEntry[] {
+async function loadHistory(): Promise<HistoryEntry[]> {
   try {
-    const parsed = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]') as unknown;
+    const parsed = JSON.parse((await shellCache.read(HISTORY_FILE)) ?? '[]') as unknown;
     return Array.isArray(parsed) ? (parsed as HistoryEntry[]) : [];
   } catch {
     return [];
@@ -46,11 +46,8 @@ function loadHistory(): HistoryEntry[] {
 }
 
 function saveHistory(history: HistoryEntry[]): void {
-  try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-  } catch {
-    // The postgame still shows; only the list of earlier games is not kept.
-  }
+  // A failed write costs the list of earlier games, never the postgame on screen.
+  void shellCache.write(HISTORY_FILE, JSON.stringify(history));
 }
 
 let endAsked = false;
@@ -131,12 +128,13 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   if (!inShell) return;
   notify = onView;
 
+  // The files live with the shell; the webview's fetch revalidates with its own HTTP cache.
   const refresher = new DataRefresher(
-    () => loadDataSet(browserFetcher, browserCache),
+    () => loadDataSet(browserFetcher, shellCache),
     (set) => void apply(set),
   );
-  refresher.start(await loadKept(browserCache));
-  session.setHistory(loadHistory());
+  refresher.start(await loadKept(shellCache));
+  session.setHistory(await loadHistory());
 
   await listen<ClientStatus>('client://status', (e) => {
     session.onStatus(e.payload);

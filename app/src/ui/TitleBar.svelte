@@ -1,12 +1,17 @@
 <script lang="ts">
   import { AREAS, type Area, type ViewModel } from '../core/view';
   import Segment from './Segment.svelte';
-  import { hideToTray, minimize, setPinned } from '../platform/shell';
+  import { hideToTray, isPinned, minimize, onTrayHint, setPinned } from '../platform/shell';
 
   let { view, area, onArea }: { view: ViewModel; area: Area; onArea: (area: Area) => void } = $props();
 
   let pinned = $state(false);
   let menuOpen = $state(false);
+  let trayHint = $state(false);
+
+  // The pin as the settings left it; the hint when the window goes to the tray for the first time.
+  void isPinned().then((on) => (pinned = on)).catch(() => undefined);
+  onTrayHint(() => (trayHint = true));
 
   function togglePin() {
     pinned = !pinned;
@@ -44,6 +49,13 @@
       <svg viewBox="0 0 20 20" class="stroke"><path d="M5.5 5.5l9 9m0-9-9 9" /></svg>
     </button>
   </div>
+
+  {#if trayHint}
+    <div class="hint" role="status">
+      <b>DirkDraft läuft weiter</b>
+      <span>Das Fenster liegt jetzt im Infobereich unten rechts. Beenden: Rechtsklick auf das Symbol → Beenden.</span>
+    </div>
+  {/if}
 
   {#if menuOpen}
     <div class="popover">
@@ -223,6 +235,30 @@
     -webkit-backdrop-filter: blur(30px);
     backdrop-filter: blur(30px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), var(--edge);
+  }
+
+  .hint {
+    position: absolute;
+    right: 10px;
+    top: 48px;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-width: 300px;
+    padding: 10px 12px;
+    border-radius: var(--r-m);
+    background: var(--popover);
+    -webkit-backdrop-filter: blur(30px);
+    backdrop-filter: blur(30px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), var(--edge);
+    font: var(--t-caption);
+    color: var(--fg2);
+  }
+
+  .hint b {
+    color: var(--fg);
+    font-size: 13px;
   }
 
   .popover p {

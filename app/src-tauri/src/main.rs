@@ -5,7 +5,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod client;
+mod data;
 mod lcu;
+mod settings;
 mod shell;
 
 fn main() {

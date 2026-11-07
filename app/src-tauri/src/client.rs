@@ -39,12 +39,13 @@ impl ClientState {
     }
 }
 
-pub fn start(app: &AppHandle) {
+/// `lockfile`: 1.5's lockfilePath setting, for an install the search does not find.
+pub fn start(app: &AppHandle, lockfile: Option<std::path::PathBuf>) {
     app.manage(ClientState::default());
     let (phase_tx, phase_rx) = watch::channel(String::new());
 
     let handle = app.clone();
-    tauri::async_runtime::spawn(source::run(None, move |update| {
+    tauri::async_runtime::spawn(source::run(lockfile, move |update| {
         let state = handle.state::<ClientState>();
         match update {
             Update::Status(status) => {
@@ -58,6 +59,7 @@ pub fn start(app: &AppHandle) {
                     s.phase = Some(phase.clone());
                 }
                 let _ = phase_tx.send(phase.clone());
+                crate::shell::on_phase(&handle, &phase);
                 let _ = handle.emit("client://phase", phase);
             }
             Update::Session(session) => {
