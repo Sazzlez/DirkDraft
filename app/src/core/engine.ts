@@ -151,6 +151,22 @@ export class DraftEngine {
 
   private readonly pool: ((lane: Lane) => ReadonlySet<number> | null) | null;
 
+  /** Champions the local player may pick (owned or free this week); null until the client said. */
+  private selectable: ReadonlySet<number> | null = null;
+
+  /**
+   * The client's pickable-champion-ids. Filters the own seat's picks, its hover rank and its pool
+   * list — never a teammate's seat and never bans (1.5's ownership filter). Reset with every new
+   * draft, because the free rotation and the account can change between drafts.
+   */
+  setSelectable(ids: ReadonlySet<number> | null): void {
+    this.selectable = ids && ids.size > 0 ? ids : null;
+  }
+
+  get hasSelectable(): boolean {
+    return this.selectable !== null;
+  }
+
   /**
    * One session update from the client (the parsed /lol-champ-select/v1/session, or null outside
    * champ select). A new draft resets the turn tracker: the session went active, fewer champions
@@ -161,6 +177,7 @@ export class DraftEngine {
     const progress = state.unavailable.size;
     const isNewDraft = state.isActive && (!this.wasActive || progress < this.lastProgress || state.localCellId !== this.lastLocal);
     if (isNewDraft) this.turns.reset();
+    if (isNewDraft || !state.isActive) this.selectable = null;
     this.wasActive = state.isActive;
     this.lastProgress = progress;
     this.lastLocal = state.localCellId;
@@ -195,19 +212,21 @@ export class DraftEngine {
     let bench: DraftFrame['aramBench'] = null;
 
     if (state.isActive && target && usesLanes(state.queue)) {
-      const pickSet = recommender.recommend(state, { ...target, action: 'pick' }, enemyPredictions, allyPredictions, null, LIST_LIMIT);
+      const own = target.slot.cellId === state.localCellId ? this.selectable : null;
+      const pickSet = recommender.recommend(state, { ...target, action: 'pick' }, enemyPredictions, allyPredictions, own, LIST_LIMIT);
       picks = frameSet(pickSet);
       bans = frameSet(recommender.recommend(state, { ...target, action: 'ban' }, enemyPredictions, allyPredictions, null, LIST_LIMIT));
 
       const pool = this.pool?.(pickSet.lane) ?? null;
-      if (pool && pool.size > 0) {
-        poolPicks = frameSet(recommender.recommend(state, { ...target, action: 'pick' }, enemyPredictions, allyPredictions, pool, LIST_LIMIT));
+      const usable = pool && own ? new Set([...pool].filter((id) => own.has(id))) : pool;
+      if (usable && usable.size > 0) {
+        poolPicks = frameSet(recommender.recommend(state, { ...target, action: 'pick' }, enemyPredictions, allyPredictions, usable, LIST_LIMIT));
       }
     }
 
     const mine = localSlot(state);
     if (state.isActive && hover !== 0 && mine && usesLanes(state.queue)) {
-      const evaluation = recommender.evaluate(state, { slot: mine, action: 'pick', isFollowingTurn: false }, hover, enemyPredictions, allyPredictions);
+      const evaluation = recommender.evaluate(state, { slot: mine, action: 'pick', isFollowingTurn: false }, hover, enemyPredictions, allyPredictions, this.selectable);
       if (evaluation) {
         hoverResult = {
           championId: hover,

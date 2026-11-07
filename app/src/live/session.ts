@@ -55,6 +55,9 @@ export class LiveSession {
   private session: Record<string, unknown> | null = null;
   private sessionAt = 0;
   private frame: GoldenFrame | null = null;
+  /** The last frame of a running draft: the loading screen still shows the matchup. */
+  private lastActive: GoldenFrame | null = null;
+  private noBans = false;
   private game: LiveGameData | null = null;
   private readonly situations = new SituationTracker();
   /** The own pick of the last draft, for the build and the game after it. */
@@ -84,6 +87,8 @@ export class LiveSession {
 
   onPhase(phase: string): void {
     if (phase === 'GameStart' && this.phase !== 'GameStart') this.situations.reset();
+    // Back in the lobby or the queue: the last draft is over for good.
+    if (phase === 'Lobby' || phase === 'Matchmaking' || phase === 'None') this.lastActive = null;
     this.phase = phase;
   }
 
@@ -95,7 +100,24 @@ export class LiveSession {
     if (!this.engine) return;
     const { frame } = this.engine.update(parsed);
     this.frame = frame as unknown as GoldenFrame;
-    if (parsed && frame.state.isActive) this.rememberPick();
+    if (parsed && frame.state.isActive) {
+      this.lastActive = this.frame;
+      // The session says so itself: bans.numBans is 0 in blind pick.
+      this.noBans = (parsed.bans as { numBans?: number } | undefined)?.numBans === 0;
+      this.rememberPick();
+    }
+  }
+
+  /** Whether the champions the player may pick are still unknown for the running draft. */
+  get needsSelectable(): boolean {
+    return !!this.engine && !!this.frame?.state.isActive && !this.engine.hasSelectable;
+  }
+
+  /** The client's pickable-champion-ids; the own seat's picks are filtered to them from now on. */
+  setSelectable(ids: readonly number[]): void {
+    if (!this.engine || ids.length === 0) return;
+    this.engine.setSelectable(new Set(ids));
+    if (this.session) this.onSession(this.session, this.sessionAt);
   }
 
   onGame(game: string | LiveGameData | null): void {
@@ -103,9 +125,10 @@ export class LiveSession {
   }
 
   view(now = Date.now()): ViewModel {
-    const frame = this.frame?.state.isActive ? this.frame : null;
-    const facts = frame ? this.adapter.facts(frame) : null;
-    const moment = momentOf(facts, this.phase);
+    const active = this.frame?.state.isActive ? this.frame : null;
+    const moment = momentOf(active ? this.adapter.facts(active) : null, this.phase);
+    // The session ends when the loading screen starts; the matchup stays on screen through it.
+    const frame = active ?? (moment === 'loading' ? this.lastActive : null);
     const base: ViewModel = {
       moment,
       connection: this.connection(),
@@ -135,7 +158,11 @@ export class LiveSession {
       };
     }
 
-    const board = this.adapter.board(frame, this.secondsLeft(now));
+    const board = this.adapter.board(frame, active ? this.secondsLeft(now) : null);
+    if (this.withoutBans()) board.steps = [
+      { label: 'Picks', state: frame.state.phase === 'finalization' || !active ? 'done' : 'now' },
+      { label: 'Finalisierung', state: !active ? 'done' : frame.state.phase === 'finalization' ? 'now' : 'next' },
+    ];
     const me = board.allies.find((slot) => slot.isMe) ?? null;
     const myChampion = me?.champion ?? null;
     const lane = me?.lane ?? null;
@@ -216,6 +243,11 @@ export class LiveSession {
     ];
   }
 
+  /** Blind pick and other modes without bans (kept through the loading screen). */
+  private withoutBans(): boolean {
+    return this.noBans;
+  }
+
   /** Seconds left in the current champion select step, counted down from the session's timer. */
   private secondsLeft(now: number): number | null {
     const timer = this.session?.timer as { adjustedTimeLeftInPhase?: number } | undefined;
@@ -269,7 +301,14 @@ export class LiveSession {
     const game = this.game;
     const build = this.pickedBuild();
     if (!game) {
-      return { ...base, build, emptyText: base.moment === 'postgame' ? 'Das Spiel ist vorbei.' : 'Das Spiel lädt …' };
+      return {
+        ...base,
+        build,
+        emptyText:
+          base.moment === 'postgame'
+            ? 'Das Nachspiel (Ergebnis und Platz deines Picks) kommt in einem der nächsten Schritte.'
+            : 'Sobald das Spiel läuft: nächster Kauf gegen dein Gold, der nächste Skillpunkt und was die Gegner bauen.',
+      };
     }
 
     const items = assets()?.itemInfo ?? new Map();

@@ -74,6 +74,58 @@ describe('LiveSession', () => {
     expect(live.view(6_000).board?.seconds).toBe(15);
   });
 
+  it('keeps the matchup on screen through the loading screen', () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    for (const record of sessions('state-nachlock')) live.onSession(record.session ?? null);
+    live.onSession(null);
+    live.onPhase('GameStart');
+    const view = live.view();
+    expect(view.moment).toBe('loading');
+    expect(view.main.kind).toBe('matchup');
+    expect(view.board?.seconds).toBeNull();
+    live.onPhase('Lobby');
+    expect(live.view().board).toBeNull();
+  });
+
+  it('shows no ban steps in blind pick', () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    const last = sessions('live-tournament-draft').filter((r) => r.session).at(-1)!.session!;
+    live.onSession({ ...last, bans: { myTeamBans: [], theirTeamBans: [], numBans: 0 } });
+    expect(live.view().board?.steps.map((s) => s.label)).toEqual(['Picks', 'Finalisierung']);
+    live.onSession({ ...last, bans: { myTeamBans: [], theirTeamBans: [], numBans: 10 } });
+    expect(live.view().board?.steps.map((s) => s.label)).toContain('Bann 1');
+  });
+
+  it('suggests only champions the player may pick, for the own seat only', () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    const last = sessions('live-tournament-draft').filter((r) => r.session).at(-1)!.session!;
+    live.onSession(last);
+    const before = live.view().main;
+    if (before.kind !== 'picks' && before.kind !== 'bans') throw new Error(`kein Pick-Tile: ${before.kind}`);
+    expect(live.needsSelectable).toBe(true);
+
+    const first = before.tile.items[0]!.champion.id;
+    const owned = snapshot.champions.map((c) => c.id).filter((id) => id !== first);
+    live.setSelectable(owned);
+    expect(live.needsSelectable).toBe(false);
+    const after = live.view().main;
+    if (after.kind === 'picks') expect(after.tile.items.map((i) => i.champion.id)).not.toContain(first);
+
+    // A new draft asks again: the free rotation may have changed.
+    live.onSession(null);
+    live.onSession(last);
+    expect(live.needsSelectable).toBe(true);
+  });
+
   it('shows the game from the live client', () => {
     const live = new LiveSession();
     live.setData(data);

@@ -62,6 +62,10 @@
           <GameArea game={view.game} build={view.build} />
         {:else if view.postgame}
           <PostgameArea postgame={view.postgame} />
+        {:else if view.moment === 'game' || view.moment === 'loading'}
+          <EmptyState title="Das Spiel lädt …" text={view.emptyText ?? 'Sobald das Spiel läuft: nächster Kauf gegen dein Gold, der nächste Skillpunkt und was die Gegner bauen.'} />
+        {:else if view.moment === 'postgame'}
+          <EmptyState title="Spiel vorbei" text={view.emptyText ?? 'Das Nachspiel kommt hierher.'} />
         {:else}
           <EmptyState title="Noch kein Spiel" text="Sobald das Spiel startet: nächster Kauf gegen dein Gold, der nächste Skillpunkt und was die Gegner bauen." />
         {/if}

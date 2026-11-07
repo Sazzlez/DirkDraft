@@ -33,6 +33,28 @@ function render(): void {
   notify(session.view());
 }
 
+let selectableAsked = false;
+
+/**
+ * Asks the client which champions the player may pick, once per draft. The list can come back empty
+ * at the very start of champion select; then the next session event asks again (as 1.5 does).
+ */
+function askSelectable(): void {
+  if (!session.needsSelectable || selectableAsked) return;
+  selectableAsked = true;
+  invoke<number[]>('client_pickable')
+    .then((ids) => {
+      if (ids.length > 0) {
+        session.setSelectable(ids);
+        render();
+      }
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      selectableAsked = false;
+    });
+}
+
 async function apply(set: DataSet): Promise<void> {
   await loadAssets(set.meta.patch).catch(() => undefined);
   session.setData(set);
@@ -62,6 +84,7 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   });
   await listen<string | null>('client://session', (e) => {
     session.onSession(e.payload);
+    askSelectable();
     render();
   });
   await listen<string | null>('game://live', (e) => {
@@ -73,7 +96,10 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   const snapshot = await invoke<Snapshot>('client_snapshot');
   session.onStatus(snapshot.status);
   if (snapshot.phase) session.onPhase(snapshot.phase);
-  if (snapshot.session) session.onSession(snapshot.session);
+  if (snapshot.session) {
+    session.onSession(snapshot.session);
+    askSelectable();
+  }
   if (snapshot.game) session.onGame(snapshot.game);
   void refresher.onPhase(snapshot.status.clientRunning ? snapshot.phase : null, Date.now());
   render();
