@@ -2,10 +2,14 @@
   import Shell from './ui/Shell.svelte';
   import { SCENES, sceneView } from './data/scenes';
   import type { ViewModel } from './core/view';
+  import { inShell } from './platform/shell';
+  import { startLive } from './live/bridge';
 
   const params = new URLSearchParams(location.search);
   const forcedTheme = params.get('theme');
   const screenshot = params.has('shot');
+  // In the app: the live client. In the browser (or with ?scene in the app): the recorded scenes.
+  const live = inShell && !params.has('scene');
 
   let sceneId = $state(params.get('scene') ?? 'picking');
   let view = $state<ViewModel | null>(null);
@@ -20,7 +24,15 @@
     document.documentElement.dataset.theme = theme;
   });
 
+  if (live) {
+    startLive((v) => {
+      view = v;
+      document.body.dataset.ready = 'live';
+    }).catch((e: unknown) => (error = String(e)));
+  }
+
   $effect(() => {
+    if (live) return;
     const id = sceneId;
     error = null;
     sceneView(id)
@@ -45,7 +57,7 @@
   <Shell {view} />
 {/if}
 
-{#if !screenshot}
+{#if !screenshot && !live}
   <nav class="scenes" aria-label="Szenen">
     {#each SCENES as scene (scene.id)}
       <button class:on={scene.id === sceneId} onclick={() => choose(scene.id)}>{scene.title}</button>

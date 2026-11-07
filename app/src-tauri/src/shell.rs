@@ -25,11 +25,18 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
+            crate::client::start(app.handle());
             let window = create_window(app.handle())?;
             create_tray(app.handle())?;
             window.show()?;
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            crate::client::client_snapshot,
+            crate::client::client_pickable,
+            crate::client::client_game_version,
+            crate::client::client_import,
+        ])
         .on_window_event(|window, event| {
             // X, Alt+F4 and "close" in the taskbar all put the window in the tray.
             if let WindowEvent::CloseRequested { api, .. } = event {

@@ -5,10 +5,26 @@
   import Tile from '../Tile.svelte';
   import RuneRow from '../build/RuneRow.svelte';
   import { importLabel } from '../../core/loadout';
+  import { runImport } from '../../live/bridge';
 
   let { matchup, build }: { matchup: MatchupView; build: BuildView | null } = $props();
 
   const label = $derived(importLabel(!!build?.runes, (build?.spells.length ?? 0) >= 2));
+
+  let busy = $state(false);
+  let result = $state<string | null>(null);
+
+  async function take() {
+    busy = true;
+    result = null;
+    try {
+      result = await runImport();
+    } catch (e) {
+      result = `Fehlgeschlagen: ${String(e)}`;
+    } finally {
+      busy = false;
+    }
+  }
 </script>
 
 <Tile title="Dein Matchup" sub={LANE_NAMES[matchup.lane]} main>
@@ -29,10 +45,11 @@
   {#if build}
     <div class="card">
       {#if build.runes}<RuneRow runes={build.runes} />{/if}
-      <button class="primary">
+      <button class="primary" onclick={take} disabled={busy}>
         <svg viewBox="0 0 16 16"><path d="M8 2v8m0 0 3-3m-3 3L5 7M3 13h10" /></svg>
-        {label}
+        {busy ? 'Wird übernommen …' : label}
       </button>
+      {#if result}<p class="result" role="status">{result}</p>{/if}
     </div>
 
     <div class="kit">
@@ -126,6 +143,17 @@
     background: var(--blue);
     color: #fff;
     font-weight: 600;
+  }
+
+  .primary:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .result {
+    margin: 8px 2px 0;
+    font-size: 11.5px;
+    color: var(--fg2);
   }
 
   .primary svg {
