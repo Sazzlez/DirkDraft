@@ -240,6 +240,8 @@ public sealed class RiotCollector(
                 entry is not null && statics!.Traits.For(entry.Key).HasHardCc);
         }
         var games = new List<int[]>(state.Games);
+        // A refused mastery request costs the samples of this run, never the run itself.
+        var askMastery = options.MasteryEvery > 0;
         var matchups = new RiotMatchupTally();
         matchups.Add(state.Matchups ?? []);
         var seen = new HashSet<long>(state.Seen);
@@ -357,7 +359,7 @@ public sealed class RiotCollector(
                     matchups.Add(reading);
 
                     var (masteryIndex, masteryPoints) = (-1, 0);
-                    if (options.MasteryEvery > 0 && (counted + 1) % options.MasteryEvery == 0)
+                    if (askMastery && (counted + 1) % options.MasteryEvery == 0)
                     {
                         var puuids = RiotMatchReader.PlayerIds(matchJson);
                         if (puuids.Count == reading.Participants.Count)
@@ -366,10 +368,18 @@ public sealed class RiotCollector(
                             var rarest = Enumerable.Range(0, reading.Participants.Count)
                                 .MinBy(i => meta.LaneGames(reading.Participants[i].ChampionId, reading.Participants[i].Lane));
                             var sampled = reading.Participants[rarest];
-                            var masteryJson = await api.GetAsync(options.Platform,
-                                $"/lol/champion-mastery/v4/champion-masteries/by-puuid/{Uri.EscapeDataString(puuids[rarest])}/by-champion/{sampled.ChampionId}", ct).ConfigureAwait(false);
-                            if (masteryJson is not null && RiotMatchReader.MasteryPoints(masteryJson) is { } points)
-                                (masteryIndex, masteryPoints) = (rarest, points);
+                            try
+                            {
+                                var masteryJson = await api.GetAsync(options.Platform,
+                                    $"/lol/champion-mastery/v4/champion-masteries/by-puuid/{Uri.EscapeDataString(puuids[rarest])}/by-champion/{sampled.ChampionId}", ct).ConfigureAwait(false);
+                                if (masteryJson is not null && RiotMatchReader.MasteryPoints(masteryJson) is { } points)
+                                    (masteryIndex, masteryPoints) = (rarest, points);
+                            }
+                            catch (RiotApiException ex)
+                            {
+                                askMastery = false;
+                                log?.Invoke($"Mastery-Abfrage für diesen Lauf abgeschaltet: {ex.Message}");
+                            }
                         }
                     }
 

@@ -232,6 +232,7 @@ public class RiotBuildTests
 
         var current = Match.Replace("\"gameVersion\":  \"16.16.804.9184\"", "\"gameVersion\":  \"16.22.123.4567\"");
         var old = Match.Replace("\"gameCreation\":  ", "\"gameCreation\":  1");  // an older patch, created whenever
+        var masteryRefused = false;
 
         var handler = new FakeHandler(request =>
         {
@@ -249,7 +250,7 @@ public class RiotBuildTests
                 _ when path.EndsWith("/timeline", StringComparison.Ordinal) => Ok(Timeline),
                 "/lol/match/v5/matches/EUW1_200" => Ok(old),
                 _ when path.StartsWith("/lol/champion-mastery/v4/champion-masteries/by-puuid/r", StringComparison.Ordinal)
-                    => Ok("""{"championLevel":5,"championPoints":4321}"""),
+                    => masteryRefused ? new HttpResponseMessage(HttpStatusCode.Forbidden) : Ok("""{"championLevel":5,"championPoints":4321}"""),
                 _ => new HttpResponseMessage(HttpStatusCode.NotFound),
             };
         });
@@ -293,6 +294,15 @@ public class RiotBuildTests
         Assert.DoesNotContain("\"p1\"", stored);
         Assert.DoesNotContain("\"q2\"", stored);
         Assert.DoesNotContain("\"r1\"", stored);
+
+        // A refused mastery request costs the sample, never the run.
+        masteryRefused = true;
+        var second = new CollectorState();
+        using var secondApi = new RiotApiClient("RGAPI-test", handler, delay: (_, _) => Task.CompletedTask);
+        var secondReport = await new RiotCollector(secondApi, Items, new CollectorOptions { Tiers = ["gold"], Duration = TimeSpan.FromMinutes(1), MaxPages = 1, MasteryEvery = 1 })
+            .RunAsync(second, _ => { }, stop.Token);
+        Assert.Equal(2, secondReport.Counted);
+        Assert.All(second.Games, line => Assert.Equal(-1, line[13]));
     }
 
     [Fact]
