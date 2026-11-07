@@ -16,7 +16,10 @@ name: Daten sammeln
 
 on:
   schedule:
-    # Every six hours; a run takes five and a half, so the key is busy most of the day.
+    # Every six hours; a run takes five and a half, so the key is busy most of the day. Only the
+    # fallback now: GitHub skipped the 06:23 and 12:23 slots of 07.11.2026 without a trace, so each
+    # run starts its successor itself (last step). The concurrency group below keeps it at one
+    # collector at a time — the key's rate stays what one run uses, only the gap between runs goes.
     - cron: '23 */6 * * *'
   workflow_dispatch:
     inputs:
@@ -34,6 +37,8 @@ concurrency:
 
 permissions:
   contents: write
+  # The last step starts the next run (workflow_dispatch) and looks whether one is already waiting.
+  actions: write
 
 jobs:
   collect:
@@ -49,6 +54,7 @@ jobs:
       - name: Schluessel vorhanden?
         id: key
         run: |
+          echo "STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
           if [ -z "$RIOT_API_KEY" ]; then
             echo "::notice::Kein RIOT_API_KEY hinterlegt - nichts zu tun."
             echo "present=false" >> "$GITHUB_OUTPUT"
@@ -118,3 +124,30 @@ jobs:
           if [ -f aram.json ]; then git add aram.json; fi
           git commit -q -m "Daten $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
+
+      # The next run, started by this one (a workflow_dispatch from GITHUB_TOKEN does start a run).
+      # Guards: a run that ended within 30 minutes failed early — no chain then, or a broken key would
+      # loop every few minutes; the six-hourly schedule stays as the fallback. Nothing is started while
+      # another run already waits (the schedule's). The repository variable COLLECT_CHAIN=off stops the
+      # chain without touching this file.
+      - name: Naechsten Lauf starten
+        if: always() && steps.key.outputs.present == 'true' && vars.COLLECT_CHAIN != 'off'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          elapsed=$(( $(date +%s) - STARTED_AT ))
+          if [ "$elapsed" -lt 1800 ]; then
+            echo "::notice::Lauf endete nach $(( elapsed / 60 )) min - kein Nachfolger, der Zeitplan bleibt."
+            exit 0
+          fi
+          waiting=0
+          for status in queued pending waiting requested; do
+            n=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow collect-builds.yml --status "$status" --json databaseId --jq length)
+            waiting=$(( waiting + n ))
+          done
+          if [ "$waiting" -gt 0 ]; then
+            echo "::notice::Es wartet schon ein Lauf - kein weiterer."
+            exit 0
+          fi
+          gh workflow run collect-builds.yml --repo "$GITHUB_REPOSITORY" --ref "${{ github.ref_name }}"
+          echo "::notice::Naechster Lauf gestartet."
