@@ -43,6 +43,12 @@
         <span class="k">Skills</span>
         <span class="seq">{build.skillPriority.replaceAll('>', '›') || '—'}</span>
       </div>
+      {#if build.support}
+        <div>
+          <span class="k">Support-Item</span>
+          <span class="icons">{#each build.support.items as item, i (i)}<Icon kind="item" id={item.id} size={26} title="{item.name} · {build.support.stats}" />{/each}</span>
+        </div>
+      {/if}
       <div class="core">
         <span class="k">Kern</span>
         <span class="icons">

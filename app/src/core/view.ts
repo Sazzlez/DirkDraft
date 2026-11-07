@@ -236,8 +236,10 @@ export interface BuildView {
   boots: ItemOption | null;
   core: ItemOption | null;
   late: ItemRef[];
-  /** The support item upgrade most played (supports only). */
+  /** The support item upgrade to pick when the quest is done (supports only). */
   support: ItemOption | null;
+  /** The other upgrades worth showing (20+ games). */
+  alsoSupport: ItemOption[];
   alsoStart: ItemOption[];
   alsoBoots: ItemOption[];
   alsoCore: ItemOption[];
@@ -251,7 +253,7 @@ export interface GameView {
   gold: number;
   me: ChampionRef;
   title: string;
-  nextBuy: { item: ItemRef; cost: number; affordable: boolean; then: ItemRef | null } | null;
+  nextBuy: { item: ItemRef; cost: number; affordable: boolean; then: ItemRef | null; supportChoice: boolean } | null;
   path: { slot: string; items: (ItemRef & { owned: boolean; next: boolean })[] }[];
   /** The plan's next point; `now`: a point is open right now (level above the points spent). */
   nextSkill: { key: 'Q' | 'W' | 'E' | 'R'; level: number; now: boolean } | null;

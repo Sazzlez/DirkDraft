@@ -56,6 +56,13 @@ export interface ItemInfo {
 /** Basic boots; every finished pair is built from them. */
 export const BASIC_BOOTS = 1001;
 
+/** Bounty of Worlds: the support quest done; each of the five final support items is built from it. */
+export const SUPPORT_QUEST_DONE = 3867;
+
+/** One of the support quest's final items (Celestial Opposition, Dream Maker, …). */
+export const isSupportUpgrade = (id: number, items: ReadonlyMap<number, ItemInfo>): boolean =>
+  items.get(id)?.from.includes(SUPPORT_QUEST_DONE) ?? false;
+
 const hasTag = (info: ItemInfo | undefined, tag: string): boolean =>
   !!info?.tags?.some((t) => t.toLowerCase() === tag.toLowerCase());
 
@@ -111,7 +118,7 @@ export type Skill = 'Q' | 'W' | 'E' | 'R';
 // ---- what the game moment says ------------------------------------------------------------------
 
 export interface PathStep {
-  slot: 'Start' | 'Schuhe' | 'Kern' | 'Spät';
+  slot: 'Start' | 'Schuhe' | 'Support' | 'Kern' | 'Spät';
   itemId: number;
   owned: boolean;
 }
@@ -124,6 +131,8 @@ export interface NextBuy {
   affordable: boolean;
   /** The item this buy works towards, when the buy is a component of it. */
   towards: number | null;
+  /** The support quest is done: the planned upgrade is waiting to be picked in the shop. */
+  supportChoice: boolean;
 }
 
 export interface EnemyView {
@@ -216,16 +225,24 @@ function pathOf(plan: RiotBuildPlan | null, owned: readonly number[], gameTime: 
   const steps: PathStep[] = [];
   if (gameTime <= START_WINDOW_SECONDS) for (const id of plan.starters[0]?.ids ?? []) steps.push({ slot: 'Start', itemId: id, owned: has(id) });
   for (const id of plan.boots[0]?.ids ?? []) steps.push({ slot: 'Schuhe', itemId: id, owned: has(id) || hasBoots });
+  // Any final support item fills the slot, like any pair fills the boots'.
+  const hasSupportUpgrade = owned.some((id) => isSupportUpgrade(id, items));
+  for (const id of plan.supportChoice?.ids ?? []) steps.push({ slot: 'Support', itemId: id, owned: has(id) || hasSupportUpgrade });
   for (const id of plan.core[0]?.ids ?? []) steps.push({ slot: 'Kern', itemId: id, owned: has(id) });
   for (const option of plan.late) for (const id of option.ids) steps.push({ slot: 'Spät', itemId: id, owned: has(id) });
   return steps;
 }
 
 function nextBuyOf(steps: PathStep[], owned: readonly number[], gold: number, items: ReadonlyMap<number, ItemInfo>): NextBuy | null {
-  const target = steps.find((s) => !s.owned);
+  // The support upgrade can be picked only once the quest is done (Bounty of Worlds in the
+  // inventory) — then it comes first, at no cost; before that it is no buy at all.
+  const questDone = owned.includes(SUPPORT_QUEST_DONE);
+  const choice = steps.find((s) => s.slot === 'Support' && !s.owned);
+  if (choice && questDone) return { itemId: choice.itemId, cost: remainingCost(choice.itemId, [...owned], items), affordable: true, towards: null, supportChoice: true };
+  const target = steps.find((s) => !s.owned && s.slot !== 'Support');
   if (!target) return null;
   const cost = remainingCost(target.itemId, [...owned], items);
-  if (gold >= cost) return { itemId: target.itemId, cost, affordable: true, towards: null };
+  if (gold >= cost) return { itemId: target.itemId, cost, affordable: true, towards: null, supportChoice: false };
 
   // Not enough for the whole item: the most expensive component that is affordable and not owned —
   // recursively, so a half-built component is offered rather than its parent.
@@ -241,8 +258,8 @@ function nextBuyOf(steps: PathStep[], owned: readonly number[], gold: number, it
   visit(target.itemId);
   const chosen = best as { id: number; cost: number } | null;
   return chosen
-    ? { itemId: chosen.id, cost: chosen.cost, affordable: true, towards: target.itemId }
-    : { itemId: target.itemId, cost, affordable: false, towards: null };
+    ? { itemId: chosen.id, cost: chosen.cost, affordable: true, towards: target.itemId, supportChoice: false }
+    : { itemId: target.itemId, cost, affordable: false, towards: null, supportChoice: false };
 }
 
 function nextSkillOf(order: string, data: LiveGameData): GameModel['nextSkill'] {

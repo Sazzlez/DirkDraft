@@ -12,7 +12,7 @@
     { label: 'Start', main: build.start, also: build.alsoStart },
     { label: 'Schuhe', main: build.boots, also: build.alsoBoots },
     { label: 'Kern', main: build.core, also: build.alsoCore },
-    ...(build.support ? [{ label: 'Support-Item', main: build.support, also: [] }] : []),
+    ...(build.support ? [{ label: 'Support-Item', main: build.support, also: build.alsoSupport }] : []),
   ]);
 </script>
 

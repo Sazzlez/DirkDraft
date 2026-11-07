@@ -160,6 +160,16 @@ describe('builds from own data', () => {
     expect(plan.late.map((o) => o.ids[0])).toEqual([3026, 3072]);
   });
 
+  it('offers the support upgrade with its alternatives', () => {
+    const plan = riotPlan(
+      file([stats(412, Lane.Support, 700, { core, supportChoice: [count([3876], 459, 238), count([3869], 264, 135), count([3877], 10, 6)] })]),
+      412,
+      Lane.Support,
+    )!;
+    expect(plan.supportChoice!.ids).toEqual([3876]);
+    expect(plan.supportOptions.map((o) => o.ids[0])).toEqual([3876, 3869]);
+  });
+
   it('drops thin alternatives but never the best option', () => {
     const plan = riotPlan(file([stats(122, Lane.Top, 10, { core: [count([1, 2, 3], 5, 4), count([4, 5, 6], 4, 1)] })]), 122, Lane.Top)!;
     expect(plan.core).toHaveLength(1);

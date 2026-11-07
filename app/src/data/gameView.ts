@@ -45,7 +45,7 @@ export function gameView(
 ): GameView {
   const me = champion(model.championId) ?? { id: model.championId, key: '', name: `#${model.championId}` };
 
-  const slots = ['Start', 'Schuhe', 'Kern', 'Spät'] as const;
+  const slots = ['Start', 'Schuhe', 'Support', 'Kern', 'Spät'] as const;
   const nextId = model.nextBuy?.towards ?? model.nextBuy?.itemId ?? null;
   const path = slots
     .map((slot) => ({
@@ -78,6 +78,7 @@ export function gameView(
           cost: model.nextBuy.cost,
           affordable: model.nextBuy.affordable,
           then: model.nextBuy.towards ? item(model.nextBuy.towards) : null,
+          supportChoice: model.nextBuy.supportChoice,
         }
       : null,
     path,

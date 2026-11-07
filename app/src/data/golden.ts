@@ -512,6 +512,7 @@ export function buildFromPlan(plan: GoldenPlan, champion: ChampionRef, opponent:
     core: option(plan.coreItems[0]),
     late: plan.lateItems.flatMap((set) => set.itemIds.map((id) => ({ id, name: itemName(id) }))),
     support: null,
+    alsoSupport: [],
     alsoStart: alternatives(plan.starters),
     alsoBoots: alternatives(plan.boots),
     alsoCore: alternatives(plan.coreItems),

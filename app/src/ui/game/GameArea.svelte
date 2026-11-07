@@ -30,9 +30,13 @@
       <section class="next">
         <Icon kind="item" id={game.nextBuy.item.id} size={44} />
         <span class="t">
-          <span class="kicker">Nächster Kauf</span>
+          <span class="kicker">{game.nextBuy.supportChoice ? 'Support-Quest erfüllt' : 'Nächster Kauf'}</span>
           <b>{game.nextBuy.item.name}</b>
-          <span class="num">{count(game.nextBuy.cost)} Gold · {game.nextBuy.affordable ? 'kaufbar' : `noch ${count(game.nextBuy.cost - game.gold)} Gold`}</span>
+          {#if game.nextBuy.supportChoice}
+            <span>Jetzt im Shop als Upgrade wählen</span>
+          {:else}
+            <span class="num">{count(game.nextBuy.cost)} Gold · {game.nextBuy.affordable ? 'kaufbar' : `noch ${count(game.nextBuy.cost - game.gold)} Gold`}</span>
+          {/if}
         </span>
         {#if game.nextBuy.then}
           <span class="then">danach <Icon kind="item" id={game.nextBuy.then.id} size={26} title={game.nextBuy.then.name} /></span>

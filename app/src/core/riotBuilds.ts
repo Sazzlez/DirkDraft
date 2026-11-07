@@ -73,6 +73,11 @@ export interface RiotBuildPlan {
   /** Fourth to sixth item, each the slot's best not already in the plan. */
   late: PlanOption[];
   supportChoice: PlanOption | null;
+  /**
+   * The support quest's final item: the best first, then the alternatives worth showing (from
+   * Bounty of Worlds the player picks one of five; the choice is the decision, not the gold).
+   */
+  supportOptions: PlanOption[];
   /** "QEWQQRQEQERE…" (15 levels), empty when no order has games. */
   skillOrder: string;
   /** "QEW": which basic ability is maxed first, second, third. */
@@ -278,6 +283,7 @@ function planOf(file: RiotBuildFile, championId: number, stats: ChampionBuildSta
     core,
     late,
     supportChoice: ranked(stats.supportChoice, k.supportChoice)[0] ?? null,
+    supportOptions: slot(stats.supportChoice, k.supportChoice),
     skillOrder: ranked(stats.skillOrder, k.skillOrder)[0]?.text ?? '',
     skillMax: ranked(stats.skillMax, k.skillMax)[0]?.text ?? '',
   };

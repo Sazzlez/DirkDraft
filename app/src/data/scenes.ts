@@ -279,6 +279,7 @@ function planFromGolden(p: GoldenPlan): RiotBuildPlan {
     core: p.coreItems.map(option),
     late: p.lateItems.slice(0, 3).map(option),
     supportChoice: null,
+    supportOptions: [],
     skillOrder: p.skillOrder.join(''),
     skillMax: p.skillPriority.replace(/[^QWE]/g, ''),
   };

@@ -24,6 +24,10 @@ const ITEMS = new Map<number, ItemInfo>([
   // Manamune turns into Muramana, which has no recipe of its own, only specialRecipe.
   [3004, { total: 2900, from: [3133] }],
   [3042, { total: 2900, from: [], purchasable: false, specialRecipe: 3004 }],
+  // The support quest (Data Dragon 16.22): Bounty of Worlds, then a free pick of five final items.
+  [3867, { total: 400, from: [], purchasable: false, into: [3876, 3869] }],
+  [3876, { total: 400, from: [3867] }],
+  [3869, { total: 400, from: [3867] }],
 ]);
 
 const meta = new MetaBuilder()
@@ -47,6 +51,7 @@ const plan: RiotBuildPlan = {
   core: [option([3071])],
   late: [],
   supportChoice: null,
+  supportOptions: [],
   skillOrder: 'QEWQQRQEQERE',
   skillMax: 'QEW',
 };
@@ -68,6 +73,28 @@ function game(overrides: { gold?: number; items?: number[]; time?: number; level
     gameData: { gameTime: overrides.time ?? 600 },
   };
 }
+
+describe('the support item upgrade', () => {
+  const support = { ...plan, supportChoice: option([3876]), supportOptions: [option([3876]), option([3869])] };
+
+  it('is no buy before the quest is done, though the path shows it', () => {
+    const model = gameModel(game({ items: [3047], gold: 5000, time: 600 }), meta, support, ITEMS)!;
+    expect(model.path.find((s) => s.slot === 'Support')).toEqual({ slot: 'Support', itemId: 3876, owned: false });
+    expect(model.nextBuy!.itemId).toBe(3071);
+    expect(model.nextBuy!.supportChoice).toBe(false);
+  });
+
+  it('comes first, at no cost, once Bounty of Worlds is in the inventory', () => {
+    const model = gameModel(game({ items: [3047, 3867], gold: 50, time: 900 }), meta, support, ITEMS)!;
+    expect(model.nextBuy).toEqual({ itemId: 3876, cost: 0, affordable: true, towards: null, supportChoice: true });
+  });
+
+  it('counts as done with any of the final items, not only the planned one', () => {
+    const model = gameModel(game({ items: [3047, 3869], gold: 5000, time: 1200 }), meta, support, ITEMS)!;
+    expect(model.path.find((s) => s.slot === 'Support')!.owned).toBe(true);
+    expect(model.nextBuy!.itemId).toBe(3071);
+  });
+});
 
 describe('items that changed shape', () => {
   it('upgraded tier-3 boots fill the boots slot and the planned pair counts as owned', () => {
@@ -96,7 +123,7 @@ describe('next buy', () => {
 
   it('offers the whole item when the gold is there', () => {
     const model = gameModel(game({ gold: 3200, items: [3047] }), meta, plan, ITEMS)!;
-    expect(model.nextBuy).toEqual({ itemId: 3071, cost: 3000, affordable: true, towards: null });
+    expect(model.nextBuy).toEqual({ itemId: 3071, cost: 3000, affordable: true, towards: null, supportChoice: false });
   });
 
   it('else the most expensive component that is affordable', () => {
@@ -106,12 +133,14 @@ describe('next buy', () => {
       cost: 1100,
       affordable: true,
       towards: 3071,
+      supportChoice: false,
     });
     expect(gameModel(game({ gold: 500, items: [3047] }), meta, plan, ITEMS)!.nextBuy).toEqual({
       itemId: 1036,
       cost: 350,
       affordable: true,
       towards: 3071,
+      supportChoice: false,
     });
     expect(gameModel(game({ gold: 100, items: [3047] }), meta, plan, ITEMS)!.nextBuy?.affordable).toBe(false);
   });
