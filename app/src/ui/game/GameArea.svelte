@@ -99,6 +99,8 @@
 
   </div>
   <div class="col right">
+  <!-- Only with something to say: an empty tile with just its footnote read like a fault (live test 07.11.). -->
+  {#if game.hints.length > 0}
   <div class="hints">
     <Tile title="Hinweise">
       {#each game.hints as hint (hint.title)}
@@ -110,6 +112,7 @@
       <p class="tiny">Hinweise stehen neben dem Build. Sie ändern seine Reihenfolge nie.</p>
     </Tile>
   </div>
+  {/if}
 
   <div class="enemies">
     <Tile title="Gegner im Spiel" sub="laut Scoreboard">

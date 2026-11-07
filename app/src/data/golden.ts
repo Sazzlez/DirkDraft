@@ -174,8 +174,11 @@ export class GoldenAdapter {
     const slot = (g: GoldenSlot): SlotView => {
       const isMe = g.cellId === s.localCellId;
       const prediction = predicted.get(g.cellId);
-      const lane = toLane(g.assignedLane) ?? (s.usesLanes ? toLane(prediction?.lane) : null);
       const shown = g.lockedChampionId || g.hoverChampionId;
+      // An enemy seat nobody has shown yet gets a lane only once the others pin it down (the last
+      // open role); before that the seat order alone would put "Toplane, Jungle, Midlane…" there.
+      const guess = g.isAlly || !!shown || (!!prediction && !prediction.isUncertain);
+      const lane = toLane(g.assignedLane) ?? (s.usesLanes && guess ? toLane(prediction?.lane) : null);
       const allyHoverBlocked = g.isAlly && !g.lockedChampionId && g.hoverChampionId && unavailable.has(g.hoverChampionId);
       return {
         cellId: g.cellId,
@@ -239,13 +242,14 @@ export class GoldenAdapter {
     };
   }
 
-  recommendation(item: GoldenItem, rank: number, leader: GoldenItem, decimals: number, isBan: boolean, tied: boolean): RecommendationView {
+  /** `lane`: the pick list's lane, for the row's reason; ARAM and bans have none. */
+  recommendation(item: GoldenItem, rank: number, leader: GoldenItem, decimals: number, isBan: boolean, tied: boolean, lane: Lane | null = null): RecommendationView {
     const champion = this.champion(item.championId) ?? { id: item.championId, key: '', name: item.name };
     const verdict = isBan
       ? banVerdict(item.score)
       : pickVerdict(item.uncertainty > 0, rank, standing(leader.score, leader.uncertainty, item.score, item.uncertainty));
     const reasons = item.reasons.map((r) => ({ text: r.text, tone: toneOf(r.tone) }));
-    const main = item.reasons.find((r) => r.tone === 'pro') ?? item.reasons[0];
+    const main = { text: mainReason(item, isBan ? null : lane) };
     return {
       champion,
       value: isBan ? `${points(item.score)} Pkt` : percent(item.score, decimals),
@@ -263,7 +267,7 @@ export class GoldenAdapter {
 
   pickTile(set: GoldenSet, frame: GoldenFrame, title: string): PickTileView {
     const isBan = set.action === 'ban';
-    const rows = (s: GoldenSet) => s.items.map((item, i) => this.recommendation(item, i + 1, s.items[0]!, s.decimals, isBan, i < s.tied));
+    const rows = (s: GoldenSet) => s.items.map((item, i) => this.recommendation(item, i + 1, s.items[0]!, s.decimals, isBan, i < s.tied, toLane(s.lane)));
     return {
       kind: isBan ? 'bans' : 'picks',
       title,
@@ -397,6 +401,24 @@ function steps(frame: GoldenFrame): PhaseStep[] {
   else if (locks === 0 && s.turn?.action !== 'pick') now = 0;
   else now = 1;
   return labels.map((label, i) => ({ label, state: i < now ? 'done' : i === now ? 'now' : 'next' }));
+}
+
+/**
+ * The one reason a row shows: the first "pro" reason, unless the lane strength is the biggest
+ * contribution and has no reason of its own — the lane reason starts at 1,5 points, and on our own,
+ * more carefully smoothed numbers few champions reach that, so every marksman read "ist Ranged" (a
+ * small team-need term) while the bar showed lane strength first (live test 07.11.2026).
+ */
+export function mainReason(item: GoldenItem, lane: Lane | null): string | undefined {
+  const pro = item.reasons.find((r) => r.tone === 'pro') ?? item.reasons[0];
+  if (!lane) return pro?.text;
+  const lead = item.breakdown
+    .filter((t) => !t.isGate && t.logOdds !== null && t.points > 0)
+    .reduce<GoldenItem['breakdown'][number] | null>((best, t) => (!best || t.points > best.points ? t : best), null);
+  if (lead?.kind === 'laneStrength' && !item.reasons.some((r) => r.text.includes(' WR auf '))) {
+    return `${percent(1 / (1 + Math.exp(-lead.logOdds!)), 1)} WR auf ${LANE_NAMES[lane]}`;
+  }
+  return pro?.text;
 }
 
 function toneOf(tone: string): Tone {

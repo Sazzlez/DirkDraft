@@ -127,10 +127,11 @@ describe('LiveSession', () => {
     const ban = { ...pick, id: 2, type: 'ban' };
     live.onSession({ ...last, timer: { phase: 'BAN_PICK' }, actions: [[ban], [pick]] });
     expect(live.view().board?.steps.map((s) => `${s.label}:${s.state}`)).toEqual(['Banns:now', 'Picks:next', 'Finalisierung:next']);
-    // The loading screen looks back on a finished draft.
+    // The loading screen looks back on a finished draft, and says what it is.
     live.onSession(null);
     live.onPhase('GameStart');
     expect(live.view().board?.steps.every((s) => s.state === 'done')).toBe(true);
+    expect(live.view().board?.turnText).toBe('Ladebildschirm');
   });
 
   it('Arena and rotating modes: no list, a word why; ARAM without numbers: no empty bench', () => {
@@ -164,6 +165,17 @@ describe('LiveSession', () => {
     expect(live.view().board!.modeNote).toBe('Zahlen aus Solo/Duo');
     live.onSession({ ...last, queueId: 430 });
     expect(live.view().board!.mode).toBe('Normal Blind');
+  });
+
+  it('puts no guessed lane on an enemy seat nobody has shown yet', () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    const last = sessions('state-myturn').filter((r) => r.session).at(-1)!.session!;
+    const theirTeam = (last.theirTeam as Record<string, unknown>[]).map((p) => ({ ...p, championId: 0, championPickIntent: 0 }));
+    live.onSession({ ...last, theirTeam });
+    expect(live.view().board!.enemies.map((e) => e.lane)).toEqual([null, null, null, null, null]);
   });
 
   it('says "Planung" while the first ban is only marked in progress', () => {

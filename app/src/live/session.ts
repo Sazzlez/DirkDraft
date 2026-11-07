@@ -21,7 +21,7 @@ import { GoldenAdapter, type GoldenFrame } from '../data/golden';
 import { dataLine, dataLineShort, type DataSet } from '../data/remote';
 import { draftStateFrom } from '../core/model/draftState';
 import { patchesBetween, patchLine } from '../core/model/patchVersion';
-import { draftSteps } from '../core/steps';
+import { draftSteps, simultaneousTurn } from '../core/steps';
 
 export interface ClientStatus {
   leagueFound: boolean;
@@ -228,8 +228,16 @@ export class LiveSession {
     board.total = clock?.total ?? null;
     // The draft's own order (tournament, ranked/draft, blind); after the session, every step is done.
     board.steps = frame.state.usesLanes ? draftSteps(active ? this.session : this.lastSession, !active) : [];
+    if (active && frame.state.phase !== 'planning') board.turnText = simultaneousTurn(this.session) ?? board.turnText;
     // Seats can be chosen only while the draft runs; the loading screen is a look back.
-    if (!active) for (const slot of board.allies) slot.canTarget = false;
+    if (!active) {
+      for (const slot of board.allies) {
+        slot.canTarget = false;
+        slot.laneEditable = false;
+      }
+      board.turnText = 'Ladebildschirm';
+      board.myTurn = false;
+    }
     const me = board.allies.find((slot) => slot.isMe) ?? null;
     // Whose list the main tile shows: the clock's seat or a seat the user clicked (TurnTracker).
     const target = frame.target ? board.allies.find((slot) => slot.cellId === frame.target!.cellId) ?? null : null;
