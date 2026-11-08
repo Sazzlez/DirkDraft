@@ -3,6 +3,11 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
+## 2.1.0 — unveröffentlicht
+
+- Nach einem Update zeigt auch die Taskleiste das neue Icon. Bisher blieb dort das alte aus 1.x
+  stehen, weil Windows es für denselben Programmpfad zwischenspeichert.
+
 ## 2.0.0 — 2026-11-07
 
 DirkDraft ist neu gebaut: neues Fenster, eigene Zahlen statt OP.GG, eine Spielansicht aus dem

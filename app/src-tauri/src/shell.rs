@@ -334,6 +334,14 @@ fn legacy_place(settings: &Settings) -> Option<(f64, f64, Option<(f64, f64)>)> {
     Some((settings.number("windowLeft")?, settings.number("windowTop")?, width.zip(height)))
 }
 
+/// Tells Explorer that icons changed, so the taskbar and the shortcuts read the exe's icon again —
+/// the notification installers send, harmless. Run once after each update (main.rs).
+#[cfg(windows)]
+pub fn icons_changed() {
+    use windows_sys::Win32::UI::Shell::{SHChangeNotify, SHCNE_ASSOCCHANGED, SHCNF_IDLIST};
+    unsafe { SHChangeNotify(SHCNE_ASSOCCHANGED as i32, SHCNF_IDLIST, std::ptr::null(), std::ptr::null()) };
+}
+
 /// Mica exists from Windows 11 (build 22000). On Windows 10 the effect silently does nothing and a
 /// transparent window would show the raw desktop, so it stays opaque there. Acrylic would work on
 /// 10, but lags behind the mouse while the window is dragged or resized.

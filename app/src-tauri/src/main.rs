@@ -17,7 +17,14 @@ fn main() {
     // First, before anything else: Velopack starts the exe with its own arguments when it installs,
     // updates or removes the app, and expects it to do that job and exit. Not installed (dev), it
     // returns at once.
-    velopack::VelopackApp::build().run();
+    let mut velopack = velopack::VelopackApp::build();
+    // After an update the exe sits at the same path with another icon, and Explorer kept showing the
+    // old one in the taskbar (1.5 → 2.0, 08.11.2026) until told that icons changed.
+    #[cfg(windows)]
+    {
+        velopack = velopack.on_after_update_fast_callback(|_| shell::icons_changed());
+    }
+    velopack.run();
 
     logfile::init();
     shell::run();
