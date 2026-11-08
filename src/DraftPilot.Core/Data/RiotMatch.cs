@@ -174,13 +174,62 @@ public static class RiotMatchReader
     /// </summary>
     public static int? MasteryPoints(string masteryJson)
     {
-        using var document = JsonDocument.Parse(masteryJson);
-        return document.RootElement.ValueKind == JsonValueKind.Object
+        using var document = TryParse(masteryJson);
+        return document is not null
+            && document.RootElement.ValueKind == JsonValueKind.Object
             && document.RootElement.TryGetProperty("championPoints", out var points)
             && points.TryGetInt64(out var value)
                 ? (int)Math.Clamp(value, 0, int.MaxValue)
                 : null;
     }
+
+    /// <summary>
+    /// A Riot answer as a document, or null when it is missing or not valid JSON. Riot (or the way
+    /// there) now and then delivers a body cut short — one lost answer, never the end of a run.
+    /// </summary>
+    public static JsonDocument? TryParse(string? json)
+    {
+        if (json is null)
+            return null;
+        try
+        {
+            return JsonDocument.Parse(json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>As <see cref="ReadHeader"/>, or null for an answer that is not a readable match.</summary>
+    public static (string Patch, long CreatedAtMs, int QueueId, bool Counts)? TryReadHeader(string matchJson)
+    {
+        try
+        {
+            return ReadHeader(matchJson);
+        }
+        catch (Exception ex) when (Unreadable(ex))
+        {
+            return null;
+        }
+    }
+
+    /// <summary>As <see cref="Read"/>, or null when the match or its timeline cannot be read.</summary>
+    public static MatchReading? TryRead(string matchJson, string timelineJson, ItemCatalog items)
+    {
+        try
+        {
+            return Read(matchJson, timelineJson, items);
+        }
+        catch (Exception ex) when (Unreadable(ex))
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Not valid JSON, or valid JSON in a shape a match never has.</summary>
+    private static bool Unreadable(Exception ex)
+        => ex is JsonException or KeyNotFoundException or InvalidOperationException or FormatException;
 
     /// <summary>Reads the match alone, enough to decide whether its timeline is worth a request.</summary>
     public static (string Patch, long CreatedAtMs, int QueueId, bool Counts) ReadHeader(string matchJson)

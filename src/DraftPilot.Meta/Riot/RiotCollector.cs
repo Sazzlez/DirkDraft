@@ -321,7 +321,13 @@ public sealed class RiotCollector(
                     if (matchJson is null)
                         continue;
 
-                    var header = RiotMatchReader.ReadHeader(matchJson);
+                    // A body cut short on the way is one game less, never the end of the run.
+                    if (RiotMatchReader.TryReadHeader(matchJson) is not { } header)
+                    {
+                        skipped++;
+                        continue;
+                    }
+
                     if (header.Patch != patch)
                     {
                         // An older game tells us the patch began after it; the next match lists
@@ -346,8 +352,8 @@ public sealed class RiotCollector(
                         continue;
                     }
 
-                    var reading = RiotMatchReader.Read(matchJson, timelineJson, items);
-                    if (reading.Participants.Count != 10)
+                    var reading = RiotMatchReader.TryRead(matchJson, timelineJson, items);
+                    if (reading is null || reading.Participants.Count != 10)
                     {
                         skipped++;
                         continue;
@@ -431,7 +437,10 @@ public sealed class RiotCollector(
             $"/lol/league/v4/entries/RANKED_SOLO_5x5/{tier.ToUpperInvariant()}/{division}?page={page}",
             ct).ConfigureAwait(false);
 
-        using var document = json is null ? null : JsonDocument.Parse(json);
+        using var document = RiotMatchReader.TryParse(json);
+        if (json is not null && document is null)
+            return [];   // unreadable: another page next time, the bound stays
+
         if (document is null || document.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.GetArrayLength() == 0)
         {
             _pages[key] = Math.Max(1, page - 1);
@@ -458,10 +467,10 @@ public sealed class RiotCollector(
             $"/lol/match/v5/matches/by-puuid/{Uri.EscapeDataString(puuid)}/ids?queue={RiotMatchReader.RankedSoloQueue}&type=ranked&startTime={since.ToUnixTimeSeconds()}&count={options.MatchesPerPlayer}",
             ct).ConfigureAwait(false);
 
-        if (json is null)
+        using var document = RiotMatchReader.TryParse(json);
+        if (document is null)
             return [];
 
-        using var document = JsonDocument.Parse(json);
         return document.RootElement.ValueKind == JsonValueKind.Array
             ? [.. document.RootElement.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.String).Select(e => e.GetString() ?? string.Empty)]
             : [];

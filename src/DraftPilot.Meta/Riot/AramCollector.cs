@@ -165,7 +165,13 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
                 if (matchJson is null)
                     continue;
 
-                var header = RiotMatchReader.ReadHeader(matchJson);
+                // A body cut short on the way is one game less, never the end of the run.
+                if (RiotMatchReader.TryReadHeader(matchJson) is not { } header)
+                {
+                    skipped++;
+                    continue;
+                }
+
                 if (header.Patch != patch)
                 {
                     if (PatchVersion.PatchesBetween(header.Patch, patch) > 0)
@@ -187,8 +193,8 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
                     continue;
                 }
 
-                var reading = RiotMatchReader.Read(matchJson, timelineJson, items);
-                if (reading.Participants.Count != 10)
+                var reading = RiotMatchReader.TryRead(matchJson, timelineJson, items);
+                if (reading is null || reading.Participants.Count != 10)
                 {
                     skipped++;
                     continue;
@@ -229,14 +235,16 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
         if (json is null)
             return result;
 
-        using var document = JsonDocument.Parse(json);
+        using var document = RiotMatchReader.TryParse(json);
+        if (document is null || document.RootElement.ValueKind != JsonValueKind.Array)
+            return result;
         foreach (var id in document.RootElement.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.String).Select(e => e.GetString() ?? string.Empty))
         {
             var match = await api.GetAsync(options.Region, $"/lol/match/v5/matches/{id}", ct).ConfigureAwait(false);
             if (match is null)
                 continue;
-            var queue = RiotMatchReader.ReadHeader(match).QueueId;
-            result[queue] = result.GetValueOrDefault(queue) + 1;
+            if (RiotMatchReader.TryReadHeader(match) is { } header)
+                result[header.QueueId] = result.GetValueOrDefault(header.QueueId) + 1;
         }
 
         return result;
@@ -254,11 +262,8 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
             options.Region,
             $"/riot/account/v1/accounts/by-riot-id/{Uri.EscapeDataString(name)}/{Uri.EscapeDataString(tag)}",
             ct).ConfigureAwait(false);
-        if (json is null)
-            return null;
-
-        using var document = JsonDocument.Parse(json);
-        return document.RootElement.TryGetProperty("puuid", out var puuid) && puuid.ValueKind == JsonValueKind.String ? puuid.GetString() : null;
+        using var document = RiotMatchReader.TryParse(json);
+        return document is not null && document.RootElement.ValueKind == JsonValueKind.Object && document.RootElement.TryGetProperty("puuid", out var puuid) && puuid.ValueKind == JsonValueKind.String ? puuid.GetString() : null;
     }
 
     /// <summary>Active players from one random page of a league list, a few of them, shuffled.</summary>
@@ -273,7 +278,10 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
             $"/lol/league/v4/entries/RANKED_SOLO_5x5/{tier.ToUpperInvariant()}/{division}?page={page}",
             ct).ConfigureAwait(false);
 
-        using var document = json is null ? null : JsonDocument.Parse(json);
+        using var document = RiotMatchReader.TryParse(json);
+        if (json is not null && document is null)
+            return [];   // unreadable: another page next time, the bound stays
+
         if (document is null || document.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.GetArrayLength() == 0)
         {
             // Past the last page: the next draw stays below this one.
@@ -301,10 +309,8 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
                 options.Region,
                 $"/lol/match/v5/matches/by-puuid/{Uri.EscapeDataString(puuid)}/ids?queue={queue}&startTime={since.ToUnixTimeSeconds()}&count={options.MatchesPerPlayer}",
                 ct).ConfigureAwait(false);
-            if (json is null)
-                continue;
-            using var document = JsonDocument.Parse(json);
-            if (document.RootElement.ValueKind == JsonValueKind.Array)
+            using var document = RiotMatchReader.TryParse(json);
+            if (document is not null && document.RootElement.ValueKind == JsonValueKind.Array)
                 ids.AddRange(document.RootElement.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.String).Select(e => e.GetString() ?? string.Empty));
         }
 

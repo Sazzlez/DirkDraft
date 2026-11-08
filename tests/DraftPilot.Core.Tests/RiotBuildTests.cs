@@ -241,7 +241,9 @@ public class RiotBuildTests
             {
                 _ when path.StartsWith("/lol/league/v4/entries/", StringComparison.Ordinal)
                     => Ok("""[{"puuid":"p1","wins":30,"losses":30,"inactive":false},{"puuid":"p2","wins":1,"losses":1,"inactive":false}]"""),
-                "/lol/match/v5/matches/by-puuid/p1/ids" => Ok("""["EUW1_100","EUW1_200","EUW1_100"]"""),
+                "/lol/match/v5/matches/by-puuid/p1/ids" => Ok("""["EUW1_100","EUW1_200","EUW1_100","EUW1_400"]"""),
+                // A body cut short on the way (as Riot delivered once on 08.11.): skipped, the run goes on.
+                "/lol/match/v5/matches/EUW1_400" => Ok(current[..^40]),
                 // The players of p1's game are leads; their game is counted, its players are not.
                 "/lol/match/v5/matches/by-puuid/q2/ids" => Ok("""["EUW1_300"]"""),
                 _ when path.EndsWith("/ids", StringComparison.Ordinal) => Ok("[]"),
@@ -269,6 +271,7 @@ public class RiotBuildTests
         Assert.Contains(100L, state.Seen);
         Assert.Contains(200L, state.Seen);
         Assert.Contains(300L, state.Seen);
+        Assert.Contains(400L, state.Seen);                     // looked at once, unreadable, not asked again
         Assert.True(state.OldPatchLatestMs > 0);               // the 16.16 game marks where 16.22 began
         Assert.True(saves >= 1);
         Assert.Equal(10, state.Tally.Builds.Count);
@@ -331,6 +334,19 @@ public class RiotBuildTests
         state.StartPatch("16.22", "na1");
         Assert.Empty(state.OlderGames);
         Assert.Null(state.Previous);
+    }
+
+    [Fact]
+    public void UnreadableAnswers_AreNullNotAnException()
+    {
+        Assert.Null(RiotMatchReader.TryParse("""{"info": {"gameDuration": 1"""));
+        Assert.Null(RiotMatchReader.TryParse(null));
+        Assert.Null(RiotMatchReader.TryReadHeader(Match[..^40]));
+        Assert.Null(RiotMatchReader.TryReadHeader("""{"metadata": {}}"""));   // valid JSON, no match
+        Assert.NotNull(RiotMatchReader.TryReadHeader(Match));
+        Assert.Null(RiotMatchReader.TryRead(Match, Timeline[..^40], Items));
+        Assert.NotNull(RiotMatchReader.TryRead(Match, Timeline, Items));
+        Assert.Null(RiotMatchReader.MasteryPoints("""{"championPoints": 12"""));
     }
 
     private static HttpResponseMessage Ok(string body, string? appLimit = null)
