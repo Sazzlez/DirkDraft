@@ -23,7 +23,6 @@
       <text x="75" y="80" class="small">Gegner {chance.enemyText}</text>
     </svg>
     <p class="verdict">{chance.verdict}.</p>
-    <p class="note">{chance.note}</p>
   </div>
 </Tile>
 
@@ -75,12 +74,5 @@
     margin: 6px 0 0;
     font-size: 12.5px;
     font-weight: 600;
-  }
-
-  .note {
-    margin: 2px 0 0;
-    font-size: 11px;
-    color: var(--fg3);
-    text-align: center;
   }
 </style>

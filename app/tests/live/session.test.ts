@@ -72,18 +72,6 @@ describe('LiveSession', () => {
     expect(live.view().board).toBeNull();
   });
 
-  it('counts the clock down between session events', () => {
-    const live = new LiveSession();
-    live.setData(data);
-    live.onStatus(connected);
-    live.onPhase('ChampSelect');
-    const last = sessions('live-tournament-draft').filter((r) => r.session).at(-1)!.session!;
-    const session = { ...last, timer: { adjustedTimeLeftInPhase: 20_000 } };
-    live.onSession(session, 1_000);
-    expect(live.view(1_000).board?.seconds).toBe(20);
-    expect(live.view(6_000).board?.seconds).toBe(15);
-  });
-
   it('keeps the matchup on screen through the loading screen', () => {
     const live = new LiveSession();
     live.setData(data);
@@ -95,7 +83,6 @@ describe('LiveSession', () => {
     const view = live.view();
     expect(view.moment).toBe('loading');
     expect(view.main.kind).toBe('matchup');
-    expect(view.board?.seconds).toBeNull();
     live.onPhase('Lobby');
     expect(live.view().board).toBeNull();
   });
@@ -195,18 +182,35 @@ describe('LiveSession', () => {
     live.setData(data);
     live.onStatus(connected);
     live.onPhase('ChampSelect');
-    const last = sessions('build-demo').filter((r) => r.session).at(-1)!.session!;
-    live.onSession(last);
+    // Ranked, own pick locked, two teammates still choosing.
+    const open = sessions('live-ranked').filter((r) => r.session)[40]!.session!;
+    live.onSession(open);
     const before = live.view();
-    // Locked already: the own matchup leads until a click asks for a teammate.
-    expect(before.moment).toBe('locked');
-    const mate = before.board!.allies.find((s) => !s.isMe && s.canTarget && !s.isTarget)!;
+    const mate = before.board!.allies.find((s) => !s.isMe && s.canTarget && !s.isTarget && (!s.champion || s.hovering))!;
     live.selectSeat(mate.cellId);
     const after = live.view();
     expect(after.board!.allies.find((s) => s.cellId === mate.cellId)!.isTarget).toBe(true);
     if (after.main.kind !== 'picks') throw new Error(after.main.kind);
     expect(after.main.tile.title.startsWith(`Picks für ${mate.label}`)).toBe(true);
     expect(after.main.tile.hover).toBeNull();
+  });
+
+  it('a click on a teammate who has locked in shows his matchup, without a build to import', () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    live.onSession(sessions('live-ranked').filter((r) => r.session)[40]!.session!);
+    const mate = live.view().board!.allies.find((s) => !s.isMe && s.canTarget && s.champion && !s.hovering && s.lane)!;
+    live.selectSeat(mate.cellId);
+    const view = live.view();
+    if (view.main.kind !== 'matchup') throw new Error(view.main.kind);
+    expect(view.main.matchup.title).toBe(`Matchup von ${mate.label}`);
+    expect(view.main.matchup.mine).toBe(false);
+    expect(view.main.matchup.me.id).toBe(mate.champion!.id);
+    expect(view.main.matchup.lane).toBe(mate.lane);
+    expect(view.main.matchup.verdict).not.toMatch(/dich/);
+    expect(view.main.build).toBeNull();
   });
 
   it('a lane set by hand holds and goes back to the prediction on "automatisch"', () => {

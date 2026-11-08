@@ -1,4 +1,4 @@
-// A plan from DirkDraft's own build counts (core/riotBuilds) as the build area shows it.
+// A plan from DirkDraft's own build counts (core/riotBuilds) as the matchup, ARAM and game tiles show it.
 
 import { sampleText } from '../core/format';
 import { laneKey } from '../core/model/lane';
@@ -20,8 +20,6 @@ export function aramBuild(plan: RiotBuildPlan, champion: ChampionRef, mayhem: bo
   return {
     ...buildFromRiot(plan, champion, null),
     lane: null,
-    title: champion.name,
-    source: `ARAM-Build · ${sampleText(plan.winRate, plan.games)}`,
     caveat: mayhem ? 'Aus normalem ARAM gezählt — Mayhem-Spiele gibt Riot nicht heraus, Augments verändern den Build.' : null,
   };
 }
@@ -35,8 +33,6 @@ export function buildFromRiot(plan: RiotBuildPlan, champion: ChampionRef, oppone
   return {
     champion,
     lane,
-    title: opponent ? `${champion.name} vs ${opponent.name}` : `${champion.name} · ${where}`,
-    source: `Unser Build · ${where} · ${sampleText(plan.winRate, plan.games)}`,
     caveat: asked
       ? `Auf ${LANE_NAMES[asked]} noch keine Spiele gezählt — Build von ${where}`
       : opponent
@@ -58,12 +54,7 @@ export function buildFromRiot(plan: RiotBuildPlan, champion: ChampionRef, oppone
     start: option(plan.starters[0]),
     boots: option(plan.boots[0]),
     core: option(plan.core[0]),
-    late: plan.late.flatMap((o) => o.ids.map((id) => ({ id, name: itemName(id) }))),
     support: option(plan.supportOptions[0] ?? plan.supportChoice ?? undefined),
-    alsoSupport: plan.supportOptions.slice(1).map((o) => option(o)!),
-    alsoStart: plan.starters.slice(1).map((o) => option(o)!),
-    alsoBoots: plan.boots.slice(1).map((o) => option(o)!),
-    alsoCore: plan.core.slice(1).map((o) => option(o)!),
     skills: extendSkills(plan.skillOrder.split('')).map((s) => ({ level: s.level, key: s.ability, derived: s.isDerived })),
     skillPriority: plan.skillMax.split('').join(' > '),
   };

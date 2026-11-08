@@ -22,15 +22,15 @@ Was sich geändert hat, steht in `CHANGELOG.md`.
 
 ## Was es zeigt
 
-Oben drei Bereiche, die von selbst wechseln (ein Klick hält bis zum nächsten Moment):
+Oben zwei Bereiche, die von selbst wechseln (ein Klick hält bis zum nächsten Moment):
 
-- **Draft** — das Board mit beiden Teams, geschätzten Lanes und der Uhr; darunter die Vorschläge
+- **Draft** — das Board mit beiden Teams, geschätzten Lanes und wer dran ist; darunter die Vorschläge
   für den Platz, der gerade dran ist, mit Begründung und Fehlerbalken („Vorne gleichauf"), deinem
   Hover, Banns, Draft-Chance und Comp-Vergleich. Nach dem Lock: dein Matchup mit Build und dem Knopf
-  **„Runen und Zauber übernehmen"**. In ARAM und Mayhem: „Behalten oder tauschen?" für deine Bank.
-- **Build** — Runen, Zauber, Start, Schuhe, Kern, spätere Items und die Skill-Reihenfolge bis 18.
+  **„Runen und Zauber übernehmen"**; ein Klick auf einen gelockten Teammate zeigt sein Matchup.
+  In ARAM und Mayhem: „Behalten oder tauschen?" für deine Bank.
 - **Spiel** — nächster Kauf gegen dein Gold, Build-Pfad, nächster Skillpunkt, Gegner-Items mit
-  Schadensart und „Für dieses Spiel": bis zu drei Items, die gegen genau diese Gegner deutlich öfter
+  Schadensart und „Situative Items": bis zu drei Items, die gegen genau diese Gegner deutlich öfter
   gekauft werden, als Alternative neben dem Build.
 
 Das Fenster passt sich der Breite an: breit ab 1.100 Pixeln, mittel ab 720, schmal ab 340 — schmal

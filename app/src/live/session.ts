@@ -229,9 +229,7 @@ export class LiveSession {
       };
     }
 
-    const clock = active ? this.clock(now) : null;
-    const board = this.adapter.board(frame, clock?.left ?? null);
-    board.total = clock?.total ?? null;
+    const board = this.adapter.board(frame);
     // The draft's own order (tournament, ranked/draft, blind); after the session, every step is done.
     board.steps = frame.state.usesLanes ? draftSteps(active ? this.session : this.lastSession, !active) : [];
     if (active && frame.state.phase !== 'planning') board.turnText = simultaneousTurn(this.session) ?? board.turnText;
@@ -279,6 +277,12 @@ export class LiveSession {
     } else if (moment === 'locked' || moment === 'loading') {
       main = myChampion ? { kind: 'matchup', matchup: this.adapter.matchup(frame, myChampion, lane ?? 'top'), build } : { kind: 'none' };
       side.push({ kind: 'verdict', lines: this.adapter.verdictLines(frame) });
+      side.push({ kind: 'chance', chance: this.adapter.chance(frame) });
+      side.push({ kind: 'comp', comp: this.adapter.comp(frame) });
+    } else if (target && !target.isMe && target.champion && !target.hovering && target.lane) {
+      // A teammate who has locked in: his lane duel, like the own after the lock. No build — the
+      // import button would write his runes into the own client.
+      main = { kind: 'matchup', matchup: this.adapter.matchup(frame, target.champion, target.lane, target.label), build: null };
       side.push({ kind: 'chance', chance: this.adapter.chance(frame) });
       side.push({ kind: 'comp', comp: this.adapter.comp(frame) });
     } else if (moment === 'banning' && frame.bans) {
@@ -339,7 +343,7 @@ export class LiveSession {
     // Spells exist only in champion select, and the page is named after this draft's matchup.
     const frame = this.frame?.state.isActive ? this.frame : null;
     if (!frame) return 'Übernehmen geht nur im Champ Select.';
-    const board = this.adapter.board(frame, null);
+    const board = this.adapter.board(frame);
     const me = board.allies.find((slot) => slot.isMe);
     if (!me?.champion) return 'Erst einen Champion hovern oder locken.';
     const lane = me.lane ? laneFromKey(me.lane) : Lane.Unknown;
@@ -405,15 +409,6 @@ export class LiveSession {
     return lines;
   }
 
-  /** Seconds left in the current champion select step, counted down from the session's timer. */
-  private clock(now: number): { left: number; total: number | null } | null {
-    const timer = this.session?.timer as { adjustedTimeLeftInPhase?: number; totalTimeInPhase?: number } | undefined;
-    const left = timer?.adjustedTimeLeftInPhase;
-    if (typeof left !== 'number' || left <= 0) return null;
-    const total = typeof timer?.totalTimeInPhase === 'number' && timer.totalTimeInPhase > 0 ? Math.round(timer.totalTimeInPhase / 1000) : null;
-    return { left: Math.max(0, Math.round((left - (now - this.sessionAt)) / 1000)), total };
-  }
-
   private currentSpells(): [number, number] {
     const s = this.session;
     const cell = s?.localPlayerCellId;
@@ -425,7 +420,7 @@ export class LiveSession {
   private rememberPick(): void {
     const frame = this.frame;
     if (!frame) return;
-    const board = this.adapter.board(frame, null);
+    const board = this.adapter.board(frame);
     const me = board.allies.find((slot) => slot.isMe);
     const locked = frame.state.allies.find((slot) => slot.cellId === frame.state.localCellId)?.lockedChampionId ?? 0;
     if (!me || !locked) return;

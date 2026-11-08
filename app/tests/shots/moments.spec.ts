@@ -2,13 +2,13 @@ import { test } from '@playwright/test';
 
 // One image per scene and area. Written to screenshots/ (not committed), named
 // <scene>-<area>-<width>-<theme>.png so a folder listing reads like a contact sheet.
-const shots: { scene: string; area?: 'build' | 'game'; settings?: boolean }[] = [
+const shots: { scene: string; area?: 'game'; settings?: boolean }[] = [
   { scene: 'lobby' },
   { scene: 'planning' },
   { scene: 'banning' },
   { scene: 'picking' },
-  { scene: 'picking', area: 'build' },
   { scene: 'teammate' },
+  { scene: 'mate' },
   { scene: 'locked' },
   { scene: 'loading' },
   { scene: 'aram' },
@@ -26,7 +26,7 @@ for (const shot of shots) {
     await page.waitForSelector(`body[data-ready="${shot.scene}"]`);
 
     if (shot.area) {
-      await page.getByRole('tab', { name: shot.area === 'build' ? 'Build' : 'Spiel' }).first().click();
+      await page.getByRole('tab', { name: 'Spiel' }).first().click();
     }
     if (shot.settings) {
       // Narrow: the gear lives in the menu.

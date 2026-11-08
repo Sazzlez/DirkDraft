@@ -5,7 +5,6 @@
   import TitleBar from './TitleBar.svelte';
   import Segment from './Segment.svelte';
   import DraftArea from './draft/DraftArea.svelte';
-  import BuildArea from './build/BuildArea.svelte';
   import GameArea from './game/GameArea.svelte';
   import EmptyState from './EmptyState.svelte';
   import Settings from './Settings.svelte';
@@ -56,12 +55,6 @@
             <DraftArea {view} />
           {:else}
             <EmptyState title={view.emptyTitle ?? 'Kein Draft'} text={view.emptyText ?? 'Sobald ein Champ Select beginnt, steht hier das Board.'} />
-          {/if}
-        {:else if area === 'build'}
-          {#if view.build}
-            <BuildArea build={view.build} canImport={view.canImport} />
-          {:else}
-            <EmptyState title="Noch kein Build" text="Sobald du einen Champion hoverst oder lockst, steht hier sein Build." />
           {/if}
         {:else if view.game}
           <GameArea game={view.game} build={view.build} />

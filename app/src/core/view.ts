@@ -26,11 +26,10 @@ export type Moment =
   | 'aramBench'
   | 'game';
 
-export type Area = 'draft' | 'build' | 'game';
+export type Area = 'draft' | 'game';
 
 export const AREAS: { id: Area; label: string }[] = [
   { id: 'draft', label: 'Draft' },
-  { id: 'build', label: 'Build' },
   { id: 'game', label: 'Spiel' },
 ];
 
@@ -91,10 +90,6 @@ export interface BoardView {
   enemies: SlotView[];
   allyBans: ChampionRef[];
   enemyBans: ChampionRef[];
-  /** Seconds left in the current step; null when the client sends none. */
-  seconds: number | null;
-  /** The step's full length in seconds, for the ring; null: 30 s, a ranked pick. */
-  total: number | null;
   /** "Du pickst", "Teammate 3 pickt", "Gegner bannen", "Finalisierung". */
   turnText: string;
   myTurn: boolean;
@@ -168,7 +163,6 @@ export interface DraftChanceView {
   allyText: string;
   enemyText: string;
   verdict: string;
-  note: string;
 }
 
 export interface CompRow {
@@ -187,6 +181,10 @@ export interface CompView {
 }
 
 export interface MatchupView {
+  /** "Dein Matchup", or "Matchup von Teammate 2" for a teammate who has locked in. */
+  title: string;
+  /** The own seat (ring around the portrait). */
+  mine: boolean;
   me: ChampionRef;
   opponent: ChampionRef | null;
   lane: Lane;
@@ -227,22 +225,14 @@ export interface RunePageView {
 export interface BuildView {
   champion: ChampionRef;
   lane: Lane | null;
-  title: string;
-  source: string;
   caveat: string | null;
   runes: RunePageView | null;
   spells: number[];
   start: ItemOption | null;
   boots: ItemOption | null;
   core: ItemOption | null;
-  late: ItemRef[];
   /** The support item upgrade to pick when the quest is done (supports only). */
   support: ItemOption | null;
-  /** The other upgrades worth showing (20+ games). */
-  alsoSupport: ItemOption[];
-  alsoStart: ItemOption[];
-  alsoBoots: ItemOption[];
-  alsoCore: ItemOption[];
   skills: { level: number; key: 'Q' | 'W' | 'E' | 'R'; derived: boolean }[];
   skillPriority: string;
 }

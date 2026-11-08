@@ -40,7 +40,7 @@ describe('momentOf', () => {
 
 describe('nextArea', () => {
   it('keeps a manual choice until the moment changes', () => {
-    expect(nextArea('picking', 'picking', 'build', 'draft')).toEqual({ area: 'build', manual: 'build' });
-    expect(nextArea('picking', 'game', 'build', 'game')).toEqual({ area: 'game', manual: null });
+    expect(nextArea('picking', 'picking', 'game', 'draft')).toEqual({ area: 'game', manual: 'game' });
+    expect(nextArea('picking', 'game', 'draft', 'game')).toEqual({ area: 'game', manual: null });
   });
 });

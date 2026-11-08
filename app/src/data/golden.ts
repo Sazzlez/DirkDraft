@@ -166,7 +166,7 @@ export class GoldenAdapter {
     return momentOf(this.facts(frame), 'ChampSelect');
   }
 
-  board(frame: GoldenFrame, seconds: number | null): BoardView {
+  board(frame: GoldenFrame): BoardView {
     const s = frame.state;
     const predicted = new Map([...frame.predictions.allies, ...frame.predictions.enemies].map((p) => [p.cellId, p]));
     const unavailable = new Set(s.unavailable);
@@ -226,8 +226,6 @@ export class GoldenAdapter {
       enemies: s.enemies.map(slot),
       allyBans: s.allyBans.map((id) => this.champion(id)).filter((c): c is ChampionRef => !!c),
       enemyBans: s.enemyBans.map((id) => this.champion(id)).filter((c): c is ChampionRef => !!c),
-      seconds,
-      total: null,
       turnText,
       myTurn: !planning && !!turn?.isLocalPlayer,
       // ARAM has no bans and no pick order to walk through — only the timer.
@@ -311,7 +309,7 @@ export class GoldenAdapter {
   chance(frame: GoldenFrame): DraftChanceView {
     const b = frame.balance;
     if (!b.hasData) {
-      return { ally: null, allyText: '—', enemyText: '—', verdict: 'Noch nicht vergleichbar', note: 'Erst wenn beide Seiten etwas aufgedeckt haben.' };
+      return { ally: null, allyText: '—', enemyText: '—', verdict: 'Noch nicht vergleichbar' };
     }
     const gap = Math.abs(b.allyWinRate - 0.5) * 100;
     return {
@@ -319,7 +317,6 @@ export class GoldenAdapter {
       allyText: percent(b.allyWinRate, 1),
       enemyText: percent(1 - b.allyWinRate, 1),
       verdict: gap < 1 ? 'Ausgeglichen' : b.allyWinRate > 0.5 ? 'Ihr liegt vorn' : 'Der Gegner liegt vorn',
-      note: 'Unter einem Punkt Abstand ist das Rauschen.',
     };
   }
 
@@ -342,18 +339,22 @@ export class GoldenAdapter {
     };
   }
 
-  matchup(frame: GoldenFrame, me: ChampionRef, lane: Lane): MatchupView {
+  /** The lane duel of the own seat, or of a teammate's (`seat`: his label) once he has locked in. */
+  matchup(frame: GoldenFrame, me: ChampionRef, lane: Lane, seat: string | null = null): MatchupView {
     const duel = frame.laneMatchups.find((m) => m.lane === lane);
     const opponent = duel ? this.champion(duel.enemyId) : null;
     const rate = duel?.winRate ?? null;
     const measured = typeof duel?.measured === 'number' ? duel.measured : null;
+    const whom = seat === null ? 'dich' : me.name;
     return {
+      title: seat === null ? 'Dein Matchup' : `Matchup von ${seat}`,
+      mine: seat === null,
       me,
       opponent,
       lane,
       value: rate === null ? null : percent(rate, 1),
       sample: duel && duel.play > 0 ? `gemessen ${measured === null ? '—' : percent(measured, 1)} in ${count(duel.play)} Spielen` : 'keine Statistik für dieses Matchup',
-      verdict: rate === null ? '—' : Math.abs(rate - 0.5) < 0.01 ? 'ausgeglichen' : rate > 0.5 ? 'läuft für dich' : 'läuft gegen dich',
+      verdict: rate === null ? '—' : Math.abs(rate - 0.5) < 0.01 ? 'ausgeglichen' : rate > 0.5 ? `läuft für ${whom}` : `läuft gegen ${whom}`,
       tone: rate === null ? 'neutral' : rate > 0.51 ? 'good' : rate < 0.49 ? 'bad' : 'neutral',
     };
   }
@@ -482,18 +483,12 @@ export interface GoldenPlan {
 const option = (set: PlanSet | undefined): ItemOption | null =>
   set ? { items: set.itemIds.map((id) => ({ id, name: itemName(id) })), stats: sampleText(set.winRate, set.play) } : null;
 
-/** Alternatives from 20 games on, the rate from 50 (GameBuildViewModel.MinimumAlternativePlay). */
-const alternatives = (sets: PlanSet[]): ItemOption[] =>
-  sets.slice(1).filter((set) => set.play >= 20).map((set) => option(set)!);
-
-export function buildFromPlan(plan: GoldenPlan, champion: ChampionRef, opponent: ChampionRef | null): BuildView {
+export function buildFromPlan(plan: GoldenPlan, champion: ChampionRef): BuildView {
   const lane = toLane(plan.lane);
   const runes = plan.runes;
   return {
     champion,
     lane,
-    title: opponent ? `${champion.name} vs ${opponent.name}` : `${champion.name} · ${lane ? LANE_NAMES[lane] : ''}`,
-    source: opponent ? 'Matchup-Build' : 'Bester Build der Lane',
     caveat: null,
     runes: runes
       ? {
@@ -510,12 +505,7 @@ export function buildFromPlan(plan: GoldenPlan, champion: ChampionRef, opponent:
     start: option(plan.starters[0]),
     boots: option(plan.boots[0]),
     core: option(plan.coreItems[0]),
-    late: plan.lateItems.flatMap((set) => set.itemIds.map((id) => ({ id, name: itemName(id) }))),
     support: null,
-    alsoSupport: [],
-    alsoStart: alternatives(plan.starters),
-    alsoBoots: alternatives(plan.boots),
-    alsoCore: alternatives(plan.coreItems),
     skills: extendSkills(plan.skillOrder).map((s) => ({ level: s.level, key: s.ability, derived: s.isDerived })),
     skillPriority: plan.skillPriority,
   };

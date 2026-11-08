@@ -38,7 +38,7 @@ Die Zeilen liegen im
 Bestand (der laufende Patch und die zwei davor; ein Wechsel der Region verwirft sie) und als Artefakt `games` jedes Laufs (`games.json.gz`, eine Woche
 aufbewahrt, nie veröffentlicht). Herunterladen: `gh run download <Lauf> -n games`.
 
-**Situative Items** (Spielansicht, Kachel „Für dieses Spiel“): nur gemessen, keine Faustregeln.
+**Situative Items** (Spielansicht, gleichnamige Kachel): nur gemessen, keine Faustregeln.
 
 - *Lagen:* viel physischer bzw. magischer Schaden, 2+ Tanks, 3+ mit harter Kontrolle (aus den
   gegnerischen Champions) und — zum Zeitpunkt jedes Kaufs — Gegner mit ≥ 150 Rüstung bzw. ≥ 120

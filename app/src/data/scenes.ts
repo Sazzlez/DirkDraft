@@ -30,6 +30,7 @@ export const SCENES: Scene[] = [
   { id: 'banning', title: 'Bannen', moment: 'banning' },
   { id: 'picking', title: 'Dein Pick', moment: 'picking' },
   { id: 'teammate', title: 'Teammate am Zug', moment: 'teammate' },
+  { id: 'mate', title: 'Teammate gelockt', moment: 'teammate' },
   { id: 'locked', title: 'Gelockt', moment: 'locked' },
   { id: 'loading', title: 'Finalisierung', moment: 'loading' },
   { id: 'aram', title: 'ARAM-Bank', moment: 'aramBench' },
@@ -149,31 +150,42 @@ export async function sceneView(id: string): Promise<ViewModel> {
 
     case 'planning': {
       const frame = lastActive(s.recordings.get('live-tournament-draft')!, (f) => !!f.hover);
-      return draftScene(a, frame, 'planning', 24, s.plans, 'Planung');
+      return draftScene(a, frame, 'planning', s.plans, 'Planung');
     }
     case 'banning': {
       const frame = lastActive(s.recordings.get('state-myban')!);
-      return draftScene(a, frame, 'banning', 18, s.plans, 'Banns für dich');
+      return draftScene(a, frame, 'banning', s.plans, 'Banns für dich');
     }
     case 'picking': {
       const frame = s.drafts.get('readme-top-vs-jax')!.frame;
-      return draftScene(a, frame, 'picking', 24, s.plans, 'Picks für dich');
+      return draftScene(a, frame, 'picking', s.plans, 'Picks für dich');
     }
     case 'teammate': {
       const frame = lastActive(s.recordings.get('build-demo')!);
-      return draftScene(a, frame, 'teammate', 21, s.plans, 'Picks für Teammate 4');
+      return draftScene(a, frame, 'teammate', s.plans, 'Picks für Teammate 4');
+    }
+    // A click on a teammate who has locked in: his matchup, from the live session itself.
+    case 'mate': {
+      const live = new LiveSession();
+      live.setData({ meta: s.meta.snapshot, builds: null, aram: null, situational: null, fresh: true, changed: false, problems: [] });
+      live.onStatus(CONNECTED_STATUS);
+      live.onPhase('ChampSelect');
+      live.onSession((sessionOf.get(lastActive(s.recordings.get('build-demo')!)) as Record<string, unknown> | undefined) ?? null);
+      const mate = live.view().board?.allies.find((slot) => !slot.isMe && slot.canTarget && slot.champion && !slot.hovering && slot.lane);
+      if (mate) live.selectSeat(mate.cellId);
+      return { ...live.view(), sampleNote: SAMPLE };
     }
     case 'locked': {
       const frame = lastActive(s.recordings.get('state-nachlock')!);
-      return draftScene(a, frame, 'locked', 27, s.plans, 'Dein Matchup');
+      return draftScene(a, frame, 'locked', s.plans, 'Dein Matchup');
     }
     case 'loading': {
       const frame = lastActive(s.recordings.get('state-final')!);
-      return draftScene(a, frame, 'loading', null, s.plans, 'Dein Matchup');
+      return draftScene(a, frame, 'loading', s.plans, 'Dein Matchup');
     }
     case 'aram': {
       const frame = lastActive(s.recordings.get('state-aram-bench')!);
-      const view = draftScene(a, frame, 'aramBench', 41, s.plans, 'Behalten oder tauschen?');
+      const view = draftScene(a, frame, 'aramBench', s.plans, 'Behalten oder tauschen?');
       return view;
     }
     case 'game':
@@ -202,11 +214,10 @@ function draftScene(
   a: GoldenAdapter,
   frame: GoldenFrame,
   moment: Moment,
-  seconds: number | null,
   plans: { matchupGuide: GoldenPlan; laneBuild: GoldenPlan },
   title: string,
 ): ViewModel {
-  const board = a.board(frame, seconds);
+  const board = a.board(frame);
   if (sessionOf.has(frame) && board.usesLanes) board.steps = draftSteps(sessionOf.get(frame));
   const me = board.allies.find((slot) => slot.isMe)!;
   const myChampion = me.champion;
@@ -215,7 +226,6 @@ function draftScene(
   let build: BuildView | null = null;
 
   const darius = a.champion(122)!;
-  const jax = a.champion(24)!;
 
   if (moment === 'aramBench') {
     const aram = a.aram(frame);
@@ -223,7 +233,7 @@ function draftScene(
     side.push({ kind: 'comp', comp: a.comp(frame) });
   } else if (moment === 'locked' || moment === 'loading') {
     const lane = me.lane ?? 'top';
-    build = buildFromPlan(plans.matchupGuide, darius, jax);
+    build = buildFromPlan(plans.matchupGuide, darius);
     main = { kind: 'matchup', matchup: a.matchup(frame, myChampion ?? darius, lane), build };
     side.push({ kind: 'verdict', lines: a.verdictLines(frame) });
     side.push({ kind: 'chance', chance: a.chance(frame) });
@@ -239,8 +249,6 @@ function draftScene(
     main = { kind: 'picks', tile: a.pickTile(set, frame, `${title}${laneName}`) };
     side.push({ kind: 'chance', chance: a.chance(frame) });
     side.push({ kind: 'comp', comp: a.comp(frame) });
-    // Before the own lock, Build shows the hovered champion's build — here the lane build sample.
-    build = buildFromPlan(plans.laneBuild, darius, null);
   }
 
   return {
@@ -287,7 +295,7 @@ function planFromGolden(p: GoldenPlan): RiotBuildPlan {
 
 function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: MetaLookup): ViewModel {
   const darius = ref(a, 122);
-  const build = buildFromPlan(plans.matchupGuide, darius, ref(a, 24));
+  const build = buildFromPlan(plans.matchupGuide, darius);
   const plan = planFromGolden(plans.matchupGuide);
 
   // A sample answer of /liveclientdata/allgamedata at 14:32: boots and the first core item done,

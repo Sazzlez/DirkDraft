@@ -82,7 +82,7 @@
 
   {#if game.situational}
     <div class="situational">
-      <Tile title="Für dieses Spiel" sub="Vorschlag zur aktuellen Lage">
+      <Tile title="Situative Items">
         {#snippet accessory()}<span class="badge">Alternative</span>{/snippet}
         {#each game.situational as s (s.item.id)}
           <div class="alt">
@@ -119,7 +119,7 @@
   {/if}
 
   <div class="enemies">
-    <Tile title="Gegner im Spiel" sub="laut Scoreboard">
+    <Tile title="Gegner">
       {#each game.enemies as enemy (enemy.champion.id)}
         <div class="er">
           <Icon kind="champion" champion={enemy.champion} size={28} />

@@ -9,9 +9,9 @@
   let { matchup, build, canImport }: { matchup: MatchupView; build: BuildView | null; canImport: boolean } = $props();
 </script>
 
-<Tile title="Dein Matchup" sub={LANE_NAMES[matchup.lane]} main>
+<Tile title={matchup.title} sub={LANE_NAMES[matchup.lane]} main>
   <div class="mu">
-    <Icon kind="champion" champion={matchup.me} size={48} ring="me" />
+    <Icon kind="champion" champion={matchup.me} size={48} ring={matchup.mine ? 'me' : null} />
     <span class="vs">vs</span>
     <Icon kind="champion" champion={matchup.opponent} size={48} />
     <span class="names">
@@ -58,7 +58,6 @@
         </span>
       </div>
     </div>
-    <p class="source">{build.source} · Kern {build.core?.stats ?? '—'}</p>
   {/if}
 </Tile>
 
@@ -154,12 +153,6 @@
     font-size: 14px;
     font-weight: 650;
     letter-spacing: 0.04em;
-  }
-
-  .source {
-    margin: 8px 2px 0;
-    font-size: 11px;
-    color: var(--fg3);
   }
 
   @container main (max-width: 469px) {

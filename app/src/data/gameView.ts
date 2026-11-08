@@ -25,11 +25,10 @@ function clock(seconds: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
-/** "3× so oft gekauft wie sonst · Winrate damit 53 % (sonst 51 %) · 1.800 Spiele" */
+/** "Winrate damit 53 % (sonst 51 %) · 1.800 Spiele" */
 export function situationalStats(s: SituationalSuggestion): string {
   const pct = (r: number) => `${Math.round(r * 100)} %`;
-  const times = s.timesMoreOften < 2 ? s.timesMoreOften.toFixed(1).replace('.', ',') : String(Math.round(s.timesMoreOften));
-  return `${times}× so oft gekauft wie sonst · Winrate damit ${pct(s.winRate)} (sonst ${pct(s.otherRate)}) · ${s.games.toLocaleString('de-DE')} Spiele`;
+  return `Winrate damit ${pct(s.winRate)} (sonst ${pct(s.otherRate)}) · ${s.games.toLocaleString('de-DE')} Spiele`;
 }
 
 /**
@@ -59,7 +58,7 @@ export function gameView(
   const hints: GameView['hints'] = [];
   // Mixed champions count half to each side, so the share is said as a share, not as a head count.
   const known = model.enemies.filter((e) => e.damage !== DamageType.Unknown).length;
-  const share = (value: number) => `Etwa ${Math.round(value * 100)} % ihres Schadens ist`;
+  const share = (value: number) => `Etwa ${Math.round(value * 100)} % des Schadens im Gegnerteam ist`;
   if (known >= 3 && model.enemyPhysical >= DAMAGE_HINT_SHARE) {
     hints.push({ title: 'Rüstung lohnt sich', detail: `${share(model.enemyPhysical)} physisch.`, tone: 'info' as Tone });
   } else if (known >= 3 && model.enemyMagic >= DAMAGE_HINT_SHARE) {

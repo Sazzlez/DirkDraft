@@ -63,9 +63,9 @@ export function momentOf(draft: DraftFacts | null, gameflow: GameflowPhase | nul
 export function nextArea(
   previousMoment: Moment | null,
   moment: Moment,
-  manual: 'draft' | 'build' | 'game' | null,
-  automatic: 'draft' | 'build' | 'game',
-): { area: 'draft' | 'build' | 'game'; manual: 'draft' | 'build' | 'game' | null } {
+  manual: 'draft' | 'game' | null,
+  automatic: 'draft' | 'game',
+): { area: 'draft' | 'game'; manual: 'draft' | 'game' | null } {
   if (previousMoment !== moment) return { area: automatic, manual: null };
   return { area: manual ?? automatic, manual };
 }
