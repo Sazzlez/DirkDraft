@@ -116,7 +116,7 @@ internal static class RiotCommand
             {
                 JsonSerializer.Serialize(gzip, gamesFile, RiotGamesJson.Default.RiotGamesFile);
             }
-            Console.WriteLine($"Spiel-Liste: {string.Join(", ", gamesFile.Patches.Select(p => $"{p.Games.Count:N0} Spiele von Patch {p.Patch}"))}, {new FileInfo(gamesPath).Length / 1024:N0} KB → {gamesPath}");
+            Console.WriteLine($"Spiel-Liste: {string.Join(", ", gamesFile.Patches.Select(p => $"{p.Games.Count:N0} Spiele von Patch {p.Patch} ({p.Games.Count(line => line.Length > RiotGames.DraftLength):N0} mit Lanes, {p.Games.Sum(line => RiotGames.Duels(line).Count()):N0} Duelle)"))}, {new FileInfo(gamesPath).Length / 1024:N0} KB → {gamesPath}");
         }
 
         // What players take against each lane opponent, this patch — not published yet (run artifact).

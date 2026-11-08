@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using DraftPilot.Core.Draft;
 
@@ -35,7 +36,8 @@ public sealed record ParticipantBuild(
     long TrueDamage = 0,
     IReadOnlyList<int>? Augments = null,
     IReadOnlyList<long>? ItemTimesMs = null,
-    long BootsTimeMs = 0)
+    long BootsTimeMs = 0,
+    int ParticipantId = 0)
 {
     /// <summary>When each of <see cref="Items"/> was bought, ms into the game; empty without a timeline.</summary>
     public IReadOnlyList<long> ItemTimes => ItemTimesMs ?? [];
@@ -106,6 +108,8 @@ public sealed record ParticipantBuild(
 /// match carries no ban list.
 /// </param>
 /// <param name="DurationSeconds">How long the game ran; 0 when unknown.</param>
+/// <param name="LaneKills">The duels between lane opponents, in order; empty without a timeline.</param>
+/// <param name="MinuteTen">Each player's minute frame at ten minutes (participant id → numbers); null without one.</param>
 public sealed record MatchReading(
     string Patch,
     long CreatedAtMs,
@@ -114,9 +118,13 @@ public sealed record MatchReading(
     IReadOnlyList<ParticipantBuild> Participants,
     IReadOnlyList<int>? Bans = null,
     IReadOnlyDictionary<int, long[]>? TeamGold = null,
-    int DurationSeconds = 0)
+    int DurationSeconds = 0,
+    IReadOnlyList<LaneKill>? LaneKills = null,
+    IReadOnlyDictionary<int, PlayerFrame>? MinuteTen = null)
 {
     public IReadOnlyList<int> BannedChampions => Bans ?? [];
+
+    public IReadOnlyList<LaneKill> Duels => LaneKills ?? [];
 
     /// <summary>
     /// Gold lead over the enemy team at a moment, from the timeline's minute frames (the last frame at
@@ -133,6 +141,24 @@ public sealed record MatchReading(
         return own[minute] - enemy[minute];
     }
 }
+
+/// <summary>A player's numbers in one minute frame of the timeline.</summary>
+public sealed record PlayerFrame(int Level, long TotalGold, long Xp);
+
+/// <summary>
+/// How one player stood at a moment: level, and what the items held are worth and give in armor
+/// and magic resist — what the live game's scoreboard lets anyone work out as well, so the duel
+/// scale can be fed the same numbers in a running game.
+/// </summary>
+public sealed record PlayerMoment(int ParticipantId, int Level, int ItemGold, int Armor, int MagicResist);
+
+/// <summary>
+/// A kill between lane opponents that nobody else took part in, with how every player of that lane
+/// stood at the moment: top, jungle and mid one against one without helpers; on the bot lane among
+/// the four bot players, the killer's partner the only helper allowed. Who won the duel, at which
+/// level and with which items — the duel scale's evidence (docs/lane-vergleich.md).
+/// </summary>
+public sealed record LaneKill(long TimeMs, int KillerId, int VictimId, IReadOnlyList<PlayerMoment> Lane);
 
 /// <summary>
 /// Reads Riot's MATCH-V5 match and timeline answers into <see cref="ParticipantBuild"/>s. The match
@@ -247,6 +273,7 @@ public static class RiotMatchReader
         var (patch, created, queue, counts) = Header(info);
 
         var events = Events(timeline.RootElement);
+        var frames = Frames(timeline.RootElement);
         var participants = new List<ParticipantBuild>();
 
         foreach (var participant in info.GetProperty("participants").EnumerateArray())
@@ -287,10 +314,134 @@ public static class RiotMatchReader
                 TrueDamage: Long(participant, "trueDamageDealtToChampions"),
                 Augments: [.. Enumerable.Range(1, 6).Select(slot => Int(participant, $"playerAugment{slot}")).Where(augment => augment > 0)],
                 ItemTimesMs: [.. finished.Select(p => p.Timestamp)],
-                BootsTimeMs: boots?.Timestamp ?? 0));
+                BootsTimeMs: boots?.Timestamp ?? 0,
+                ParticipantId: id));
         }
 
-        return new MatchReading(patch, created, queue, counts, participants, Bans(info), TeamGold(timeline.RootElement, info), Int(info, "gameDuration"));
+        const int minuteTen = (int)(RiotGames.LaneAtMs / 60_000);
+        return new MatchReading(
+            patch, created, queue, counts, participants, Bans(info), TeamGold(timeline.RootElement, info), Int(info, "gameDuration"),
+            LaneKills(events, participants, frames, items),
+            frames.Count > minuteTen && frames[minuteTen].Count > 0 ? frames[minuteTen] : null);
+    }
+
+    private static bool IsBot(Lane lane) => lane is Lane.Adc or Lane.Support;
+
+    /// <summary>
+    /// The kills between lane opponents nobody else took part in (<see cref="LaneKill"/>). A kill
+    /// with a stranger's help — a gank, a roam, the tower — says nothing about who wins the duel.
+    /// </summary>
+    private static List<LaneKill> LaneKills(List<TimelineEvent> events, List<ParticipantBuild> players, List<Dictionary<int, PlayerFrame>> frames, ItemCatalog items)
+    {
+        var byId = new Dictionary<int, ParticipantBuild>();
+        foreach (var player in players.Where(p => p.ParticipantId > 0))
+            byId.TryAdd(player.ParticipantId, player);
+
+        var kills = new List<LaneKill>();
+        foreach (var kill in events.Where(e => e.Type == "CHAMPION_KILL"))
+        {
+            if (!byId.TryGetValue(kill.KillerId, out var killer) || !byId.TryGetValue(kill.VictimId, out var victim) || killer.TeamId == victim.TeamId)
+                continue;
+
+            List<ParticipantBuild> lane;
+            if (IsBot(killer.Lane) && IsBot(victim.Lane))
+            {
+                var partnerOnly = kill.Assists.All(helper => helper != killer.ParticipantId
+                    && byId.TryGetValue(helper, out var partner) && partner.TeamId == killer.TeamId && IsBot(partner.Lane));
+                if (!partnerOnly)
+                    continue;
+                lane = [.. players.Where(p => p.ParticipantId > 0 && IsBot(p.Lane))];
+            }
+            else if (killer.Lane == victim.Lane && killer.Lane is Lane.Top or Lane.Jungle or Lane.Mid && kill.Assists.Count == 0)
+            {
+                lane = [killer, victim];
+            }
+            else
+            {
+                continue;
+            }
+
+            kills.Add(new LaneKill(kill.Timestamp, killer.ParticipantId, victim.ParticipantId,
+                [.. lane.OrderBy(p => p.ParticipantId).Select(p => Moment(p.ParticipantId, kill.Timestamp, events, frames, items))]));
+        }
+
+        return kills;
+    }
+
+    /// <summary>
+    /// A player's level and inventory at a moment, replayed from the timeline: the level from the
+    /// last minute frame and the level-ups since, the items from purchases, sales, items used up or
+    /// built into something else, and undos.
+    /// </summary>
+    private static PlayerMoment Moment(int id, long timeMs, List<TimelineEvent> events, List<Dictionary<int, PlayerFrame>> frames, ItemCatalog items)
+    {
+        var level = 1;
+        for (var minute = (int)Math.Min(timeMs / 60_000, frames.Count - 1); minute >= 0; minute--)
+        {
+            if (frames[minute].TryGetValue(id, out var frame) && frame.Level > 0)
+            {
+                level = frame.Level;
+                break;
+            }
+        }
+
+        var held = new List<int>();
+        foreach (var e in events)
+        {
+            if (e.Timestamp > timeMs)
+                break;
+            if (e.ParticipantId != id)
+                continue;
+
+            switch (e.Type)
+            {
+                case "LEVEL_UP":
+                    level = Math.Max(level, e.Level);
+                    break;
+                case "ITEM_PURCHASED" when e.ItemId > 0:
+                    held.Add(e.ItemId);
+                    break;
+                case "ITEM_SOLD" or "ITEM_DESTROYED":
+                    held.Remove(e.ItemId);
+                    break;
+                case "ITEM_UNDO":
+                    // Undoing a purchase takes the item back (before → nothing), undoing a sale
+                    // brings it back (nothing → after).
+                    if (e.BeforeId > 0)
+                        held.Remove(e.BeforeId);
+                    if (e.AfterId > 0)
+                        held.Add(e.AfterId);
+                    break;
+            }
+        }
+
+        var worth = held.Where(items.CountsForWorth).ToList();
+        return new PlayerMoment(id, level, worth.Sum(items.Gold), worth.Sum(items.Armor), worth.Sum(items.MagicResist));
+    }
+
+    /// <summary>Each minute frame's numbers per player (participant id → level, total gold, experience).</summary>
+    private static List<Dictionary<int, PlayerFrame>> Frames(JsonElement timeline)
+    {
+        var list = new List<Dictionary<int, PlayerFrame>>();
+        if (!timeline.TryGetProperty("info", out var info) || !info.TryGetProperty("frames", out var frames) || frames.ValueKind != JsonValueKind.Array)
+            return list;
+
+        foreach (var frame in frames.EnumerateArray())
+        {
+            var players = new Dictionary<int, PlayerFrame>();
+            if (frame.ValueKind == JsonValueKind.Object && frame.TryGetProperty("participantFrames", out var participantFrames) && participantFrames.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var player in participantFrames.EnumerateObject())
+                {
+                    if (int.TryParse(player.Name, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) && player.Value.ValueKind == JsonValueKind.Object)
+                        players[id] = new PlayerFrame(Int(player.Value, "level"), Long(player.Value, "totalGold"), Long(player.Value, "xp"));
+                }
+            }
+
+            list.Add(players);
+        }
+
+        return list;
     }
 
     /// <summary>Every champion banned in the game, once — a ban by both teams is still one ban.</summary>
@@ -472,7 +623,13 @@ public static class RiotMatchReader
                     BeforeId: Int(e, "beforeId"),
                     AfterId: Int(e, "afterId"),
                     SkillSlot: Int(e, "skillSlot"),
-                    LevelUpType: Text(e, "levelUpType")));
+                    LevelUpType: Text(e, "levelUpType"),
+                    Level: Int(e, "level"),
+                    KillerId: Int(e, "killerId"),
+                    VictimId: Int(e, "victimId"),
+                    Assists: e.TryGetProperty("assistingParticipantIds", out var helpers) && helpers.ValueKind == JsonValueKind.Array
+                        ? [.. helpers.EnumerateArray().Where(h => h.ValueKind == JsonValueKind.Number && h.TryGetInt32(out _)).Select(h => h.GetInt32())]
+                        : []));
             }
         }
 
@@ -488,5 +645,6 @@ public static class RiotMatchReader
         => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : string.Empty;
 
     private sealed record TimelineEvent(
-        string Type, long Timestamp, int ParticipantId, int ItemId, int BeforeId, int AfterId, int SkillSlot, string LevelUpType);
+        string Type, long Timestamp, int ParticipantId, int ItemId, int BeforeId, int AfterId, int SkillSlot, string LevelUpType,
+        int Level, int KillerId, int VictimId, IReadOnlyList<int> Assists);
 }

@@ -48,6 +48,19 @@ public class RiotBuildTests
         Assert.True(Items.IsSupportChoice(3871));
         Assert.False(Items.IsSupportChoice(3867));
         Assert.True(Items.IsTrinket(3340));
+
+        // What an inventory is worth: the shop price of what is held, without what is used up, free
+        // or handed to every support.
+        Assert.Equal(450, Items.Gold(1055));
+        Assert.True(Items.CountsForWorth(1055));
+        Assert.True(Items.CountsForWorth(3134));
+        Assert.False(Items.CountsForWorth(2003)); // potion
+        Assert.False(Items.CountsForWorth(2055)); // control ward
+        Assert.False(Items.CountsForWorth(3340)); // trinket
+        Assert.False(Items.CountsForWorth(3865)); // World Atlas …
+        Assert.False(Items.CountsForWorth(3867)); // … Bounty of Worlds …
+        Assert.False(Items.CountsForWorth(3871)); // … and the choice at the end
+        Assert.False(Items.CountsForWorth(999999));
     }
 
     [Fact]
@@ -277,7 +290,9 @@ public class RiotBuildTests
         Assert.Equal(10, state.Tally.Builds.Count);
         Assert.Equal(2, state.Meta.Matches);
         Assert.Equal(2, state.Games.Count);                     // one line per counted game, for measuring the model
-        Assert.All(state.Games, line => Assert.Equal(15, line.Length));
+        // The first line keeps the lane part (every 8th does; the fixture's timeline has no frames and
+        // no kills, so it is just the empty part), the second ends after the draft.
+        Assert.Equal([RiotGames.FixedLength, RiotGames.DraftLength], state.Games.Select(line => line.Length));
         // The second counted game (the lead's) had one player asked about, by his place in the line.
         Assert.Equal(-1, state.Games[0][13]);
         Assert.InRange(state.Games[1][13], 0, 9);
@@ -302,10 +317,12 @@ public class RiotBuildTests
         masteryRefused = true;
         var second = new CollectorState();
         using var secondApi = new RiotApiClient("RGAPI-test", handler, delay: (_, _) => Task.CompletedTask);
-        var secondReport = await new RiotCollector(secondApi, Items, new CollectorOptions { Tiers = ["gold"], Duration = TimeSpan.FromMinutes(1), MaxPages = 1, MasteryEvery = 1 })
+        var secondReport = await new RiotCollector(secondApi, Items, new CollectorOptions { Tiers = ["gold"], Duration = TimeSpan.FromMinutes(1), MaxPages = 1, MasteryEvery = 1, LaneEvery = 1, LaneGamesPerPatch = 1 })
             .RunAsync(second, _ => { }, stop.Token);
         Assert.Equal(2, secondReport.Counted);
         Assert.All(second.Games, line => Assert.Equal(-1, line[13]));
+        // Every line would keep the lane part, but the patch's share is one.
+        Assert.Equal([RiotGames.FixedLength, RiotGames.DraftLength], second.Games.Select(line => line.Length));
     }
 
     [Fact]
@@ -347,6 +364,102 @@ public class RiotBuildTests
         Assert.Null(RiotMatchReader.TryRead(Match, Timeline[..^40], Items));
         Assert.NotNull(RiotMatchReader.TryRead(Match, Timeline, Items));
         Assert.Null(RiotMatchReader.MasteryPoints("""{"championPoints": 12"""));
+    }
+
+    // Prices and stats for the duel test; the item fixture carries no stats.
+    private static readonly ItemCatalog DuelItems = ItemCatalog.Parse("""
+        {"version":"16.22.1","data":{
+          "1055":{"name":"Doran's Blade","gold":{"total":450,"purchasable":true},"tags":["Damage","Lane"]},
+          "1054":{"name":"Doran's Shield","gold":{"total":450,"purchasable":true},"tags":["Health","Lane"]},
+          "2003":{"name":"Health Potion","gold":{"total":50,"purchasable":true},"tags":["Consumable"]},
+          "1029":{"name":"Cloth Armor","gold":{"total":300,"purchasable":true},"tags":["Armor"],"stats":{"FlatArmorMod":15}},
+          "1033":{"name":"Null-Magic Mantle","gold":{"total":400,"purchasable":true},"tags":["SpellBlock"],"stats":{"FlatSpellBlockMod":25}},
+          "1036":{"name":"Long Sword","gold":{"total":350,"purchasable":true},"tags":["Damage"],"into":["3134"]},
+          "3134":{"name":"Serrated Dirk","gold":{"total":1000,"purchasable":true},"tags":["Damage"],"from":["1036","1036"]},
+          "3865":{"name":"World Atlas","gold":{"total":400,"purchasable":true},"tags":["GoldPer"]}
+        }}
+        """);
+
+    /// <summary>
+    /// The real game's ten players (1 top, 2 jungle, 3 mid, 4 adc, 5 support; 6–10 the same on red)
+    /// with a timeline written for the case: minute frames at 0, 5 and 10, and every kind of kill.
+    /// </summary>
+    private static string DuelTimeline()
+    {
+        static string Frame(int level, Func<int, int>? gold = null, Func<int, int>? xp = null, Func<int, int>? levels = null)
+            => "{" + string.Join(",", Enumerable.Range(1, 10).Select(id =>
+                $"\"{id}\":{{\"participantId\":{id},\"level\":{levels?.Invoke(id) ?? level},\"totalGold\":{gold?.Invoke(id) ?? 500},\"currentGold\":0,\"xp\":{xp?.Invoke(id) ?? 0}}}")) + "}";
+        static string Buy(long t, int id, int item) => $"{{\"type\":\"ITEM_PURCHASED\",\"timestamp\":{t},\"participantId\":{id},\"itemId\":{item}}}";
+        static string Gone(long t, int id, int item, string type = "ITEM_DESTROYED") => $"{{\"type\":\"{type}\",\"timestamp\":{t},\"participantId\":{id},\"itemId\":{item}}}";
+        static string Up(long t, int id, int level) => $"{{\"type\":\"LEVEL_UP\",\"timestamp\":{t},\"participantId\":{id},\"level\":{level}}}";
+        static string Kill(long t, int killer, int victim, params int[] helpers)
+            => $"{{\"type\":\"CHAMPION_KILL\",\"timestamp\":{t},\"killerId\":{killer},\"victimId\":{victim}"
+               + (helpers.Length > 0 ? $",\"assistingParticipantIds\":[{string.Join(",", helpers)}]" : "") + "}";
+
+        var events = new[]
+        {
+            Buy(0, 0, 3865), Buy(4000, 1, 1055), Buy(4000, 1, 2003), Buy(5000, 6, 1054), Buy(5000, 4, 1055), Buy(5000, 9, 1055),
+            Up(100000, 1, 2), Up(110000, 6, 2), Up(150000, 1, 3), Buy(170000, 1, 1029),
+            Kill(200000, 1, 6),            // A: top, alone
+            Kill(210000, 6, 1, 7),         // the red jungler helped: a gank
+            Kill(220000, 3, 6),            // mid kills top: no lane duel
+            Kill(230000, 0, 8),            // executed by the tower
+            Gone(250000, 5, 3865),         // the quest item was never bought by 5: nothing to take away
+            Kill(300000, 4, 9, 5),         // B: bot, the partner helped
+            Kill(310000, 10, 5, 7),        // bot with the jungler's help
+            Kill(320000, 2, 7),            // C: jungle, alone
+            Gone(400000, 1, 1055, "ITEM_SOLD"),
+            Buy(450000, 6, 1036), "{\"type\":\"ITEM_UNDO\",\"timestamp\":451000,\"participantId\":6,\"beforeId\":1036,\"afterId\":0}",
+            Buy(460000, 6, 1036), Buy(461000, 6, 1036), Buy(470000, 6, 3134), Gone(470000, 6, 1036), Gone(470000, 6, 1036),
+            Buy(480000, 1, 1033),
+            Kill(500000, 6, 1),            // D: top again, after a sale, an undo and a finished component
+        };
+
+        var frames = Enumerable.Range(0, 11).Select(minute =>
+        {
+            var participants = minute switch
+            {
+                0 => Frame(1),
+                5 => Frame(4, levels: id => id is 5 or 10 ? 3 : 4),
+                10 => Frame(7, gold: id => 3000 + 10 * id, xp: id => 4000 + id),
+                _ => null,
+            };
+            return $"{{\"timestamp\":{minute * 60_000 + 10}"
+                + (participants is null ? "" : $",\"participantFrames\":{participants}")
+                + $",\"events\":[{(minute == 0 ? string.Join(",", events) : "")}]}}";
+        });
+        return $"{{\"metadata\":{{}},\"info\":{{\"frameInterval\":60000,\"frames\":[{string.Join(",", frames)}]}}}}";
+    }
+
+    [Fact]
+    public void LaneDuels_AreKillsBetweenLaneOpponentsWithoutStrangers()
+    {
+        var reading = RiotMatchReader.Read(Match, DuelTimeline(), DuelItems);
+
+        static string Said(LaneKill kill) => $"{kill.TimeMs / 1000}: {kill.KillerId}>{kill.VictimId} " + string.Join(" ", kill.Lane.Select(m => $"[{m.ParticipantId} L{m.Level} {m.ItemGold}g {m.Armor}a {m.MagicResist}mr]"));
+        Assert.Equal(
+            [
+                // Top: 1 has Doran's Blade and Cloth (the potion is used up, it counts nothing), level 3
+                // from the level-ups; 6 has Doran's Shield, level 2.
+                "200: 1>6 [1 L3 750g 15a 0mr] [6 L2 450g 0a 0mr]",
+                // Bot: all four, levels from the frame at 5:00; the supports' quest item counts nothing.
+                "300: 4>9 [4 L4 450g 0a 0mr] [5 L3 0g 0a 0mr] [9 L4 450g 0a 0mr] [10 L3 0g 0a 0mr]",
+                "320: 2>7 [2 L4 0g 0a 0mr] [7 L4 0g 0a 0mr]",
+                // 1 sold Doran's Blade and bought a Mantle; 6's undone Long Sword is gone, the two
+                // others went into the Serrated Dirk.
+                "500: 6>1 [1 L4 700g 15a 25mr] [6 L4 1450g 0a 0mr]",
+            ],
+            reading.Duels.Select(Said));
+        Assert.Equal(new PlayerFrame(7, 3010, 4001), reading.MinuteTen![1]);
+
+        var line = RiotGames.Encode(reading)!;
+        Assert.Equal((3010, 4001), (line[15], line[25]));          // top blue is place 0 …
+        Assert.Equal((3060, 4006), (line[20], line[30]));          // … top red place 5
+        var duels = RiotGames.Duels(line).ToList();
+        Assert.Equal(4, duels.Count);
+        Assert.Equal([200, 0, 5, 0, 3, 750, 15, 0, 5, 2, 450, 0, 0], duels[0]);
+        Assert.Equal([300, 3, 8, 3, 4, 450, 0, 0, 4, 3, 0, 0, 0, 8, 4, 450, 0, 0, 9, 3, 0, 0, 0], duels[1]);
+        Assert.Equal(RiotGames.FixedLength + 4 + 13 + 23 + 13 + 13, line.Length);
     }
 
     private static HttpResponseMessage Ok(string body, string? appLimit = null)

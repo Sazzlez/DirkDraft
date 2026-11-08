@@ -23,7 +23,18 @@ Zeile ab: zehn Champions mit Lane, den Sieger, die Spieldauer und den Gold-Vorsp
 Zeile zusätzlich die Mastery-Punkte eines Spielers auf seinem Champion (des Spielers mit dem seltensten
 Champion; eine Abfrage, ohne den Spieler zu speichern). Dazu zählt der Sammler je Champion, Lane und
 Lane-Gegner Keystone, Nebenbaum, Zauber neben Blitz und Startitems (`matchups.json.gz`, nur laufender
-Patch). Die Zeilen liegen im
+Patch).
+
+**Für die Stärke-Skala im Spiel** (`docs/lane-vergleich.md`, seit 08.11.2026, Spiel-Liste Version 2): jede
+achte Zeile, höchstens 40.000 je Patch, trägt zusätzlich einen Lane-Teil — Gold und Erfahrung jedes Platzes
+nach 10 Minuten und jedes Lane-Duell: ein Kill zwischen Lane-Gegnern ohne fremde Hilfe (Bot: unter den vier
+Bot-Spielern, nur der Partner des Siegers hilft), mit Sekunde, Sieger, Verlierer und für jeden Spieler der
+Lane Level, Itemwert (Ladenpreis der gehaltenen Items ohne Tränke, Wards, Schmuck und Support-Quest),
+Rüstung und Magieresistenz aus Items. Level und Inventar werden aus der Zeitleiste nachgespielt, die der
+Sammler ohnehin holt — keine zusätzliche Anfrage. Gemessen am 08.11.: ein Platin-Spiel hat rund 15 solche
+Duelle (280 in 19 Spielen), daher nur eine Stichprobe; die übrigen Zeilen enden nach 15 Zahlen.
+
+Die Zeilen liegen im
 Bestand (der laufende Patch und die zwei davor; ein Wechsel der Region verwirft sie) und als Artefakt `games` jedes Laufs (`games.json.gz`, eine Woche
 aufbewahrt, nie veröffentlicht). Herunterladen: `gh run download <Lauf> -n games`.
 

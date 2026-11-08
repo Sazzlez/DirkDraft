@@ -29,6 +29,10 @@ public sealed class ItemCatalog
     /// <summary>The last free step of the support quest; the choice after it is the decision.</summary>
     public const int SupportQuestBase = 3867;
 
+    /// <summary>World Atlas and Runic Compass, the support quest's first two steps (16.22.1).</summary>
+    private const int WorldAtlas = 3865;
+    private const int RunicCompass = 3866;
+
     private const int FinishedItemGold = 1000;
 
     private readonly Dictionary<int, Entry> _items;
@@ -95,6 +99,25 @@ public sealed class ItemCatalog
     /// <summary>The support quest's final choice (Celestial Opposition, Solstice Sleigh, …).</summary>
     public bool IsSupportChoice(int id)
         => _items.TryGetValue(id, out var entry) && entry.From.Contains(SupportQuestBase);
+
+    /// <summary>A step of the support quest: World Atlas, Runic Compass, Bounty of Worlds or the final choice.</summary>
+    public bool IsSupportQuest(int id) => id is WorldAtlas or RunicCompass or SupportQuestBase || IsSupportChoice(id);
+
+    /// <summary>The item's price in the shop (Data Dragon gold.total), 0 when unknown.</summary>
+    public int Gold(int id) => _items.TryGetValue(id, out var entry) ? entry.Gold : 0;
+
+    /// <summary>
+    /// Whether an item held counts towards what a player's items are worth — the duel scale's
+    /// "Itemwert", the same in the timeline and in the live game. Potions, wards and the trinket are
+    /// used up or free. The support quest's items every support carries, and the timeline hands them
+    /// over from participant 0 without a purchase: counted, supports would look poorer in the
+    /// timeline than in the live game.
+    /// </summary>
+    public bool CountsForWorth(int id)
+        => _items.TryGetValue(id, out var entry)
+            && !entry.Tags.Contains("Consumable", StringComparer.OrdinalIgnoreCase)
+            && !IsTrinket(id)
+            && !IsSupportQuest(id);
 
     public bool IsTrinket(int id)
         => _items.TryGetValue(id, out var entry) && entry.Tags.Contains("Trinket", StringComparer.OrdinalIgnoreCase);

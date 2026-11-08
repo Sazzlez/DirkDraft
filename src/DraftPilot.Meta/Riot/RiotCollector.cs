@@ -37,6 +37,17 @@ public sealed record CollectorOptions
     /// a tenth of the games per hour; 0 asks nobody.
     /// </summary>
     public int MasteryEvery { get; init; } = 4;
+
+    /// <summary>
+    /// Every n-th game line keeps the lane part — gold and experience at ten minutes and the lane
+    /// duels (<see cref="RiotGames.Format"/>); the others end after the draft part. A Platinum game
+    /// has about fifteen duels (measured 08.11.2026: 280 in 19 games), so every line with them would
+    /// make the state some twenty times larger, and a sample says as much. 0 keeps none.
+    /// </summary>
+    public int LaneEvery { get; init; } = 8;
+
+    /// <summary>At most this many lines of a patch keep the lane part: about 600.000 duels, some 12 MB packed.</summary>
+    public int LaneGamesPerPatch { get; init; } = 40_000;
 }
 
 public sealed record CollectorReport(int Counted, int Skipped, int Requests, int Throttled, TimeSpan Elapsed);
@@ -240,6 +251,7 @@ public sealed class RiotCollector(
                 entry is not null && statics!.Traits.For(entry.Key).HasHardCc);
         }
         var games = new List<int[]>(state.Games);
+        var laneGames = games.Count(line => line.Length > RiotGames.DraftLength);
         // A refused mastery request costs the samples of this run, never the run itself.
         var askMastery = options.MasteryEvery > 0;
         var matchups = new RiotMatchupTally();
@@ -390,7 +402,14 @@ public sealed class RiotCollector(
                     }
 
                     if (RiotGames.Encode(reading, masteryIndex, masteryPoints) is { } line)
-                        games.Add(line);
+                    {
+                        // Every n-th line keeps the lane part, up to the patch's share; counted by the
+                        // lines so far, so the choice runs on across runs.
+                        var keepLanes = options.LaneEvery > 0 && games.Count % options.LaneEvery == 0 && laneGames < options.LaneGamesPerPatch;
+                        if (keepLanes)
+                            laneGames++;
+                        games.Add(keepLanes ? line : line[..RiotGames.DraftLength]);
+                    }
                     if (statics is not null)
                         situational.Add(reading, Profile, items);
 

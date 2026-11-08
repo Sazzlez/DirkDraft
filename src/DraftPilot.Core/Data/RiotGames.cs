@@ -6,25 +6,45 @@ namespace DraftPilot.Core.Data;
 /// <summary>
 /// The counted games themselves, one line each, for measuring how much each part of the draft model
 /// predicts the winner (docs/draft-konzept.md): which champion played which lane on which side, and
-/// who won, how long it ran and who led after fifteen minutes. No player, no match id, no date.
+/// who won, how long it ran and who led after fifteen minutes. Since version 2 also how each lane
+/// stood after ten minutes and every duel between lane opponents — the evidence for the duel scale
+/// in the game view (docs/lane-vergleich.md). No player, no match id, no date.
 /// </summary>
 public static class RiotGames
 {
     public const string Format =
         "[5 × Blau, 5 × Rot, Blau gewinnt (1/0), Dauer in vollen Minuten, Gold-Vorsprung Blau nach 15 Minuten, " +
-        "Platz des befragten Spielers (0–9, −1 keiner), seine Mastery-Punkte auf dem Champion]; " +
+        "Platz des befragten Spielers (0–9, −1 keiner), seine Mastery-Punkte auf dem Champion, " +
+        "10 × Gold nach 10 Minuten, 10 × Erfahrung nach 10 Minuten (je Platz), " +
+        "dann je Lane-Duell: Länge L, danach L Zahlen — Sekunde, Platz Sieger, Platz Verlierer, " +
+        "je Spieler der Lane: Platz, Level, Itemwert, Rüstung aus Items, Magieresistenz aus Items]; " +
         "je Spieler Champion × 8 + Lane + 1 (Lane −1 unbekannt, 0 Top, 1 Jungle, 2 Mid, 3 ADC, 4 Support), " +
-        "je Seite nach Lane sortiert. Dauer und Gold 0, wo unbekannt.";
+        "je Seite nach Lane sortiert, die Plätze 0–9 in dieser Reihenfolge. Lane-Duell: Kill zwischen Lane-Gegnern " +
+        "ohne fremde Hilfe (Bot: unter den vier Bot-Spielern, nur der Partner des Siegers hilft). Itemwert: Ladenpreis " +
+        "der gehaltenen Items ohne Tränke, Wards, Schmuck und Support-Quest. Dauer, Gold und Erfahrung 0, wo unbekannt. " +
+        "Nur ein Teil der Zeilen trägt den Lane-Teil (ab Platz 15); die übrigen und alle aus Version 1 enden nach 15 Zahlen.";
 
     /// <summary>The moment the early-game lead is read at: the end of the laning phase.</summary>
     public const long EarlyLeadAtMs = 15 * 60_000;
 
+    /// <summary>The moment each lane's gold and experience are read at: deep in the laning phase.</summary>
+    public const long LaneAtMs = 10 * 60_000;
+
+    /// <summary>The draft part every line has: players, winner, duration, early lead, mastery.</summary>
+    public const int DraftLength = 15;
+
+    /// <summary>A line with the lane part: the draft part, gold and experience at ten minutes, then the duels.</summary>
+    public const int FixedLength = 35;
+
+    private const int GoldAtTen = 15;
+    private const int XpAtTen = 25;
+
     /// <summary>
-    /// One game as fifteen numbers (<see cref="Format"/>); null when it does not split into two
-    /// sides of five. Duration and the early lead let the measurement tell early from late
-    /// line-ups — what a champion is worth depends on when the game is decided. The mastery of one
-    /// player (<paramref name="masteryIndex"/> into <see cref="MatchReading.Participants"/>, −1 for
-    /// none) lets it tell a champion's strength from the experience of the players who pick it.
+    /// One game as a line (<see cref="Format"/>); null when it does not split into two sides of
+    /// five. Duration and the early lead let the measurement tell early from late line-ups — what a
+    /// champion is worth depends on when the game is decided. The mastery of one player
+    /// (<paramref name="masteryIndex"/> into <see cref="MatchReading.Participants"/>, −1 for none)
+    /// lets it tell a champion's strength from the experience of the players who pick it.
     /// </summary>
     public static int[]? Encode(MatchReading game, int masteryIndex = -1, int masteryPoints = 0)
     {
@@ -33,8 +53,9 @@ public static class RiotGames
             return null;
 
         var asked = masteryIndex >= 0 && masteryIndex < game.Participants.Count ? game.Participants[masteryIndex] : null;
-        var line = new int[15];
+        var line = new int[FixedLength];
         line[13] = -1;
+        var places = new Dictionary<int, int>();
         var index = 0;
         foreach (var side in sides)
         {
@@ -45,18 +66,56 @@ public static class RiotGames
                     line[13] = index;
                     line[14] = Math.Max(0, masteryPoints);
                 }
+                if (player.ParticipantId > 0)
+                {
+                    places.TryAdd(player.ParticipantId, index);
+                    if (game.MinuteTen?.TryGetValue(player.ParticipantId, out var frame) == true)
+                    {
+                        line[GoldAtTen + index] = Clamp(frame.TotalGold);
+                        line[XpAtTen + index] = Clamp(frame.Xp);
+                    }
+                }
                 line[index++] = player.ChampionId * 8 + (int)player.Lane + 1;
             }
         }
 
         line[10] = sides[0].First().Win ? 1 : 0;
         line[11] = Math.Max(0, game.DurationSeconds) / 60;
-        line[12] = (int)Math.Clamp(game.GoldLead(sides[0].Key, EarlyLeadAtMs), int.MinValue, int.MaxValue);
-        return line;
+        line[12] = Clamp(game.GoldLead(sides[0].Key, EarlyLeadAtMs));
+
+        var result = new List<int>(line);
+        foreach (var duel in game.Duels)
+        {
+            if (!places.TryGetValue(duel.KillerId, out var winner) || !places.TryGetValue(duel.VictimId, out var loser))
+                continue;
+
+            var lane = duel.Lane.Where(m => places.ContainsKey(m.ParticipantId)).OrderBy(m => places[m.ParticipantId]).ToList();
+            result.Add(3 + 5 * lane.Count);
+            result.AddRange([(int)Math.Clamp(duel.TimeMs / 1000, 0, int.MaxValue), winner, loser]);
+            foreach (var m in lane)
+                result.AddRange([places[m.ParticipantId], m.Level, m.ItemGold, m.Armor, m.MagicResist]);
+        }
+
+        return [.. result];
     }
 
     /// <summary>A player's number back as champion and lane.</summary>
     public static (int ChampionId, Lane Lane) Decode(int player) => (player / 8, (Lane)(player % 8 - 1));
+
+    /// <summary>The duels of a line, each as its own numbers (second, winner, loser, the lane's players); none in a version-1 line.</summary>
+    public static IEnumerable<int[]> Duels(int[] line)
+    {
+        for (var at = FixedLength; at < line.Length;)
+        {
+            var length = line[at];
+            if (length <= 0 || at + 1 + length > line.Length)
+                yield break;
+            yield return line[(at + 1)..(at + 1 + length)];
+            at += 1 + length;
+        }
+    }
+
+    private static int Clamp(long value) => (int)Math.Clamp(value, int.MinValue, int.MaxValue);
 }
 
 /// <summary>The game lines of one patch.</summary>
@@ -73,7 +132,8 @@ public sealed class PatchGames
 /// </summary>
 public sealed class RiotGamesFile
 {
-    public int Version { get; set; } = 1;
+    /// <summary>2 since 08.11.2026: lanes after ten minutes and the lane duels (<see cref="RiotGames.Format"/>).</summary>
+    public int Version { get; set; } = 2;
 
     public string Platform { get; set; } = string.Empty;
 

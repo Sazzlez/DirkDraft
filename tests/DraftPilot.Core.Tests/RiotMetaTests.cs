@@ -154,7 +154,9 @@ public sealed class RiotMetaTests
         var line = RiotGames.Encode(Game(blueWins: false, red: [21, 22, 23, 24, 25]));
 
         Assert.NotNull(line);
-        Assert.Equal(15, line.Length);
+        Assert.Equal(RiotGames.FixedLength, line.Length);
+        Assert.Empty(RiotGames.Duels(line));
+        Assert.Empty(RiotGames.Duels(new int[15]));            // a line from version 1
         Assert.Equal((-1, 0), (line[13], line[14]));           // nobody asked about
         Assert.Equal((1, Lane.Top), RiotGames.Decode(line[0]));
         Assert.Equal((5, Lane.Support), RiotGames.Decode(line[4]));
@@ -174,6 +176,36 @@ public sealed class RiotMetaTests
         var lopsided = Game(blueWins: true);
         var four = new MatchReading(lopsided.Patch, 0, 420, true, [.. lopsided.Participants.Skip(1)]);
         Assert.Null(RiotGames.Encode(four));
+    }
+
+    [Fact]
+    public void AGameLine_CarriesTheLanesAtTenMinutesAndTheDuelsByPlace()
+    {
+        var plain = Game(blueWins: true, red: [15, 11, 12, 13, 14], redLanes: [Lane.Support, Lane.Top, Lane.Jungle, Lane.Mid, Lane.Adc]);
+        // Participant ids as Riot numbers them: 1–5 blue, 6–10 red in the order listed (red support first).
+        var players = plain.Participants.Select((p, i) => p with { ParticipantId = i + 1 }).ToList();
+        var game = plain with
+        {
+            Participants = players,
+            MinuteTen = new Dictionary<int, PlayerFrame> { [1] = new(5, 3200, 4100), [7] = new(5, 3000, 3900) },
+            LaneKills =
+            [
+                new LaneKill(200_500, 1, 7, [new(1, 3, 750, 15, 0), new(7, 2, 450, 0, 0)]),
+                new LaneKill(300_000, 4, 10, [new(4, 4, 450, 0, 0), new(5, 3, 0, 0, 0), new(10, 4, 450, 0, 0), new(6, 3, 0, 0, 0)]),
+                new LaneKill(400_000, 1, 11, [new(1, 3, 750, 15, 0), new(11, 2, 450, 0, 0)]),   // nobody in the game: left out
+            ],
+        };
+
+        var line = RiotGames.Encode(game)!;
+
+        // Red sorts by lane: 7 (top) is place 5, 10 (adc) place 8, 6 (support) place 9.
+        Assert.Equal((3200, 4100), (line[15], line[25]));
+        Assert.Equal((3000, 3900), (line[20], line[30]));
+        Assert.Equal(0, line[16]);
+        var duels = RiotGames.Duels(line).ToList();
+        Assert.Equal(2, duels.Count);
+        Assert.Equal([200, 0, 5, 0, 3, 750, 15, 0, 5, 2, 450, 0, 0], duels[0]);
+        Assert.Equal([300, 3, 8, 3, 4, 450, 0, 0, 4, 3, 0, 0, 0, 8, 4, 450, 0, 0, 9, 3, 0, 0, 0], duels[1]);
     }
 
     [Fact]
