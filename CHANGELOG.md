@@ -5,6 +5,15 @@ Kopien melden sie beim nächsten Start.
 
 ## 2.1.0 — unveröffentlicht
 
+- **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items
+  stehen ohnehin in der Matchup-Kachel und in der Spielansicht.
+- **Ein Klick auf einen Teammate, der gelockt hat, zeigt sein Matchup** wie das eigene nach dem
+  Lock: Lane-Gegner, Winrate, Stichprobe. Ohne Build und ohne Import-Knopf, denn der würde seine
+  Runen in deinen Client schreiben.
+- Weniger Füllzeilen: kein Sekunden-Ring mehr (der Timer steht im Client), keine Quellzeile im
+  Matchup, kein Rauschen-Hinweis unter der Draft-Chance, kein „n× so oft gekauft wie sonst“ bei den
+  Items. Die Kacheln im Spiel heißen jetzt „Situative Items“ und „Gegner“, und der Schadenshinweis
+  sagt ausdrücklich, dass es um das Gegnerteam geht.
 - Nach einem Update zeigt auch die Taskleiste das neue Icon. Bisher blieb dort das alte aus 1.x
   stehen, weil Windows es für denselben Programmpfad zwischenspeichert.
 
