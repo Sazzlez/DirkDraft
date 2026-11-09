@@ -96,6 +96,8 @@ export interface DraftFrame {
     enemies: FrameSlot[];
     allyBans: number[];
     enemyBans: number[];
+    /** New in 2.1; absent from the 1.5 reference frames. */
+    allyBanIntents?: { cellId: number; championId: number }[];
     unavailable: number[];
     turn: { cellId: number; isAlly: boolean; isLocalPlayer: boolean; action: TurnAction } | null;
     bench: number[];
@@ -277,6 +279,7 @@ export class DraftEngine {
         enemies: state.enemies.map(frameSlot),
         allyBans: [...state.allyBans],
         enemyBans: [...state.enemyBans],
+        allyBanIntents: state.allyBanIntents.map((intent) => ({ ...intent })),
         unavailable: [...state.unavailable].sort((a, b) => a - b),
         turn: state.turn,
         bench: [...state.bench],
@@ -330,6 +333,7 @@ export function stateFromFrame(s: DraftFrame['state']): DraftState {
     enemies: s.enemies.map(slot),
     allyBans: s.allyBans,
     enemyBans: s.enemyBans,
+    allyBanIntents: s.allyBanIntents ?? [],
     phase: s.phase,
     turn: s.turn,
     unavailable: new Set(s.unavailable),

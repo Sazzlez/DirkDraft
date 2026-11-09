@@ -176,6 +176,8 @@ interface Seat {
   lane: Lane;
   allies: number[];
   hoveredByOthers: ReadonlySet<number>;
+  /** What another teammate is about to ban; his ban hover counts as banned. */
+  bannedByOthers: ReadonlySet<number>;
   allyComp: CompProfile;
   enemyComp: CompProfile;
 }
@@ -214,7 +216,7 @@ export class Recommender {
     const seat = this.prepare(state, target, enemyLanes, allyLanes);
     const items =
       target.action === 'ban'
-        ? this.scoreBans(state, seat.lane, seat.allies, seat.hoveredByOthers, enemyLanes, limit)
+        ? this.scoreBans(state, seat.lane, seat.allies, new Set([...seat.hoveredByOthers, ...seat.bannedByOthers]), enemyLanes, limit)
         : top(this.scorePicks(state, seat, enemyLanes, selectable), limit);
     return { cellId: target.slot.cellId, lane: seat.lane, action: target.action, items, allyComp: seat.allyComp, enemyComp: seat.enemyComp };
   }
@@ -255,10 +257,15 @@ export class Recommender {
         .filter((slot) => target.action === 'ban' || slot.cellId !== target.slot.cellId)
         .map((slot) => slot.hoverChampionId),
     );
+    // The advised seat's own ban hover stays in its list, or the list would jump while it hovers.
+    const bannedByOthers = new Set(
+      state.allyBanIntents.filter((intent) => intent.cellId !== target.slot.cellId).map((intent) => intent.championId),
+    );
     return {
       lane,
       allies: allyChampions,
       hoveredByOthers,
+      bannedByOthers,
       allyComp: this.comp.analyze(allyChampions),
       enemyComp: this.comp.analyze(enemyChampions),
     };

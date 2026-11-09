@@ -90,6 +90,8 @@ export interface BoardView {
   enemies: SlotView[];
   allyBans: ChampionRef[];
   enemyBans: ChampionRef[];
+  /** Bans the own team has hovered but not locked yet; `by` is the seat label ("Teammate 2"). */
+  allyBanIntents: { champion: ChampionRef; by: string }[];
   /** "Du pickst", "Teammate 3 pickt", "Gegner bannen", "Finalisierung". */
   turnText: string;
   myTurn: boolean;

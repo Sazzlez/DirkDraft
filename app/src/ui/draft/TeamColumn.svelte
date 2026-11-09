@@ -9,6 +9,7 @@
     title,
     slots,
     bans,
+    planned = [],
     usesLanes,
     onSeat,
     onLane,
@@ -17,6 +18,8 @@
     title: string;
     slots: SlotView[];
     bans: ChampionRef[];
+    /** Ban hovers not locked yet, shown faded after the locked bans. */
+    planned?: { champion: ChampionRef; by: string }[];
     usesLanes: boolean;
     /** A click on an ally seat: its list until the clock moves on (1.5's slot click). */
     onSeat?: (cellId: number) => void;
@@ -42,7 +45,12 @@
       <span class="bans" aria-label="Banns">
         {#each Array(5) as _, i (i)}
           {@const ban = bans[i]}
-          <Icon kind="champion" champion={ban ?? null} size={18} grey={!!ban} title={ban ? `gebannt: ${ban.name}` : 'kein Bann'} />
+          {@const hover = ban ? null : planned[i - bans.length]}
+          {#if hover}
+            <Icon kind="champion" champion={hover.champion} size={18} dim title={`Ban-Hover von ${hover.by === 'Du' ? 'dir' : hover.by}: ${hover.champion.name}`} />
+          {:else}
+            <Icon kind="champion" champion={ban ?? null} size={18} grey={!!ban} title={ban ? `gebannt: ${ban.name}` : 'kein Bann'} />
+          {/if}
         {/each}
       </span>
     {/if}

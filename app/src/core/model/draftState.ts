@@ -30,6 +30,12 @@ export interface ActiveTurn {
   action: TurnAction;
 }
 
+/** A ban the own team has hovered but not locked yet. */
+export interface BanIntent {
+  cellId: number;
+  championId: number;
+}
+
 export interface DraftState {
   isActive: boolean;
   localCellId: number;
@@ -37,6 +43,11 @@ export interface DraftState {
   enemies: readonly DraftSlot[];
   allyBans: readonly number[];
   enemyBans: readonly number[];
+  /**
+   * Ban hovers of the own team, not locked yet: in ranked the whole team bans at once, and the
+   * client shows each other's choice. The enemy's never arrive.
+   */
+  allyBanIntents: readonly BanIntent[];
   phase: DraftPhase;
   turn: ActiveTurn | null;
   /** Banned or locked anywhere in the draft. */
@@ -54,6 +65,7 @@ export const INACTIVE: DraftState = Object.freeze({
   enemies: [],
   allyBans: [],
   enemyBans: [],
+  allyBanIntents: [],
   phase: 'none',
   turn: null,
   unavailable: new Set<number>(),
@@ -190,6 +202,13 @@ function fromSession(session: unknown): DraftState {
     if (!target.includes(action.championId)) target.push(action.championId);
   }
 
+  const allyBanIntents: BanIntent[] = [];
+  for (const action of actions) {
+    if (action.type?.toLowerCase() !== 'ban' || !action.isAllyAction) continue;
+    if (action.completed || action.championId === 0) continue;
+    allyBanIntents.push({ cellId: action.actorCellId, championId: action.championId });
+  }
+
   const unavailable = new Set<number>([...ally, ...enemy]);
   for (const slot of [...allies, ...enemies]) if (isLocked(slot)) unavailable.add(slot.lockedChampionId);
 
@@ -208,6 +227,7 @@ function fromSession(session: unknown): DraftState {
     enemies,
     allyBans: ally,
     enemyBans: enemy,
+    allyBanIntents,
     phase: parsePhase(timerPhase),
     turn: findActiveTurn(actions, localCellId),
     unavailable,

@@ -18,7 +18,7 @@ Jede Abweichung braucht eine Begründung im Commit und im CHANGELOG.
 ## Inhalt
 
 | Datei | Eingabe | Ausgabe |
-|---|---|---|
+|---|---|
 | `snapshot.json` | echter Snapshot (OP.GG, alle Ränge, Patch 16.22, gebaut mit 1.5.0) | — |
 | `aram-stats.json` | feste ARAM-Tabelle (1.5 holt sie live; hier einmal erzeugt, auf ganze Prozent gerundet wie OP.GG) | — |
 | `drafts/*.json` | erfundene Drafts: die `recommend`-Beispiele aus README und `docs/modellpruefung.md`, je Lane ein Blind Pick, volle Boards | Lane-Vorhersage, Picks und Bans mit Kriterien, Hover, Comp, Draft-Chance, Lane-Matchups |
@@ -31,3 +31,14 @@ die Referenz beschreibt das Modell auf dem gespeicherten Bestand.
 
 `state.allies/enemies` folgen dem C#-Typ `DraftSlot`, Enums als camelCase-Strings, `NaN` als
 `"NaN"`. `fetchedAtUtc` in den Plänen gehört nicht zum Vergleich.
+
+## Neu in 2.1
+
+Was das Modell seit 2.1 bewusst anders macht als 1.5. Neue Felder stehen in `ADDED_IN_2_1`
+(`harness.ts`) und dürfen in den Referenz-Frames fehlen; jeder andere Unterschied zählt weiter.
+Geänderte Werte sind in den Referenzdateien angepasst, mit Begründung hier, im Commit und im
+CHANGELOG.
+
+| Feld / Änderung | Warum |
+|---|---|---|
+| `state.allyBanIntents` (neues Feld) | Ban-Hovers der Teammates; der Ban-Vorschlag lässt aus, was ein anderer Teammate gerade bannt. In keiner Referenz-Aufzeichnung kommt ein solcher Hover vor, die Werte bleiben gleich. |

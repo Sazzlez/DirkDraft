@@ -95,6 +95,7 @@ export interface GoldenFrame {
     enemies: GoldenSlot[];
     allyBans: number[];
     enemyBans: number[];
+    allyBanIntents?: { cellId: number; championId: number }[];
     unavailable: number[];
     turn: { cellId: number; isAlly: boolean; isLocalPlayer: boolean; action: string } | null;
     bench: number[];
@@ -226,6 +227,9 @@ export class GoldenAdapter {
       enemies: s.enemies.map(slot),
       allyBans: s.allyBans.map((id) => this.champion(id)).filter((c): c is ChampionRef => !!c),
       enemyBans: s.enemyBans.map((id) => this.champion(id)).filter((c): c is ChampionRef => !!c),
+      allyBanIntents: (s.allyBanIntents ?? [])
+        .filter((intent) => !unavailable.has(intent.championId))
+        .map((intent) => ({ champion: this.champion(intent.championId)!, by: label(intent.cellId) })),
       turnText,
       myTurn: !planning && !!turn?.isLocalPlayer,
       // ARAM has no bans and no pick order to walk through — only the timer.

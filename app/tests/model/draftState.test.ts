@@ -62,6 +62,22 @@ describe('DraftStateTests', () => {
     expect(draftStateFrom(session).allyBans).toHaveLength(0);
   });
 
+  it('BanIntents_AreTheOwnTeamsHoversNotLockedYet', () => {
+    const session = new SessionBuilder()
+      .action(0, 157, 'ban', false, true)
+      .onClock(1, 'ban')
+      .completedBan(2, 84)
+      .action(6, 555, 'ban', false, true)
+      .build();
+
+    const state = draftStateFrom(session);
+
+    // A hover is no ban yet: still pickable, and the enemy's are none of our business.
+    expect(state.allyBanIntents).toEqual([{ cellId: 0, championId: 157 }]);
+    expect(state.allyBans).toEqual([84]);
+    expect(state.unavailable.has(157)).toBe(false);
+  });
+
   it('Unavailable_CoversBansAndLockedPicks', () => {
     const session = new SessionBuilder().summaryBans([157], [555]).locked(0, 266).locked(5, 24).hovering(2, 103).build();
 

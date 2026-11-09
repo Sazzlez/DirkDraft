@@ -56,6 +56,17 @@ export interface Difference {
   actual: unknown;
 }
 
+/**
+ * Fields the 2.1 engine adds to a frame that the 1.5 reference never had (README.md, "Neu in 2.1").
+ * Only these may be absent from a reference frame; a changed value in any field still counts.
+ */
+export const ADDED_IN_2_1: readonly string[] = ['state.allyBanIntents'];
+
+const isAdded = (path: string): boolean => {
+  const bare = path.replace(/\[\d+\]/g, '');
+  return ADDED_IN_2_1.some((field) => bare.endsWith(`.${field}`));
+};
+
 /** Strings, booleans, order and lengths exactly; numbers to `tolerance`; "NaN" matches NaN. */
 export function compare(expected: unknown, actual: unknown, tolerance: number, path = '$', out: Difference[] = []): Difference[] {
   if (out.length > 40) return out;
@@ -81,7 +92,7 @@ export function compare(expected: unknown, actual: unknown, tolerance: number, p
     const e = expected as Record<string, unknown>;
     const a = actual as Record<string, unknown>;
     for (const key of Object.keys(e)) compare(e[key], a[key], tolerance, `${path}.${key}`, out);
-    for (const key of Object.keys(a)) if (!(key in e)) out.push({ path: `${path}.${key}`, expected: undefined, actual: a[key] });
+    for (const key of Object.keys(a)) if (!(key in e) && !isAdded(`${path}.${key}`)) out.push({ path: `${path}.${key}`, expected: undefined, actual: a[key] });
     return out;
   }
   if (expected !== actual) out.push({ path, expected, actual });

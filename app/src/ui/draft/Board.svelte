@@ -16,7 +16,7 @@
   </div>
 
   <div class="grid">
-    <TeamColumn side="ally" title="Dein Team" slots={board.allies} bans={board.allyBans} usesLanes={board.usesLanes} onSeat={chooseSeat} onLane={chooseLane} />
+    <TeamColumn side="ally" title="Dein Team" slots={board.allies} bans={board.allyBans} planned={board.allyBanIntents} usesLanes={board.usesLanes} onSeat={chooseSeat} onLane={chooseLane} />
     <div class="clock">
       <Clock turn={board.turnText} mine={board.myTurn} steps={board.steps} />
       <span class="mode">{board.mode}{#if board.modeNote}<span class="note">{board.modeNote}</span>{/if}</span>

@@ -28,6 +28,7 @@ export const SCENES: Scene[] = [
   { id: 'lobby', title: 'Lobby', moment: 'lobby' },
   { id: 'planning', title: 'Planung und Hover', moment: 'planning' },
   { id: 'banning', title: 'Bannen', moment: 'banning' },
+  { id: 'teambans', title: 'Bannen im Team', moment: 'banning' },
   { id: 'picking', title: 'Dein Pick', moment: 'picking' },
   { id: 'teammate', title: 'Teammate am Zug', moment: 'teammate' },
   { id: 'mate', title: 'Teammate gelockt', moment: 'teammate' },
@@ -95,7 +96,7 @@ function load(): Promise<Sources> {
     await loadAssets(snapshot.patch);
     const options = { aramStats: new Map(aram.map((s) => [s.championId, s])) };
     const recordings = new Map<string, { frames: { frame?: GoldenFrame }[] }>();
-    for (const name of ['live-tournament-draft', 'state-myban', 'build-demo', 'state-nachlock', 'state-final', 'state-aram-bench'])
+    for (const name of ['live-tournament-draft', 'state-myban', 'live-ranked', 'build-demo', 'state-nachlock', 'state-final', 'state-aram-bench'])
       recordings.set(name, play(new DraftEngine(snapshot, options), await text(`/tests/recordings/${name}.jsonl`)));
     // A stored draft (README example) has no session to replay; its state is evaluated directly.
     const drafts = new Map<string, { frame: GoldenFrame }>();
@@ -154,6 +155,11 @@ export async function sceneView(id: string): Promise<ViewModel> {
     }
     case 'banning': {
       const frame = lastActive(s.recordings.get('state-myban')!);
+      return draftScene(a, frame, 'banning', s.plans, 'Banns für dich');
+    }
+    // Ranked: the whole team bans at once; the teammates' hovers stand faded in the ban row.
+    case 'teambans': {
+      const frame = lastActive(s.recordings.get('live-ranked')!, (f) => f.state.turn?.action === 'ban' && (f.state.allyBanIntents?.length ?? 0) > 1);
       return draftScene(a, frame, 'banning', s.plans, 'Banns für dich');
     }
     case 'picking': {
