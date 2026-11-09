@@ -98,8 +98,83 @@ internal static class PriorsCommand
 
         PairExpectation(snapshot, meta, repetitions);
 
+        // Own data counts every duel; OP.GG's stored duels are a selection both halves would share.
+        if (complete)
+            CounterReliability(snapshot, meta, repetitions);
+
         return 0;
     }
+
+    private static readonly double[] MixtureShares = [0.02, 0.05, 0.1, 0.2, 0.4];
+    private static readonly double[] MixtureKappas = [25, 50, 100, 200, 400];
+
+    /// <summary>A large deviation: this far from the expectation, on at least this many games in one half.</summary>
+    private const double BigDeviation = 0.08;
+    private const int BigDeviationGames = 40;
+
+    private static readonly (string Name, Lane? Lane)[] LaneGroups =
+        [("Top", Lane.Top), ("Jungle", Lane.Jungle), ("Mid", Lane.Mid), ("Bot", Lane.Adc), ("Support", Lane.Support), ("alle Lanes", null)];
+
+    /// <summary>
+    /// Counters per lane, half against half: how much of a duel's deviation from both champions'
+    /// strength holds in games it was not counted on — with today's linear pull, with the pull that
+    /// lets strong evidence through (<see cref="PairEvidence.Mixture"/>), and for large deviations on
+    /// their own: what share of them the other half shows again, against the share today's smoothing
+    /// keeps. One weight for every lane and every pair is right for the typical pair; this asks
+    /// whether a lane, or a well-counted hard counter, deserves less.
+    /// </summary>
+    private static void CounterReliability(MetaSnapshot snapshot, MetaLookup meta, int repetitions)
+    {
+        var rows = snapshot.Matchups
+            .Where(stat => stat.Play > 0 && stat.Lane != Lane.Unknown)
+            .GroupBy(stat => (stat.Lane, Low: Math.Min(stat.ChampionId, stat.OpponentId), High: Math.Max(stat.ChampionId, stat.OpponentId)))
+            .Select(group => group.OrderByDescending(stat => stat.Play).First())
+            .Select(stat => (stat.Lane, Row: ToEvidence(stat.WinRate, stat.Play, meta.MatchupTarget(stat.ChampionId, stat.OpponentId, stat.Lane))))
+            .ToList();
+
+        var linear = Grid.Select(kappa => (Func<int, int, double, double>)((wins, games, expected) => PairEvidence.Linear(wins, games, expected, kappa))).ToList();
+        var mixtures = (from share in MixtureShares from kappa in MixtureKappas select (Share: share, Kappa: kappa)).ToList();
+        var estimators = linear
+            .Concat(mixtures.Select(m => (Func<int, int, double, double>)((wins, games, expected) => PairEvidence.Mixture(wins, games, expected, m.Share, m.Kappa))))
+            .ToList();
+        var today = Array.IndexOf(Grid, Shrinkage.MatchupPrior);
+        static string Weight(int kappa) => kappa == int.MaxValue ? "∞" : kappa.ToString("N0");
+
+        Console.WriteLine($"=== Counter je Lane, Hälfte gegen Hälfte ({repetitions} Teilungen): was trägt die Abweichung eines Duells von beider Stärke?");
+        Console.WriteLine($"    Log-Loss der zurückgehaltenen Hälfte, 0,000 % = heute (linear, κ = {Shrinkage.MatchupPrior:N0}). Bestwerte auf denselben Teilungen gewählt.");
+        foreach (var (name, lane) in LaneGroups)
+        {
+            var group = rows.Where(entry => lane is null || entry.Lane == lane).Select(entry => entry.Row).ToList();
+            if (group.Count == 0)
+                continue;
+
+            var sorted = group.Select(row => row.Games).Order().ToList();
+            var (tau, kappaMoments) = MethodOfMoments([.. group.Select(row => new Row(row.Wins, row.Games, row.Expected))]);
+            var loss = PairEvidence.HeldOutLoss(group, repetitions, estimators);
+            var reference = loss[today];
+            string Change(int index) => $"{(loss[index] - reference) / reference * 100:+0.000;-0.000;0.000} %";
+            var bestLinear = Enumerable.Range(0, linear.Count).MinBy(index => loss[index]);
+            var bestMixture = Enumerable.Range(linear.Count, mixtures.Count).MinBy(index => loss[index]);
+            var (share, kappa) = mixtures[bestMixture - linear.Count];
+            var confirmation = PairEvidence.Confirm(group, repetitions, BigDeviationGames, BigDeviation, Shrinkage.MatchupPrior);
+
+            Console.WriteLine($"--- {name}: {group.Count:N0} Paare, {group.Sum(row => (long)row.Games):N0} Spiele, Median {sorted[sorted.Count / 2]:N0} je Paar; "
+                + $"Momente τ = {tau * 100:0.00} Punkte → κ ≈ {(double.IsFinite(kappaMoments) ? kappaMoments.ToString("N0") : "∞")}");
+            Console.WriteLine($"    linear: κ = 300 {Change(Array.IndexOf(Grid, 300))} · 1.000 {Change(today)} · 3.000 {Change(Array.IndexOf(Grid, 3000))} · ∞ {Change(Grid.Length - 1)}"
+                + $" → bestes κ = {Weight(Grid[bestLinear])} ({Change(bestLinear)})");
+            Console.WriteLine($"    starke Belege durch: bestes π = {share * 100:0} %, κ₁ = {kappa:0} → {Change(bestMixture)}");
+            Console.WriteLine(confirmation.PairsPerSplit == 0
+                ? $"    große Abweichungen (≥ {BigDeviation * 100:0} Punkte bei ≥ {BigDeviationGames} Spielen in einer Hälfte): keine"
+                : $"    große Abweichungen (≥ {BigDeviation * 100:0} Punkte bei ≥ {BigDeviationGames} Spielen in einer Hälfte): {confirmation.PairsPerSplit:0.0} Paare je Teilung, "
+                    + $"im Mittel {confirmation.MeanGames:0} Spiele; die andere Hälfte zeigt {confirmation.Retained * 100:0} % davon wieder, "
+                    + $"die heutige Glättung behält {confirmation.RetainedToday * 100:0} %");
+        }
+
+        Console.WriteLine();
+    }
+
+    private static PairEvidence.Row ToEvidence(double rate, int games, double expected)
+        => new(Math.Clamp((int)Math.Round(rate * games), 0, games), games, Math.Clamp(expected, 0.01, 0.99));
 
     /// <summary>
     /// Does a duo's rate carry the two champions' own strength? If it does, a duo term centred on
@@ -278,8 +353,8 @@ internal static class PriorsCommand
         {
             foreach (var row in rows)
             {
-                var trainWins = Binomial(random, row.Wins);
-                var trainLosses = Binomial(random, row.Games - row.Wins);
+                var trainWins = PairEvidence.Binomial(random, row.Wins);
+                var trainLosses = PairEvidence.Binomial(random, row.Games - row.Wins);
                 var trainGames = trainWins + trainLosses;
 
                 var testWins = row.Wins - trainWins;
@@ -311,32 +386,4 @@ internal static class PriorsCommand
         return [.. totals.Select(total => total / testGames)];
     }
 
-    /// <summary>
-    /// Binomial(n, ½). Exact by coin flips for small n; above that the normal approximation, whose
-    /// error at these sizes is far below anything the comparison resolves.
-    /// </summary>
-    private static int Binomial(Random random, int n)
-    {
-        if (n <= 0)
-            return 0;
-
-        if (n <= 200)
-        {
-            var count = 0;
-            for (var i = 0; i < n; i++)
-            {
-                if (random.Next(2) == 0)
-                    count++;
-            }
-
-            return count;
-        }
-
-        // Box-Muller.
-        var u1 = 1.0 - random.NextDouble();
-        var u2 = random.NextDouble();
-        var normal = Math.Sqrt(-2 * Math.Log(u1)) * Math.Cos(2 * Math.PI * u2);
-
-        return Math.Clamp((int)Math.Round((n / 2.0) + (normal * Math.Sqrt(n / 4.0))), 0, n);
-    }
 }

@@ -349,6 +349,36 @@ Artefakt vom 09.11. morgens). Kein Gewicht geändert — das kommt mit dem endg�
   (0,0001 im Log-Loss, Gewicht Top 0,16 ± 0,90), weil die Paare erst ein bis fünf Spiele mit Gold
   haben. Mit dem endgültigen Lauf nachmessen.
 
+## 14. Counter je Lane, Hälfte gegen Hälfte (09.11.2026, vorläufig)
+
+Werkzeug: `dotnet run --project src/DraftPilot.Tools -- priors 200 --snapshot meta.json`, Abschnitt
+„Counter je Lane“ (Rechnung in `PairEvidence`, nur für eigene Daten). Daten: 46.277 Spiele, Patch 16.22.
+
+Die Frage: Wie viel der Abweichung eines Duells von beider Stärke zeigt sich in Spielen wieder, auf
+denen es nicht gezählt wurde? Und lässt eine Glättung, die starke Belege durchlässt, echte Hard-Counter
+besser durch als das eine Gewicht von heute (κ = 1.000)?
+
+| Lane | Paare | Median Spiele | τ (Momente) | bestes κ, linear | große Abweichungen: kommen wieder | heute behalten |
+|---|---:|---:|---:|---:|---:|---:|
+| Top | 1.236 | 30 | 1,34 Pkt | 1.200 | 4 % | 5 % |
+| Jungle | 1.332 | 26 | 1,77 Pkt | 3.000 | 1 % | 5 % |
+| Mid | 1.046 | 30 | 0 | ∞ | 5 % | 6 % |
+| Bot | 548 | 40 | 1,52 Pkt | 1.200 | 10 % | 7 % |
+| Support | 900 | 36 | 0 | ∞ | −7 % | 6 % |
+| alle | 5.062 | 30 | 0,80 Pkt | 3.000 | 2 % | 6 % |
+
+- **Große Abweichungen sind mit dieser Datenmenge fast nur Zufall.** Gezählt sind Abweichungen von
+  mindestens 8 Punkten bei mindestens 40 Spielen in einer Hälfte (im Mittel 55–70 Spiele). Die andere
+  Hälfte zeigt davon 1–10 % wieder, die Glättung von heute behält 5–7 %. Die Glättung ist für diese
+  Menge nicht zu stark; je Lane liegt das beste Gewicht bei 1.200 bis unendlich.
+- **Die Glättung, die starke Belege durchlässt** (`PairEvidence.Mixture`: die meisten Paare ohne
+  Effekt, ein Anteil π mit), sagt die andere Hälfte nicht besser voraus; der Unterschied liegt unter
+  0,01 % im Log-Loss, wie bei jedem Gewicht ab 1.000.
+- **Einzelne Hard-Counter** wie Kayle gegen Garen (62 % aus 140 Spielen, rund 3 Standardfehler) sind so
+  nicht von den rund 30 zufälligen Ausreißern je Lane und Teilung zu trennen. Das liegt an den Spielen je
+  Paar, nicht an der Glättung. Mit der vollen Menge (~150.000) und mit Matchups über drei Patches
+  nachmessen; erst dann kann eine Lane oder ein gut gezähltes Paar weniger Glättung verdienen.
+
 ## Was offen bleibt (2.0)
 
 - **ARAM:** Die erste `aram.json` kommt mit dem Lauf vom 07.11. nachmittags; eine lokale Probe hatte
