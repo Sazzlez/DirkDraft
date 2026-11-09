@@ -114,6 +114,9 @@ Ein Platin-Spiel hat rund **15 Lane-Duelle** (280 in 19 Spielen; ein nachgezähl
 davon 10 allein auf Top/Jungle/Mid und 10 unter den vier Bot-Spielern). Deshalb trägt nur **jede achte
 Spielzeile, höchstens 40.000 je Patch**, den Lane-Teil — rund 600.000 Duelle je Patch, etwa 12 MB
 gepackt; alle Zeilen den Lane-Teil tragen zu lassen, hätte den Bestand rund zwanzigmal so groß gemacht.
+Seit Version 3 (09.11.) tragen alle Zeilen Gold und Erfahrung mit 10 min, nur die Duelle bleiben bei
+jeder achten; eine Zeile ohne ihre Duelle schließt mit −1 (`RiotGames.Keep`, `HasDuelSample`). Wer Duelle
+zählt, nimmt nur Zeilen mit `HasDuelSample` — sonst sähe jede übrige wie ein Spiel ohne Duelle aus.
 
 Die Zeilen gehen ins Artefakt `games`; das Modell wird beim Export gerechnet, in die Datendatei
 kommen nur seine Zahlen (Level-Gewicht, Gold-Gewicht, Champion-Stärke je Abschnitt, Paarwerte ab

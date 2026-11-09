@@ -48,6 +48,8 @@ describe('lane gold', () => {
     const gold = [3000, 3100, 3200, 3300, 3400, 3500, 3600, 3700, 3800, 3900];
     const full = [...LINE_SEATS, 1, 30, 0, -1, 0, ...gold, ...gold.map((g) => g * 2)];
     expect(decode(full)!.gold).toEqual(gold);
+    // Format 3: a line without its duels, closed by −1.
+    expect(decode([...full, -1])!.gold).toEqual(gold);
     expect(decode(full.slice(0, 15))!.gold).toBeUndefined();
     const missing = [...full];
     missing[17] = 0;

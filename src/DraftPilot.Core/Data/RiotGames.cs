@@ -8,7 +8,9 @@ namespace DraftPilot.Core.Data;
 /// predicts the winner (docs/draft-konzept.md): which champion played which lane on which side, and
 /// who won, how long it ran and who led after fifteen minutes. Since version 2 also how each lane
 /// stood after ten minutes and every duel between lane opponents — the evidence for the duel scale
-/// in the game view (docs/lane-vergleich.md). No player, no match id, no date.
+/// in the game view (docs/lane-vergleich.md). Since version 3 every line has the ten-minute numbers
+/// (what a matchup does to the laning phase, docs/modellpruefung.md §13) and a sample of lines the
+/// duels. No player, no match id, no date.
 /// </summary>
 public static class RiotGames
 {
@@ -16,13 +18,18 @@ public static class RiotGames
         "[5 × Blau, 5 × Rot, Blau gewinnt (1/0), Dauer in vollen Minuten, Gold-Vorsprung Blau nach 15 Minuten, " +
         "Platz des befragten Spielers (0–9, −1 keiner), seine Mastery-Punkte auf dem Champion, " +
         "10 × Gold nach 10 Minuten, 10 × Erfahrung nach 10 Minuten (je Platz), " +
-        "dann je Lane-Duell: Länge L, danach L Zahlen — Sekunde, Platz Sieger, Platz Verlierer, " +
+        "dann entweder −1 (die Duelle dieser Zeile nicht behalten) " +
+        "oder je Lane-Duell: Länge L, danach L Zahlen — Sekunde, Platz Sieger, Platz Verlierer, " +
         "je Spieler der Lane: Platz, Level, Itemwert, Rüstung aus Items, Magieresistenz aus Items]; " +
         "je Spieler Champion × 8 + Lane + 1 (Lane −1 unbekannt, 0 Top, 1 Jungle, 2 Mid, 3 ADC, 4 Support), " +
         "je Seite nach Lane sortiert, die Plätze 0–9 in dieser Reihenfolge. Lane-Duell: Kill zwischen Lane-Gegnern " +
         "ohne fremde Hilfe (Bot: unter den vier Bot-Spielern, nur der Partner des Siegers hilft). Itemwert: Ladenpreis " +
         "der gehaltenen Items ohne Tränke, Wards, Schmuck und Support-Quest. Dauer, Gold und Erfahrung 0, wo unbekannt. " +
-        "Nur ein Teil der Zeilen trägt den Lane-Teil (ab Platz 15); die übrigen und alle aus Version 1 enden nach 15 Zahlen.";
+        "Gold und Erfahrung (ab Platz 15) trägt seit Version 3 jede Zeile mit gelesener Minute 10, die Duelle nur " +
+        "ein Teil davon. Zeilen ohne Minute 10 und alle aus Version 1 enden nach 15 Zahlen, in Version 2 auch die ohne Duelle.";
+
+    /// <summary>Closes a line whose duels were not kept, so that it never reads as a game without any.</summary>
+    public const int NoDuels = -1;
 
     /// <summary>The moment the early-game lead is read at: the end of the laning phase.</summary>
     public const long EarlyLeadAtMs = 15 * 60_000;
@@ -99,6 +106,32 @@ public static class RiotGames
         return [.. result];
     }
 
+    /// <summary>
+    /// The line as the collector keeps it. With its duels: whole. Without: the draft part and the
+    /// numbers after ten minutes, closed by <see cref="NoDuels"/> — some twenty numbers more per game,
+    /// where the duels would be some three hundred; the draft part alone when no minute ten was read.
+    /// </summary>
+    public static int[] Keep(int[] line, bool withDuels)
+    {
+        if (withDuels || line.Length < FixedLength)
+            return line;
+        for (var at = DraftLength; at < FixedLength; at++)
+        {
+            if (line[at] != 0)
+                return [.. line[..FixedLength], NoDuels];
+        }
+        return line[..DraftLength];
+    }
+
+    /// <summary>Whether the line carries gold and experience after ten minutes.</summary>
+    public static bool HasLanePart(int[] line) => line.Length >= FixedLength;
+
+    /// <summary>
+    /// Whether the line's duels were kept — then an empty list means a game without any. True for every
+    /// version-2 line with the lane part.
+    /// </summary>
+    public static bool HasDuelSample(int[] line) => line.Length == FixedLength || (line.Length > FixedLength && line[FixedLength] != NoDuels);
+
     /// <summary>A player's number back as champion and lane.</summary>
     public static (int ChampionId, Lane Lane) Decode(int player) => (player / 8, (Lane)(player % 8 - 1));
 
@@ -132,8 +165,11 @@ public sealed class PatchGames
 /// </summary>
 public sealed class RiotGamesFile
 {
-    /// <summary>2 since 08.11.2026: lanes after ten minutes and the lane duels (<see cref="RiotGames.Format"/>).</summary>
-    public int Version { get; set; } = 2;
+    /// <summary>
+    /// 2 since 08.11.2026: lanes after ten minutes and the lane duels. 3 since 09.11.2026: the numbers
+    /// after ten minutes in every line, the duels in a sample (<see cref="RiotGames.Format"/>).
+    /// </summary>
+    public int Version { get; set; } = 3;
 
     public string Platform { get; set; } = string.Empty;
 

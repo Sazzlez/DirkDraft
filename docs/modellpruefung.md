@@ -340,8 +340,8 @@ Artefakt vom 09.11. morgens). Kein Gewicht geändert — das kommt mit dem endg�
 - **Der beste Pick bringt** gegenüber dem nach Pickrate gewichteten Durchschnitt +2,8 Punkte (Bot +3,1,
   Support +2,6; nach C +2,9). Nachträglich gerechnet mit allen zehn Champions bekannt, also eine
   Obergrenze.
-- **Lane-Gold nach 10 Minuten, je Lane** (`app/tools/measure/laneGold.ts`; der Sammler behält es seit
-  dem 08.11. für jedes achte Spiel, hier 3.114 Trainingsspiele). Ein Vorsprung von 1.000 Gold ist auf Top, Jungle, Mid und
+- **Lane-Gold nach 10 Minuten, je Lane** (`app/tools/measure/laneGold.ts`; der Sammler behielt es ab dem
+  08.11. für jedes achte Spiel, ab Spiel-Liste Version 3 für jedes; hier 3.114 Trainingsspiele). Ein Vorsprung von 1.000 Gold ist auf Top, Jungle, Mid und
   Bot 13–15 Punkte Winrate wert, auf Support 8. Den Gold-Unterschied bestimmt auf Top das Matchup fast
   so stark wie der Champion (±166 gegen ±186 Gold, 1,9 σ); auf Jungle, Mid, Bot und Support zeigt sich
   kein Matchup. Über das Gold zählt ein Top-Paar ab 31 Spielen halb, über den Sieg bei gleich starkem

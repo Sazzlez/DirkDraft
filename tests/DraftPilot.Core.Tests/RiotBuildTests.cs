@@ -290,8 +290,9 @@ public class RiotBuildTests
         Assert.Equal(10, state.Tally.Builds.Count);
         Assert.Equal(2, state.Meta.Matches);
         Assert.Equal(2, state.Games.Count);                     // one line per counted game, for measuring the model
-        // The first line keeps the lane part (every 8th does; the fixture's timeline has no frames and
-        // no kills, so it is just the empty part), the second ends after the draft.
+        // The first line keeps its duels (every 8th does; the fixture's timeline has no frames and no
+        // kills, so it is just the empty lane part). The second keeps no duels, and without a minute-ten
+        // frame it ends after the draft (RiotGamesTests: with one it keeps minute ten).
         Assert.Equal([RiotGames.FixedLength, RiotGames.DraftLength], state.Games.Select(line => line.Length));
         // The second counted game (the lead's) had one player asked about, by his place in the line.
         Assert.Equal(-1, state.Games[0][13]);
@@ -317,11 +318,11 @@ public class RiotBuildTests
         masteryRefused = true;
         var second = new CollectorState();
         using var secondApi = new RiotApiClient("RGAPI-test", handler, delay: (_, _) => Task.CompletedTask);
-        var secondReport = await new RiotCollector(secondApi, Items, new CollectorOptions { Tiers = ["gold"], Duration = TimeSpan.FromMinutes(1), MaxPages = 1, MasteryEvery = 1, LaneEvery = 1, LaneGamesPerPatch = 1 })
+        var secondReport = await new RiotCollector(secondApi, Items, new CollectorOptions { Tiers = ["gold"], Duration = TimeSpan.FromMinutes(1), MaxPages = 1, MasteryEvery = 1, DuelEvery = 1, DuelGamesPerPatch = 1 })
             .RunAsync(second, _ => { }, stop.Token);
         Assert.Equal(2, secondReport.Counted);
         Assert.All(second.Games, line => Assert.Equal(-1, line[13]));
-        // Every line would keep the lane part, but the patch's share is one.
+        // Every line would keep its duels, but the patch's share is one.
         Assert.Equal([RiotGames.FixedLength, RiotGames.DraftLength], second.Games.Select(line => line.Length));
     }
 

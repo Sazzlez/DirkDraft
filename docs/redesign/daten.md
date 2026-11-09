@@ -32,7 +32,12 @@ Bot-Spielern, nur der Partner des Siegers hilft), mit Sekunde, Sieger, Verlierer
 Lane Level, Itemwert (Ladenpreis der gehaltenen Items ohne Tränke, Wards, Schmuck und Support-Quest),
 Rüstung und Magieresistenz aus Items. Level und Inventar werden aus der Zeitleiste nachgespielt, die der
 Sammler ohnehin holt — keine zusätzliche Anfrage. Gemessen am 08.11.: ein Platin-Spiel hat rund 15 solche
-Duelle (280 in 19 Spielen), daher nur eine Stichprobe; die übrigen Zeilen enden nach 15 Zahlen.
+Duelle (280 in 19 Spielen), daher nur eine Stichprobe.
+
+Seit Version 3 (09.11.2026) trägt **jede** Zeile Gold und Erfahrung nach 10 Minuten — für die Messung,
+was ein Matchup in der Lane-Phase tut (`docs/modellpruefung.md` §13); das sind 20 Zahlen je Spiel, die
+Duelle wären rund 300. Die Duelle bleiben bei jeder achten Zeile; eine Zeile ohne ihre Duelle schließt mit
+−1, damit sie nie als Spiel ohne Duelle gelesen wird. Ohne gelesene Minute 10 endet eine Zeile nach 15 Zahlen.
 
 Die Zeilen liegen im
 Bestand (der laufende Patch und die zwei davor; ein Wechsel der Region verwirft sie) und als Artefakt `games` jedes Laufs (`games.json.gz`, eine Woche

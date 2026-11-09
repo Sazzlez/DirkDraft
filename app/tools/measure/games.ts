@@ -21,7 +21,8 @@ export interface Game {
   minutes: number;
   /**
    * Gold of each player after ten minutes, places 0–9 (blue's five, then red's, in seat order); only
-   * on lines with the lane part (format 2) where every value is known.
+   * on lines with the lane part where every value is known. Format 2 kept it in every eighth line,
+   * format 3 in every line (a line without its duels ends in −1 after the lane part).
    */
   gold?: number[];
 }
