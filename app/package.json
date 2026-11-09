@@ -11,7 +11,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "shots": "playwright test",
-    "measure": "node tools/run.mjs tools/measure/comp.ts"
+    "measure": "node tools/run.mjs tools/measure/comp.ts",
+    "measure:model": "node tools/run.mjs tools/measure/model.ts"
   },
   "devDependencies": {
     "@fontsource-variable/inter": "^5.3.0",

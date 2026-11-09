@@ -8,7 +8,6 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { gunzipSync } from 'node:zlib';
 import { CompAnalyzer, hasIssue, PLAN_NAMES, type CompIssue, type CompProfile, type Plan } from '../../src/core/model/compAnalyzer';
 import { Lane } from '../../src/core/model/lane';
 import { isTagged, MetaLookup, type MetaSnapshot } from '../../src/core/model/metaLookup';
@@ -16,23 +15,11 @@ import { logit } from '../../src/core/model/scoreModel';
 import { TankShred } from '../../src/core/model/tankShred';
 import { TraitTable } from '../../src/core/model/traits';
 import type { RiotBuildFile } from '../../src/core/riotBuilds';
+import { gamesOf, isHeldOut, readGamesFile, type Seat } from './games';
 import { fitLogistic, logLoss, predict, type LogisticFit } from './logistic';
 
-interface Seat {
-  championId: number;
-  lane: Lane;
-}
-
-interface Game {
-  blue: Seat[];
-  red: Seat[];
-  blueWins: number;
-  /** Full minutes, 0 where unknown. */
-  minutes: number;
-}
-
 /** One side as the measurement reads it. */
-interface Side {
+export interface Side {
   profile: CompProfile;
   /** Sum of the poke trait (2.1). */
   poke: number;
@@ -40,7 +27,7 @@ interface Side {
   shredders: number;
 }
 
-interface Feature {
+export interface Feature {
   key: string;
   label: string;
   isNew: boolean;
@@ -79,13 +66,6 @@ const pct = (value: number): string => `${(value * 100).toFixed(1).replace('.', 
 
 const count = (value: number): string => value.toLocaleString('de-DE');
 
-function decode(line: readonly number[]): Game | null {
-  if (line.length < 15) return null;
-  const seats = line.slice(0, 10).map((v) => ({ championId: Math.floor(v / 8), lane: ((v % 8) - 1) as Lane }));
-  if (seats.some((s) => s.championId <= 0)) return null;
-  return { blue: seats.slice(0, 5), red: seats.slice(5), blueWins: line[10] === 1 ? 1 : 0, minutes: Math.max(0, line[11] ?? 0) };
-}
-
 function args(list: readonly string[]): { files: string[]; options: Record<string, string> } {
   const files: string[] = [];
   const options: Record<string, string> = {};
@@ -97,6 +77,18 @@ function args(list: readonly string[]): { files: string[]; options: Record<strin
   return { files, options };
 }
 
+/** One side's comp as the measurement reads it, with the app's rules. */
+export function sideOf(meta: MetaLookup, traits: TraitTable, shred: TankShred, analyzer: CompAnalyzer, seats: readonly Seat[]): Side {
+  let poke = 0;
+  let shredders = 0;
+  for (const s of seats) {
+    const champion = meta.champion(s.championId);
+    poke += traits.for(champion?.key).poke;
+    if (champion && !isTagged(champion, 'Assassin') && shred.has(s.championId, s.lane)) shredders++;
+  }
+  return { profile: analyzer.analyze(seats.map((s) => s.championId)), poke, shredders };
+}
+
 export async function main(argv: string[]): Promise<number> {
   const { files, options } = args(argv);
   if (files.length < 3) {
@@ -104,12 +96,7 @@ export async function main(argv: string[]): Promise<number> {
     return 2;
   }
   const [gamesPath, metaPath, buildsPath] = files as [string, string, string];
-  const gamesFile = JSON.parse(gunzipSync(readFileSync(gamesPath)).toString('utf8')) as {
-    tier: string;
-    platform: string;
-    collectedAtUtc: string;
-    patches: { patch: string; games: number[][] }[];
-  };
+  const gamesFile = readGamesFile(gamesPath);
   const snapshot = JSON.parse(readFileSync(metaPath, 'utf8').replace(/^﻿/, '')) as MetaSnapshot;
   const builds = JSON.parse(readFileSync(buildsPath, 'utf8').replace(/^﻿/, '')) as RiotBuildFile;
   const patch = options.patch ?? snapshot.patch;
@@ -119,7 +106,7 @@ export async function main(argv: string[]): Promise<number> {
   const shred = TankShred.fromBuilds(builds);
   const analyzer = new CompAnalyzer(meta, traits, shred);
 
-  const games = (gamesFile.patches.find((p) => p.patch === patch)?.games ?? []).map(decode).filter((g): g is Game => g !== null);
+  const games = gamesOf(gamesFile, patch);
   if (games.length === 0) {
     console.error(`Keine Spiele für Patch ${patch}.`);
     return 1;
@@ -132,17 +119,7 @@ export async function main(argv: string[]): Promise<number> {
       return sum + logit(meta.laneStat(s.championId, lane)?.winRate ?? 0.5);
     }, 0);
 
-  const side = (seats: Seat[]): Side => {
-    const ids = seats.map((s) => s.championId);
-    let poke = 0;
-    let shredders = 0;
-    for (const s of seats) {
-      const champion = meta.champion(s.championId);
-      poke += traits.for(champion?.key).poke;
-      if (champion && !isTagged(champion, 'Assassin') && shred.has(s.championId, s.lane)) shredders++;
-    }
-    return { profile: analyzer.analyze(ids), poke, shredders };
-  };
+  const side = (seats: Seat[]): Side => sideOf(meta, traits, shred, analyzer, seats);
 
   const rows: { baseline: number; features: number[]; y: number; blue: Side; red: Side; minutes: number }[] = [];
   for (const g of games) {
@@ -171,9 +148,8 @@ export async function main(argv: string[]): Promise<number> {
   const joint = fitLogistic(rows.map(wide), y);
 
   // Held-out games: does the comp predict the winner of games it was not fitted on?
-  const isTest = (i: number) => (Math.imul(i + 1, 2654435761) >>> 0) % 10 < 2;
-  const train = rows.filter((_, i) => !isTest(i));
-  const test = rows.filter((_, i) => isTest(i));
+  const train = rows.filter((_, i) => !isHeldOut(i));
+  const test = rows.filter((_, i) => isHeldOut(i));
   const holdA = fitLogistic(train.map((r) => [r.baseline]), train.map((r) => r.y));
   const holdB = fitLogistic(train.map(wide), train.map((r) => r.y));
   const accuracy = (fit: LogisticFit, withComp: boolean) =>

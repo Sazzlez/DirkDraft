@@ -304,6 +304,35 @@ echte Unterschiede tragen, folgt dieselbe Regel ihnen. Dazu:
 - Items aus dem eigenen Build sind keine Alternative zu ihm (vorher: Kai'Sa „Terminus“, Jinx
   „Klinge der Unendlichkeit“, beide im Kern).
 
+## 13. Modellvergleich A/B — Zwischenstand (09.11.2026, vorläufig)
+
+Werkzeug: `npm run measure:model -- <games.json.gz> <meta.json> [builds.json]` (`app/tools/measure/model.ts`).
+Alle Raten nur aus Trainingsspielen gezählt (für diese selbst ohne das eigene Fünftel), durch die
+MetaLookup der App gelesen; geprüft an 9.248 zurückgehaltenen von 46.277 Spielen (Patch 16.22, Platin,
+Artefakt vom 09.11. morgens). Kein Gewicht geändert — das kommt mit dem endgültigen Lauf (~150.000 Spiele).
+
+| Modell | Log-Loss | Treffer |
+|---|---|---|
+| Münzwurf | 0,6931 | 50,2 % |
+| A: Draft-Chance wie heute | 0,6915 | 53,7 % |
+| A kalibriert | 0,6887 | 53,7 % |
+| Lane-Stärke allein | 0,6890 | 53,9 % |
+| B: Stärke, Duelle je Lane, Synergie und Gegner-Paare je Art, Comp | 0,6890 | 53,4 % |
+
+- **Der Draft allein sagt in Platin wenig voraus:** rund 54 % Treffer, 0,6 % der Unsicherheit erklärt.
+  Weniger als die 55–60 % aus dem Konzept.
+- **Die Draft-Chance ist zu flach:** Sie passt erst mit Steigung 4,2 ± 0,6, liegt also viel zu nah an
+  50 %. Sie mittelt Stärke und Duelle über die Lanes, gemessen zählt die Summe (Lane-Stärke
+  0,85 ± 0,13 je Einheit). Betrifft C2, nach der Messung.
+- **Lane-Stärke trägt fast alles.** Duelle, Synergien und Gegner-Paare sind mit diesen Spielen nicht
+  messbar (Fehlerbalken ±0,5 bis ±2); dafür braucht es die volle Menge und die drei Patches.
+- **Comp:** „AP-Schaden fehlt“ (−0,32 ± 0,19) und „kein Engage“ (−0,36 ± 0,24) sind selten, aber
+  deutlich; die Merkmale aus 2.1 liegen bei null.
+- **Kalibrierung von B gut:** in jedem Bereich weniger als 2,5 Punkte zwischen vorhergesagt und
+  tatsächlich.
+- **Der beste Pick bringt** gegenüber dem nach Pickrate gewichteten Durchschnitt +2,8 Punkte (Bot +3,1,
+  Support +2,6). Nachträglich gerechnet mit allen zehn Champions bekannt, also eine Obergrenze.
+
 ## Was offen bleibt (2.0)
 
 - **ARAM:** Die erste `aram.json` kommt mit dem Lauf vom 07.11. nachmittags; eine lokale Probe hatte

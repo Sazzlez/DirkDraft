@@ -178,7 +178,7 @@ Spiel-Zeilen. Alles zusammen kommt mit 2.1.
 | 1 | Sammler: Gegner-Paare über alle Lanes (`versus`, darin Botlane-Kreuz und Jungle gegen Laner), je Spiel eine Zeile (zehn Champions mit Lane, Sieger, Dauer, Gold nach 15 Minuten). Die App rechnet noch wie heute. | **erledigt 07.11.2026** — zählt ab dem Lauf, der in der Nacht auf den 08.11. startet |
 | 1b | Sammler behält die Spiel-Zeilen der letzten drei Patches (für Synergien und Counter über Patches) | **erledigt 07.11.2026** |
 | 1c | Sammler: Mastery-Stichprobe in der Spiel-Zeile (Punkt 1), Runen, Zauber und Start je Lane-Gegner (Punkt 3) | **erledigt 07.11.2026** |
-| 2 | Messen: A, B und C an Prüfspielen vergleichen; Glättungen, Paar-Arten je Lane, Comp-Merkmale (Werkzeug steht: `npm run measure`), früh/spät; dazu, wie viel der beste Pick gegenüber dem Durchschnitt bringt. Ergebnis in `docs/modellpruefung.md` | nach 5–7 Tagen Sammeln (~150.000 Spiele) |
+| 2 | Messen: A, B und C an Prüfspielen vergleichen; Glättungen, Paar-Arten je Lane, Comp-Merkmale (Werkzeuge stehen: `npm run measure:model` für A/B, `npm run measure` für die Comp; Zwischenstand in `docs/modellpruefung.md` §13), früh/spät; dazu, wie viel der beste Pick gegenüber dem Durchschnitt bringt. Ergebnis in `docs/modellpruefung.md` | nach 5–7 Tagen Sammeln (~150.000 Spiele) |
 | 3 | Bestes Modell in Sammler-Export und App, Anzeige der Teile, Team-Chance, dazu Phase 4 (Punkte 1–3, 5–7), Tests, Release 2.1 | nach Phase 2, Release nur mit deinem OK |
 
 Bleibt wie es ist: Daten nur aus eigener Zählung, keine Namen anderer Spieler, kein automatisches
