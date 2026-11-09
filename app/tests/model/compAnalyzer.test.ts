@@ -192,7 +192,7 @@ describe('CompAnalyzerTests', () => {
 
     a.fit(TankTagged, profile, EMPTY_PROFILE, reasons);
 
-    assertChip(reasons, 'steht vorne', 'pro');
+    assertChip(reasons, 'Frontline', 'pro');
   });
 
   it('Fit_RewardsBringingEngage', () => {
@@ -368,7 +368,7 @@ describe('CompAnalyzerTests', () => {
 
     expect(score).not.toBeNull();
     expect(score!).toBeGreaterThan(0);
-    assertChip(reasons, 'Engage auf', 'pro');
+    assertChip(reasons, 'Disengage', 'pro');
   });
 
   it('Fit_StaysSilentOnPeelWhenTheEnemyCannotEngage', () => {

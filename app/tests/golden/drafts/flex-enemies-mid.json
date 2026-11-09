@@ -441,9 +441,9 @@
               "hint": "Aus 1.561 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
             },
             {
-              "text": "h\u00E4lt ihr Engage auf",
+              "text": "Disengage",
               "tone": "pro",
-              "hint": "Der Gegner hat einen Champ, der einen Teamfight von sich aus starten kann. Dieser Pick kann die Getroffenen wieder herausholen \u2014 sonst entscheidet ihr Anspiel den Kampf."
+              "hint": "Der Gegner hat einen Champ, der einen Teamfight von sich aus starten kann. Dieser Pick kann die Getroffenen wieder herausholen (Disengage) \u2014 sonst entscheidet ihr Anspiel den Kampf."
             }
           ],
           "breakdown": [
@@ -624,9 +624,9 @@
               "hint": "OP.GGs eigene Einstufung f\u00FCr Midlane, von OP (st\u00E4rkste) \u00FCber S bis D (schw\u00E4chste). Z\u00E4hlt nicht in die Prozentzahl: sie mischt Winrate und Pickrate, und die Winrate steckt schon drin."
             },
             {
-              "text": "h\u00E4lt ihr Engage auf",
+              "text": "Disengage",
               "tone": "pro",
-              "hint": "Der Gegner hat einen Champ, der einen Teamfight von sich aus starten kann. Dieser Pick kann die Getroffenen wieder herausholen \u2014 sonst entscheidet ihr Anspiel den Kampf."
+              "hint": "Der Gegner hat einen Champ, der einen Teamfight von sich aus starten kann. Dieser Pick kann die Getroffenen wieder herausholen (Disengage) \u2014 sonst entscheidet ihr Anspiel den Kampf."
             }
           ],
           "breakdown": [
@@ -741,9 +741,9 @@
           "uncertaintyPoints": 1.0870395854872028,
           "reasons": [
             {
-              "text": "h\u00E4lt ihr Engage auf",
+              "text": "Disengage",
               "tone": "pro",
-              "hint": "Der Gegner hat einen Champ, der einen Teamfight von sich aus starten kann. Dieser Pick kann die Getroffenen wieder herausholen \u2014 sonst entscheidet ihr Anspiel den Kampf."
+              "hint": "Der Gegner hat einen Champ, der einen Teamfight von sich aus starten kann. Dieser Pick kann die Getroffenen wieder herausholen (Disengage) \u2014 sonst entscheidet ihr Anspiel den Kampf."
             }
           ],
           "breakdown": [

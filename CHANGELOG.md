@@ -21,6 +21,8 @@ Kopien melden sie beim nächsten Start.
   Daten tragen jetzt je Champion den durchschnittlichen Schaden an Champions je Spiel, und die
   AD/AP-Anteile in der Comp-Kachel und in den Befunden („AP-Schaden fehlt“) richten sich danach. Wo
   die Zahl fehlt (ältere Datei, neuer Champion), wird für diese Seite wie bisher nach Köpfen gezählt.
+- Die Chips sprechen League: „Frontline“ statt „steht vorne“, „Peel“ statt „schützt deine Carrys“,
+  „Disengage“ statt „hält ihr Engage auf“. Der Hinweis darunter erklärt weiter, was gemeint ist.
 - **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items
   stehen ohnehin in der Matchup-Kachel und in der Spielansicht.
 - **Ein Klick auf einen Teammate, der gelockt hat, zeigt sein Matchup** wie das eigene nach dem

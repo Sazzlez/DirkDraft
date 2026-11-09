@@ -198,8 +198,8 @@ export class CompAnalyzer {
         score += 0.4;
         reasons.push(
           pro(
-            'steht vorne',
-            'In deinem Team ist noch niemand, der im Teamfight vorne stehen und Schaden abfangen kann — ohne so einen Champ trifft alles direkt die Carrys.',
+            'Frontline',
+            'In deinem Team ist noch niemand, der im Teamfight vorne stehen und Schaden abfangen kann (Frontline) — ohne so einen Champ trifft alles direkt die Carrys.',
           ),
         );
       }
@@ -230,7 +230,7 @@ export class CompAnalyzer {
         score += 0.25;
         reasons.push(
           pro(
-            'schützt deine Carrys',
+            'Peel',
             'Niemand in deinem Team kann Gegner von den eigenen Carrys wegdrängen (Peel). Ein Assassine kommt so ungestört durch.',
           ),
         );
@@ -316,8 +316,8 @@ export class CompAnalyzer {
         score += 0.3;
         reasons.push(
           pro(
-            'hält ihr Engage auf',
-            'Der Gegner hat einen Champ, der einen Teamfight von sich aus starten kann. Dieser Pick kann die Getroffenen wieder herausholen — sonst entscheidet ihr Anspiel den Kampf.',
+            'Disengage',
+            'Der Gegner hat einen Champ, der einen Teamfight von sich aus starten kann. Dieser Pick kann die Getroffenen wieder herausholen (Disengage) — sonst entscheidet ihr Anspiel den Kampf.',
           ),
         );
       }
