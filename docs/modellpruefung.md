@@ -304,7 +304,7 @@ echte Unterschiede tragen, folgt dieselbe Regel ihnen. Dazu:
 - Items aus dem eigenen Build sind keine Alternative zu ihm (vorher: Kai'Sa „Terminus“, Jinx
   „Klinge der Unendlichkeit“, beide im Kern).
 
-## 13. Modellvergleich A/B — Zwischenstand (09.11.2026, vorläufig)
+## 13. Modellvergleich A/B/C — Zwischenstand (09.11.2026, vorläufig)
 
 Werkzeug: `npm run measure:model -- <games.json.gz> <meta.json> [builds.json]` (`app/tools/measure/model.ts`).
 Alle Raten nur aus Trainingsspielen gezählt (für diese selbst ohne das eigene Fünftel), durch die
@@ -318,6 +318,8 @@ Artefakt vom 09.11. morgens). Kein Gewicht geändert — das kommt mit dem endg�
 | A kalibriert | 0,6887 | 53,7 % |
 | Lane-Stärke allein | 0,6890 | 53,9 % |
 | B: Stärke, Duelle je Lane, Synergie und Gegner-Paare je Art, Comp | 0,6890 | 53,4 % |
+| C ohne Paare: Stärken je Champion und Lane gemeinsam gelernt, Comp | 0,6883 | 54,0 % |
+| C: dazu Synergie und Counter aus 2 gelernten Merkmalen je Champion und Lane | 0,6882 | 54,1 % |
 
 - **Der Draft allein sagt in Platin wenig voraus:** rund 54 % Treffer, 0,6 % der Unsicherheit erklärt.
   Weniger als die 55–60 % aus dem Konzept.
@@ -330,8 +332,14 @@ Artefakt vom 09.11. morgens). Kein Gewicht geändert — das kommt mit dem endg�
   deutlich; die Merkmale aus 2.1 liegen bei null.
 - **Kalibrierung von B gut:** in jedem Bereich weniger als 2,5 Punkte zwischen vorhergesagt und
   tatsächlich.
+- **Modell C** (`tools/measure/factor.ts`, Konzept §4) ist knapp das beste, aber im Rauschen: 0,0009 vor B.
+  Sein Vorsprung kommt aus den gemeinsam gelernten Stärken. Synergie und Counter aus gelernten Merkmalen
+  bewegen die Vorhersage kaum: Streuung 0,0 und 0,4 Punkte, gegenüber 4,5 für die Stärke und 1,4 für die
+  Comp. Regularisierung auf einem Validierungsteil gewählt, Optimum innen im Gitter (L2 0,003 auf den
+  Stärken).
 - **Der beste Pick bringt** gegenüber dem nach Pickrate gewichteten Durchschnitt +2,8 Punkte (Bot +3,1,
-  Support +2,6). Nachträglich gerechnet mit allen zehn Champions bekannt, also eine Obergrenze.
+  Support +2,6; nach C +2,9). Nachträglich gerechnet mit allen zehn Champions bekannt, also eine
+  Obergrenze.
 
 ## Was offen bleibt (2.0)
 
