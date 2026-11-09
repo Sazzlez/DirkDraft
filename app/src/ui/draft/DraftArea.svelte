@@ -9,6 +9,7 @@
   import CompTile from './CompTile.svelte';
   import OpenRolesTile from './OpenRolesTile.svelte';
   import VerdictTile from './VerdictTile.svelte';
+  import TeamPlanTile from './TeamPlanTile.svelte';
 
   let { view }: { view: ViewModel } = $props();
   const main = $derived(view.main);
@@ -38,7 +39,9 @@
   {#if view.side.length > 0}
     <div class="side">
       {#each view.side as tile, i (i)}
-        {#if tile.kind === 'chance'}
+        {#if tile.kind === 'team'}
+          <div class="wide"><TeamPlanTile team={tile.team} /></div>
+        {:else if tile.kind === 'chance'}
           <ChanceTile chance={tile.chance} />
         {:else if tile.kind === 'comp'}
           <CompTile comp={tile.comp} />
@@ -81,6 +84,11 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     gap: 12px;
+  }
+
+  /* The team plan needs the whole side column: five rows with names and lanes. */
+  .wide {
+    grid-column: 1 / -1;
   }
 
   @container app (max-width: 1099px) {

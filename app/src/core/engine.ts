@@ -22,6 +22,7 @@ import { isAram, usesLanes, type QueueKind } from './model/queue';
 import { isGate, Recommender, termGate, termLabel, termPoints, type Recommendation, type RecommendationSet } from './model/recommender';
 import { countLeadingTies, decimalsOf, errorAsPoints } from './model/scoreError';
 import { TankShred } from './model/tankShred';
+import { planTeam, type TeamPlan } from './model/teamPlanner';
 import { TraitTable } from './model/traits';
 import { TurnTracker, type RecommendationTarget } from './model/turnTracker';
 import priors from './model/data/pick_order_priors.json';
@@ -133,6 +134,8 @@ export interface DraftFrame {
   gap?: { cellId: number; count: number; findings: FrameProfile['findings'] } | null;
   /** New in 2.1: where the advised seat stands in the pick order (pickHintOf). */
   pickHint?: PickHint | null;
+  /** New in 2.1 (D1): the open seats planned together, in team mode only. */
+  teamPlan?: { picks: { cellId: number; lane: LaneName; item: FrameItem }[]; first: number | null; last: number | null } | null;
 }
 
 /** What the pick position means for the advised seat's list. */
@@ -216,6 +219,13 @@ export class DraftEngine {
    * teammate's seat and never bans (1.5's ownership filter). Reset with every new draft, because
    * the free rotation and the account can change between drafts.
    */
+  /** D1: plan the own team's open seats together (setting "Team-Modus", off by default). */
+  private teamMode = false;
+
+  setTeamMode(on: boolean): void {
+    this.teamMode = on;
+  }
+
   setSelectable(ids: ReadonlySet<number> | null): void {
     this.selectable = ids && ids.size > 0 ? ids : null;
   }
@@ -390,6 +400,7 @@ export class DraftEngine {
       aramBench: bench,
       gap,
       pickHint,
+      teamPlan: this.teamMode && state.isActive && usesLanes(state.queue) ? frameTeamPlan(planTeam(recommender, meta, state, enemyPredictions, allyPredictions, this.selectable)) : null,
     };
   }
 }
@@ -477,6 +488,13 @@ const framePredictions = (result: LanePredictionResult): FramePrediction[] =>
     isManual: p.isManual,
     isUncertain: isUncertain(p),
   }));
+
+const frameTeamPlan = (plan: TeamPlan | null): DraftFrame['teamPlan'] =>
+  plan && {
+    picks: plan.picks.map((p) => ({ cellId: p.cellId, lane: laneKey(p.lane), item: frameItem(p.item) })),
+    first: plan.first,
+    last: plan.last,
+  };
 
 const gapOf = (cellId: number, p: CompProfile): NonNullable<DraftFrame['gap']> => ({
   cellId,

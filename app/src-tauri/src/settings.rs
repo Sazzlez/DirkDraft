@@ -88,6 +88,7 @@ impl Settings {
             "showUnowned": self.flag(SHOW_UNOWNED.0, SHOW_UNOWNED.1),
             "glassEffect": self.flag(GLASS_EFFECT.0, GLASS_EFFECT.1),
             "diagnostics": self.diagnostics(),
+            "teamMode": self.flag(TEAM_MODE.0, TEAM_MODE.1),
             "flashKey": if self.text(FLASH_KEY).as_deref() == Some("D") { "D" } else { "F" },
         })
     }
@@ -138,10 +139,12 @@ pub const GLASS_EFFECT: (&str, bool) = ("glassEffect", true);
 /// Off unless switched on: only the developer's own machine needs it (user's word, 07.11.2026); the
 /// small log (logfile.rs) runs everywhere, so "Diagnose speichern" still helps a friend with a fault.
 pub const DIAGNOSTICS: (&str, bool) = ("diagnostics", false);
+/// 2.1: plan the own team's open seats together, for a fixed five in Flex (D1). Off by default.
+pub const TEAM_MODE: (&str, bool) = ("teamMode", false);
 /// An empty file of this name next to settings.json switches the recording on by default.
 pub const DIAGNOSTICS_MARKER: &str = "diagnostics.on";
 
-const FLAGS: [&str; 7] = [
+const FLAGS: [&str; 8] = [
     AUTO_SHOW_ON_CHAMP_SELECT.0,
     AUTO_SHOW_ON_GAME_START.0,
     AUTO_HIDE_AFTER_CHAMP_SELECT.0,
@@ -149,6 +152,7 @@ const FLAGS: [&str; 7] = [
     SHOW_UNOWNED.0,
     GLASS_EFFECT.0,
     DIAGNOSTICS.0,
+    TEAM_MODE.0,
 ];
 
 #[cfg(test)]
@@ -195,6 +199,9 @@ mod tests {
         assert!(settings.set_from_page("flashKey", Value::from("Q")).is_err());
         assert!(settings.set_from_page("showUnowned", Value::from(true)).is_ok());
         assert!(settings.set_from_page("showUnowned", Value::from("ja")).is_err());
+        assert_eq!(page["teamMode"], false);
+        assert!(settings.set_from_page("teamMode", Value::from(true)).is_ok());
+        assert_eq!(settings.page()["teamMode"], true);
         assert!(settings.set_from_page("poolAdded", serde_json::json!([122, 86])).is_err());
         assert!(settings.set_from_page("lockfilePath", Value::from("C:\\x")).is_err());
         assert!(settings.set_from_page("trayHintShown", Value::from(false)).is_err());

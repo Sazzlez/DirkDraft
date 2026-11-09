@@ -43,6 +43,11 @@ Kopien melden sie beim nächsten Start.
 - **Flex-Picks.** Ist ein Vorschlag auf mindestens zwei Lanes stark, die in eurem Team noch offen
   sind, trägt er den Chip „Flex: Top oder Mid“. Der Gegner sieht dann den Champion, aber nicht seine
   Lane. Zählt nicht in die Prozentzahl.
+- **Team-Modus** (Einstellungen, standardmäßig aus) für Flex mit festem Team: Die Kachel „Team-Plan“
+  plant die offenen Plätze gemeinsam — die beste Kombination ohne doppelte Champions, mit der
+  Synergie zwischen den neuen Picks — und schlägt eine Reihenfolge vor: zuerst der Pick mit den
+  wenigsten offenen Countern (Flex-Picks zählen einen weniger), zuletzt der am leichtesten zu
+  kontern ist. Hat niemand offene Counter, steht keine Reihenfolge da.
 - Die Chips sprechen League: „Frontline“ statt „steht vorne“, „Peel“ statt „schützt deine Carrys“,
   „Disengage“ statt „hält ihr Engage auf“. Der Hinweis darunter erklärt weiter, was gemeint ist.
 - **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items

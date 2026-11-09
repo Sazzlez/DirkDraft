@@ -115,6 +115,7 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
 
   onSettings((s) => {
     session.setShowUnowned(s.showUnowned);
+    session.setTeamMode(s.teamMode);
     askSelectable();
     render();
   });

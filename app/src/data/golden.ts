@@ -28,6 +28,7 @@ import {
   type CompView,
   type GapLine,
   type PickNote,
+  type TeamPlanView,
   type DraftChanceView,
   type HoverView,
   type ItemOption,
@@ -64,6 +65,7 @@ export interface GoldenItem {
   breakdown: { kind: string; logOdds: number | null; points: number; isGate: boolean; gate: number; label: string }[];
   /** New in 2.1 (engine.ts). */
   openCounters?: number;
+  flexLanes?: string[];
 }
 
 export interface GoldenSet {
@@ -125,6 +127,8 @@ export interface GoldenFrame {
   /** New in 2.1 (engine.ts): the own team's gaps for the seat about to pick. */
   gap?: { cellId: number; count: number; findings: { issue: string; text: string; severity: number }[] } | null;
   /** New in 2.1 (engine.ts, pickHintOf). */
+  /** New in 2.1 (engine.ts, D1). */
+  teamPlan?: { picks: { cellId: number; lane: string; item: GoldenItem }[]; first: number | null; last: number | null } | null;
   pickHint?: {
     risky: { championId: number; counters: number } | null;
     safest: { championId: number; counters: number } | null;
@@ -350,6 +354,48 @@ export class GoldenAdapter {
     if (!hint.gapFirst) return null;
     const line = this.gapLine(frame);
     return line ? { kind: 'gap', line } : null;
+  }
+
+  /** D1: the team plan as a tile; null outside team mode. */
+  teamPlan(frame: GoldenFrame): TeamPlanView | null {
+    const plan = frame.teamPlan;
+    if (!plan || plan.picks.length === 0) return null;
+    const s = frame.state;
+    const label = (cellId: number) => {
+      const slot = s.allies.find((a) => a.cellId === cellId);
+      return cellId === s.localCellId ? 'Du' : `Teammate ${(slot?.index ?? 0) + 1}`;
+    };
+    const why = (item: GoldenItem) =>
+      item.flexLanes
+        ? 'Flex'
+        : item.openCounters === undefined
+          ? 'Lane-Gegner bekannt'
+          : item.openCounters === 0
+            ? 'kein offener Counter'
+            : item.openCounters === 1
+              ? '1 offener Counter'
+              : `${item.openCounters} offene Counter`;
+    const rows = plan.picks.map((p) => ({
+      cellId: p.cellId,
+      label: label(p.cellId),
+      lane: toLane(p.lane),
+      champion: this.champion(p.item.championId) ?? { id: p.item.championId, key: '', name: p.item.name },
+      value: percent(p.item.score, 0),
+      flex: p.item.reasons.find((r) => r.text.startsWith('Flex: '))?.text ?? null,
+      order: p.cellId === plan.first ? ('first' as const) : p.cellId === plan.last ? ('last' as const) : null,
+      isMe: p.cellId === s.localCellId,
+    }));
+    const first = plan.picks.find((p) => p.cellId === plan.first);
+    const last = plan.picks.find((p) => p.cellId === plan.last);
+    const name = (p: (typeof plan.picks)[number]) => this.champion(p.item.championId)?.name ?? p.item.name;
+    return {
+      rows,
+      order:
+        first && last
+          ? `Zuerst ${label(first.cellId)} mit ${name(first)} (${why(first.item)}), zuletzt ${label(last.cellId)} mit ${name(last)} (${why(last.item)}).`
+          : null,
+      note: 'Die beste Kombination für die offenen Plätze, mit der Synergie zwischen den neuen Picks. Wie sich ihre Comp gegenseitig ergänzt, ist nicht eingerechnet.',
+    };
   }
 
   /** B3: what each line-up is built around, and what that side wants from the game. */

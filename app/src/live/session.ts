@@ -90,6 +90,7 @@ export class LiveSession {
       aramRounded: !set.aram,
       tankShred: TankShred.fromBuilds(set.builds),
     });
+    this.engine.setTeamMode(this.teamMode);
     this.applyPatchLag();
     // New numbers arrive only while idle (core/refresh), but a kept session is re-evaluated anyway —
     // the first start may swap them in during a draft, and the new engine must keep its filter.
@@ -289,6 +290,8 @@ export class LiveSession {
       side.push({ kind: 'comp', comp: this.adapter.comp(frame) });
     } else if (moment === 'banning' && frame.bans) {
       main = { kind: 'bans', tile: this.adapter.pickTile(frame.bans, frame, forMe ? 'Banns für dich' : `Banns für ${target!.label}`) };
+      const team = this.adapter.teamPlan(frame);
+      if (team) side.push({ kind: 'team', team });
       side.push({ kind: 'openRoles', roles: this.adapter.openRoles(frame) });
       side.push({ kind: 'chance', chance: this.adapter.chance(frame) });
       side.push({ kind: 'comp', comp: this.adapter.comp(frame) });
@@ -300,6 +303,8 @@ export class LiveSession {
       // "Dein Hover" ranks the own hover on the own lane; over a teammate's list it would mislead.
       if (!forMe) tile.hover = null;
       main = { kind: 'picks', tile };
+      const team = this.adapter.teamPlan(frame);
+      if (team) side.push({ kind: 'team', team });
       side.push({ kind: 'chance', chance: this.adapter.chance(frame) });
       side.push({ kind: 'comp', comp: this.adapter.comp(frame) });
     } else {
@@ -307,6 +312,16 @@ export class LiveSession {
     }
 
     return { ...base, board, main, side, build, emptyText };
+  }
+
+  /** D1: plan the open seats together (setting "Team-Modus"). */
+  private teamMode = false;
+
+  setTeamMode(on: boolean): void {
+    if (this.teamMode === on) return;
+    this.teamMode = on;
+    this.engine?.setTeamMode(on);
+    if (this.session) this.onSession(this.session, this.sessionAt);
   }
 
   /** A click on an ally seat: its list until the clock passes to someone else (1.5's TurnTracker). */

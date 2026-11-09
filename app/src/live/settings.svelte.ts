@@ -18,6 +18,8 @@ export interface AppSettings {
   glassEffect: boolean;
   /** The last drafts and games recorded locally (scrubbed) for finding faults. */
   diagnostics: boolean;
+  /** 2.1: plan the own team's open seats together (Flex with a fixed five). */
+  teamMode: boolean;
 }
 
 /** 1.5's defaults, and F for Flash (user's rule). */
@@ -30,6 +32,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   flashKey: 'F',
   glassEffect: true,
   diagnostics: false,
+  teamMode: false,
 };
 
 export const settings = $state<AppSettings>({ ...DEFAULT_SETTINGS });

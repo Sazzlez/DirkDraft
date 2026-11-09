@@ -34,6 +34,7 @@ export const SCENES: Scene[] = [
   { id: 'lastpick', title: 'Letzter Pick', moment: 'picking' },
   { id: 'teammate', title: 'Teammate am Zug', moment: 'teammate' },
   { id: 'mate', title: 'Teammate gelockt', moment: 'teammate' },
+  { id: 'team', title: 'Team-Modus', moment: 'picking' },
   { id: 'locked', title: 'Gelockt', moment: 'locked' },
   { id: 'loading', title: 'Finalisierung', moment: 'loading' },
   { id: 'aram', title: 'ARAM-Bank', moment: 'aramBench' },
@@ -197,6 +198,17 @@ export async function sceneView(id: string): Promise<ViewModel> {
       live.onSession((sessionOf.get(lastActive(s.recordings.get('build-demo')!)) as Record<string, unknown> | undefined) ?? null);
       const mate = live.view().board?.allies.find((slot) => !slot.isMe && slot.canTarget && slot.champion && !slot.hovering && slot.lane);
       if (mate) live.selectSeat(mate.cellId);
+      return { ...live.view(), sampleNote: SAMPLE };
+    }
+    // Team mode (D1): the open seats planned together, from the live session itself.
+    case 'team': {
+      const live = new LiveSession();
+      live.setData({ meta: s.meta.snapshot, builds: null, aram: null, situational: null, fresh: true, changed: false, problems: [] });
+      live.setTeamMode(true);
+      live.onStatus(CONNECTED_STATUS);
+      live.onPhase('ChampSelect');
+      const frame = lastActive(s.recordings.get('live-ranked')!, (f) => f.state.turn?.action === 'pick' && f.state.turn.isLocalPlayer && f.state.allies.every((slot) => !slot.lockedChampionId));
+      live.onSession((sessionOf.get(frame) as Record<string, unknown> | undefined) ?? null);
       return { ...live.view(), sampleNote: SAMPLE };
     }
     case 'locked': {

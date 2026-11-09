@@ -343,7 +343,27 @@ export type MainTile =
   | { kind: 'lobby'; title: string; lines: { label: string; value: string; tone: Tone }[] }
   | { kind: 'none' };
 
+/** D1: the open seats of the own team planned together (team mode). */
+export interface TeamPlanView {
+  rows: {
+    cellId: number;
+    /** "Du", "Teammate 3". */
+    label: string;
+    lane: Lane | null;
+    champion: ChampionRef;
+    value: string;
+    /** "Flex: Top oder Mid". */
+    flex: string | null;
+    order: 'first' | 'last' | null;
+    isMe: boolean;
+  }[];
+  /** "Zuerst Teammate 5 mit Rakan (Flex), zuletzt Du mit Darius (3 offene Counter)." */
+  order: string | null;
+  note: string;
+}
+
 export type SideTile =
+  | { kind: 'team'; team: TeamPlanView }
   | { kind: 'chance'; chance: DraftChanceView }
   | { kind: 'comp'; comp: CompView }
   | { kind: 'openRoles'; roles: OpenRolesView }
