@@ -103,7 +103,7 @@
       <label class="row">
         <span class="text">
           <b>Team-Modus</b>
-          <small>Für Flex mit festem Team: plant die offenen Plätze gemeinsam, schlägt eine Pick-Reihenfolge und fünf abgestimmte Bans vor.</small>
+          <small>Für Flex mit festem Team: plant die offenen Plätze gemeinsam, schlägt eine Pick-Reihenfolge und fünf abgestimmte Banns vor.</small>
         </span>
         <input type="checkbox" role="switch" checked={settings.teamMode} onchange={(e) => void changeSetting('teamMode', e.currentTarget.checked)} />
       </label>
