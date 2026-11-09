@@ -21,6 +21,7 @@ import { MetaLookup, type MetaSnapshot } from './model/metaLookup';
 import { isAram, usesLanes, type QueueKind } from './model/queue';
 import { isGate, Recommender, termGate, termLabel, termPoints, type Recommendation, type RecommendationSet } from './model/recommender';
 import { countLeadingTies, decimalsOf, errorAsPoints } from './model/scoreError';
+import { TankShred } from './model/tankShred';
 import { TraitTable } from './model/traits';
 import { TurnTracker, type RecommendationTarget } from './model/turnTracker';
 import priors from './model/data/pick_order_priors.json';
@@ -179,6 +180,8 @@ export interface EngineOptions {
   aramStats?: ReadonlyMap<number, AramStat>;
   /** Whether the ARAM rates are rounded to whole percent (OP.GG) rather than counted exactly (own data). */
   aramRounded?: boolean;
+  /** Who shreds tanks, from the own build file (B4); none without one. */
+  tankShred?: TankShred;
 }
 
 export class DraftEngine {
@@ -187,6 +190,7 @@ export class DraftEngine {
   readonly seats: SeatPriors;
   readonly aramStats: ReadonlyMap<number, AramStat>;
   readonly aramRounded: boolean;
+  private readonly shred: TankShred;
 
   private readonly turns = new TurnTracker();
   private wasActive = false;
@@ -199,6 +203,7 @@ export class DraftEngine {
     this.seats = options.seats ?? SeatPriors.fromJson(priors);
     this.aramStats = options.aramStats ?? new Map();
     this.aramRounded = options.aramRounded ?? true;
+    this.shred = options.tankShred ?? TankShred.none;
   }
 
   /** Champions the local player may pick (owned or free this week); null until the client said. */
@@ -279,8 +284,8 @@ export class DraftEngine {
     const manual = this.manualLanes.size > 0 ? this.manualLanes : null;
     const enemyPredictions = predictor.predict(state.enemies, manual);
     const allyPredictions = predictor.predict(state.allies, manual);
-    const comp = new CompAnalyzer(meta, this.traits);
-    const recommender = new Recommender(meta, this.traits);
+    const comp = new CompAnalyzer(meta, this.traits, this.shred);
+    const recommender = new Recommender(meta, this.traits, this.shred);
 
     let picks: FrameSet | null = null;
     let bans: FrameSet | null = null;

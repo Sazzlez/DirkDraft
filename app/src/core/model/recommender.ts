@@ -24,6 +24,7 @@ import {
   tierName,
 } from './scoreModel';
 import { MATCHUP_PRIOR, SYNERGY_PRIOR } from './shrinkage';
+import { TankShred } from './tankShred';
 import type { TraitTable } from './traits';
 import type { RecommendationTarget } from './turnTracker';
 
@@ -202,8 +203,9 @@ export class Recommender {
   constructor(
     private readonly meta: MetaLookup,
     traits: TraitTable,
+    shred: TankShred = TankShred.none,
   ) {
-    this.comp = new CompAnalyzer(meta, traits);
+    this.comp = new CompAnalyzer(meta, traits, shred);
   }
 
   recommend(
@@ -305,7 +307,7 @@ export class Recommender {
         ? this.mainLaneLogOdds(candidate, lane, reasons, budget)
         : this.laneLogOdds(candidate, lane, reasons, budget);
 
-    const compFit = this.comp.fit(candidate, seat.allyComp, seat.enemyComp, reasons);
+    const compFit = this.comp.fit(candidate, seat.allyComp, seat.enemyComp, reasons, lane);
 
     const counters = openLaneBlocked ? this.addCounterRisk(candidate, lane, openLaneBlocked, reasons) : undefined;
 

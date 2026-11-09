@@ -21,6 +21,7 @@ import { GoldenAdapter, type GoldenFrame } from '../data/golden';
 import { dataLine, dataLineShort, type DataSet } from '../data/remote';
 import { draftStateFrom } from '../core/model/draftState';
 import { patchesBetween, patchLine } from '../core/model/patchVersion';
+import { TankShred } from '../core/model/tankShred';
 import { draftSteps, simultaneousTurn } from '../core/steps';
 
 export interface ClientStatus {
@@ -87,6 +88,7 @@ export class LiveSession {
       traits: this.traits,
       aramStats: set.aram ? aramStatsFrom(set.aram) : undefined,
       aramRounded: !set.aram,
+      tankShred: TankShred.fromBuilds(set.builds),
     });
     this.applyPatchLag();
     // New numbers arrive only while idle (core/refresh), but a kept session is re-evaluated anyway —

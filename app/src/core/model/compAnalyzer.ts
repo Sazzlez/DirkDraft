@@ -4,6 +4,8 @@
 import { DamageType, hasStaticData, isRanged, isTagged, type ChampionEntry, type MetaLookup } from './metaLookup';
 import { contra, neutral, pro, type Reason } from './reason';
 import { clamp } from './scoreModel';
+import { Lane } from './lane';
+import { TankShred } from './tankShred';
 import { hasHardCc, hasHardEngage, hasPeel, type ChampionTraits, type TraitTable } from './traits';
 
 export type CompIssue =
@@ -92,6 +94,7 @@ export class CompAnalyzer {
   constructor(
     private readonly meta: MetaLookup,
     private readonly traits: TraitTable,
+    private readonly shred: TankShred = TankShred.none,
   ) {}
 
   analyze(championIds: readonly number[]): CompProfile {
@@ -190,7 +193,8 @@ export class CompAnalyzer {
   }
 
   /** How much the candidate covers the gaps, -1..+1; null where no rule could fire either way. */
-  fit(candidateId: number, profile: CompProfile, enemies: CompProfile, reasons: Reason[]): number | null {
+  /** `lane`: the seat's lane, for what the candidate builds there (B4); Unknown reads any lane. */
+  fit(candidateId: number, profile: CompProfile, enemies: CompProfile, reasons: Reason[], lane: Lane = Lane.Unknown): number | null {
     const champion = this.meta.champion(candidateId);
     if (!champion || (profile.count === 0 && enemies.count < MINIMUM_ENEMIES_TO_JUDGE)) return null;
 
@@ -347,6 +351,20 @@ export class CompAnalyzer {
           contra(
             'kommt schwer an ihre Carrys',
             'Der Gegner hat schon zwei Champs, die vorne stehen und Schaden aushalten. Sie stehen genau zwischen diesem Pick und den Zielen, für die er gebaut ist.',
+          ),
+        );
+      }
+
+      // The counterpart of the assassin rule, from what players build: through armour, resist and
+      // health. Assassins are left out — against two frontliners they already get the contra above.
+      if (enemies.frontlineCount >= 2 && !isTagged(champion, 'Assassin') && this.shred.has(candidateId, lane)) {
+        score += 0.25;
+        reasons.push(
+          pro(
+            'Tank-Shred',
+            'Der Gegner hat schon zwei Champs, die vorne stehen und viel aushalten. Dieser Champ baut auf dieser Lane meistens ' +
+              'Items, die durch Rüstung oder Magieresistenz gehen oder nach Leben Schaden machen (etwa Black Cleaver, Lord ' +
+              'Dominik’s, Void Staff, Liandry’s) — gezählt in unseren eigenen Builds.',
           ),
         );
       }

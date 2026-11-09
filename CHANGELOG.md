@@ -36,6 +36,10 @@ Kopien melden sie beim nächsten Start.
   nur da, wenn er klar vorn liegt. Picks, die euren Plan verstärken, tragen den Chip „passt zu eurem
   Poke-Plan“; er zählt nicht in die Prozentzahl. Dafür kennen die Champion-Merkmale jetzt auch
   Poke, Splitpush und Pick (nur Champions mit klarem Profil).
+- **Tank-Shred.** Hat der Gegner zwei oder mehr Frontliner, bekommen Picks, die auf ihrer Lane meistens
+  Items gegen Rüstung, Magieresistenz oder Leben bauen (Black Cleaver, Lord Dominik’s, Void Staff,
+  Liandry’s …), den Chip „Tank-Shred“ und ein kleines Plus in der Teamcomp. Wer das baut, steht in
+  unseren eigenen Build-Daten, nicht in einer Liste von Hand. Assassinen sind ausgenommen.
 - Die Chips sprechen League: „Frontline“ statt „steht vorne“, „Peel“ statt „schützt deine Carrys“,
   „Disengage“ statt „hält ihr Engage auf“. Der Hinweis darunter erklärt weiter, was gemeint ist.
 - **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items
