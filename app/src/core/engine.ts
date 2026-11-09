@@ -73,6 +73,8 @@ export interface FrameProfile {
   totalCrowdControl: number;
   lateScalingCount: number;
   /** New in 2.1. */
+  earlyScalingCount: number;
+  /** New in 2.1. */
   strongWaveclearCount: number;
   traitsKnown: number;
   traitCoverage: number;
@@ -482,6 +484,7 @@ const frameProfile = (p: CompProfile): FrameProfile => ({
   maxPeel: p.maxPeel,
   totalCrowdControl: p.totalCrowdControl,
   lateScalingCount: p.lateScalingCount,
+  earlyScalingCount: p.earlyScalingCount,
   strongWaveclearCount: p.strongWaveclearCount,
   traitsKnown: p.traitsKnown,
   traitCoverage: traitCoverage(p),

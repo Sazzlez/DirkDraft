@@ -9,6 +9,7 @@
 
 <Tile title="Comp-Vergleich">
   {#if comp.gap}<p class="gap tone-{comp.gap.tone}"><GapSentence line={comp.gap} /></p>{/if}
+  {#if comp.timing}<p class="timing" title={comp.timing.hint}>{comp.timing.text}</p>{/if}
 
   <div class="grid">
     <span class="h"></span>
@@ -121,6 +122,12 @@
     font-size: 13px;
     font-weight: 600;
     line-height: 1.35;
+  }
+
+  .timing {
+    margin: -4px 0 12px;
+    font-size: 12px;
+    color: var(--orange);
   }
 
   .verdict {

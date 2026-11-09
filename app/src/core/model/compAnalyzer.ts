@@ -14,7 +14,8 @@ export type CompIssue =
   | 'noPeel'
   | 'littleCrowdControl'
   | 'allMelee'
-  | 'littleWaveclear';
+  | 'littleWaveclear'
+  | 'mixedTiming';
 
 export interface CompFinding {
   issue: CompIssue;
@@ -32,6 +33,8 @@ export interface CompProfile {
   maxPeel: number;
   totalCrowdControl: number;
   lateScalingCount: number;
+  /** Champions at their strongest early (trait "early"). */
+  earlyScalingCount: number;
   /** Champions with strong waveclear (trait 2 and up). */
   strongWaveclearCount: number;
   traitsKnown: number;
@@ -48,6 +51,7 @@ export const EMPTY_PROFILE: CompProfile = Object.freeze({
   maxPeel: 0,
   totalCrowdControl: 0,
   lateScalingCount: 0,
+  earlyScalingCount: 0,
   strongWaveclearCount: 0,
   traitsKnown: 0,
   findings: [],
@@ -92,6 +96,7 @@ export class CompAnalyzer {
     let maxPeel = 0;
     let totalCc = 0;
     let lateScaling = 0;
+    let earlyScaling = 0;
     let strongWaveclear = 0;
     let traitsKnown = 0;
     let staticKnown = 0;
@@ -138,12 +143,13 @@ export class CompAnalyzer {
       maxPeel = Math.max(maxPeel, trait.peel);
       totalCc += trait.cc;
       if (trait.scaling === 'late') lateScaling++;
+      if (trait.scaling === 'early') earlyScaling++;
       if (trait.waveclear >= STRONG_WAVECLEAR) strongWaveclear++;
     });
 
     const physicalShare = damageTotal > 0 ? physical / damageTotal : 0;
     const magicShare = damageTotal > 0 ? magic / damageTotal : 0;
-    const findings = evaluate(damageKnown, physicalShare, magicShare, frontline, ranged, maxEngage, maxPeel, totalCc, traitsKnown, staticKnown, strongWaveclear);
+    const findings = evaluate(damageKnown, physicalShare, magicShare, frontline, ranged, maxEngage, maxPeel, totalCc, traitsKnown, staticKnown, strongWaveclear, earlyScaling, lateScaling);
 
     return {
       count: ids.length,
@@ -155,6 +161,7 @@ export class CompAnalyzer {
       maxPeel,
       totalCrowdControl: totalCc,
       lateScalingCount: lateScaling,
+      earlyScalingCount: earlyScaling,
       strongWaveclearCount: strongWaveclear,
       traitsKnown,
       findings,
@@ -256,6 +263,18 @@ export class CompAnalyzer {
           ),
         );
       }
+
+      // Smaller still: the early/late traits are coarse (most champions sit on "mid").
+      const majority = timingMajority(profile);
+      if (majority && trait.scaling === majority) {
+        score += 0.15;
+        reasons.push(
+          pro(
+            majority === 'late' ? 'passt zum Late Game eures Teams' : 'passt zum Early Game eures Teams',
+            `In eurem Team stehen schon Champions, die früh, und solche, die spät am stärksten sind. Dieser Pick passt zur Mehrheit (${majority === 'late' ? 'Late Game' : 'Early Game'}), so will das Team in derselben Phase gewinnen. Die Einordnung früh/spät ist grob — die meisten Champions stehen auf „mitte“ — und noch nicht gemessen.`,
+          ),
+        );
+      }
     }
 
     if (profile.physicalShare >= 0.75 && champion.damage === DamageType.Physical) {
@@ -353,6 +372,8 @@ function evaluate(
   traitsKnown: number,
   staticKnown: number,
   strongWaveclear: number,
+  earlyScaling: number,
+  lateScaling: number,
 ): CompFinding[] {
   const findings: CompFinding[] = [];
 
@@ -376,8 +397,17 @@ function evaluate(
   if (totalCc * 2 < traitsKnown) findings.push({ issue: 'littleCrowdControl', text: 'wenig CC', severity: 0.7 });
   // From four champions on, as peel: with three, the mid laner who usually brings it is often still open.
   if (strongWaveclear === 0 && traitsKnown >= 4) findings.push({ issue: 'littleWaveclear', text: 'wenig Waveclear', severity: 0.5 });
+  // Early and late at once, three or more between them: the team wants to win in two phases.
+  if (earlyScaling >= 1 && lateScaling >= 1 && earlyScaling + lateScaling >= 3)
+    findings.push({ issue: 'mixedTiming', text: 'gemischtes Timing', severity: 0.3 });
 
   return findings;
+}
+
+/** With mixed timing, the side most of the team is on; null without the finding or on a tie. */
+export function timingMajority(p: CompProfile): 'early' | 'late' | null {
+  if (!hasIssue(p, 'mixedTiming') || p.earlyScalingCount === p.lateScalingCount) return null;
+  return p.earlyScalingCount > p.lateScalingCount ? 'early' : 'late';
 }
 
 /** Physical and magic damage per game, when the file has both and they are not nothing. */

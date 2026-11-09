@@ -1,7 +1,7 @@
 // Port of tests/DraftPilot.Core.Tests/CompAnalyzerTests.cs.
 
 import { describe, expect, it } from 'vitest';
-import { CompAnalyzer, EMPTY_PROFILE, hasDamageMix, hasIssue, traitCoverage } from '../../src/core/model/compAnalyzer';
+import { CompAnalyzer, EMPTY_PROFILE, hasDamageMix, hasIssue, timingMajority, traitCoverage } from '../../src/core/model/compAnalyzer';
 import { DamageType, type MetaLookup } from '../../src/core/model/metaLookup';
 import type { Reason, ReasonTone } from '../../src/core/model/reason';
 import { TraitTable, type ScalingCurve } from '../../src/core/model/traits';
@@ -258,6 +258,31 @@ describe('CompAnalyzerTests', () => {
 
     assertChip(reasons, 'guter Waveclear', 'pro');
     expect(withWaveclear - without).toBeCloseTo(0.2, 10);
+  });
+
+  it('Timing_IsMixedWithEarlyAndLateTogether_FromThreeOn', () => {
+    const a = analyzer(scalingTraits(['Ad1', 'early'], ['Ad2', 'late'], ['Ad3', 'late'], ['Ad4', 'mid'], ['Ap1', 'early']));
+
+    expect(hasIssue(a.analyze([Ad1, Ad2, Ad4]), 'mixedTiming')).toBe(false); // one of each: too little to call it
+    const mixed = a.analyze([Ad1, Ad2, Ad3]);
+    expect(hasIssue(mixed, 'mixedTiming')).toBe(true);
+    expect(mixed.earlyScalingCount).toBe(1);
+    expect(mixed.lateScalingCount).toBe(2);
+    expect(timingMajority(mixed)).toBe('late');
+    expect(timingMajority(a.analyze([Ad1, Ad2, Ad3, Ap1]))).toBeNull(); // two each: no majority
+  });
+
+  it('Fit_RewardsThePickThatMatchesTheTeamsTiming', () => {
+    const team = [Ad1, Ad2, Ad3] as const;
+    const late = analyzer(scalingTraits(['Ad1', 'early'], ['Ad2', 'late'], ['Ad3', 'late'], ['Ap1', 'late']));
+    const mid = analyzer(scalingTraits(['Ad1', 'early'], ['Ad2', 'late'], ['Ad3', 'late'], ['Ap1', 'mid']));
+    const reasons: Reason[] = [];
+
+    const matching = late.fit(Ap1, late.analyze(team), EMPTY_PROFILE, reasons)!;
+    const neutralPick = mid.fit(Ap1, mid.analyze(team), EMPTY_PROFILE, [])!;
+
+    assertChip(reasons, 'passt zum Late Game eures Teams', 'pro');
+    expect(matching - neutralPick).toBeCloseTo(0.15, 10);
   });
 
   it('DamageShares_FollowTheDamageDealt_WhereTheFileHasIt', () => {

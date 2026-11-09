@@ -86,6 +86,7 @@ export interface GoldenProfile {
   lateScalingCount: number;
   /** New in 2.1; absent from the 1.5 reference frames. */
   strongWaveclearCount?: number;
+  earlyScalingCount?: number;
   traitsKnown: number;
   findings: { issue: string; text: string; severity: number }[];
 }
@@ -141,6 +142,11 @@ const GAP_NAMES: Record<string, string> = {
   allMelee: 'Range',
   littleWaveclear: 'Waveclear',
 };
+
+/** Findings that are no gap to fill: shown on their own line, not in "fehlt noch". */
+const NOT_A_GAP = new Set(['mixedTiming']);
+
+const gapsOf = <T extends { issue: string }>(findings: T[]): T[] => findings.filter((f) => !NOT_A_GAP.has(f.issue));
 
 /** The findings as names, most severe first. */
 function gapItems(findings: { issue: string; text: string; severity: number }[]): string[] {
@@ -348,9 +354,10 @@ export class GoldenAdapter {
   private gapLine(frame: GoldenFrame): GapLine | null {
     const a = frame.comp.allies;
     const own = frame.gap ?? { count: a.count, findings: a.findings };
+    const gaps = gapsOf(own.findings);
     const open = frame.state.allies.some((slot) => !slot.lockedChampionId);
-    return own.findings.length > 0
-      ? { lead: `Eurem Team fehlt${open ? ' noch' : ''}`, items: gapItems(own.findings), tone: 'warn' }
+    return gaps.length > 0
+      ? { lead: `Eurem Team fehlt${open ? ' noch' : ''}`, items: gapItems(gaps), tone: 'warn' }
       : own.count >= 3
         ? { lead: `Eurem Team fehlt${open ? ' bisher' : ''} nichts`, items: [], tone: 'good' }
         : null;
@@ -412,7 +419,13 @@ export class GoldenAdapter {
       ],
       allyDamage: damage(a),
       enemyDamage: damage(e),
-      enemyGap: e.findings.length > 0 ? { lead: 'Dem Gegnerteam fehlt', items: gapItems(e.findings), tone: 'good' } : null,
+      enemyGap: gapsOf(e.findings).length > 0 ? { lead: 'Dem Gegnerteam fehlt', items: gapItems(gapsOf(e.findings)), tone: 'good' } : null,
+      timing: a.findings.some((f) => f.issue === 'mixedTiming')
+        ? {
+            text: `Gemischtes Timing: ${a.earlyScalingCount ?? 0}× Early Game, ${a.lateScalingCount}× Late Game`,
+            hint: 'Euer Team will teils früh, teils spät gewinnen. Die Einordnung früh/spät ist grob — die meisten Champions stehen auf „mitte“ — und noch nicht gemessen.',
+          }
+        : null,
     };
   }
 

@@ -1412,6 +1412,11 @@
             "issue": "noFrontline",
             "text": "kein Frontline",
             "severity": 0.8
+          },
+          {
+            "issue": "mixedTiming",
+            "text": "gemischtes Timing",
+            "severity": 0.3
           }
         ]
       }

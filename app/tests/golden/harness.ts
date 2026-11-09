@@ -60,7 +60,7 @@ export interface Difference {
  * Fields the 2.1 engine adds to a frame that the 1.5 reference never had (README.md, "Neu in 2.1").
  * Only these may be absent from a reference frame; a changed value in any field still counts.
  */
-export const ADDED_IN_2_1: readonly string[] = ['state.allyBanIntents', 'gap', 'strongWaveclearCount', 'state.allyPickOrder', 'openCounters', 'pickHint'];
+export const ADDED_IN_2_1: readonly string[] = ['state.allyBanIntents', 'gap', 'strongWaveclearCount', 'state.allyPickOrder', 'openCounters', 'pickHint', 'earlyScalingCount'];
 
 const isAdded = (path: string): boolean => {
   const bare = path.replace(/\[\d+\]/g, '');

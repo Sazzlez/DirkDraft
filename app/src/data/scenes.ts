@@ -31,6 +31,7 @@ export const SCENES: Scene[] = [
   { id: 'teambans', title: 'Bannen im Team', moment: 'banning' },
   { id: 'picking', title: 'Dein Pick', moment: 'picking' },
   { id: 'blind', title: 'Blind Pick mit offenen Countern', moment: 'picking' },
+  { id: 'lastpick', title: 'Letzter Pick', moment: 'picking' },
   { id: 'teammate', title: 'Teammate am Zug', moment: 'teammate' },
   { id: 'mate', title: 'Teammate gelockt', moment: 'teammate' },
   { id: 'locked', title: 'Gelockt', moment: 'locked' },
@@ -109,6 +110,10 @@ function load(): Promise<Sources> {
     const blind = await json<{ frame: DraftFrame }>('/tests/golden/drafts/blind-top.json');
     const blindState = stateFromFrame(blind.frame.state);
     drafts.set('blind-top', { frame: engine.evaluate(blindState, engine.resolveTarget(blindState), 54) });
+    // Top last, everyone else shown: the comp gap above the list, mixed timing in the comp tile.
+    const last = await json<{ input: { hover: number }; frame: DraftFrame }>('/tests/golden/drafts/last-pick-top.json');
+    const lastState = stateFromFrame(last.frame.state);
+    drafts.set('last-pick-top', { frame: engine.evaluate(lastState, engine.resolveTarget(lastState), last.input.hover) });
     const plans = await json<{ matchupGuide: GoldenPlan; laneBuild: GoldenPlan }>('/tests/golden/builds/plans.json');
     return { adapter: new GoldenAdapter(snapshot.champions), plans, recordings, drafts, meta: new MetaLookup(snapshot) };
   })();
@@ -173,6 +178,10 @@ export async function sceneView(id: string): Promise<ViewModel> {
     }
     case 'blind': {
       const frame = s.drafts.get('blind-top')!.frame;
+      return draftScene(a, frame, 'picking', s.plans, 'Picks für dich');
+    }
+    case 'lastpick': {
+      const frame = s.drafts.get('last-pick-top')!.frame;
       return draftScene(a, frame, 'picking', s.plans, 'Picks für dich');
     }
     case 'teammate': {

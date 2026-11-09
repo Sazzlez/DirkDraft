@@ -26,6 +26,11 @@ Kopien melden sie beim nächsten Start.
   tauschen?“ (nur wenn nach dir noch ein Teammate pickt). In der Gleichauf-Gruppe bekommt der Pick
   mit den wenigsten offenen Countern das Etikett „sicherer Blind Pick“. Ist der Lane-Gegner bekannt
   oder pickst du als Letzter deines Teams, steht dort stattdessen, was eurem Team noch fehlt.
+- **Timing im eigenen Team.** Will euer Team teils früh, teils spät gewinnen (mindestens ein Early-
+  und ein Late-Game-Champion, zusammen drei), zeigt die Comp-Kachel „Gemischtes Timing“, und Picks,
+  die zur Mehrheit passen, bekommen den Chip „passt zum Late Game eures Teams“ (oder Early Game) mit
+  einem kleinen Plus in der Teamcomp. Die Einordnung früh/spät ist grob und noch nicht gemessen; der
+  Hinweis sagt das.
 - Die Chips sprechen League: „Frontline“ statt „steht vorne“, „Peel“ statt „schützt deine Carrys“,
   „Disengage“ statt „hält ihr Engage auf“. Der Hinweis darunter erklärt weiter, was gemeint ist.
 - **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items

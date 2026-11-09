@@ -1336,7 +1336,13 @@
         "lateScalingCount": 2,
         "traitsKnown": 4,
         "traitCoverage": 1,
-        "findings": []
+        "findings": [
+          {
+            "issue": "mixedTiming",
+            "text": "gemischtes Timing",
+            "severity": 0.3
+          }
+        ]
       },
       "enemies": {
         "count": 5,
