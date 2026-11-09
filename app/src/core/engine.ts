@@ -52,6 +52,8 @@ export interface FrameItem {
   breakdown: { kind: string; logOdds: number | null; points: number; isGate: boolean; gate: number; label: string }[];
   /** New in 2.1: open counters while the lane opponent is open; absent otherwise. */
   openCounters?: number;
+  /** New in 2.1 (D2): open own lanes the pick is strong on, two or more. */
+  flexLanes?: LaneName[];
 }
 
 export interface FrameSet {
@@ -461,6 +463,7 @@ function frameItem(r: Recommendation): FrameItem {
       label: termLabel(t.kind),
     })),
     ...(r.openCounters !== undefined ? { openCounters: r.openCounters } : {}),
+    ...(r.flexLanes ? { flexLanes: r.flexLanes.map(laneKey) } : {}),
   };
 }
 

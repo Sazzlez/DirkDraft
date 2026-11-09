@@ -327,6 +327,11 @@
               "text": "1 offener Counter",
               "tone": "contra",
               "hint": "Auf Toplane ist noch niemand aufgedeckt, und diese Champs sind noch frei und schneiden gegen Shen besser ab als seine Gegner \u00FCblicherweise: Garen 54 % aus 818 Games. Sie zu nehmen steht dem Gegner frei \u2014 ob er es tut, sagen die Daten nicht, deshalb z\u00E4hlt das hier nicht in die Prozentzahl hinein. Aufgelistet ist, was OP.GG als auff\u00E4llige Gegner kennt, nicht jeder m\u00F6gliche."
+            },
+            {
+              "text": "Flex: Top oder Support",
+              "tone": "neutral",
+              "hint": "Stark auf Top und Support (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -1250,6 +1255,11 @@
             "text": "1 offener Counter",
             "tone": "contra",
             "hint": "Auf Toplane ist noch niemand aufgedeckt, und diese Champs sind noch frei und schneiden gegen Shen besser ab als seine Gegner \u00FCblicherweise: Garen 54 % aus 818 Games. Sie zu nehmen steht dem Gegner frei \u2014 ob er es tut, sagen die Daten nicht, deshalb z\u00E4hlt das hier nicht in die Prozentzahl hinein. Aufgelistet ist, was OP.GG als auff\u00E4llige Gegner kennt, nicht jeder m\u00F6gliche."
+          },
+          {
+            "text": "Flex: Top oder Support",
+            "tone": "neutral",
+            "hint": "Stark auf Top und Support (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
           }
         ],
         "breakdown": [

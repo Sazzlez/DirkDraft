@@ -373,6 +373,11 @@
           "uncertaintyPoints": 1.008280580425342,
           "reasons": [
             {
+              "text": "Flex: Top oder Jungle",
+              "tone": "neutral",
+              "hint": "Stark auf Top und Jungle (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
+            },
+            {
               "text": "54 % WR gegen Jax",
               "tone": "pro",
               "hint": "Gemessen auf Toplane: 58,0 % gegen Jax aus 775 Games. Gez\u00E4hlt wird 53,8 % \u2014 ein einzelnes Duell \u00FCber so wenige Games ist zum gro\u00DFen Teil Zufall, deshalb r\u00FCckt die Zahl zu dem, was die Lane-St\u00E4rke beider Champs ohnehin erwarten l\u00E4sst. 50 % w\u00E4re ausgeglichen.\n\nStammt aus OP.GGs Liste der auff\u00E4lligsten Gegner. Solche Werte sind eine Auswahl der Extreme und fallen bei neuer Messung erfahrungsgem\u00E4\u00DF deutlich zur Mitte zur\u00FCck \u2014 auch das steckt in der gez\u00E4hlten Zahl."
@@ -495,6 +500,11 @@
           "uncertaintyPoints": 1.1817282132438922,
           "reasons": [
             {
+              "text": "Flex: Top oder Mid",
+              "tone": "neutral",
+              "hint": "Stark auf Top und Mid (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
+            },
+            {
               "text": "53 % WR gegen Jax",
               "tone": "pro",
               "hint": "Gemessen auf Toplane: 59,0 % gegen Jax aus 338 Games. Gez\u00E4hlt wird 53,3 % \u2014 ein einzelnes Duell \u00FCber so wenige Games ist zum gro\u00DFen Teil Zufall, deshalb r\u00FCckt die Zahl zu dem, was die Lane-St\u00E4rke beider Champs ohnehin erwarten l\u00E4sst. 50 % w\u00E4re ausgeglichen.\n\nStammt aus OP.GGs Liste der auff\u00E4lligsten Gegner. Solche Werte sind eine Auswahl der Extreme und fallen bei neuer Messung erfahrungsgem\u00E4\u00DF deutlich zur Mitte zur\u00FCck \u2014 auch das steckt in der gez\u00E4hlten Zahl."
@@ -615,6 +625,11 @@
               "text": "S-Tier auf Toplane",
               "tone": "neutral",
               "hint": "OP.GGs eigene Einstufung f\u00FCr Toplane, von OP (st\u00E4rkste) \u00FCber S bis D (schw\u00E4chste). Z\u00E4hlt nicht in die Prozentzahl: sie mischt Winrate und Pickrate, und die Winrate steckt schon drin."
+            },
+            {
+              "text": "Flex: Top oder Support",
+              "tone": "neutral",
+              "hint": "Stark auf Top und Support (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -676,6 +691,11 @@
               "text": "A-Tier auf Toplane",
               "tone": "neutral",
               "hint": "OP.GGs eigene Einstufung f\u00FCr Toplane, von OP (st\u00E4rkste) \u00FCber S bis D (schw\u00E4chste). Z\u00E4hlt nicht in die Prozentzahl: sie mischt Winrate und Pickrate, und die Winrate steckt schon drin."
+            },
+            {
+              "text": "Flex: Top oder Mid",
+              "tone": "neutral",
+              "hint": "Stark auf Top und Mid (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [

@@ -434,6 +434,11 @@
               "text": "53,3 % WR auf Botlane",
               "tone": "pro",
               "hint": "Aus 2.170 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+            },
+            {
+              "text": "Flex: Top oder Bot",
+              "tone": "neutral",
+              "hint": "Stark auf Top und Bot (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -607,6 +612,11 @@
               "text": "52,1 % WR auf Botlane",
               "tone": "pro",
               "hint": "Aus 1.787 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+            },
+            {
+              "text": "Flex: Mid oder Bot",
+              "tone": "neutral",
+              "hint": "Stark auf Mid und Bot (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -670,6 +680,11 @@
               "hint": "OP.GGs eigene Einstufung f\u00FCr Botlane, von OP (st\u00E4rkste) \u00FCber S bis D (schw\u00E4chste). Z\u00E4hlt nicht in die Prozentzahl: sie mischt Winrate und Pickrate, und die Winrate steckt schon drin."
             },
             {
+              "text": "Flex: Mid, Bot oder Support",
+              "tone": "neutral",
+              "hint": "Stark auf Mid, Bot und Support (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
+            },
+            {
               "text": "57 % WR gegen Ezreal",
               "tone": "pro",
               "hint": "Gemessen auf Botlane: 49,0 % gegen Ezreal aus 287 Games. Gez\u00E4hlt wird 57,2 % \u2014 ein einzelnes Duell \u00FCber so wenige Games ist zum gro\u00DFen Teil Zufall, deshalb r\u00FCckt die Zahl zu dem, was die Lane-St\u00E4rke beider Champs ohnehin erwarten l\u00E4sst. 50 % w\u00E4re ausgeglichen.\n\nStammt aus OP.GGs Liste der auff\u00E4lligsten Gegner. Solche Werte sind eine Auswahl der Extreme und fallen bei neuer Messung erfahrungsgem\u00E4\u00DF deutlich zur Mitte zur\u00FCck \u2014 auch das steckt in der gez\u00E4hlten Zahl. Abgeleitet aus der Gegenrichtung \u2014 gemessen wurde Ezreal gegen diesen Champ."
@@ -729,6 +744,11 @@
               "text": "52,6 % WR auf Botlane",
               "tone": "pro",
               "hint": "Aus 4.641 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+            },
+            {
+              "text": "Flex: Mid oder Bot",
+              "tone": "neutral",
+              "hint": "Stark auf Mid und Bot (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [

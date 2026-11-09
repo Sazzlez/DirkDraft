@@ -316,6 +316,11 @@
               "text": "S-Tier auf Midlane",
               "tone": "neutral",
               "hint": "OP.GGs eigene Einstufung f\u00FCr Midlane, von OP (st\u00E4rkste) \u00FCber S bis D (schw\u00E4chste). Z\u00E4hlt nicht in die Prozentzahl: sie mischt Winrate und Pickrate, und die Winrate steckt schon drin."
+            },
+            {
+              "text": "Flex: Jungle oder Mid",
+              "tone": "neutral",
+              "hint": "Stark auf Jungle und Mid (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -372,6 +377,11 @@
               "text": "52,1 % WR auf Midlane",
               "tone": "pro",
               "hint": "Aus 3.963 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+            },
+            {
+              "text": "Flex: Top oder Mid",
+              "tone": "neutral",
+              "hint": "Stark auf Top und Mid (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -616,6 +626,11 @@
               "text": "3 offene Counter",
               "tone": "contra",
               "hint": "Auf Midlane ist noch niemand aufgedeckt, und diese Champs sind noch frei und schneiden gegen Katarina besser ab als seine Gegner \u00FCblicherweise: Yasuo 54 % aus 2.106 Games, Diana 56 % aus 1.071 Games, Vladimir 56 % aus 845 Games. Sie zu nehmen steht dem Gegner frei \u2014 ob er es tut, sagen die Daten nicht, deshalb z\u00E4hlt das hier nicht in die Prozentzahl hinein. Aufgelistet ist, was OP.GG als auff\u00E4llige Gegner kennt, nicht jeder m\u00F6gliche."
+            },
+            {
+              "text": "Flex: Mid oder Bot",
+              "tone": "neutral",
+              "hint": "Stark auf Mid und Bot (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -733,6 +748,11 @@
               "text": "51,5 % WR auf Midlane",
               "tone": "pro",
               "hint": "Aus 1.561 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+            },
+            {
+              "text": "Flex: Top, Jungle oder Mid",
+              "tone": "neutral",
+              "hint": "Stark auf Top, Jungle und Mid (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [

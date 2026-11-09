@@ -311,6 +311,11 @@
               "text": "53,4 % WR auf Jungle",
               "tone": "pro",
               "hint": "Aus 1.068 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+            },
+            {
+              "text": "Flex: Top, Jungle oder Mid",
+              "tone": "neutral",
+              "hint": "Stark auf Top, Jungle und Mid (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -428,6 +433,11 @@
               "text": "52,2 % WR auf Jungle",
               "tone": "pro",
               "hint": "Aus 2.453 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+            },
+            {
+              "text": "Flex: Top oder Jungle",
+              "tone": "neutral",
+              "hint": "Stark auf Top und Jungle (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -728,6 +738,11 @@
               "text": "1 offener Counter",
               "tone": "contra",
               "hint": "Auf Jungle ist noch niemand aufgedeckt, und diese Champs sind noch frei und schneiden gegen Fiddlesticks besser ab als seine Gegner \u00FCblicherweise: Shaco 55 % aus 379 Games. Sie zu nehmen steht dem Gegner frei \u2014 ob er es tut, sagen die Daten nicht, deshalb z\u00E4hlt das hier nicht in die Prozentzahl hinein. Aufgelistet ist, was OP.GG als auff\u00E4llige Gegner kennt, nicht jeder m\u00F6gliche."
+            },
+            {
+              "text": "Flex: Jungle oder Support",
+              "tone": "neutral",
+              "hint": "Stark auf Jungle und Support (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [

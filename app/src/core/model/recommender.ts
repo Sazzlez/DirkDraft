@@ -110,6 +110,8 @@ export interface Recommendation {
   uncertainty: number;
   /** Champions still free that counter this pick on its lane, while the lane opponent is open (2.1). */
   openCounters?: number;
+  /** Lanes still open in the own team on which this pick is strong too, two or more (D2). */
+  flexLanes?: Lane[];
 }
 
 export interface RecommendationSet {
@@ -181,6 +183,8 @@ interface Seat {
   hoveredByOthers: ReadonlySet<number>;
   /** What another teammate is about to ban; his ban hover counts as banned. */
   bannedByOthers: ReadonlySet<number>;
+  /** Lanes of own seats nobody has locked yet, the advised seat's included (D2). */
+  openLanes: readonly Lane[];
   allyComp: CompProfile;
   enemyComp: CompProfile;
 }
@@ -192,6 +196,12 @@ interface BanLane {
 }
 
 const ordinal = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/** D2: a flex lane needs this shrunk win rate and this share of the champion's games. */
+export const FLEX_WIN_RATE = 0.5;
+export const FLEX_ROLE_RATE = 0.1;
+
+const FLEX_NAMES: Record<number, string> = { [Lane.Top]: 'Top', [Lane.Jungle]: 'Jungle', [Lane.Mid]: 'Mid', [Lane.Adc]: 'Bot', [Lane.Support]: 'Support' };
 
 const finiteOr = (value: number, fallback: number): number => (Number.isFinite(value) ? value : fallback);
 
@@ -265,11 +275,19 @@ export class Recommender {
     const bannedByOthers = new Set(
       state.allyBanIntents.filter((intent) => intent.cellId !== target.slot.cellId).map((intent) => intent.championId),
     );
+    const openLanes = new Set<Lane>();
+    for (const slot of state.allies) {
+      if (isLocked(slot) && slot.cellId !== target.slot.cellId) continue;
+      const seatLane = slot.assignedLane !== Lane.Unknown ? slot.assignedLane : (allyLanes?.forCell(slot.cellId)?.lane ?? Lane.Unknown);
+      if (seatLane !== Lane.Unknown) openLanes.add(seatLane);
+    }
+    if (lane !== Lane.Unknown) openLanes.add(lane);
     return {
       lane,
       allies: allyChampions,
       hoveredByOthers,
       bannedByOthers,
+      openLanes: ALL_LANES.filter((l) => openLanes.has(l)),
       allyComp: this.comp.analyze(allyChampions),
       enemyComp: this.comp.analyze(enemyChampions),
     };
@@ -310,6 +328,7 @@ export class Recommender {
     const compFit = this.comp.fit(candidate, seat.allyComp, seat.enemyComp, reasons, lane);
 
     const counters = openLaneBlocked ? this.addCounterRisk(candidate, lane, openLaneBlocked, reasons) : undefined;
+    const flexLanes = this.flexLanes(candidate, seat.openLanes, reasons);
 
     const terms: ScoreTerm[] = [
       { kind: 'laneStrength', logOdds: baseTerm },
@@ -330,7 +349,33 @@ export class Recommender {
       breakdown: terms,
       uncertainty: budget.standardError,
       ...(counters !== undefined ? { openCounters: counters } : {}),
+      ...(flexLanes ? { flexLanes } : {}),
     };
+  }
+
+  /**
+   * D2: strong on two or more lanes the own team still has open — the enemy sees the champion, not
+   * its lane. Strong: a shrunk lane win rate of 50 % or more, on a lane that holds a tenth of its
+   * games. A hint only, it adds nothing to the score.
+   */
+  private flexLanes(candidate: number, openLanes: readonly Lane[], reasons: Reason[]): Lane[] | undefined {
+    if (openLanes.length < 2) return undefined;
+    const strong = openLanes.filter((l) => {
+      const stat = this.meta.laneStat(candidate, l);
+      return !!stat && stat.winRate >= FLEX_WIN_RATE && stat.roleRate >= FLEX_ROLE_RATE;
+    });
+    if (strong.length < 2) return undefined;
+    const names = strong.map((l) => FLEX_NAMES[l]);
+    const list = `${names.slice(0, -1).join(', ')} oder ${names[names.length - 1]}`;
+    reasons.push(
+      neutral(
+        `Flex: ${list}`,
+        `Stark auf ${names.slice(0, -1).join(', ')} und ${names[names.length - 1]} (Lane-Winrate ab 50 %, dort oft gespielt), ` +
+          'und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt — ' +
+          'gezielt kontern kann er erst später. Zählt nicht in die Prozentzahl.',
+      ),
+    );
+    return strong;
   }
 
   private scoreBans(

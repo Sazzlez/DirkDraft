@@ -383,6 +383,11 @@
               "text": "S-Tier auf Midlane",
               "tone": "neutral",
               "hint": "OP.GGs eigene Einstufung f\u00FCr Midlane, von OP (st\u00E4rkste) \u00FCber S bis D (schw\u00E4chste). Z\u00E4hlt nicht in die Prozentzahl: sie mischt Winrate und Pickrate, und die Winrate steckt schon drin."
+            },
+            {
+              "text": "Flex: Jungle oder Mid",
+              "tone": "neutral",
+              "hint": "Stark auf Jungle und Mid (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -444,6 +449,11 @@
               "text": "Disengage",
               "tone": "pro",
               "hint": "Der Gegner hat einen Champ, der einen Teamfight von sich aus starten kann. Dieser Pick kann die Getroffenen wieder herausholen (Disengage) \u2014 sonst entscheidet ihr Anspiel den Kampf."
+            },
+            {
+              "text": "Flex: Jungle oder Mid",
+              "tone": "neutral",
+              "hint": "Stark auf Jungle und Mid (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -500,6 +510,11 @@
               "text": "A-Tier auf Midlane",
               "tone": "neutral",
               "hint": "OP.GGs eigene Einstufung f\u00FCr Midlane, von OP (st\u00E4rkste) \u00FCber S bis D (schw\u00E4chste). Z\u00E4hlt nicht in die Prozentzahl: sie mischt Winrate und Pickrate, und die Winrate steckt schon drin."
+            },
+            {
+              "text": "Flex: Mid oder Bot",
+              "tone": "neutral",
+              "hint": "Stark auf Mid und Bot (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             },
             {
               "text": "54 % WR gegen Sylas (falls Lane-Gegner)",

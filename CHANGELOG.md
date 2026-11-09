@@ -40,6 +40,9 @@ Kopien melden sie beim nächsten Start.
   Items gegen Rüstung, Magieresistenz oder Leben bauen (Black Cleaver, Lord Dominik’s, Void Staff,
   Liandry’s …), den Chip „Tank-Shred“ und ein kleines Plus in der Teamcomp. Wer das baut, steht in
   unseren eigenen Build-Daten, nicht in einer Liste von Hand. Assassinen sind ausgenommen.
+- **Flex-Picks.** Ist ein Vorschlag auf mindestens zwei Lanes stark, die in eurem Team noch offen
+  sind, trägt er den Chip „Flex: Top oder Mid“. Der Gegner sieht dann den Champion, aber nicht seine
+  Lane. Zählt nicht in die Prozentzahl.
 - Die Chips sprechen League: „Frontline“ statt „steht vorne“, „Peel“ statt „schützt deine Carrys“,
   „Disengage“ statt „hält ihr Engage auf“. Der Hinweis darunter erklärt weiter, was gemeint ist.
 - **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items

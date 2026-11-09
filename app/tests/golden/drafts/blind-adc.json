@@ -321,6 +321,11 @@
               "text": "1 offener Counter",
               "tone": "contra",
               "hint": "Auf Botlane ist noch niemand aufgedeckt, und diese Champs sind noch frei und schneiden gegen Vel\u0027Koz besser ab als seine Gegner \u00FCblicherweise: Ezreal 51 % aus 287 Games. Sie zu nehmen steht dem Gegner frei \u2014 ob er es tut, sagen die Daten nicht, deshalb z\u00E4hlt das hier nicht in die Prozentzahl hinein. Aufgelistet ist, was OP.GG als auff\u00E4llige Gegner kennt, nicht jeder m\u00F6gliche."
+            },
+            {
+              "text": "Flex: Mid, Bot oder Support",
+              "tone": "neutral",
+              "hint": "Stark auf Mid, Bot und Support (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -494,6 +499,11 @@
               "text": "53,3 % WR auf Botlane",
               "tone": "pro",
               "hint": "Aus 2.170 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+            },
+            {
+              "text": "Flex: Top oder Bot",
+              "tone": "neutral",
+              "hint": "Stark auf Top und Bot (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -606,6 +616,11 @@
               "text": "52,6 % WR auf Botlane",
               "tone": "pro",
               "hint": "Aus 4.641 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+            },
+            {
+              "text": "Flex: Mid oder Bot",
+              "tone": "neutral",
+              "hint": "Stark auf Mid und Bot (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
@@ -718,6 +733,11 @@
               "text": "52,1 % WR auf Botlane",
               "tone": "pro",
               "hint": "Aus 1.787 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+            },
+            {
+              "text": "Flex: Mid oder Bot",
+              "tone": "neutral",
+              "hint": "Stark auf Mid und Bot (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [

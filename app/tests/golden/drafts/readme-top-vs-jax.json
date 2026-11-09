@@ -635,6 +635,11 @@
               "text": "S-Tier auf Toplane",
               "tone": "neutral",
               "hint": "OP.GGs eigene Einstufung f\u00FCr Toplane, von OP (st\u00E4rkste) \u00FCber S bis D (schw\u00E4chste). Z\u00E4hlt nicht in die Prozentzahl: sie mischt Winrate und Pickrate, und die Winrate steckt schon drin."
+            },
+            {
+              "text": "Flex: Top oder Support",
+              "tone": "neutral",
+              "hint": "Stark auf Top und Support (Lane-Winrate ab 50 %, dort oft gespielt), und diese Lanes sind in eurem Team noch offen. Der Gegner sieht den Champion, aber nicht, wo er spielt \u2014 gezielt kontern kann er erst sp\u00E4ter. Z\u00E4hlt nicht in die Prozentzahl."
             }
           ],
           "breakdown": [
