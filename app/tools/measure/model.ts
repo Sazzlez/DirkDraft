@@ -2,8 +2,9 @@
 // the winner, and how well the same parts with measured weights, split by kind of pair (B)? Every rate
 // is counted on training games only — out of fold for the games B is fitted on — and read through the
 // app's own MetaLookup, so shrinkage and baselines are the app's. Checked on held-out games, with the
-// calibration and what the best pick is worth against the average one. Changes no weight: the result
-// goes into docs/modellpruefung.md first.
+// calibration and what the best pick is worth against the average one. Then every lane on its own
+// through the gold after ten minutes (laneGold.ts): champion or matchup, and what a lead is worth.
+// Changes no weight: the result goes into docs/modellpruefung.md first.
 //
 //   npm run measure:model -- <games.json.gz> <meta.json> [builds.json] [--out bericht.md] [--patch 16.22] [--sample 1000]
 
@@ -20,10 +21,14 @@ import type { RiotBuildFile } from '../../src/core/riotBuilds';
 import { FEATURES, MINIMUM_DIFFERING_GAMES, sideOf } from './comp';
 import { gamesOf, isHeldOut, readGamesFile, type Game, type Seat } from './games';
 import { DEFAULT_FACTOR, FactorModel, type FactorGame, type FactorOptions } from './factor';
-import { fitLogistic, predict } from './logistic';
+import { conversion, edgeOf, goldDuels, LANE_GOLD_MINIMUM, matchupGold, splitLane } from './laneGold';
+import { fitLogistic, predict, type LogisticFit } from './logistic';
 import { tally, versusKey, VERSUS_MINIMUM_GAMES, type Tally } from './tally';
 
 const FOLDS = 5;
+
+/** Training games with gold after ten minutes before the lane-gold section reports anything. */
+const LANE_GOLD_GAMES = 500;
 
 const LANE_NAMES: Record<number, string> = { [Lane.Top]: 'Top', [Lane.Jungle]: 'Jungle', [Lane.Mid]: 'Mid', [Lane.Adc]: 'Bot', [Lane.Support]: 'Support' };
 
@@ -154,6 +159,133 @@ function brier(fit: (row: number) => number, y: readonly number[]): number {
   let total = 0;
   for (let i = 0; i < y.length; i++) total += (fit(i) - y[i]!) ** 2;
   return total / Math.max(1, y.length);
+}
+
+/** What the lane-gold section needs from the comparison: the split, the parts and the strength-only fit. */
+interface LaneGoldInput {
+  games: readonly Game[];
+  trainIndex: readonly number[];
+  testIndex: readonly number[];
+  parts: ReadonlyMap<number, Parts>;
+  xTrain: readonly number[][];
+  yTrain: readonly number[];
+  xTest: readonly number[][];
+  strengthOnly: LogisticFit;
+  evaluate: (predictRow: (k: number) => number) => { loss: number; hits: number; brier: number };
+}
+
+/**
+ * Pick → lane lead → win, every lane on its own (laneGold.ts). Counted only on training games that
+ * carry the gold after ten minutes; the per-lane weights are fitted on the training games without it,
+ * so no game ever sees its own gold, and checked on the same held-out games as everything else.
+ */
+function reportLaneGold(report: string[], input: LaneGoldInput): void {
+  const { games, trainIndex, testIndex, parts, xTrain, yTrain, xTest, strengthOnly, evaluate } = input;
+  const goldTrain = trainIndex.map((i) => games[i]!).filter((g) => g.gold);
+  report.push('## Lane-Gold nach 10 Minuten, je Lane', '');
+  const converted = goldTrain.length >= LANE_GOLD_GAMES ? conversion(goldTrain) : null;
+  if (!converted) {
+    report.push(`Zu wenige Trainingsspiele mit Gold nach 10 Minuten: ${count(goldTrain.length)}, nötig ${count(LANE_GOLD_GAMES)}.`, '');
+    return;
+  }
+
+  const perGold = (lane: Lane) => converted.fit.coefficients[lane + 1]! / 1000;
+  const lanes = ALL_LANES.map((lane) => {
+    const duels = goldDuels(goldTrain, lane);
+    const split = splitLane(duels);
+    return { lane, split, edges: matchupGold(duels, split) };
+  });
+  const termsOf = (game: Game): number[] =>
+    lanes.map(({ lane, edges }) => {
+      const blue = game.blue.filter((s) => s.lane === lane);
+      const red = game.red.filter((s) => s.lane === lane);
+      return blue.length === 1 && red.length === 1 ? perGold(lane) * edgeOf(edges, blue[0]!.championId, red[0]!.championId) : 0;
+    });
+  const used = lanes.filter((l) => l.edges.size > 0).map((l) => l.lane);
+  const fitIndex = trainIndex.filter((i) => !games[i]!.gold);
+  const terms = new Map<number, number[]>();
+  for (const i of [...fitIndex, ...testIndex]) terms.set(i, termsOf(games[i]!));
+  const total = (i: number) => terms.get(i)!.reduce((s, v) => s + v, 0);
+
+  const duelColumns = 1 + ALL_LANES.length;
+  const strengthDuels = fitLogistic(xTrain.map((v) => v.slice(0, duelColumns)), yTrain);
+  const perLane = used.length > 0
+    ? fitLogistic(
+        fitIndex.map((i) => [parts.get(i)!.strength, ...used.map((l) => terms.get(i)![l]!)]),
+        fitIndex.map((i) => games[i]!.blueWins),
+      )
+    : null;
+  const checks: [string, ReturnType<typeof evaluate>][] = [
+    ['Lane-Stärke allein, angepasst', evaluate((k) => predict(strengthOnly, [xTest[k]![0]!]))],
+    ['dazu gezählte Duelle (über den Sieg), Gewichte angepasst', evaluate((k) => predict(strengthDuels, xTest[k]!.slice(0, duelColumns)))],
+    ['dazu Matchups über das Lane-Gold, umgerechnet, nichts angepasst', evaluate((k) => predict(strengthOnly, [xTest[k]![0]!], total(testIndex[k]!)))],
+  ];
+  if (perLane)
+    checks.push(['dazu Matchups über das Lane-Gold, Gewicht je Lane angepasst', evaluate((k) => predict(perLane, [xTest[k]![0]!, ...used.map((l) => terms.get(testIndex[k]!)![l]!)]))]);
+
+  const gold = (value: number) => `±${count(Math.round(value))} Gold`;
+  const win = (lane: Lane, value: number) => `${num(value * perGold(lane) * 25, 1)} Pkt`;
+  const games50 = (value: number) => (Number.isFinite(value) ? count(Math.round(value)) : '—');
+  const seen = (z: number) => (z >= 2 ? 'deutlich' : z >= 1 ? 'angedeutet' : 'nicht zu sehen');
+
+  report.push(
+    `${count(goldTrain.length)} Trainingsspiele tragen das Gold jedes Spielers nach 10 Minuten (Lane-Teil des Sammlers). ` +
+      'Die Kette je Lane: Was bestimmt den Gold-Unterschied zwischen den beiden Lane-Gegnern — der Champion (sein Schnitt ' +
+      'gegen alle) oder das Matchup (was das Paar darüber hinaus tut)? Und was ist ein Vorsprung nach 10 Minuten im Sieg ' +
+      'wert? Streuungen sind die echten, der Zufallsanteil herausgerechnet (Momentenmethode).',
+    '',
+    '### Was ein Vorsprung nach 10 Minuten wert ist',
+    '',
+    `Alle fünf Lanes zugleich angepasst, ${count(converted.games)} Spiele. Winrate-Punkte bei 50 %.`,
+    '',
+    '| Lane | je 1.000 Gold | typischer Unterschied der Lane-Gegner |',
+    '|---|---|---|',
+    ...lanes.map(({ lane, split }) => {
+      const c = converted.fit.coefficients[lane + 1]!;
+      const e = converted.fit.standardErrors[lane + 1]!;
+      return `| ${LANE_NAMES[lane]} | ${c >= 0 ? '+' : '−'}${num(Math.abs(c) * 25, 1)} ± ${num(1.96 * e * 25, 1)} Pkt | ${gold(split.spread)} |`;
+    }),
+    '',
+    '### Was den Gold-Unterschied bestimmt',
+    '',
+    `Champions mit mindestens ${LANE_GOLD_MINIMUM} Spielen auf der Lane. „Halb zählt“: ab so vielen Spielen sagt das eigene Gold ` +
+      'eines Paars mehr als der Schnitt — über das Gold und, bei gleicher Stärke des Matchups, über den Sieg.',
+    '',
+    '| Lane | Duelle | Champion | Matchup | höchstens (95 %) | Matchup-Signal | Paar zählt halb: Gold | über den Sieg |',
+    '|---|---|---|---|---|---|---|---|',
+    ...lanes.map(({ lane, split }) => {
+      const effect = split.matchupSpread * perGold(lane) * 0.25;
+      const viaWin = effect > 0 ? 0.25 / effect ** 2 : Infinity;
+      return (
+        `| ${LANE_NAMES[lane]} | ${count(split.duels)} | ${gold(split.championSpread)} (${win(lane, split.championSpread)}) | ` +
+        `${gold(split.matchupSpread)} (${win(lane, split.matchupSpread)}) | ${gold(split.matchupUpper)} (${win(lane, split.matchupUpper)}) | ` +
+        `${seen(split.matchupZ)} (${split.matchupZ < 0 ? '−' : ''}${num(Math.abs(split.matchupZ), 1)} σ) | ${games50(split.prior)} | ${games50(viaWin)} |`
+      );
+    }),
+    '',
+    '### Prüfung auf zurückgehaltenen Spielen',
+    '',
+    'Die Matchups über das Lane-Gold: das eigene Gold jedes Paars über die Schnitte beider Champions hinaus, geglättet mit ' +
+      '„Paar zählt halb“, mit der Umrechnung seiner Lane in log-odds. Die Gewichte je Lane sind auf den Trainingsspielen ' +
+      `ohne Gold angepasst (${count(fitIndex.length)}), damit kein Spiel sein eigenes Gold sieht.`,
+    '',
+    '| Modell | Log-Loss | Treffer |',
+    '|---|---|---|',
+    ...checks.map(([name, m]) => `| ${name} | ${num(m.loss)} | ${pct(m.hits)} |`),
+    '',
+  );
+  if (perLane)
+    report.push(
+      'Gewicht je Lane, 1 hieße: das Matchup zählt so viel, wie Gold und Umrechnung sagen; 0: gar nicht.',
+      '',
+      '| Lane | Gewicht |',
+      '|---|---|',
+      ...ALL_LANES.map((lane) => {
+        const j = used.indexOf(lane);
+        return `| ${LANE_NAMES[lane]} | ${j < 0 ? '— (kein Matchup-Signal im Gold)' : pts(perLane.coefficients[j + 2]!, perLane.standardErrors[j + 2]!)} |`;
+      }),
+      '',
+    );
 }
 
 function args(list: readonly string[]): { files: string[]; options: Record<string, string> } {
@@ -454,6 +586,8 @@ export async function main(argv: string[]): Promise<number> {
   const tb = total(valueB);
   const tc = total(valueC);
   report.push(`| alle | ${count(tb.seats)} | ${cell(tb.overAverage, tb.seats)} | ${cell(tb.overActual, tb.seats)} | ${cell(tc.overAverage, tc.seats)} | ${cell(tc.overActual, tc.seats)} |`, '');
+
+  reportLaneGold(report, { games, trainIndex, testIndex, parts, xTrain, yTrain, xTest, strengthOnly, evaluate });
 
   report.push(
     '## Noch nicht drin',
