@@ -2,7 +2,7 @@
 // shift in log-odds; picks sum them into a win rate with an error bar, bans into denied points.
 // Texts and numbers match the 1.5 model to the character — the golden tests hold it to that.
 
-import { CompAnalyzer, EMPTY_PROFILE, type CompProfile } from './compAnalyzer';
+import { CompAnalyzer, EMPTY_PROFILE, type CompProfile, type Plan } from './compAnalyzer';
 import { effectiveChampionId, isLocked, type DraftState, type TurnAction } from './draftState';
 import { ALL_LANES, Lane, laneDisplay } from './lane';
 import type { LanePrediction, LanePredictionResult } from './lanePredictor';
@@ -25,7 +25,7 @@ import {
 } from './scoreModel';
 import { MATCHUP_PRIOR, SYNERGY_PRIOR } from './shrinkage';
 import { TankShred } from './tankShred';
-import type { TraitTable } from './traits';
+import { hasHardEngage, hasPeel, type TraitTable } from './traits';
 import type { RecommendationTarget } from './turnTracker';
 
 export type ScoreTermKind =
@@ -112,6 +112,8 @@ export interface Recommendation {
   openCounters?: number;
   /** Lanes still open in the own team on which this pick is strong too, two or more (D2). */
   flexLanes?: Lane[];
+  /** Bans: the lane the enemy would most likely play the champion on (D3). */
+  banLane?: Lane;
 }
 
 export interface RecommendationSet {
@@ -212,7 +214,7 @@ export class Recommender {
 
   constructor(
     private readonly meta: MetaLookup,
-    traits: TraitTable,
+    private readonly traits: TraitTable,
     shred: TankShred = TankShred.none,
   ) {
     this.comp = new CompAnalyzer(meta, traits, shred);
@@ -230,7 +232,7 @@ export class Recommender {
     const seat = this.prepare(state, target, enemyLanes, allyLanes);
     const items =
       target.action === 'ban'
-        ? this.scoreBans(state, seat.lane, seat.allies, new Set([...seat.hoveredByOthers, ...seat.bannedByOthers]), enemyLanes, limit)
+        ? this.scoreBans(state, seat.lane, seat.allies, new Set([...seat.hoveredByOthers, ...seat.bannedByOthers]), enemyLanes, limit, seat.allyComp.plan)
         : top(this.scorePicks(state, seat, enemyLanes, selectable), limit);
     return { cellId: target.slot.cellId, lane: seat.lane, action: target.action, items, allyComp: seat.allyComp, enemyComp: seat.enemyComp };
   }
@@ -385,6 +387,7 @@ export class Recommender {
     hoveredByOthers: ReadonlySet<number>,
     enemyLanes: LanePredictionResult,
     limit: number,
+    plan: Plan | null = null,
   ): Recommendation[] {
     const results: Recommendation[] = [];
     const takenByEnemy = enemyLanesTaken(state, enemyLanes);
@@ -403,6 +406,7 @@ export class Recommender {
       const last = terms[terms.length - 1]!;
       const gate = termHasData(last) ? termGate(last) : 0;
       const deniedPoints = gate * (sigmoid(threat) - 0.5) * 100;
+      this.addPlanThreat(candidate, plan, reasons);
       results.push({
         championId: candidate,
         name: this.meta.championName(candidate),
@@ -410,9 +414,34 @@ export class Recommender {
         reasons: dedupe(reasons),
         breakdown: terms,
         uncertainty: 0,
+        ...(banLane ? { banLane: banLane.lane } : {}),
       });
     }
     return top(results, limit);
+  }
+
+  /**
+   * D3: a champion that breaks the plan the own team is built around — disengage against a
+   * teamfight plan, hard engage against a poke plan. A hint only, it adds nothing to the ban value.
+   */
+  private addPlanThreat(candidate: number, plan: Plan | null, reasons: Reason[]): void {
+    if (plan !== 'teamfight' && plan !== 'poke') return;
+    const trait = this.traits.for(this.meta.champion(candidate)?.key);
+    if (plan === 'teamfight' && hasPeel(trait)) {
+      reasons.push(
+        neutral(
+          'bedroht euren Teamfight-Plan',
+          'Mit viel Peel holt er Getroffene aus eurem Engage wieder heraus (Disengage) — euer Teamfight-Plan läuft dann ins Leere. Zählt nicht in den Bann-Wert.',
+        ),
+      );
+    } else if (plan === 'poke' && hasHardEngage(trait)) {
+      reasons.push(
+        neutral(
+          'bedroht euren Poke-Plan',
+          'Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Zählt nicht in den Bann-Wert.',
+        ),
+      );
+    }
   }
 
   /** Names the open counters as a reason; returns how many there are. */

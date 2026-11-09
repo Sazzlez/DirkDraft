@@ -50,6 +50,8 @@ export interface DraftState {
   allyBanIntents: readonly BanIntent[];
   /** The own team's pick actions in draft order (cell ids); empty where the session has none. */
   allyPickOrder: readonly number[];
+  /** Ban actions of the own team not done yet, hovered or not (D3). */
+  allyBansOpen: number;
   phase: DraftPhase;
   turn: ActiveTurn | null;
   /** Banned or locked anywhere in the draft. */
@@ -69,6 +71,7 @@ export const INACTIVE: DraftState = Object.freeze({
   enemyBans: [],
   allyBanIntents: [],
   allyPickOrder: [],
+  allyBansOpen: 0,
   phase: 'none',
   turn: null,
   unavailable: new Set<number>(),
@@ -238,6 +241,7 @@ function fromSession(session: unknown): DraftState {
     enemyBans: enemy,
     allyBanIntents,
     allyPickOrder,
+    allyBansOpen: actions.filter((a) => a.type?.toLowerCase() === 'ban' && a.isAllyAction && !a.completed).length,
     phase: parsePhase(timerPhase),
     turn: findActiveTurn(actions, localCellId),
     unavailable,

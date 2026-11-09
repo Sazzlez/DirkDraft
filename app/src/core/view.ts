@@ -362,8 +362,24 @@ export interface TeamPlanView {
   note: string;
 }
 
+/** D3: the team's bans as one set (team mode). */
+export interface TeamBansView {
+  rows: {
+    champion: ChampionRef;
+    lane: Lane | null;
+    /** "+3,8 Pkt" */
+    value: string;
+    /** "Teammate 3 hovert ihn" — already set. */
+    by: string | null;
+    /** The first ban of the set nobody hovers yet: the own one. */
+    mine: boolean;
+  }[];
+  note: string;
+}
+
 export type SideTile =
   | { kind: 'team'; team: TeamPlanView }
+  | { kind: 'teamBans'; bans: TeamBansView }
   | { kind: 'chance'; chance: DraftChanceView }
   | { kind: 'comp'; comp: CompView }
   | { kind: 'openRoles'; roles: OpenRolesView }

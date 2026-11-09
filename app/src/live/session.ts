@@ -290,6 +290,8 @@ export class LiveSession {
       side.push({ kind: 'comp', comp: this.adapter.comp(frame) });
     } else if (moment === 'banning' && frame.bans) {
       main = { kind: 'bans', tile: this.adapter.pickTile(frame.bans, frame, forMe ? 'Banns für dich' : `Banns für ${target!.label}`) };
+      const teamBans = this.adapter.teamBans(frame);
+      if (teamBans) side.push({ kind: 'teamBans', bans: teamBans });
       const team = this.adapter.teamPlan(frame);
       if (team) side.push({ kind: 'team', team });
       side.push({ kind: 'openRoles', roles: this.adapter.openRoles(frame) });

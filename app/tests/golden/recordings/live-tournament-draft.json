@@ -845,7 +845,13 @@
               "score": 0.12517907406731238,
               "uncertainty": 0,
               "uncertaintyPoints": 0,
-              "reasons": [],
+              "reasons": [
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+                }
+              ],
               "breakdown": [
                 {
                   "kind": "banStrength",
@@ -887,7 +893,13 @@
               "score": 0.0668379000613224,
               "uncertainty": 0,
               "uncertaintyPoints": 0,
-              "reasons": [],
+              "reasons": [
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+                }
+              ],
               "breakdown": [
                 {
                   "kind": "banStrength",
@@ -934,6 +946,11 @@
                   "text": "stark auf Jungle",
                   "tone": "pro",
                   "hint": "Jungle ist die Lane, auf der dieser Champ gerade am gef\u00E4hrlichsten ist und auf der ihn der Gegner am ehesten spielt: 52,0 % Winrate aus 8.469 Games."
+                },
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
                 }
               ],
               "breakdown": [
@@ -1061,7 +1078,13 @@
               "score": 0.04244251551243262,
               "uncertainty": 0,
               "uncertaintyPoints": 0,
-              "reasons": [],
+              "reasons": [
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+                }
+              ],
               "breakdown": [
                 {
                   "kind": "banStrength",
@@ -2137,7 +2160,13 @@
               "score": 0.12517907406731238,
               "uncertainty": 0,
               "uncertaintyPoints": 0,
-              "reasons": [],
+              "reasons": [
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+                }
+              ],
               "breakdown": [
                 {
                   "kind": "banStrength",
@@ -2179,7 +2208,13 @@
               "score": 0.0668379000613224,
               "uncertainty": 0,
               "uncertaintyPoints": 0,
-              "reasons": [],
+              "reasons": [
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+                }
+              ],
               "breakdown": [
                 {
                   "kind": "banStrength",
@@ -2226,6 +2261,11 @@
                   "text": "stark auf Jungle",
                   "tone": "pro",
                   "hint": "Jungle ist die Lane, auf der dieser Champ gerade am gef\u00E4hrlichsten ist und auf der ihn der Gegner am ehesten spielt: 52,0 % Winrate aus 8.469 Games."
+                },
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
                 }
               ],
               "breakdown": [
@@ -2353,7 +2393,13 @@
               "score": 0.04244251551243262,
               "uncertainty": 0,
               "uncertaintyPoints": 0,
-              "reasons": [],
+              "reasons": [
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+                }
+              ],
               "breakdown": [
                 {
                   "kind": "banStrength",
@@ -3429,7 +3475,13 @@
               "score": 0.12517907406731238,
               "uncertainty": 0,
               "uncertaintyPoints": 0,
-              "reasons": [],
+              "reasons": [
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+                }
+              ],
               "breakdown": [
                 {
                   "kind": "banStrength",
@@ -3471,7 +3523,13 @@
               "score": 0.0668379000613224,
               "uncertainty": 0,
               "uncertaintyPoints": 0,
-              "reasons": [],
+              "reasons": [
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+                }
+              ],
               "breakdown": [
                 {
                   "kind": "banStrength",
@@ -3518,6 +3576,11 @@
                   "text": "stark auf Jungle",
                   "tone": "pro",
                   "hint": "Jungle ist die Lane, auf der dieser Champ gerade am gef\u00E4hrlichsten ist und auf der ihn der Gegner am ehesten spielt: 52,0 % Winrate aus 8.469 Games."
+                },
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
                 }
               ],
               "breakdown": [
@@ -3645,7 +3708,13 @@
               "score": 0.04244251551243262,
               "uncertainty": 0,
               "uncertaintyPoints": 0,
-              "reasons": [],
+              "reasons": [
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+                }
+              ],
               "breakdown": [
                 {
                   "kind": "banStrength",
@@ -4721,7 +4790,13 @@
               "score": 0.12517907406731238,
               "uncertainty": 0,
               "uncertaintyPoints": 0,
-              "reasons": [],
+              "reasons": [
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+                }
+              ],
               "breakdown": [
                 {
                   "kind": "banStrength",
@@ -4763,7 +4838,13 @@
               "score": 0.0668379000613224,
               "uncertainty": 0,
               "uncertaintyPoints": 0,
-              "reasons": [],
+              "reasons": [
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+                }
+              ],
               "breakdown": [
                 {
                   "kind": "banStrength",
@@ -4810,6 +4891,11 @@
                   "text": "stark auf Jungle",
                   "tone": "pro",
                   "hint": "Jungle ist die Lane, auf der dieser Champ gerade am gef\u00E4hrlichsten ist und auf der ihn der Gegner am ehesten spielt: 52,0 % Winrate aus 8.469 Games."
+                },
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
                 }
               ],
               "breakdown": [
@@ -4937,7 +5023,13 @@
               "score": 0.04244251551243262,
               "uncertainty": 0,
               "uncertaintyPoints": 0,
-              "reasons": [],
+              "reasons": [
+                {
+                  "text": "bedroht euren Poke-Plan",
+                  "tone": "neutral",
+                  "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+                }
+              ],
               "breakdown": [
                 {
                   "kind": "banStrength",

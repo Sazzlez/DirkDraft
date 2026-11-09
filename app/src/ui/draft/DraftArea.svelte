@@ -10,6 +10,7 @@
   import OpenRolesTile from './OpenRolesTile.svelte';
   import VerdictTile from './VerdictTile.svelte';
   import TeamPlanTile from './TeamPlanTile.svelte';
+  import TeamBansTile from './TeamBansTile.svelte';
 
   let { view }: { view: ViewModel } = $props();
   const main = $derived(view.main);
@@ -41,6 +42,8 @@
       {#each view.side as tile, i (i)}
         {#if tile.kind === 'team'}
           <div class="wide"><TeamPlanTile team={tile.team} /></div>
+        {:else if tile.kind === 'teamBans'}
+          <div class="wide"><TeamBansTile bans={tile.bans} /></div>
         {:else if tile.kind === 'chance'}
           <ChanceTile chance={tile.chance} />
         {:else if tile.kind === 'comp'}

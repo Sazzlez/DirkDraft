@@ -84,3 +84,59 @@ export function planTeam(
   if (last) for (const pick of picks) if (pick !== last && blindRisk(pick.item) < blindRisk(last.item) && (!first || blindRisk(pick.item) < blindRisk(first.item))) first = pick;
   return { picks, first: first && last ? first.cellId : null, last: first && last ? last.cellId : null };
 }
+
+/** D3: one ban of the team's set; `by` is the seat already hovering it. */
+export interface TeamBan {
+  championId: number;
+  lane: Lane;
+  /** Denied points; null for a teammate's hover no list rates. */
+  score: number | null;
+  by: number | null;
+}
+
+/** Bans per lane in the team's set: spread, so one lane is not banned out while others stay open. */
+export const TEAM_BANS_PER_LANE = 2;
+
+/**
+ * D3: the team's bans as one set instead of five times the same list. What teammates already hover
+ * counts as set; the rest comes from every ally seat's ban list, best first, at most two per lane.
+ */
+export function planTeamBans(
+  recommender: Recommender,
+  meta: MetaLookup,
+  state: DraftState,
+  enemyLanes: LanePredictionResult,
+  allyLanes: LanePredictionResult,
+): TeamBan[] | null {
+  const left = state.allyBansOpen;
+  if (left <= 0) return null;
+
+  const pool = new Map<number, { lane: Lane; score: number }>();
+  for (const slot of state.allies) {
+    const set = recommender.recommend(state, { slot, action: 'ban', isFollowingTurn: false }, enemyLanes, allyLanes, null, 10);
+    for (const item of set.items) {
+      const known = pool.get(item.championId);
+      if (!known || item.score > known.score) pool.set(item.championId, { lane: item.banLane ?? Lane.Unknown, score: item.score });
+    }
+  }
+
+  const set: TeamBan[] = [];
+  const perLane = new Map<Lane, number>();
+  const add = (ban: TeamBan) => {
+    set.push(ban);
+    if (ban.lane !== Lane.Unknown) perLane.set(ban.lane, (perLane.get(ban.lane) ?? 0) + 1);
+  };
+  for (const intent of state.allyBanIntents) {
+    if (set.length >= left || set.some((b) => b.championId === intent.championId) || state.unavailable.has(intent.championId)) continue;
+    const known = pool.get(intent.championId);
+    add({ championId: intent.championId, lane: known?.lane ?? meta.mainLane(intent.championId), score: known?.score ?? null, by: intent.cellId });
+  }
+  const ranked = [...pool.entries()].sort((a, b) => b[1].score - a[1].score);
+  for (const [championId, { lane, score }] of ranked) {
+    if (set.length >= left) break;
+    if (set.some((b) => b.championId === championId)) continue;
+    if (lane !== Lane.Unknown && (perLane.get(lane) ?? 0) >= TEAM_BANS_PER_LANE) continue;
+    add({ championId, lane, score, by: null });
+  }
+  return set;
+}

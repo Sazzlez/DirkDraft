@@ -864,7 +864,13 @@
           "score": 0.027711837547043622,
           "uncertainty": 0,
           "uncertaintyPoints": 0,
-          "reasons": [],
+          "reasons": [
+            {
+              "text": "bedroht euren Poke-Plan",
+              "tone": "neutral",
+              "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+            }
+          ],
           "breakdown": [
             {
               "kind": "banStrength",
@@ -906,7 +912,13 @@
           "score": 0.019643560017314515,
           "uncertainty": 0,
           "uncertaintyPoints": 0,
-          "reasons": [],
+          "reasons": [
+            {
+              "text": "bedroht euren Poke-Plan",
+              "tone": "neutral",
+              "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+            }
+          ],
           "breakdown": [
             {
               "kind": "banStrength",
@@ -948,7 +960,13 @@
           "score": 0.016725261115015735,
           "uncertainty": 0,
           "uncertaintyPoints": 0,
-          "reasons": [],
+          "reasons": [
+            {
+              "text": "bedroht euren Poke-Plan",
+              "tone": "neutral",
+              "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
+            }
+          ],
           "breakdown": [
             {
               "kind": "banStrength",
@@ -1079,6 +1097,11 @@
               "text": "52,7 % WR auf Support",
               "tone": "pro",
               "hint": "Genau die Lane dieses Slots: 52,7 % Winrate aus 8.683 Games. Ein Ban wirkt hier direkt."
+            },
+            {
+              "text": "bedroht euren Poke-Plan",
+              "tone": "neutral",
+              "hint": "Mit hartem Engage startet er den Kampf, bevor euer Poke wirkt. Z\u00E4hlt nicht in den Bann-Wert."
             }
           ],
           "breakdown": [

@@ -28,6 +28,7 @@ import {
   type CompView,
   type GapLine,
   type PickNote,
+  type TeamBansView,
   type TeamPlanView,
   type DraftChanceView,
   type HoverView,
@@ -66,6 +67,7 @@ export interface GoldenItem {
   /** New in 2.1 (engine.ts). */
   openCounters?: number;
   flexLanes?: string[];
+  banLane?: string;
 }
 
 export interface GoldenSet {
@@ -127,6 +129,8 @@ export interface GoldenFrame {
   /** New in 2.1 (engine.ts): the own team's gaps for the seat about to pick. */
   gap?: { cellId: number; count: number; findings: { issue: string; text: string; severity: number }[] } | null;
   /** New in 2.1 (engine.ts, pickHintOf). */
+  /** New in 2.1 (engine.ts, D3). */
+  teamBans?: { championId: number; lane: string; score: number | null; by: number | null }[] | null;
   /** New in 2.1 (engine.ts, D1). */
   teamPlan?: { picks: { cellId: number; lane: string; item: GoldenItem }[]; first: number | null; last: number | null } | null;
   pickHint?: {
@@ -356,6 +360,29 @@ export class GoldenAdapter {
     return line ? { kind: 'gap', line } : null;
   }
 
+  /** D3: the team's ban set as a tile; null outside team mode or with no ban left. */
+  teamBans(frame: GoldenFrame): TeamBansView | null {
+    const bans = frame.teamBans;
+    if (!bans || bans.length === 0) return null;
+    const s = frame.state;
+    const label = (cellId: number) => {
+      const slot = s.allies.find((a) => a.cellId === cellId);
+      return cellId === s.localCellId ? 'Du' : `Teammate ${(slot?.index ?? 0) + 1}`;
+    };
+    // The own ban: the own hover if there is one, else the first of the set nobody hovers yet.
+    const mine = (bans.find((b) => b.by === s.localCellId) ?? bans.find((b) => b.by === null))?.championId ?? null;
+    return {
+      rows: bans.map((b) => ({
+        champion: this.champion(b.championId) ?? { id: b.championId, key: '', name: `#${b.championId}` },
+        lane: toLane(b.lane),
+        value: b.score === null ? '—' : `${points(b.score)} Pkt`,
+        by: b.by === null ? null : b.by === s.localCellId ? 'dein Hover' : `${label(b.by)} hovert ihn`,
+        mine: b.championId === mine,
+      })),
+      note: 'Ein Set für das ganze Team statt fünfmal derselben Liste: die stärksten Banns aller Sitze, höchstens zwei je Lane. Was Teammates schon hovern, ist gesetzt.',
+    };
+  }
+
   /** D1: the team plan as a tile; null outside team mode. */
   teamPlan(frame: GoldenFrame): TeamPlanView | null {
     const plan = frame.teamPlan;
@@ -365,16 +392,16 @@ export class GoldenAdapter {
       const slot = s.allies.find((a) => a.cellId === cellId);
       return cellId === s.localCellId ? 'Du' : `Teammate ${(slot?.index ?? 0) + 1}`;
     };
-    const why = (item: GoldenItem) =>
-      item.flexLanes
-        ? 'Flex'
-        : item.openCounters === undefined
+    const counters = (item: GoldenItem) =>
+      item.openCounters === undefined
           ? 'Lane-Gegner bekannt'
           : item.openCounters === 0
             ? 'kein offener Counter'
             : item.openCounters === 1
               ? '1 offener Counter'
               : `${item.openCounters} offene Counter`;
+    // First for being hard to answer (flex counts), last for the counters it leaves open.
+    const whyFirst = (item: GoldenItem) => (item.flexLanes ? 'Flex' : counters(item));
     const rows = plan.picks.map((p) => ({
       cellId: p.cellId,
       label: label(p.cellId),
@@ -392,7 +419,7 @@ export class GoldenAdapter {
       rows,
       order:
         first && last
-          ? `Zuerst ${label(first.cellId)} mit ${name(first)} (${why(first.item)}), zuletzt ${label(last.cellId)} mit ${name(last)} (${why(last.item)}).`
+          ? `Zuerst ${label(first.cellId)} mit ${name(first)} (${whyFirst(first.item)}), zuletzt ${label(last.cellId)} mit ${name(last)} (${counters(last.item)}).`
           : null,
       note: 'Die beste Kombination für die offenen Plätze, mit der Synergie zwischen den neuen Picks. Wie sich ihre Comp gegenseitig ergänzt, ist nicht eingerechnet.',
     };

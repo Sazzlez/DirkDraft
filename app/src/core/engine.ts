@@ -22,7 +22,7 @@ import { isAram, usesLanes, type QueueKind } from './model/queue';
 import { isGate, Recommender, termGate, termLabel, termPoints, type Recommendation, type RecommendationSet } from './model/recommender';
 import { countLeadingTies, decimalsOf, errorAsPoints } from './model/scoreError';
 import { TankShred } from './model/tankShred';
-import { planTeam, type TeamPlan } from './model/teamPlanner';
+import { planTeam, planTeamBans, type TeamPlan } from './model/teamPlanner';
 import { TraitTable } from './model/traits';
 import { TurnTracker, type RecommendationTarget } from './model/turnTracker';
 import priors from './model/data/pick_order_priors.json';
@@ -55,6 +55,8 @@ export interface FrameItem {
   openCounters?: number;
   /** New in 2.1 (D2): open own lanes the pick is strong on, two or more. */
   flexLanes?: LaneName[];
+  /** New in 2.1 (D3): bans only, the lane the enemy would play the champion on. */
+  banLane?: LaneName;
 }
 
 export interface FrameSet {
@@ -136,6 +138,8 @@ export interface DraftFrame {
   pickHint?: PickHint | null;
   /** New in 2.1 (D1): the open seats planned together, in team mode only. */
   teamPlan?: { picks: { cellId: number; lane: LaneName; item: FrameItem }[]; first: number | null; last: number | null } | null;
+  /** New in 2.1 (D3): the team's ban set, in team mode while bans are left. */
+  teamBans?: { championId: number; lane: LaneName; score: number | null; by: number | null }[] | null;
 }
 
 /** What the pick position means for the advised seat's list. */
@@ -401,6 +405,10 @@ export class DraftEngine {
       gap,
       pickHint,
       teamPlan: this.teamMode && state.isActive && usesLanes(state.queue) ? frameTeamPlan(planTeam(recommender, meta, state, enemyPredictions, allyPredictions, this.selectable)) : null,
+      teamBans:
+        this.teamMode && bans && state.phase !== 'finalization'
+          ? (planTeamBans(recommender, meta, state, enemyPredictions, allyPredictions)?.map((b) => ({ ...b, lane: laneKey(b.lane) })) ?? null)
+          : null,
     };
   }
 }
@@ -424,6 +432,8 @@ export function stateFromFrame(s: DraftFrame['state']): DraftState {
     enemyBans: s.enemyBans,
     allyBanIntents: s.allyBanIntents ?? [],
     allyPickOrder: s.allyPickOrder ?? [],
+    // A stored frame has no actions: every ban not yet in the summary counts as open.
+    allyBansOpen: Math.max(0, s.allies.length - s.allyBans.length),
     phase: s.phase,
     turn: s.turn,
     unavailable: new Set(s.unavailable),
@@ -475,6 +485,7 @@ function frameItem(r: Recommendation): FrameItem {
     })),
     ...(r.openCounters !== undefined ? { openCounters: r.openCounters } : {}),
     ...(r.flexLanes ? { flexLanes: r.flexLanes.map(laneKey) } : {}),
+    ...(r.banLane !== undefined ? { banLane: laneKey(r.banLane) } : {}),
   };
 }
 

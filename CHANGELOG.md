@@ -48,6 +48,11 @@ Kopien melden sie beim nächsten Start.
   Synergie zwischen den neuen Picks — und schlägt eine Reihenfolge vor: zuerst der Pick mit den
   wenigsten offenen Countern (Flex-Picks zählen einen weniger), zuletzt der am leichtesten zu
   kontern ist. Hat niemand offene Counter, steht keine Reihenfolge da.
+- **Team-Banns** (im Team-Modus): eine Kachel mit einem Set für das ganze Team statt fünfmal derselben
+  Liste — die stärksten Banns aller Sitze, höchstens zwei je Lane; was Teammates schon hovern, ist
+  gesetzt, und dein eigener ist markiert. In den Bann-Vorschlägen steht außerdem, wenn ein Champion
+  euren Plan bedroht: „bedroht euren Teamfight-Plan“ (Disengage) oder „bedroht euren Poke-Plan“
+  (hartes Engage). Zählt nicht in den Bann-Wert.
 - Die Chips sprechen League: „Frontline“ statt „steht vorne“, „Peel“ statt „schützt deine Carrys“,
   „Disengage“ statt „hält ihr Engage auf“. Der Hinweis darunter erklärt weiter, was gemeint ist.
 - **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items
