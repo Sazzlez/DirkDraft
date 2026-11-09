@@ -8,6 +8,10 @@ Kopien melden sie beim nächsten Start.
 - **Keine doppelten Bans mehr.** In Ranked bannt das ganze Team gleichzeitig. Was ein Teammate gerade
   als Ban hovert, fehlt jetzt in deinen Ban-Vorschlägen, und die Ban-Reihe zeigt seinen Hover blass
   hinter den fertigen Bans. Dein eigener Ban-Hover bleibt in deiner Liste.
+- **Die Comp-Kachel sagt oben, was eurem Team noch fehlt:** „Eurem Team fehlt noch: Frontline,
+  AP-Schaden und Engage“ — alle Lücken, die wichtigste zuerst, für den Sitz, der als Nächstes pickt.
+  Sein eigener Hover zählt dabei nicht mit, sonst wäre die Lücke schon vor dem Pick „gefüllt“. Unten
+  steht, was dem Gegnerteam fehlt. Bisher zeigte die Kachel nur eine einzige Lücke.
 - **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items
   stehen ohnehin in der Matchup-Kachel und in der Spielansicht.
 - **Ein Klick auf einen Teammate, der gelockt hat, zeigt sein Matchup** wie das eigene nach dem

@@ -42,3 +42,4 @@ CHANGELOG.
 | Feld / Änderung | Warum |
 |---|---|---|
 | `state.allyBanIntents` (neues Feld) | Ban-Hovers der Teammates; der Ban-Vorschlag lässt aus, was ein anderer Teammate gerade bannt. In keiner Referenz-Aufzeichnung kommt ein solcher Hover vor, die Werte bleiben gleich. |
+| `gap` (neues Feld) | Was dem eigenen Team für den Sitz fehlt, der als Nächstes pickt — ohne dessen eigenen Hover. Nur Anzeige (Comp-Kachel), kein Score ändert sich. |

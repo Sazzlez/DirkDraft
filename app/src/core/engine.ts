@@ -113,6 +113,11 @@ export interface DraftFrame {
   balance: { allyWinRate: number; ratedChampions: number; contestedLanes: number; isComparable: boolean; hasData: boolean };
   laneMatchups: { lane: LaneName; allyId: number; enemyId: number; winRate: number | null; play: number; isInferred: boolean; measured: number | null }[];
   aramBench: { own: number; bench: number[]; rerolls: number; tied: number; decimals: number; items: FrameItem[] } | null;
+  /**
+   * New in 2.1: what the own team still lacks for the seat about to pick. Counted without that seat's
+   * own hover, which would otherwise fill the gap before the pick. Null without an open ally seat to advise.
+   */
+  gap?: { cellId: number; count: number; findings: FrameProfile['findings'] } | null;
 }
 
 export interface EngineOptions {
@@ -268,6 +273,12 @@ export class DraftEngine {
 
     const balance = estimateBalance(meta, state, allyPredictions, enemyPredictions);
 
+    const advised = target ? state.allies.find((slot) => slot.cellId === target.slot.cellId) : undefined;
+    const gap =
+      state.isActive && usesLanes(state.queue) && advised && !isLocked(advised)
+        ? gapOf(advised.cellId, comp.analyze(state.allies.filter((slot) => slot !== advised).map(effectiveChampionId)))
+        : null;
+
     return {
       state: {
         isActive: state.isActive,
@@ -312,6 +323,7 @@ export class DraftEngine {
         measured: m.measured,
       })),
       aramBench: bench,
+      gap,
     };
   }
 }
@@ -396,6 +408,12 @@ const framePredictions = (result: LanePredictionResult): FramePrediction[] =>
     isManual: p.isManual,
     isUncertain: isUncertain(p),
   }));
+
+const gapOf = (cellId: number, p: CompProfile): NonNullable<DraftFrame['gap']> => ({
+  cellId,
+  count: p.count,
+  findings: p.findings.map((f) => ({ issue: f.issue, text: f.text, severity: f.severity })),
+});
 
 const frameProfile = (p: CompProfile): FrameProfile => ({
   count: p.count,

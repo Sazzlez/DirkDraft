@@ -174,12 +174,23 @@ export interface CompRow {
   max: number;
 }
 
+/** "Eurem Team fehlt noch: Frontline, AP-Schaden und Engage", with the names kept apart (no break inside one). */
+export interface GapLine {
+  /** "Eurem Team fehlt noch", "Dem Gegnerteam fehlt", "Eurem Team fehlt nichts". */
+  lead: string;
+  /** What is missing, most severe first, in the names players use; empty for "nichts". */
+  items: string[];
+  tone: Tone;
+}
+
 export interface CompView {
+  /** The own team's gaps for the seat about to pick. */
+  gap: GapLine | null;
   rows: CompRow[];
   allyDamage: { physical: number; magic: number } | null;
   enemyDamage: { physical: number; magic: number } | null;
-  verdict: string;
-  verdictTone: Tone;
+  /** The enemy's gaps; null while they lack nothing the rules see. */
+  enemyGap: GapLine | null;
 }
 
 export interface MatchupView {

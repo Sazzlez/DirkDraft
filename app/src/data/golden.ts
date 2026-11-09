@@ -25,6 +25,7 @@ import {
   type BuildView,
   type ChampionRef,
   type CompView,
+  type GapLine,
   type DraftChanceView,
   type HoverView,
   type ItemOption,
@@ -113,7 +114,28 @@ export interface GoldenFrame {
   balance: { allyWinRate: number; ratedChampions: number; contestedLanes: number; isComparable: boolean; hasData: boolean };
   laneMatchups: { lane: string; allyId: number; enemyId: number; winRate: number | null; play: number; isInferred: boolean; measured: number | string | null }[];
   aramBench: { own: number; bench: number[]; rerolls: number; tied: number; decimals: number; items: GoldenItem[] } | null;
+  /** New in 2.1 (engine.ts): the own team's gaps for the seat about to pick. */
+  gap?: { cellId: number; count: number; findings: { issue: string; text: string; severity: number }[] } | null;
 }
+
+/** A comp finding as what is missing ("Frontline"), for "Eurem Team fehlt noch: …". */
+const GAP_NAMES: Record<string, string> = {
+  noMagicDamage: 'AP-Schaden',
+  noPhysicalDamage: 'AD-Schaden',
+  noFrontline: 'Frontline',
+  noEngage: 'Engage',
+  noPeel: 'Peel',
+  littleCrowdControl: 'CC',
+  allMelee: 'Range',
+};
+
+/** The findings as names, most severe first. */
+function gapItems(findings: { issue: string; text: string; severity: number }[]): string[] {
+  return [...findings].sort((x, y) => y.severity - x.severity).map((f) => GAP_NAMES[f.issue] ?? f.text);
+}
+
+/** A gap line as one sentence: "Eurem Team fehlt noch: Frontline und Engage". */
+export const gapText = (line: GapLine): string => (line.items.length > 0 ? `${line.lead}: ${joinGerman(line.items)}` : line.lead);
 
 export interface SnapshotChampion {
   id: number;
@@ -328,8 +350,18 @@ export class GoldenAdapter {
     const a = frame.comp.allies;
     const e = frame.comp.enemies;
     const damage = (p: GoldenProfile) => (p.count === 0 ? null : { physical: p.physicalShare, magic: p.magicShare });
-    const finding = a.findings[0] ?? null;
+    // For the seat about to pick: the team without its own hover. Once nobody is left to pick, the
+    // whole team as it stands.
+    const own = frame.gap ?? { count: a.count, findings: a.findings };
+    const open = frame.state.allies.some((slot) => !slot.lockedChampionId);
+    const gap: GapLine | null =
+      own.findings.length > 0
+        ? { lead: `Eurem Team fehlt${open ? ' noch' : ''}`, items: gapItems(own.findings), tone: 'warn' }
+        : own.count >= 3
+          ? { lead: `Eurem Team fehlt${open ? ' bisher' : ''} nichts`, items: [], tone: 'good' }
+          : null;
     return {
+      gap,
       rows: [
         { label: 'Engage', ally: a.maxEngage, enemy: e.maxEngage, max: 3 },
         { label: 'Frontline', ally: a.frontlineCount, enemy: e.frontlineCount, max: 5 },
@@ -338,8 +370,7 @@ export class GoldenAdapter {
       ],
       allyDamage: damage(a),
       enemyDamage: damage(e),
-      verdict: finding ? `Euch: ${finding.text}` : e.findings[0] ? `Gegner: ${e.findings[0].text}` : 'Keine Lücke auf beiden Seiten',
-      verdictTone: finding ? 'warn' : 'good',
+      enemyGap: e.findings.length > 0 ? { lead: 'Dem Gegnerteam fehlt', items: gapItems(e.findings), tone: 'good' } : null,
     };
   }
 
