@@ -82,6 +82,33 @@ describe('comp gap', () => {
     expect(gapText(view.enemyGap!)).toMatch(/^Dem Gegnerteam fehlt: /);
   });
 
+  it('names both plans and what each side wants', () => {
+    const Xerath = 101,
+      Ziggs = 115,
+      Ezreal = 81,
+      Thresh = 412,
+      Blitzcrank = 53,
+      Ahri103 = Ahri;
+    const frame = frameOf(
+      new SessionBuilder()
+        .queue(420)
+        .localPlayer(0)
+        .locked(1, Xerath)
+        .locked(2, Ziggs)
+        .locked(3, Ezreal)
+        .locked(5, Thresh)
+        .locked(6, Blitzcrank)
+        .locked(7, Ahri103)
+        .onClock(0, 'pick')
+        .build(),
+    );
+
+    expect(adapter.comp(frame).plans).toEqual({
+      text: 'Euer Plan: Poke · Ihr Plan: Pick',
+      detail: 'Ihr wollt aus der Distanz Schaden machen und Türme belagern, bevor gekämpft wird; sie wollen einzelne Gegner abfangen, bevor es zum Kampf kommt.',
+    });
+  });
+
   it('says nothing about the own team before three champions are known', () => {
     const frame = frameOf(new SessionBuilder().queue(420).localPlayer(0).locked(1, LeeSin).onClock(0, 'pick').build());
 

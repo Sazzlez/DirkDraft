@@ -285,6 +285,47 @@ describe('CompAnalyzerTests', () => {
     expect(matching - neutralPick).toBeCloseTo(0.15, 10);
   });
 
+  it('Plan_IsTheArchetypeWithClearlyTheMostWeight', () => {
+    const t = (entries: [string, Partial<{ engage: number; peel: number; cc: number; poke: number; split: number; pick: number }>][]) =>
+      TraitTable.fromEntries(entries.map(([key, v]) => [key, { engage: 0, peel: 0, cc: 1, scaling: 'mid' as ScalingCurve, waveclear: 1, ...v }]));
+
+    const poke = analyzer(t([['Ad1', { poke: 2 }], ['Ad2', { poke: 2 }], ['Ad3', { poke: 1 }], ['Ap1', { split: 1 }]]));
+    expect(poke.analyze([Ad1, Ad2, Ad3]).plan).toBe('poke');
+    expect(poke.analyze([Ad1, Ad2]).plan).toBeNull(); // fewer than three known
+
+    // Engage 2 with multi-target CC makes a teamfight starter; a close second keeps it open.
+    const close = analyzer(t([['Ad1', { engage: 2, cc: 3 }], ['Ad2', { pick: 2 }], ['Ad3', { pick: 1 }]]));
+    expect(close.analyze([Ad1, Ad2, Ad3]).plan).toBeNull();
+
+    // Protect needs an enchanter: Support tag, not a tank, peel 2, no hard engage.
+    const m = new MetaBuilder()
+      .champion(1, 'Janna', { damage: DamageType.Magic, tags: ['Support', 'Mage'], attackRange: 550, defense: 3 })
+      .champion(2, 'Lulu', { damage: DamageType.Magic, tags: ['Support', 'Mage'], attackRange: 550, defense: 5 })
+      .champion(3, 'Braum', { damage: DamageType.Magic, tags: ['Support', 'Tank'], attackRange: 125, defense: 9 })
+      .build();
+    const protect = new CompAnalyzer(m, t([['Janna', { peel: 2 }], ['Lulu', { peel: 2 }], ['Braum', { peel: 2, engage: 1 }]]));
+    expect(protect.analyze([1, 2, 3]).plan).toBe('protect');
+  });
+
+  it('Fit_NamesTheTeamsPlanWithoutAddingToTheScore', () => {
+    const traitsOf = (candidatePoke: number) =>
+      TraitTable.fromEntries([
+        ['Ad1', { engage: 0, peel: 0, cc: 1, scaling: 'mid' as ScalingCurve, waveclear: 1, poke: 2 }],
+        ['Ad2', { engage: 0, peel: 0, cc: 1, scaling: 'mid' as ScalingCurve, waveclear: 1, poke: 2 }],
+        ['Ad3', { engage: 0, peel: 0, cc: 1, scaling: 'mid' as ScalingCurve, waveclear: 1, poke: 1 }],
+        ['Ap1', { engage: 0, peel: 0, cc: 1, scaling: 'mid' as ScalingCurve, waveclear: 1, poke: candidatePoke }],
+      ]);
+    const fits = analyzer(traitsOf(2));
+    const plain = analyzer(traitsOf(0));
+    const reasons: Reason[] = [];
+
+    const withChip = fits.fit(Ap1, fits.analyze([Ad1, Ad2, Ad3]), EMPTY_PROFILE, reasons);
+    const without = plain.fit(Ap1, plain.analyze([Ad1, Ad2, Ad3]), EMPTY_PROFILE, []);
+
+    assertChip(reasons, 'passt zu eurem Poke-Plan', 'neutral');
+    expect(withChip).toBe(without);
+  });
+
   it('DamageShares_FollowTheDamageDealt_WhereTheFileHasIt', () => {
     // Average damage to champions per game, as the collector exports it since 2.1.
     const m = new MetaBuilder()

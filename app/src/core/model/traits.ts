@@ -1,5 +1,6 @@
 // Port of DraftPilot.Core.Data.ChampionTraits / TraitTable (1.5): the judgement-only traits no API
-// reports (engage, peel, cc, scaling, waveclear), keyed by Data Dragon key, case-insensitive.
+// reports (engage, peel, cc, scaling, waveclear; since 2.1 poke, split, pick), keyed by Data Dragon
+// key, case-insensitive.
 
 import bundled from './data/champion_traits.json';
 
@@ -11,8 +12,15 @@ export interface ChampionTraits {
   cc: number;
   scaling: ScalingCurve;
   waveclear: number;
+  /** 2.1, only where the profile is clear; 0 = neutral. */
+  poke: number;
+  split: number;
+  pick: number;
   isKnown: boolean;
 }
+
+/** What a table entry is built from; the 2.1 fields may be left out. */
+export type TraitInput = Omit<ChampionTraits, 'isKnown' | 'poke' | 'split' | 'pick'> & Partial<Pick<ChampionTraits, 'poke' | 'split' | 'pick'>>;
 
 export const UNKNOWN_TRAITS: ChampionTraits = Object.freeze({
   engage: 0,
@@ -20,6 +28,9 @@ export const UNKNOWN_TRAITS: ChampionTraits = Object.freeze({
   cc: 0,
   scaling: 'unknown',
   waveclear: 0,
+  poke: 0,
+  split: 0,
+  pick: 0,
   isKnown: false,
 });
 
@@ -36,9 +47,9 @@ export class TraitTable {
     return this.byKey.size;
   }
 
-  static fromEntries(entries: Iterable<[string, Omit<ChampionTraits, 'isKnown'>]>): TraitTable {
+  static fromEntries(entries: Iterable<[string, TraitInput]>): TraitTable {
     const map = new Map<string, ChampionTraits>();
-    for (const [key, traits] of entries) map.set(key.toLowerCase(), { ...traits, isKnown: true });
+    for (const [key, traits] of entries) map.set(key.toLowerCase(), { poke: 0, split: 0, pick: 0, ...traits, isKnown: true });
     return new TraitTable(map);
   }
 
@@ -56,6 +67,9 @@ export class TraitTable {
         cc: readInt(entry.cc),
         scaling: readScaling(entry.scaling),
         waveclear: readInt(entry.waveclear),
+        poke: readInt(entry.poke),
+        split: readInt(entry.split),
+        pick: readInt(entry.pick),
         isKnown: true,
       });
     }

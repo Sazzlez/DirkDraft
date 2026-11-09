@@ -31,6 +31,11 @@ Kopien melden sie beim nächsten Start.
   die zur Mehrheit passen, bekommen den Chip „passt zum Late Game eures Teams“ (oder Early Game) mit
   einem kleinen Plus in der Teamcomp. Die Einordnung früh/spät ist grob und noch nicht gemessen; der
   Hinweis sagt das.
+- **Win Condition.** Die Comp-Kachel ordnet beide Teams einem Plan zu — Teamfight, Pick, Poke, Protect
+  oder Splitpush — und sagt, was jede Seite will: „Euer Plan: Poke · Ihr Plan: Pick“. Ein Plan steht
+  nur da, wenn er klar vorn liegt. Picks, die euren Plan verstärken, tragen den Chip „passt zu eurem
+  Poke-Plan“; er zählt nicht in die Prozentzahl. Dafür kennen die Champion-Merkmale jetzt auch
+  Poke, Splitpush und Pick (nur Champions mit klarem Profil).
 - Die Chips sprechen League: „Frontline“ statt „steht vorne“, „Peel“ statt „schützt deine Carrys“,
   „Disengage“ statt „hält ihr Engage auf“. Der Hinweis darunter erklärt weiter, was gemeint ist.
 - **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items

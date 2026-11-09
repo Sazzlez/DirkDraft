@@ -2,9 +2,9 @@
 // covers it. Rule-based on purpose — no win rate behind it, which is why its weight is the smallest.
 
 import { DamageType, hasStaticData, isRanged, isTagged, type ChampionEntry, type MetaLookup } from './metaLookup';
-import { contra, pro, type Reason } from './reason';
+import { contra, neutral, pro, type Reason } from './reason';
 import { clamp } from './scoreModel';
-import { hasHardCc, hasHardEngage, hasPeel, type TraitTable } from './traits';
+import { hasHardCc, hasHardEngage, hasPeel, type ChampionTraits, type TraitTable } from './traits';
 
 export type CompIssue =
   | 'noMagicDamage'
@@ -16,6 +16,17 @@ export type CompIssue =
   | 'allMelee'
   | 'littleWaveclear'
   | 'mixedTiming';
+
+/** The win condition a line-up is built around (B3). */
+export type Plan = 'teamfight' | 'pick' | 'poke' | 'protect' | 'split';
+
+export const PLAN_NAMES: Record<Plan, string> = {
+  teamfight: 'Teamfight',
+  pick: 'Pick',
+  poke: 'Poke',
+  protect: 'Protect',
+  split: 'Splitpush',
+};
 
 export interface CompFinding {
   issue: CompIssue;
@@ -39,6 +50,8 @@ export interface CompProfile {
   strongWaveclearCount: number;
   traitsKnown: number;
   findings: CompFinding[];
+  /** The plan the line-up is clearly built around, or null (B3; a hint, no weight). */
+  plan: Plan | null;
 }
 
 export const EMPTY_PROFILE: CompProfile = Object.freeze({
@@ -55,6 +68,7 @@ export const EMPTY_PROFILE: CompProfile = Object.freeze({
   strongWaveclearCount: 0,
   traitsKnown: 0,
   findings: [],
+  plan: null,
 });
 
 export const traitCoverage = (p: CompProfile): number => (p.count === 0 ? 0 : p.traitsKnown / p.count);
@@ -67,6 +81,9 @@ const DAMAGE_IMBALANCE = 0.2;
 const FRONTLINE_DEFENSE = 6;
 const HARD_ENGAGE = 2;
 const STRONG_WAVECLEAR = 2;
+/** A plan needs this much weight in total and this much lead over the next one. */
+const PLAN_MINIMUM = 3;
+const PLAN_LEAD = 1;
 const MINIMUM_ENEMIES_TO_JUDGE = 2;
 const MINIMUM_FOR_DAMAGE_RULES = 3;
 const MINIMUM_FOR_ROLE_RULES = 3;
@@ -100,6 +117,7 @@ export class CompAnalyzer {
     let strongWaveclear = 0;
     let traitsKnown = 0;
     let staticKnown = 0;
+    const planWeight: Record<Plan, number> = { teamfight: 0, pick: 0, poke: 0, protect: 0, split: 0 };
 
     ids.forEach((id, index) => {
       const champion = this.meta.champion(id);
@@ -144,6 +162,8 @@ export class CompAnalyzer {
       totalCc += trait.cc;
       if (trait.scaling === 'late') lateScaling++;
       if (trait.scaling === 'early') earlyScaling++;
+      const share = planShare(trait, champion);
+      for (const plan of Object.keys(planWeight) as Plan[]) planWeight[plan] += share[plan];
       if (trait.waveclear >= STRONG_WAVECLEAR) strongWaveclear++;
     });
 
@@ -165,6 +185,7 @@ export class CompAnalyzer {
       strongWaveclearCount: strongWaveclear,
       traitsKnown,
       findings,
+      plan: traitsKnown >= MINIMUM_FOR_ROLE_RULES ? clearPlan(planWeight) : null,
     };
   }
 
@@ -297,6 +318,17 @@ export class CompAnalyzer {
       );
     }
 
+    // Fits the plan the team is built around: a hint only, it adds nothing to the score (B3).
+    if (trait.isKnown && profile.plan && planShare(trait, champion)[profile.plan] >= 2) {
+      reasons.push(
+        neutral(
+          `passt zu eurem ${PLAN_NAMES[profile.plan]}-Plan`,
+          `Euer Team ist bisher auf ${PLAN_NAMES[profile.plan]} gebaut — ${PLAN_WANTS[profile.plan]}. Dieser Pick verstärkt das. ` +
+            'Zählt nicht in die Prozentzahl: der Plan ist eine grobe Einordnung aus den Champion-Merkmalen und noch nicht gemessen.',
+        ),
+      );
+    }
+
     // What the pick does about THEIR line-up; shares the term's cap.
     if (hasStaticData(champion)) {
       if (hasIssue(enemies, 'noFrontline') && isTagged(champion, 'Assassin')) {
@@ -402,6 +434,37 @@ function evaluate(
     findings.push({ issue: 'mixedTiming', text: 'gemischtes Timing', severity: 0.3 });
 
   return findings;
+}
+
+/** What a team with this plan wants, as half a sentence: "Ihr wollt …". */
+export const PLAN_WANTS: Record<Plan, string> = {
+  teamfight: 'den großen Kampf fünf gegen fünf um Objectives',
+  pick: 'einzelne Gegner abfangen, bevor es zum Kampf kommt',
+  poke: 'aus der Distanz Schaden machen und Türme belagern, bevor gekämpft wird',
+  protect: 'den eigenen Carry schützen, bis er Kämpfe allein entscheidet',
+  split: 'über eine Seitenlane Druck machen und den großen Kampf meiden',
+};
+
+/**
+ * How much one champion adds to each plan: engage 2 is a teamfight starter (multi-target CC on
+ * top), an enchanter's peel is protect, the 2.1 traits poke, split and pick count as they are.
+ */
+function planShare(trait: ChampionTraits, champion: ChampionEntry | null): Record<Plan, number> {
+  const enchanter = !!champion && isTagged(champion, 'Support') && !isTagged(champion, 'Tank') && trait.engage < HARD_ENGAGE;
+  return {
+    teamfight: (trait.engage >= HARD_ENGAGE ? 2 : 0) + (trait.cc >= 3 ? 0.5 : 0),
+    pick: trait.pick,
+    poke: trait.poke,
+    protect: enchanter && trait.peel >= 2 ? 2 : 0,
+    split: trait.split,
+  };
+}
+
+/** The plan with clearly the most weight: enough of it, and ahead of the next by a margin. */
+function clearPlan(weight: Record<Plan, number>): Plan | null {
+  const ranked = (Object.entries(weight) as [Plan, number][]).sort((a, b) => b[1] - a[1]);
+  const [best, second] = ranked;
+  return best![1] >= PLAN_MINIMUM && best![1] - second![1] >= PLAN_LEAD ? best![0] : null;
 }
 
 /** With mixed timing, the side most of the team is on; null without the finding or on a tie. */

@@ -10,6 +10,12 @@
 <Tile title="Comp-Vergleich">
   {#if comp.gap}<p class="gap tone-{comp.gap.tone}"><GapSentence line={comp.gap} /></p>{/if}
   {#if comp.timing}<p class="timing" title={comp.timing.hint}>{comp.timing.text}</p>{/if}
+  {#if comp.plans}
+    <p class="plans" title="Grobe Einordnung aus den Champion-Merkmalen, noch nicht gemessen; zählt nicht in die Prozentzahl.">
+      <b>{comp.plans.text}</b>
+      {comp.plans.detail}
+    </p>
+  {/if}
 
   <div class="grid">
     <span class="h"></span>
@@ -122,6 +128,19 @@
     font-size: 13px;
     font-weight: 600;
     line-height: 1.35;
+  }
+
+  .plans {
+    margin: -2px 0 12px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--fg2);
+  }
+
+  .plans b {
+    display: block;
+    color: var(--fg);
+    font-weight: 600;
   }
 
   .timing {

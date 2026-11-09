@@ -198,6 +198,8 @@ export interface CompView {
   enemyDamage: { physical: number; magic: number } | null;
   /** The enemy's gaps; null while they lack nothing the rules see. */
   enemyGap: GapLine | null;
+  /** "Euer Plan: Teamfight · Ihr Plan: Poke" and what each side wants (B3); null while neither is clear. */
+  plans: { text: string; detail: string } | null;
   /** "Gemischtes Timing: 1× Early Game, 2× Late Game" — a hint, the traits are coarse. */
   timing: { text: string; hint: string } | null;
 }

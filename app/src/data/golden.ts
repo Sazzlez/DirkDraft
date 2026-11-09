@@ -15,6 +15,7 @@ import {
   termVerdict,
 } from '../core/format';
 import { momentOf, type DraftFacts } from '../core/moment';
+import { PLAN_NAMES, PLAN_WANTS, type Plan } from '../core/model/compAnalyzer';
 import { queueDisplay, type QueueKind } from '../core/model/queue';
 import { extendSkills } from '../core/skillplan';
 import {
@@ -87,6 +88,7 @@ export interface GoldenProfile {
   /** New in 2.1; absent from the 1.5 reference frames. */
   strongWaveclearCount?: number;
   earlyScalingCount?: number;
+  plan?: Plan | null;
   traitsKnown: number;
   findings: { issue: string; text: string; severity: number }[];
 }
@@ -350,6 +352,19 @@ export class GoldenAdapter {
     return line ? { kind: 'gap', line } : null;
   }
 
+  /** B3: what each line-up is built around, and what that side wants from the game. */
+  private plans(own: Plan | null, enemy: Plan | null): CompView['plans'] {
+    if (!own && !enemy) return null;
+    const name = (plan: Plan | null) => (plan ? PLAN_NAMES[plan] : 'noch offen');
+    const detail =
+      own && enemy
+        ? `Ihr wollt ${PLAN_WANTS[own]}; sie wollen ${PLAN_WANTS[enemy]}.`
+        : own
+          ? `Ihr wollt ${PLAN_WANTS[own]}.`
+          : `Sie wollen ${PLAN_WANTS[enemy!]}.`;
+    return { text: `Euer Plan: ${name(own)} · Ihr Plan: ${name(enemy)}`, detail };
+  }
+
   /** The own team's gaps for the seat about to pick; the whole team once nobody is left to pick. */
   private gapLine(frame: GoldenFrame): GapLine | null {
     const a = frame.comp.allies;
@@ -420,6 +435,7 @@ export class GoldenAdapter {
       allyDamage: damage(a),
       enemyDamage: damage(e),
       enemyGap: gapsOf(e.findings).length > 0 ? { lead: 'Dem Gegnerteam fehlt', items: gapItems(gapsOf(e.findings)), tone: 'good' } : null,
+      plans: this.plans(a.plan ?? null, e.plan ?? null),
       timing: a.findings.some((f) => f.issue === 'mixedTiming')
         ? {
             text: `Gemischtes Timing: ${a.earlyScalingCount ?? 0}× Early Game, ${a.lateScalingCount}× Late Game`,

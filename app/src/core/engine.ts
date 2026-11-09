@@ -4,7 +4,7 @@
 // golden test checks this very function.
 
 import { estimateBalance, laneMatchups, rankAram, type AramStat } from './model/advisors';
-import { CompAnalyzer, traitCoverage, type CompProfile } from './model/compAnalyzer';
+import { CompAnalyzer, traitCoverage, type CompProfile, type Plan } from './model/compAnalyzer';
 import {
   draftStateFrom,
   effectiveChampionId,
@@ -79,6 +79,8 @@ export interface FrameProfile {
   traitsKnown: number;
   traitCoverage: number;
   findings: { issue: string; text: string; severity: number }[];
+  /** New in 2.1 (B3). */
+  plan: Plan | null;
 }
 
 export interface FramePrediction {
@@ -489,4 +491,5 @@ const frameProfile = (p: CompProfile): FrameProfile => ({
   traitsKnown: p.traitsKnown,
   traitCoverage: traitCoverage(p),
   findings: p.findings.map((f) => ({ issue: f.issue, text: f.text, severity: f.severity })),
+  plan: p.plan,
 });
