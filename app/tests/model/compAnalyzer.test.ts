@@ -42,6 +42,10 @@ function scalingTraits(...entries: [key: string, scaling: ScalingCurve][]): Trai
   return TraitTable.fromEntries(entries.map(([key, scaling]) => [key, { engage: 0, peel: 0, cc: 1, scaling, waveclear: 1 }]));
 }
 
+function waveTraits(...entries: [key: string, waveclear: number][]): TraitTable {
+  return TraitTable.fromEntries(entries.map(([key, waveclear]) => [key, { engage: 0, peel: 0, cc: 1, scaling: 'mid' as ScalingCurve, waveclear }]));
+}
+
 const analyzer = (t: TraitTable | null = null): CompAnalyzer => new CompAnalyzer(meta(), t ?? TraitTable.empty);
 
 /**
@@ -230,6 +234,30 @@ describe('CompAnalyzerTests', () => {
     const a = analyzer();
 
     expect(a.fit(Ap1, EMPTY_PROFILE, EMPTY_PROFILE, [])).toBeNull();
+  });
+
+  it('Waveclear_IsMissingOnlyFromFourChampionsOn', () => {
+    const a = analyzer(waveTraits(['Ad1', 1], ['Ad2', 1], ['Ad3', 0], ['Ad4', 1], ['Ap1', 2]));
+
+    // Three: the mid laner who usually brings it may still come.
+    expect(hasIssue(a.analyze([Ad1, Ad2, Ad3]), 'littleWaveclear')).toBe(false);
+    const four = a.analyze([Ad1, Ad2, Ad3, Ad4]);
+    expect(four.strongWaveclearCount).toBe(0);
+    expect(hasIssue(four, 'littleWaveclear')).toBe(true);
+    expect(hasIssue(a.analyze([Ad1, Ad2, Ad3, Ap1]), 'littleWaveclear')).toBe(false);
+  });
+
+  it('Fit_RewardsGoodWaveclearWhereTheTeamLacksIt', () => {
+    const team = [Ad1, Ad2, Ad3, Ad4] as const;
+    const strong = analyzer(waveTraits(['Ad1', 1], ['Ad2', 1], ['Ad3', 0], ['Ad4', 1], ['Ap1', 2]));
+    const weak = analyzer(waveTraits(['Ad1', 1], ['Ad2', 1], ['Ad3', 0], ['Ad4', 1], ['Ap1', 1]));
+    const reasons: Reason[] = [];
+
+    const withWaveclear = strong.fit(Ap1, strong.analyze(team), EMPTY_PROFILE, reasons)!;
+    const without = weak.fit(Ap1, weak.analyze(team), EMPTY_PROFILE, [])!;
+
+    assertChip(reasons, 'guter Waveclear', 'pro');
+    expect(withWaveclear - without).toBeCloseTo(0.2, 10);
   });
 
   it('DuplicateChampions_AreCountedOnce', () => {

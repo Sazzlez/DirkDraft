@@ -39,7 +39,18 @@ Was das Modell seit 2.1 bewusst anders macht als 1.5. Neue Felder stehen in `ADD
 Geänderte Werte sind in den Referenzdateien angepasst, mit Begründung hier, im Commit und im
 CHANGELOG.
 
+Angepasst wird nur mit dem Abgleich-Werkzeug, nie von Hand:
+
+```powershell
+$env:REBASE_GOLDEN=1; npx vitest run tests/golden/rebase; Remove-Item Env:REBASE_GOLDEN
+```
+
+Es schreibt jeden abweichenden Wert in die Referenz, im Format des C#-Werkzeugs (der Test
+`reference writer` prüft, dass es jede Datei Byte für Byte so schreibt), und listet alle Änderungen
+in `build/golden-rebase.txt` — die Grundlage für die Begründung.
+
 | Feld / Änderung | Warum |
-|---|---|---|
+|---|---|
 | `state.allyBanIntents` (neues Feld) | Ban-Hovers der Teammates; der Ban-Vorschlag lässt aus, was ein anderer Teammate gerade bannt. In keiner Referenz-Aufzeichnung kommt ein solcher Hover vor, die Werte bleiben gleich. |
 | `gap` (neues Feld) | Was dem eigenen Team für den Sitz fehlt, der als Nächstes pickt — ohne dessen eigenen Hover. Nur Anzeige (Comp-Kachel), kein Score ändert sich. |
+| Befund „wenig Waveclear“, Pro „guter Waveclear“ (+0,2 im Comp-Term, unter dem Deckel); neues Feld `strongWaveclearCount` | Ab vier bekannten Champions ohne Waveclear 2. Geändert: je ein Frame in build-demo, build-demo-end, lanes-demo, state-blind-locked, strip-demo, test-imspiel — die Botlane-Liste eines Teams ohne Waveclear. Waveclear-Champions +0,8 Punkte, Plätze 1–4 gleich, auf 5–8 rücken Viktor, Hwei, Xerath vor Kog’Maw. |

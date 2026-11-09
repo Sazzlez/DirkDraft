@@ -303,13 +303,13 @@
           "cellId": 3,
           "lane": "adc",
           "action": "pick",
-          "tied": 3,
+          "tied": 2,
           "decimals": 0,
           "items": [
             {
               "championId": 161,
               "name": "Vel\u0027Koz",
-              "score": 0.553803585410287,
+              "score": 0.5616966877807088,
               "uncertainty": 0.04185736759651578,
               "uncertaintyPoints": 1.0464341899128946,
               "reasons": [
@@ -322,6 +322,11 @@
                   "text": "S-Tier auf Botlane",
                   "tone": "neutral",
                   "hint": "OP.GGs eigene Einstufung f\u00FCr Botlane, von OP (st\u00E4rkste) \u00FCber S bis D (schw\u00E4chste). Z\u00E4hlt nicht in die Prozentzahl: sie mischt Winrate und Pickrate, und die Winrate steckt schon drin."
+                },
+                {
+                  "text": "guter Waveclear",
+                  "tone": "pro",
+                  "hint": "Niemand in deinem Team r\u00E4umt Minion-Wellen schnell. Ohne Waveclear dr\u00FCckt der Gegner mit seinen Wellen auf eure T\u00FCrme, und ihr kommt schwer von der Lane weg zu Drachen und Baron."
                 },
                 {
                   "text": "1 offener Counter",
@@ -364,8 +369,8 @@
                 },
                 {
                   "kind": "composition",
-                  "logOdds": 0,
-                  "points": 0,
+                  "logOdds": 0.032,
+                  "points": 0.8,
                   "isGate": false,
                   "gate": 1,
                   "label": "Teamcomp"
@@ -375,7 +380,7 @@
             {
               "championId": 136,
               "name": "Aurelion Sol",
-              "score": 0.5510473991949659,
+              "score": 0.5589504283011797,
               "uncertainty": 0.041181660502916044,
               "uncertaintyPoints": 1.029541512572901,
               "reasons": [
@@ -388,6 +393,11 @@
                   "text": "A-Tier auf Botlane",
                   "tone": "neutral",
                   "hint": "OP.GGs eigene Einstufung f\u00FCr Botlane, von OP (st\u00E4rkste) \u00FCber S bis D (schw\u00E4chste). Z\u00E4hlt nicht in die Prozentzahl: sie mischt Winrate und Pickrate, und die Winrate steckt schon drin."
+                },
+                {
+                  "text": "guter Waveclear",
+                  "tone": "pro",
+                  "hint": "Niemand in deinem Team r\u00E4umt Minion-Wellen schnell. Ohne Waveclear dr\u00FCckt der Gegner mit seinen Wellen auf eure T\u00FCrme, und ihr kommt schwer von der Lane weg zu Drachen und Baron."
                 }
               ],
               "breakdown": [
@@ -425,8 +435,8 @@
                 },
                 {
                   "kind": "composition",
-                  "logOdds": 0,
-                  "points": 0,
+                  "logOdds": 0.032,
+                  "points": 0.8,
                   "isGate": false,
                   "gate": 1,
                   "label": "Teamcomp"
@@ -497,7 +507,7 @@
             {
               "championId": 50,
               "name": "Swain",
-              "score": 0.532926153981904,
+              "score": 0.5408823998543417,
               "uncertainty": 0.03777780561952096,
               "uncertaintyPoints": 0.944445140488024,
               "reasons": [
@@ -505,6 +515,11 @@
                   "text": "53,3 % WR auf Botlane",
                   "tone": "pro",
                   "hint": "Aus 2.170 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+                },
+                {
+                  "text": "guter Waveclear",
+                  "tone": "pro",
+                  "hint": "Niemand in deinem Team r\u00E4umt Minion-Wellen schnell. Ohne Waveclear dr\u00FCckt der Gegner mit seinen Wellen auf eure T\u00FCrme, und ihr kommt schwer von der Lane weg zu Drachen und Baron."
                 }
               ],
               "breakdown": [
@@ -542,8 +557,8 @@
                 },
                 {
                   "kind": "composition",
-                  "logOdds": 0,
-                  "points": 0,
+                  "logOdds": 0.032,
+                  "points": 0.8,
                   "isGate": false,
                   "gate": 1,
                   "label": "Teamcomp"
@@ -553,7 +568,7 @@
             {
               "championId": 30,
               "name": "Karthus",
-              "score": 0.5322199614808302,
+              "score": 0.5401778574899639,
               "uncertainty": 0.05046629524580531,
               "uncertaintyPoints": 1.2616573811451326,
               "reasons": [
@@ -561,6 +576,11 @@
                   "text": "53,5 % WR auf Botlane",
                   "tone": "pro",
                   "hint": "Aus 1.167 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+                },
+                {
+                  "text": "guter Waveclear",
+                  "tone": "pro",
+                  "hint": "Niemand in deinem Team r\u00E4umt Minion-Wellen schnell. Ohne Waveclear dr\u00FCckt der Gegner mit seinen Wellen auf eure T\u00FCrme, und ihr kommt schwer von der Lane weg zu Drachen und Baron."
                 }
               ],
               "breakdown": [
@@ -598,8 +618,69 @@
                 },
                 {
                   "kind": "composition",
-                  "logOdds": 0,
+                  "logOdds": 0.032,
+                  "points": 0.8,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Teamcomp"
+                }
+              ]
+            },
+            {
+              "championId": 112,
+              "name": "Viktor",
+              "score": 0.5325148813456394,
+              "uncertainty": 0.038024546303394975,
+              "uncertaintyPoints": 0.9506136575848744,
+              "reasons": [
+                {
+                  "text": "52,3 % WR auf Botlane",
+                  "tone": "pro",
+                  "hint": "Aus 3.220 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+                },
+                {
+                  "text": "guter Waveclear",
+                  "tone": "pro",
+                  "hint": "Niemand in deinem Team r\u00E4umt Minion-Wellen schnell. Ohne Waveclear dr\u00FCckt der Gegner mit seinen Wellen auf eure T\u00FCrme, und ihr kommt schwer von der Lane weg zu Drachen und Baron."
+                }
+              ],
+              "breakdown": [
+                {
+                  "kind": "laneStrength",
+                  "logOdds": 0.09020611899602127,
+                  "points": 2.2551529749005317,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Lane-St\u00E4rke"
+                },
+                {
+                  "kind": "laneMatchup",
+                  "logOdds": null,
                   "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Matchup"
+                },
+                {
+                  "kind": "enemyTeam",
+                  "logOdds": null,
+                  "points": 0,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Enemy-Team"
+                },
+                {
+                  "kind": "synergy",
+                  "logOdds": 0.00803720791934357,
+                  "points": 0.20093019798358924,
+                  "isGate": false,
+                  "gate": 1,
+                  "label": "Synergie"
+                },
+                {
+                  "kind": "composition",
+                  "logOdds": 0.032,
+                  "points": 0.8,
                   "isGate": false,
                   "gate": 1,
                   "label": "Teamcomp"
@@ -673,23 +754,28 @@
               ]
             },
             {
-              "championId": 96,
-              "name": "Kog\u0027Maw",
-              "score": 0.5262725244988333,
-              "uncertainty": 0.02843673434171513,
-              "uncertaintyPoints": 0.7109183585428782,
+              "championId": 910,
+              "name": "Hwei",
+              "score": 0.5289801318042604,
+              "uncertainty": 0.040534173052224266,
+              "uncertaintyPoints": 1.0133543263056066,
               "reasons": [
                 {
-                  "text": "52,6 % WR auf Botlane",
+                  "text": "52,1 % WR auf Botlane",
                   "tone": "pro",
-                  "hint": "Aus 4.641 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+                  "hint": "Aus 1.787 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
+                },
+                {
+                  "text": "guter Waveclear",
+                  "tone": "pro",
+                  "hint": "Niemand in deinem Team r\u00E4umt Minion-Wellen schnell. Ohne Waveclear dr\u00FCckt der Gegner mit seinen Wellen auf eure T\u00FCrme, und ihr kommt schwer von der Lane weg zu Drachen und Baron."
                 }
               ],
               "breakdown": [
                 {
                   "kind": "laneStrength",
-                  "logOdds": 0.10438742152100211,
-                  "points": 2.6096855380250528,
+                  "logOdds": 0.08405059699445015,
+                  "points": 2.101264924861254,
                   "isGate": false,
                   "gate": 1,
                   "label": "Lane-St\u00E4rke"
@@ -712,72 +798,16 @@
                 },
                 {
                   "kind": "synergy",
-                  "logOdds": 0.0007995543075742211,
-                  "points": 0.01998885768935553,
+                  "logOdds": null,
+                  "points": 0,
                   "isGate": false,
                   "gate": 1,
                   "label": "Synergie"
                 },
                 {
                   "kind": "composition",
-                  "logOdds": 0,
-                  "points": 0,
-                  "isGate": false,
-                  "gate": 1,
-                  "label": "Teamcomp"
-                }
-              ]
-            },
-            {
-              "championId": 112,
-              "name": "Viktor",
-              "score": 0.5245410961902767,
-              "uncertainty": 0.038024546303394975,
-              "uncertaintyPoints": 0.9506136575848744,
-              "reasons": [
-                {
-                  "text": "52,3 % WR auf Botlane",
-                  "tone": "pro",
-                  "hint": "Aus 3.220 Games im aktuellen Patch. 50 % w\u00E4re Durchschnitt."
-                }
-              ],
-              "breakdown": [
-                {
-                  "kind": "laneStrength",
-                  "logOdds": 0.09020611899602127,
-                  "points": 2.2551529749005317,
-                  "isGate": false,
-                  "gate": 1,
-                  "label": "Lane-St\u00E4rke"
-                },
-                {
-                  "kind": "laneMatchup",
-                  "logOdds": null,
-                  "points": 0,
-                  "isGate": false,
-                  "gate": 1,
-                  "label": "Matchup"
-                },
-                {
-                  "kind": "enemyTeam",
-                  "logOdds": null,
-                  "points": 0,
-                  "isGate": false,
-                  "gate": 1,
-                  "label": "Enemy-Team"
-                },
-                {
-                  "kind": "synergy",
-                  "logOdds": 0.00803720791934357,
-                  "points": 0.20093019798358924,
-                  "isGate": false,
-                  "gate": 1,
-                  "label": "Synergie"
-                },
-                {
-                  "kind": "composition",
-                  "logOdds": 0,
-                  "points": 0,
+                  "logOdds": 0.032,
+                  "points": 0.8,
                   "isGate": false,
                   "gate": 1,
                   "label": "Teamcomp"

@@ -81,6 +81,8 @@ export interface GoldenProfile {
   maxPeel: number;
   totalCrowdControl: number;
   lateScalingCount: number;
+  /** New in 2.1; absent from the 1.5 reference frames. */
+  strongWaveclearCount?: number;
   traitsKnown: number;
   findings: { issue: string; text: string; severity: number }[];
 }
@@ -127,6 +129,7 @@ const GAP_NAMES: Record<string, string> = {
   noPeel: 'Peel',
   littleCrowdControl: 'CC',
   allMelee: 'Range',
+  littleWaveclear: 'Waveclear',
 };
 
 /** The findings as names, most severe first. */
@@ -367,6 +370,7 @@ export class GoldenAdapter {
         { label: 'Frontline', ally: a.frontlineCount, enemy: e.frontlineCount, max: 5 },
         { label: 'Peel', ally: a.maxPeel, enemy: e.maxPeel, max: 3 },
         { label: 'Spätes Spiel', ally: a.lateScalingCount, enemy: e.lateScalingCount, max: 5 },
+        { label: 'Waveclear', ally: a.strongWaveclearCount ?? 0, enemy: e.strongWaveclearCount ?? 0, max: 5 },
       ],
       allyDamage: damage(a),
       enemyDamage: damage(e),

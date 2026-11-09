@@ -70,6 +70,8 @@ export interface FrameProfile {
   maxPeel: number;
   totalCrowdControl: number;
   lateScalingCount: number;
+  /** New in 2.1. */
+  strongWaveclearCount: number;
   traitsKnown: number;
   traitCoverage: number;
   findings: { issue: string; text: string; severity: number }[];
@@ -425,6 +427,7 @@ const frameProfile = (p: CompProfile): FrameProfile => ({
   maxPeel: p.maxPeel,
   totalCrowdControl: p.totalCrowdControl,
   lateScalingCount: p.lateScalingCount,
+  strongWaveclearCount: p.strongWaveclearCount,
   traitsKnown: p.traitsKnown,
   traitCoverage: traitCoverage(p),
   findings: p.findings.map((f) => ({ issue: f.issue, text: f.text, severity: f.severity })),

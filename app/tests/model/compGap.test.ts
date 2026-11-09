@@ -43,7 +43,16 @@ describe('comp gap', () => {
       new SessionBuilder().queue(420).localPlayer(4).locked(0, Yasuo).locked(1, LeeSin).locked(2, Zed).locked(3, Draven).onClock(4, 'pick').build(),
     );
     const issues = [...frame.gap!.findings].sort((a, b) => b.severity - a.severity).map((f) => f.issue);
-    const names: Record<string, string> = { noMagicDamage: 'AP-Schaden', noFrontline: 'Frontline', noEngage: 'Engage', noPeel: 'Peel', littleCrowdControl: 'CC', allMelee: 'Range' };
+    const names: Record<string, string> = {
+      noMagicDamage: 'AP-Schaden',
+      noPhysicalDamage: 'AD-Schaden',
+      noFrontline: 'Frontline',
+      noEngage: 'Engage',
+      noPeel: 'Peel',
+      littleCrowdControl: 'CC',
+      allMelee: 'Range',
+      littleWaveclear: 'Waveclear',
+    };
 
     expect(issues.length).toBeGreaterThan(1);
     expect(adapter.comp(frame).gap!.items).toEqual(issues.map((issue) => names[issue]));

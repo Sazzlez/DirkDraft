@@ -13,7 +13,8 @@ export type CompIssue =
   | 'noEngage'
   | 'noPeel'
   | 'littleCrowdControl'
-  | 'allMelee';
+  | 'allMelee'
+  | 'littleWaveclear';
 
 export interface CompFinding {
   issue: CompIssue;
@@ -31,6 +32,8 @@ export interface CompProfile {
   maxPeel: number;
   totalCrowdControl: number;
   lateScalingCount: number;
+  /** Champions with strong waveclear (trait 2 and up). */
+  strongWaveclearCount: number;
   traitsKnown: number;
   findings: CompFinding[];
 }
@@ -45,6 +48,7 @@ export const EMPTY_PROFILE: CompProfile = Object.freeze({
   maxPeel: 0,
   totalCrowdControl: 0,
   lateScalingCount: 0,
+  strongWaveclearCount: 0,
   traitsKnown: 0,
   findings: [],
 });
@@ -58,6 +62,7 @@ export const severityOf = (p: CompProfile, issue: CompIssue): number =>
 const DAMAGE_IMBALANCE = 0.2;
 const FRONTLINE_DEFENSE = 6;
 const HARD_ENGAGE = 2;
+const STRONG_WAVECLEAR = 2;
 const MINIMUM_ENEMIES_TO_JUDGE = 2;
 const MINIMUM_FOR_DAMAGE_RULES = 3;
 const MINIMUM_FOR_ROLE_RULES = 3;
@@ -81,6 +86,7 @@ export class CompAnalyzer {
     let maxPeel = 0;
     let totalCc = 0;
     let lateScaling = 0;
+    let strongWaveclear = 0;
     let traitsKnown = 0;
     let staticKnown = 0;
 
@@ -115,11 +121,12 @@ export class CompAnalyzer {
       maxPeel = Math.max(maxPeel, trait.peel);
       totalCc += trait.cc;
       if (trait.scaling === 'late') lateScaling++;
+      if (trait.waveclear >= STRONG_WAVECLEAR) strongWaveclear++;
     }
 
     const physicalShare = damageKnown > 0 ? physical / damageKnown : 0;
     const magicShare = damageKnown > 0 ? magic / damageKnown : 0;
-    const findings = evaluate(damageKnown, physicalShare, magicShare, frontline, ranged, maxEngage, maxPeel, totalCc, traitsKnown, staticKnown);
+    const findings = evaluate(damageKnown, physicalShare, magicShare, frontline, ranged, maxEngage, maxPeel, totalCc, traitsKnown, staticKnown, strongWaveclear);
 
     return {
       count: ids.length,
@@ -131,6 +138,7 @@ export class CompAnalyzer {
       maxPeel,
       totalCrowdControl: totalCc,
       lateScalingCount: lateScaling,
+      strongWaveclearCount: strongWaveclear,
       traitsKnown,
       findings,
     };
@@ -217,6 +225,17 @@ export class CompAnalyzer {
           pro(
             'bringt Hard CC',
             'Deinem Team fehlen Effekte, die Gegner bewegungsunfähig machen — betäuben, hochwerfen, festhalten (CC). Ohne die entkommt jeder Gegner.',
+          ),
+        );
+      }
+
+      // The smallest of the gap rules: a hint by judgement only, like the rest of this term (2.1).
+      if (hasIssue(profile, 'littleWaveclear') && trait.waveclear >= STRONG_WAVECLEAR) {
+        score += 0.2;
+        reasons.push(
+          pro(
+            'guter Waveclear',
+            'Niemand in deinem Team räumt Minion-Wellen schnell. Ohne Waveclear drückt der Gegner mit seinen Wellen auf eure Türme, und ihr kommt schwer von der Lane weg zu Drachen und Baron.',
           ),
         );
       }
@@ -316,6 +335,7 @@ function evaluate(
   totalCc: number,
   traitsKnown: number,
   staticKnown: number,
+  strongWaveclear: number,
 ): CompFinding[] {
   const findings: CompFinding[] = [];
 
@@ -337,6 +357,8 @@ function evaluate(
   if (maxPeel === 0 && traitsKnown >= 4) findings.push({ issue: 'noPeel', text: 'kein Peel', severity: 0.5 });
   // Roughly one piece of hard CC per two champions is the floor for a workable team fight.
   if (totalCc * 2 < traitsKnown) findings.push({ issue: 'littleCrowdControl', text: 'wenig CC', severity: 0.7 });
+  // From four champions on, as peel: with three, the mid laner who usually brings it is often still open.
+  if (strongWaveclear === 0 && traitsKnown >= 4) findings.push({ issue: 'littleWaveclear', text: 'wenig Waveclear', severity: 0.5 });
 
   return findings;
 }

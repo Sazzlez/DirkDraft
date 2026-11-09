@@ -12,6 +12,11 @@ Kopien melden sie beim nächsten Start.
   AP-Schaden und Engage“ — alle Lücken, die wichtigste zuerst, für den Sitz, der als Nächstes pickt.
   Sein eigener Hover zählt dabei nicht mit, sonst wäre die Lücke schon vor dem Pick „gefüllt“. Unten
   steht, was dem Gegnerteam fehlt. Bisher zeigte die Kachel nur eine einzige Lücke.
+- **Waveclear zählt mit.** Die Comp-Kachel zeigt, wie viele Champions je Team guten Waveclear haben.
+  Hat von vier oder mehr Champions keiner guten Waveclear, heißt der Befund „wenig Waveclear“, und
+  Kandidaten mit gutem Waveclear bekommen den Chip „guter Waveclear“ und ein kleines Plus innerhalb
+  der Teamcomp-Wertung (+0,8 Punkte; die Obergrenze von etwa 4 Punkten für die ganze Comp bleibt).
+  Gemessen ist das noch nicht, die Messung nach dem Sammeln prüft es.
 - **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items
   stehen ohnehin in der Matchup-Kachel und in der Spielansicht.
 - **Ein Klick auf einen Teammate, der gelockt hat, zeigt sein Matchup** wie das eigene nach dem
