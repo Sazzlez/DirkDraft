@@ -137,7 +137,11 @@ erscheint nur die einfachere.
 2. **Skala aus Level und Itemwert:** nur TypeScript (`core/game.ts`, `data/gameView.ts`, neue
    Kachel); Level, Items, Scores und Position kommen schon an, der Scrubber ersetzt nur Namen.
 3. **Modell mit Champion-Stärke:** nach einer Woche Daten, zuerst prüfen (passt zur Phase-2-Messung).
-4. **Live-Test mit dem Client** — nur nach Rückfrage.
+4. **Dieselben Paarwerte im Draft** (Nutzerwunsch 09.11.2026, vorgemerkt): Das Lane-Matchup im Draft
+   zeigt, wer die Duelle in welchem Abschnitt gewinnt (Level 1–5, 6–10, 11+), gemessen aus den
+   Solo-Kills, wo sie die Prüfung oben bestehen; sonst nichts. Vor dem Spiel, ohne Anweisung („wer ist
+   wann stärker“, nie „kämpf jetzt“), keine KI-Texte. Gilt nur, wenn Schritt 3 messbar besser ist.
+5. **Live-Test mit dem Client** — nur nach Rückfrage.
 
 Veröffentlichung mit 2.1.
 
