@@ -225,6 +225,11 @@ export class SessionBuilder {
     return this;
   }
 
+  /** A pick action already done (the champion itself comes from locked()). */
+  completedPick(actorCellId: number): this {
+    return this.action(actorCellId, 0, 'pick', true, false);
+  }
+
   completedBan(actorCellId: number, championId: number): this {
     return this.action(actorCellId, championId, 'ban', true, false);
   }

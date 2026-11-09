@@ -21,6 +21,11 @@ Kopien melden sie beim nächsten Start.
   Daten tragen jetzt je Champion den durchschnittlichen Schaden an Champions je Spiel, und die
   AD/AP-Anteile in der Comp-Kachel und in den Befunden („AP-Schaden fehlt“) richten sich danach. Wo
   die Zahl fehlt (ältere Datei, neuer Champion), wird für diese Seite wie bisher nach Köpfen gezählt.
+- **Pick-Position.** Pickst du früh, ist dein Lane-Gegner noch offen und haben dein Hover oder der
+  Top-Vorschlag zwei oder mehr offene Counter, steht über der Liste „Früh dran — Pick-Reihenfolge
+  tauschen?“ (nur wenn nach dir noch ein Teammate pickt). In der Gleichauf-Gruppe bekommt der Pick
+  mit den wenigsten offenen Countern das Etikett „sicherer Blind Pick“. Ist der Lane-Gegner bekannt
+  oder pickst du als Letzter deines Teams, steht dort stattdessen, was eurem Team noch fehlt.
 - Die Chips sprechen League: „Frontline“ statt „steht vorne“, „Peel“ statt „schützt deine Carrys“,
   „Disengage“ statt „hält ihr Engage auf“. Der Hinweis darunter erklärt weiter, was gemeint ist.
 - **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items

@@ -48,6 +48,8 @@ export interface DraftState {
    * client shows each other's choice. The enemy's never arrive.
    */
   allyBanIntents: readonly BanIntent[];
+  /** The own team's pick actions in draft order (cell ids); empty where the session has none. */
+  allyPickOrder: readonly number[];
   phase: DraftPhase;
   turn: ActiveTurn | null;
   /** Banned or locked anywhere in the draft. */
@@ -66,6 +68,7 @@ export const INACTIVE: DraftState = Object.freeze({
   allyBans: [],
   enemyBans: [],
   allyBanIntents: [],
+  allyPickOrder: [],
   phase: 'none',
   turn: null,
   unavailable: new Set<number>(),
@@ -209,6 +212,12 @@ function fromSession(session: unknown): DraftState {
     allyBanIntents.push({ cellId: action.actorCellId, championId: action.championId });
   }
 
+  const allyPickOrder: number[] = [];
+  for (const action of actions) {
+    if (action.type?.toLowerCase() !== 'pick' || !action.isAllyAction) continue;
+    if (!allyPickOrder.includes(action.actorCellId)) allyPickOrder.push(action.actorCellId);
+  }
+
   const unavailable = new Set<number>([...ally, ...enemy]);
   for (const slot of [...allies, ...enemies]) if (isLocked(slot)) unavailable.add(slot.lockedChampionId);
 
@@ -228,6 +237,7 @@ function fromSession(session: unknown): DraftState {
     allyBans: ally,
     enemyBans: enemy,
     allyBanIntents,
+    allyPickOrder,
     phase: parsePhase(timerPhase),
     turn: findActiveTurn(actions, localCellId),
     unavailable,

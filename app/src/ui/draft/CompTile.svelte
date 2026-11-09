@@ -1,16 +1,14 @@
 <script lang="ts">
-  import type { CompView, GapLine } from '../../core/view';
+  import type { CompView } from '../../core/view';
+  import GapSentence from './GapSentence.svelte';
   import { percent } from '../../core/format';
   import Tile from '../Tile.svelte';
 
   let { comp }: { comp: CompView } = $props();
 </script>
 
-<!-- Each name stays on one line: "AD-Schaden" must not break at its hyphen. -->
-{#snippet sentence(line: GapLine)}{line.lead}{#if line.items.length > 0}:{' '}{#each line.items as item, i (item)}{#if i > 0}{i === line.items.length - 1 ? ' und ' : ', '}{/if}<span class="nw">{item}</span>{/each}{/if}{/snippet}
-
 <Tile title="Comp-Vergleich">
-  {#if comp.gap}<p class="gap tone-{comp.gap.tone}">{@render sentence(comp.gap)}</p>{/if}
+  {#if comp.gap}<p class="gap tone-{comp.gap.tone}"><GapSentence line={comp.gap} /></p>{/if}
 
   <div class="grid">
     <span class="h"></span>
@@ -41,7 +39,7 @@
     {/each}
   </div>
 
-  {#if comp.enemyGap}<p class="verdict tone-{comp.enemyGap.tone}">{@render sentence(comp.enemyGap)}</p>{/if}
+  {#if comp.enemyGap}<p class="verdict tone-{comp.enemyGap.tone}"><GapSentence line={comp.enemyGap} /></p>{/if}
 </Tile>
 
 <style>
@@ -123,10 +121,6 @@
     font-size: 13px;
     font-weight: 600;
     line-height: 1.35;
-  }
-
-  .nw {
-    white-space: nowrap;
   }
 
   .verdict {

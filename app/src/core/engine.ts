@@ -49,6 +49,8 @@ export interface FrameItem {
   uncertaintyPoints: number;
   reasons: { text: string; tone: string; hint: string | null }[];
   breakdown: { kind: string; logOdds: number | null; points: number; isGate: boolean; gate: number; label: string }[];
+  /** New in 2.1: open counters while the lane opponent is open; absent otherwise. */
+  openCounters?: number;
 }
 
 export interface FrameSet {
@@ -100,6 +102,8 @@ export interface DraftFrame {
     enemyBans: number[];
     /** New in 2.1; absent from the 1.5 reference frames. */
     allyBanIntents?: { cellId: number; championId: number }[];
+    /** New in 2.1. */
+    allyPickOrder?: number[];
     unavailable: number[];
     turn: { cellId: number; isAlly: boolean; isLocalPlayer: boolean; action: TurnAction } | null;
     bench: number[];
@@ -120,6 +124,49 @@ export interface DraftFrame {
    * own hover, which would otherwise fill the gap before the pick. Null without an open ally seat to advise.
    */
   gap?: { cellId: number; count: number; findings: FrameProfile['findings'] } | null;
+  /** New in 2.1: where the advised seat stands in the pick order (pickHintOf). */
+  pickHint?: PickHint | null;
+}
+
+/** What the pick position means for the advised seat's list. */
+export interface PickHint {
+  /** Lane opponent open and the hover or the top pick has two or more open counters. */
+  risky: { championId: number; counters: number } | null;
+  /** In the leading tie group, the pick with the fewest open counters — fewer than the risky one's. */
+  safest: { championId: number; counters: number } | null;
+  /** Another ally picks after this seat, so the two could swap. Unknown order counts as yes. */
+  laterAlly: boolean;
+  /** Lane opponent known, or this seat picks last for its team: the comp gap matters first. */
+  gapFirst: boolean;
+}
+
+/**
+ * B1: an early pick with several open counters may be better swapped to later, or exchanged for the
+ * equally strong pick that is easiest to answer; a late or counter pick looks at the comp gap first.
+ */
+export function pickHintOf(picks: FrameSet, hover: FrameItem | null, cellId: number, allyPickOrder: readonly number[]): PickHint | null {
+  const top = picks.items[0];
+  if (!top) return null;
+  const position = allyPickOrder.indexOf(cellId);
+  const last = position >= 0 && position === allyPickOrder.length - 1;
+  const laterAlly = position < 0 || position < allyPickOrder.length - 1;
+  const laneOpen = top.openCounters !== undefined;
+
+  let risky: PickHint['risky'] = null;
+  for (const item of [hover, top]) {
+    if (!item || item.openCounters === undefined || item.openCounters < 2) continue;
+    if (!risky || item.openCounters > risky.counters) risky = { championId: item.championId, counters: item.openCounters };
+  }
+
+  let safest: PickHint['safest'] = null;
+  if (risky) {
+    for (const item of picks.items.slice(0, Math.max(1, picks.tied))) {
+      const counters = item.openCounters ?? Infinity;
+      if (counters < risky.counters && (!safest || counters < safest.counters)) safest = { championId: item.championId, counters };
+    }
+  }
+
+  return { risky, safest, laterAlly, gapFirst: !laneOpen || last };
 }
 
 export interface EngineOptions {
@@ -276,6 +323,10 @@ export class DraftEngine {
     const balance = estimateBalance(meta, state, allyPredictions, enemyPredictions);
 
     const advised = target ? state.allies.find((slot) => slot.cellId === target.slot.cellId) : undefined;
+    const pickHint =
+      picks && advised && !isLocked(advised)
+        ? pickHintOf(picks, advised.cellId === mine?.cellId && hoverResult ? hoverResult.item : null, advised.cellId, state.allyPickOrder)
+        : null;
     const gap =
       state.isActive && usesLanes(state.queue) && advised && !isLocked(advised)
         ? gapOf(advised.cellId, comp.analyze(state.allies.filter((slot) => slot !== advised).map(effectiveChampionId)))
@@ -293,6 +344,7 @@ export class DraftEngine {
         allyBans: [...state.allyBans],
         enemyBans: [...state.enemyBans],
         allyBanIntents: state.allyBanIntents.map((intent) => ({ ...intent })),
+        allyPickOrder: [...state.allyPickOrder],
         unavailable: [...state.unavailable].sort((a, b) => a - b),
         turn: state.turn,
         bench: [...state.bench],
@@ -326,6 +378,7 @@ export class DraftEngine {
       })),
       aramBench: bench,
       gap,
+      pickHint,
     };
   }
 }
@@ -348,6 +401,7 @@ export function stateFromFrame(s: DraftFrame['state']): DraftState {
     allyBans: s.allyBans,
     enemyBans: s.enemyBans,
     allyBanIntents: s.allyBanIntents ?? [],
+    allyPickOrder: s.allyPickOrder ?? [],
     phase: s.phase,
     turn: s.turn,
     unavailable: new Set(s.unavailable),
@@ -397,6 +451,7 @@ function frameItem(r: Recommendation): FrameItem {
       gate: termGate(t),
       label: termLabel(t.kind),
     })),
+    ...(r.openCounters !== undefined ? { openCounters: r.openCounters } : {}),
   };
 }
 

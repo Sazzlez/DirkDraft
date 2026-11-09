@@ -30,6 +30,7 @@ export const SCENES: Scene[] = [
   { id: 'banning', title: 'Bannen', moment: 'banning' },
   { id: 'teambans', title: 'Bannen im Team', moment: 'banning' },
   { id: 'picking', title: 'Dein Pick', moment: 'picking' },
+  { id: 'blind', title: 'Blind Pick mit offenen Countern', moment: 'picking' },
   { id: 'teammate', title: 'Teammate am Zug', moment: 'teammate' },
   { id: 'mate', title: 'Teammate gelockt', moment: 'teammate' },
   { id: 'locked', title: 'Gelockt', moment: 'locked' },
@@ -104,6 +105,10 @@ function load(): Promise<Sources> {
     const engine = new DraftEngine(snapshot, options);
     const state = stateFromFrame(stored.frame.state);
     drafts.set('readme-top-vs-jax', { frame: engine.evaluate(state, engine.resolveTarget(state), stored.input.hover) });
+    // Top first, nobody shown yet, Malphite hovered: two open counters (B1).
+    const blind = await json<{ frame: DraftFrame }>('/tests/golden/drafts/blind-top.json');
+    const blindState = stateFromFrame(blind.frame.state);
+    drafts.set('blind-top', { frame: engine.evaluate(blindState, engine.resolveTarget(blindState), 54) });
     const plans = await json<{ matchupGuide: GoldenPlan; laneBuild: GoldenPlan }>('/tests/golden/builds/plans.json');
     return { adapter: new GoldenAdapter(snapshot.champions), plans, recordings, drafts, meta: new MetaLookup(snapshot) };
   })();
@@ -164,6 +169,10 @@ export async function sceneView(id: string): Promise<ViewModel> {
     }
     case 'picking': {
       const frame = s.drafts.get('readme-top-vs-jax')!.frame;
+      return draftScene(a, frame, 'picking', s.plans, 'Picks für dich');
+    }
+    case 'blind': {
+      const frame = s.drafts.get('blind-top')!.frame;
       return draftScene(a, frame, 'picking', s.plans, 'Picks für dich');
     }
     case 'teammate': {

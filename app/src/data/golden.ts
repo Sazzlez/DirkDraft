@@ -26,6 +26,7 @@ import {
   type ChampionRef,
   type CompView,
   type GapLine,
+  type PickNote,
   type DraftChanceView,
   type HoverView,
   type ItemOption,
@@ -60,6 +61,8 @@ export interface GoldenItem {
   uncertaintyPoints: number;
   reasons: { text: string; tone: string; hint: string | null }[];
   breakdown: { kind: string; logOdds: number | null; points: number; isGate: boolean; gate: number; label: string }[];
+  /** New in 2.1 (engine.ts). */
+  openCounters?: number;
 }
 
 export interface GoldenSet {
@@ -118,6 +121,13 @@ export interface GoldenFrame {
   aramBench: { own: number; bench: number[]; rerolls: number; tied: number; decimals: number; items: GoldenItem[] } | null;
   /** New in 2.1 (engine.ts): the own team's gaps for the seat about to pick. */
   gap?: { cellId: number; count: number; findings: { issue: string; text: string; severity: number }[] } | null;
+  /** New in 2.1 (engine.ts, pickHintOf). */
+  pickHint?: {
+    risky: { championId: number; counters: number } | null;
+    safest: { championId: number; counters: number } | null;
+    laterAlly: boolean;
+    gapFirst: boolean;
+  } | null;
 }
 
 /** A comp finding as what is missing ("Frontline"), for "Eurem Team fehlt noch: …". */
@@ -289,23 +299,61 @@ export class GoldenAdapter {
       terms: item.breakdown.map(term),
       tied,
       unavailable: false,
+      badge: null,
     };
   }
 
   pickTile(set: GoldenSet, frame: GoldenFrame, title: string): PickTileView {
     const isBan = set.action === 'ban';
     const rows = (s: GoldenSet) => s.items.map((item, i) => this.recommendation(item, i + 1, s.items[0]!, s.decimals, isBan, i < s.tied, toLane(s.lane)));
+    // The pick position belongs to the seat the list is for (B1).
+    const hint = !isBan && frame.target?.cellId === set.cellId ? (frame.pickHint ?? null) : null;
+    const safest = hint?.safest?.championId ?? null;
     return {
       kind: isBan ? 'bans' : 'picks',
       title,
       lane: toLane(set.lane),
       tied: set.tied,
-      items: rows(set),
+      items: rows(set).map((row) => (row.champion.id === safest ? { ...row, badge: 'sicherer Blind Pick' } : row)),
       hover: isBan ? null : this.hover(frame),
+      note: hint ? this.pickNote(hint, frame, toLane(set.lane)) : null,
       footnote: isBan
         ? 'Bann-Wert: so viel Winrate nimmt der Bann dem Gegner, mal der Chance, dass er den Champion überhaupt pickt.'
         : 'Balken: Beitrag jedes Kriteriums in Prozentpunkten über 50 %. Rot zieht ab.',
     };
+  }
+
+  /** B1: early with open counters → swap or take the safe pick; counter or last pick → the comp gap. */
+  private pickNote(hint: NonNullable<GoldenFrame['pickHint']>, frame: GoldenFrame, lane: Lane | null): PickNote | null {
+    if (hint.risky && hint.laterAlly) {
+      const name = this.champion(hint.risky.championId)?.name ?? '';
+      let detail =
+        `${name} hat noch ${hint.risky.counters} offene Counter${lane ? ` auf ${LANE_NAMES[lane]}` : ''}. ` +
+        (frame.target?.cellId === frame.state.localCellId
+          ? 'Wer später pickt, sieht den Lane-Gegner vorher; ein Teammate, der nach dir dran ist, kann mit dir tauschen.'
+          : 'Wer später pickt, sieht den Lane-Gegner vorher; ein Teammate, der nach ihm dran ist, kann mit ihm tauschen.');
+      if (hint.safest) {
+        const safe = this.champion(hint.safest.championId)?.name ?? '';
+        const k = hint.safest.counters;
+        detail += ` Vorne gleichauf hat ${safe} ${k === 0 ? 'keinen offenen Counter' : k === 1 ? 'nur einen offenen Counter' : `nur ${k} offene Counter`}.`;
+      }
+      return { kind: 'early', title: 'Früh dran — Pick-Reihenfolge tauschen?', detail };
+    }
+    if (!hint.gapFirst) return null;
+    const line = this.gapLine(frame);
+    return line ? { kind: 'gap', line } : null;
+  }
+
+  /** The own team's gaps for the seat about to pick; the whole team once nobody is left to pick. */
+  private gapLine(frame: GoldenFrame): GapLine | null {
+    const a = frame.comp.allies;
+    const own = frame.gap ?? { count: a.count, findings: a.findings };
+    const open = frame.state.allies.some((slot) => !slot.lockedChampionId);
+    return own.findings.length > 0
+      ? { lead: `Eurem Team fehlt${open ? ' noch' : ''}`, items: gapItems(own.findings), tone: 'warn' }
+      : own.count >= 3
+        ? { lead: `Eurem Team fehlt${open ? ' bisher' : ''} nichts`, items: [], tone: 'good' }
+        : null;
   }
 
   hover(frame: GoldenFrame): HoverView | null {
@@ -353,18 +401,8 @@ export class GoldenAdapter {
     const a = frame.comp.allies;
     const e = frame.comp.enemies;
     const damage = (p: GoldenProfile) => (p.count === 0 ? null : { physical: p.physicalShare, magic: p.magicShare });
-    // For the seat about to pick: the team without its own hover. Once nobody is left to pick, the
-    // whole team as it stands.
-    const own = frame.gap ?? { count: a.count, findings: a.findings };
-    const open = frame.state.allies.some((slot) => !slot.lockedChampionId);
-    const gap: GapLine | null =
-      own.findings.length > 0
-        ? { lead: `Eurem Team fehlt${open ? ' noch' : ''}`, items: gapItems(own.findings), tone: 'warn' }
-        : own.count >= 3
-          ? { lead: `Eurem Team fehlt${open ? ' bisher' : ''} nichts`, items: [], tone: 'good' }
-          : null;
     return {
-      gap,
+      gap: this.gapLine(frame),
       rows: [
         { label: 'Engage', ally: a.maxEngage, enemy: e.maxEngage, max: 3 },
         { label: 'Frontline', ally: a.frontlineCount, enemy: e.frontlineCount, max: 5 },

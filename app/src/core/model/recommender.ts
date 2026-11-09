@@ -107,6 +107,8 @@ export interface Recommendation {
   breakdown: ScoreTerm[];
   /** Standard error of the score in log-odds; 0 for bans. */
   uncertainty: number;
+  /** Champions still free that counter this pick on its lane, while the lane opponent is open (2.1). */
+  openCounters?: number;
 }
 
 export interface RecommendationSet {
@@ -305,7 +307,7 @@ export class Recommender {
 
     const compFit = this.comp.fit(candidate, seat.allyComp, seat.enemyComp, reasons);
 
-    if (openLaneBlocked) this.addCounterRisk(candidate, lane, openLaneBlocked, reasons);
+    const counters = openLaneBlocked ? this.addCounterRisk(candidate, lane, openLaneBlocked, reasons) : undefined;
 
     const terms: ScoreTerm[] = [
       { kind: 'laneStrength', logOdds: baseTerm },
@@ -325,6 +327,7 @@ export class Recommender {
       reasons: dedupe(reasons),
       breakdown: terms,
       uncertainty: budget.standardError,
+      ...(counters !== undefined ? { openCounters: counters } : {}),
     };
   }
 
@@ -365,9 +368,10 @@ export class Recommender {
     return top(results, limit);
   }
 
-  private addCounterRisk(candidate: number, lane: Lane, blocked: ReadonlySet<number>, reasons: Reason[]): void {
+  /** Names the open counters as a reason; returns how many there are. */
+  private addCounterRisk(candidate: number, lane: Lane, blocked: ReadonlySet<number>, reasons: Reason[]): number {
     const threats = openCounters(this.meta, candidate, lane, blocked, 0);
-    if (threats.length === 0) return;
+    if (threats.length === 0) return 0;
     const named = threats
       .slice(0, 3)
       .map(
@@ -386,6 +390,7 @@ export class Recommender {
           (this.meta.isOwnData ? '' : ' Aufgelistet ist, was OP.GG als auffällige Gegner kennt, nicht jeder mögliche.'),
       ),
     );
+    return threats.length;
   }
 
   private candidates(lane: Lane): readonly number[] {

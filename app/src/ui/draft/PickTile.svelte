@@ -3,6 +3,7 @@
   import Tile from '../Tile.svelte';
   import PickRow from './PickRow.svelte';
   import HoverRow from './HoverRow.svelte';
+  import GapSentence from './GapSentence.svelte';
 
   let { tile }: { tile: PickTileView } = $props();
 
@@ -25,6 +26,12 @@
       <span><i class="synergy"></i>Synergie</span>
       <span><i class="comp"></i>Team-Bedarf</span>
     </div>
+  {/if}
+
+  {#if tile.note?.kind === 'early'}
+    <p class="note early"><b>{tile.note.title}</b> {tile.note.detail}</p>
+  {:else if tile.note?.kind === 'gap'}
+    <p class="note gap tone-{tile.note.line.tone}"><GapSentence line={tile.note.line} /></p>
   {/if}
 
   {#if tile.hover}
@@ -89,6 +96,32 @@
   .matchup { background: var(--teal); }
   .synergy { background: var(--purple); }
   .comp { background: var(--orange); }
+
+  /* The pick position (B1): one line above the list, before the hover. */
+  .note {
+    margin: 0 0 12px;
+    padding: 9px 12px;
+    border-radius: var(--r-m);
+    background: var(--card);
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+
+  .note.early {
+    color: var(--fg2);
+  }
+
+  .note.early b {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--orange);
+    font-size: 13px;
+  }
+
+  .note.gap {
+    font-size: 13px;
+    font-weight: 600;
+  }
 
   .group {
     margin: 14px 4px 6px;

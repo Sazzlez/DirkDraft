@@ -131,6 +131,8 @@ export interface RecommendationView {
   tied: boolean;
   /** Not choosable by the viewer (shown greyed). */
   unavailable: boolean;
+  /** A short tag beside the name: "sicherer Blind Pick". */
+  badge: string | null;
 }
 
 export interface PickTileView {
@@ -142,8 +144,13 @@ export interface PickTileView {
   items: RecommendationView[];
   /** Pinned hover row ("Dein Hover"). */
   hover: HoverView | null;
+  /** One line above the list about the pick position (B1). */
+  note: PickNote | null;
   footnote: string | null;
 }
+
+/** An early pick with open counters, or the comp gap for a counter or last pick. */
+export type PickNote = { kind: 'early'; title: string; detail: string } | { kind: 'gap'; line: GapLine };
 
 export interface HoverView {
   champion: ChampionRef;

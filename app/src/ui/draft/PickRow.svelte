@@ -15,7 +15,7 @@
   <button class="line" onclick={() => (open = !open)} aria-expanded={open}>
     <Icon kind="champion" champion={item.champion} size={34} grey={item.unavailable} />
     <span class="text">
-      <span class="name">{item.champion.name}</span>
+      <span class="name">{item.champion.name}{#if item.badge}<span class="badge">{item.badge}</span>{/if}</span>
       <span class="reason">{item.reason}</span>
     </span>
     <span class="bar"><ContributionBar terms={item.terms} /></span>
@@ -117,6 +117,19 @@
     font-size: 15px;
     font-weight: 600;
     letter-spacing: -0.015em;
+  }
+
+  .badge {
+    margin-left: 7px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--green-wash);
+    color: var(--green);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0;
+    vertical-align: 2px;
+    white-space: nowrap;
   }
 
   .reason {
