@@ -4,6 +4,7 @@
 // app's own MetaLookup, so shrinkage and baselines are the app's. Checked on held-out games, with the
 // calibration and what the best pick is worth against the average one. Then every lane on its own
 // through the gold after ten minutes (laneGold.ts): champion or matchup, and what a lead is worth.
+// Last the mechanic counters (mechanics.ts): a kit against a kit, beyond the lane strength.
 // Changes no weight: the result goes into docs/modellpruefung.md first.
 //
 //   npm run measure:model -- <games.json.gz> <meta.json> [builds.json] [--out bericht.md] [--patch 16.22] [--sample 1000]
@@ -23,6 +24,7 @@ import { gamesOf, isHeldOut, readGamesFile, type Game, type Seat } from './games
 import { DEFAULT_FACTOR, FactorModel, type FactorGame, type FactorOptions } from './factor';
 import { conversion, edgeOf, goldDuels, LANE_GOLD_MINIMUM, matchupGold, splitLane } from './laneGold';
 import { fitLogistic, predict, type LogisticFit } from './logistic';
+import { encountersOf, MECHANIC_RULES, mechanicFeatures, mechanicSets } from './mechanics';
 import { tally, versusKey, VERSUS_MINIMUM_GAMES, type Tally } from './tally';
 
 const FOLDS = 5;
@@ -286,6 +288,73 @@ function reportLaneGold(report: string[], input: LaneGoldInput): void {
       }),
       '',
     );
+}
+
+/**
+ * Mechanic counters (mechanics.ts): per rule what one encounter is worth in the win beyond the lane
+ * strength — fitted on the training games with the same out-of-fold strengths as everything else,
+ * checked on the held-out games — and, for a rule on one lane, the gold after ten minutes beyond both
+ * champions' gold strength on that lane.
+ */
+function reportMechanics(report: string[], input: LaneGoldInput, champions: readonly { id: number; key: string; name: string }[]): void {
+  const { games, trainIndex, testIndex, parts, yTrain, xTest, strengthOnly, evaluate } = input;
+  const { sets, missing } = mechanicSets(champions);
+  const features = new Map<number, number[]>();
+  for (const i of [...trainIndex, ...testIndex]) features.set(i, mechanicFeatures(games[i]!, sets));
+  const fit = fitLogistic(trainIndex.map((i) => [parts.get(i)!.strength, ...features.get(i)!]), yTrain);
+  const encounters = MECHANIC_RULES.map((rule) => trainIndex.reduce((sum, i) => sum + encountersOf(games[i]!, sets, rule).length, 0));
+
+  // Gold after ten minutes in the encounter, beyond what both champions' gold on the lane expects.
+  const goldTrain = trainIndex.map((i) => games[i]!).filter((g) => g.gold);
+  const strengths = new Map(ALL_LANES.map((lane) => [lane, splitLane(goldDuels(goldTrain, lane)).strength]));
+  const goldOf = (rule: (typeof MECHANIC_RULES)[number]): string => {
+    if (!rule.sameLane) return '— (zwei Lanes)';
+    const values: number[] = [];
+    for (const game of goldTrain) {
+      const seats = [...game.blue, ...game.red];
+      for (const e of encountersOf(game, sets, rule)) {
+        const lane = seats[e.mine]!.lane;
+        const means = strengths.get(lane);
+        const mine = means?.get(seats[e.mine]!.championId);
+        const theirs = means?.get(seats[e.theirs]!.championId);
+        if (mine === undefined || theirs === undefined) continue;
+        values.push(game.gold![e.mine]! - game.gold![e.theirs]! - (mine - theirs));
+      }
+    }
+    if (values.length < 20) return `— (${count(values.length)} Spiele mit Gold)`;
+    const mean = values.reduce((s, v) => s + v, 0) / values.length;
+    const sd = Math.sqrt(values.reduce((s, v) => s + (v - mean) ** 2, 0) / (values.length - 1));
+    return `${mean >= 0 ? '+' : '−'}${count(Math.round(Math.abs(mean)))} ± ${count(Math.round((1.96 * sd) / Math.sqrt(values.length)))} Gold (${count(values.length)} Spiele)`;
+  };
+
+  const winPoints = (j: number) => {
+    const c = fit.coefficients[j]!;
+    const e = fit.standardErrors[j]!;
+    return `${pts(c, e)} (${c >= 0 ? '+' : '−'}${num(Math.abs(c) * 25, 1)} ± ${num(1.96 * e * 25, 1)} Pkt)`;
+  };
+  const checks: [string, ReturnType<typeof evaluate>][] = [
+    ['Lane-Stärke allein, angepasst', evaluate((k) => predict(strengthOnly, [xTest[k]![0]!]))],
+    ['dazu die Mechanik-Regeln', evaluate((k) => predict(fit, [xTest[k]![0]!, ...features.get(testIndex[k]!)!]))],
+  ];
+
+  report.push(
+    '## Mechanik-Regeln',
+    '',
+    'Counter über die Skills (`tools/measure/mechanics.ts`): Listen nach Einschätzung, nur eindeutige Fälle, vom Nutzer ' +
+      'am 09.11.2026 geprüft, bevor irgendetwas darauf gemessen wurde. Gewicht einer Begegnung im Sieg über die Lane-Stärke ' +
+      'hinaus, zusammen mit ihr auf den Trainingsspielen angepasst (95-%-Fehlerbalken, Punkte bei 50 %); bei Regeln auf ' +
+      'einer Lane dazu das Gold nach 10 Minuten in der Begegnung über die Gold-Stärke beider Champions hinaus.' +
+      (missing.length > 0 ? ` Nicht im Bestand gefunden: ${missing.join(', ')}.` : ''),
+    '',
+    '| Regel | Begegnungen (Training) | je Begegnung im Sieg | Gold nach 10 Min. |',
+    '|---|---|---|---|',
+    ...MECHANIC_RULES.map((rule, r) => `| ${rule.label} | ${count(encounters[r]!)} | ${winPoints(r + 2)} | ${goldOf(rule)} |`),
+    '',
+    '| Modell (zurückgehaltene Spiele) | Log-Loss | Treffer |',
+    '|---|---|---|',
+    ...checks.map(([name, m]) => `| ${name} | ${num(m.loss)} | ${pct(m.hits)} |`),
+    '',
+  );
 }
 
 function args(list: readonly string[]): { files: string[]; options: Record<string, string> } {
@@ -587,7 +656,9 @@ export async function main(argv: string[]): Promise<number> {
   const tc = total(valueC);
   report.push(`| alle | ${count(tb.seats)} | ${cell(tb.overAverage, tb.seats)} | ${cell(tb.overActual, tb.seats)} | ${cell(tc.overAverage, tc.seats)} | ${cell(tc.overActual, tc.seats)} |`, '');
 
-  reportLaneGold(report, { games, trainIndex, testIndex, parts, xTrain, yTrain, xTest, strengthOnly, evaluate });
+  const fitted: LaneGoldInput = { games, trainIndex, testIndex, parts, xTrain, yTrain, xTest, strengthOnly, evaluate };
+  reportLaneGold(report, fitted);
+  reportMechanics(report, fitted, base.champions);
 
   report.push(
     '## Noch nicht drin',

@@ -379,6 +379,28 @@ besser durch als das eine Gewicht von heute (κ = 1.000)?
   Paar, nicht an der Glättung. Mit der vollen Menge (~150.000) und mit Matchups über drei Patches
   nachmessen; erst dann kann eine Lane oder ein gut gezähltes Paar weniger Glättung verdienen.
 
+## 15. Mechanik-Counter (09.11.2026, vorläufig)
+
+Werkzeug: `npm run measure:model`, Abschnitt „Mechanik-Regeln“ (`app/tools/measure/mechanics.ts`). Die Listen
+sind Einschätzung, nur eindeutige Fälle, und wurden vom Nutzer geprüft, bevor darauf gemessen wurde. Sie
+liegen bewusst im Messwerkzeug, nicht in `champion_traits.json`. Gewicht je Begegnung im Sieg über die
+Lane-Stärke hinaus, auf den Trainingsspielen angepasst; 46.277 Spiele.
+
+| Regel | Begegnungen | je Begegnung im Sieg |
+|---|---:|---|
+| Dash-Stopper (Poppy, Cassiopeia, Singed, Taliyah) gegen Dash-Champ | 1.703 | +2,1 ± 2,4 Pkt |
+| Spell Shield (Morgana, Sivir, Nocturne, Malzahar) gegen Hook | 843 | +1,7 ± 3,5 Pkt |
+| Hook gegen ADC ohne Dash | 5.146 | −0,2 ± 1,5 Pkt |
+| Autoattack-Blocker (Jax, Shen, Teemo, Quinn, Rammus, Malphite, Nasus) gegen Autoattack-Champ | 2.641 | +2,3 ± 1,9 Pkt |
+
+- **Autoattack-Blocker gegen Autoattack-Champ** liegt knapp über dem Fehlerbalken. Bei vier geprüften
+  Regeln ist das nur ein Hinweis. Im Lane-Gold nach 10 Minuten zeigt sich nichts (−16 ± 132 Gold, 154
+  Spiele mit Gold).
+- **Hook gegen ADC ohne Dash** bringt nichts, und das schon recht genau (±1,5 Punkte).
+- Dash-Stopper und Spell Shield zeigen in die erwartete Richtung, liegen aber im Fehlerbalken.
+- Auf den zurückgehaltenen Spielen bringen die vier Regeln zusammen 0,0001 im Log-Loss. Keine Regel
+  bekommt ein Gewicht; mit dem endgültigen Lauf nachmessen.
+
 ## Was offen bleibt (2.0)
 
 - **ARAM:** Die erste `aram.json` kommt mit dem Lauf vom 07.11. nachmittags; eine lokale Probe hatte
