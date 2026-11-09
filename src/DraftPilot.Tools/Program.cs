@@ -70,6 +70,9 @@ try
         case "probe":
             return await ProbeCommand.RunAsync(lifetime.Token);
 
+        case "party":
+            return await PartyCommand.RunAsync(lifetime.Token);
+
         case "ingame":
             return await InGameCommand.RunAsync(args.Length > 1 ? args[1] : null, lifetime.Token);
 
@@ -149,6 +152,7 @@ static void PrintUsage()
                                  4 = vierfach, max = ohne Wartezeiten
           update                 Meta-Daten von OP.GG holen und lokal speichern
           probe                  Verbindung zum Client schichtweise pruefen
+          party                  Im Champ Select: wo der Client die eigene Party verraet (ohne Namen)
           events                 Alle Client-Events roh mitschreiben
           ingame [datei.jsonl]   Die API des LAUFENDEN Spiels (Port 2999) mitschreiben und
                                  melden, welche Felder und Events sie kennt. Wartet, bis ein

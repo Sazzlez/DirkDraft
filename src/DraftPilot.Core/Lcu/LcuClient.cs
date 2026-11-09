@@ -60,6 +60,13 @@ public sealed class LcuClient : IDisposable, IRunePageClient
     public Task<string?> GetChampSelectSessionRawAsync(CancellationToken ct = default)
         => GetRawAsync("/lol-champ-select/v1/session", ct);
 
+    /// <summary>
+    /// The lobby (party) as raw JSON — read only, for the party probe (Tools -- party); the app does
+    /// not call it.
+    /// </summary>
+    public Task<string?> GetLobbyRawAsync(CancellationToken ct = default)
+        => GetRawAsync("/lol-lobby/v2/lobby", ct);
+
     /// <summary>Champions the local player may pick this game (ownership and rotation applied).</summary>
     public async Task<HashSet<int>> GetPickableChampionIdsAsync(CancellationToken ct = default)
         => [.. await GetAsync("/lol-champ-select/v1/pickable-champion-ids", LcuJson.Default.ListInt32, ct) ?? []];
