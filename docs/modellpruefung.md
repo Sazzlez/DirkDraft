@@ -313,3 +313,7 @@ echte Unterschiede tragen, folgt dieselbe Regel ihnen. Dazu:
   selbst ein, aber ob Runen- und Kern-Unterschiede je messbar werden, ist offen.
 - **Drei Gewichte bleiben Schätzungen** (übrige Gegner 0,35, Duo-Dämpfung 0,6, Comp 0,16), wie in
   1.5 — kalibrierbar erst an Spielausgängen.
+- **Comp-Merkmale aus 2.1** (Waveclear, Timing, Tank-Shred, AD/AP nach Schaden, Plan beider Teams)
+  laufen ungemessen unter dem Comp-Deckel oder ohne Gewicht. Gemessen werden sie mit
+  `npm run measure` (Liste und Methode: `docs/draft-konzept.md`, „Team-Comp, gemessen“); das Ergebnis
+  kommt hierher, bevor eines davon ein Gewicht bekommt.
