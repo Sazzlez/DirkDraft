@@ -1,7 +1,7 @@
 // Port of DraftPilot.Core.Draft.CompAnalyzer (1.5): what a line-up lacks, and how much a candidate
 // covers it. Rule-based on purpose — no win rate behind it, which is why its weight is the smallest.
 
-import { DamageType, hasStaticData, isRanged, isTagged, type MetaLookup } from './metaLookup';
+import { DamageType, hasStaticData, isRanged, isTagged, type ChampionEntry, type MetaLookup } from './metaLookup';
 import { contra, pro, type Reason } from './reason';
 import { clamp } from './scoreModel';
 import { hasHardCc, hasHardEngage, hasPeel, type TraitTable } from './traits';
@@ -77,8 +77,14 @@ export class CompAnalyzer {
     const ids = [...new Set(championIds.filter((id) => id !== 0))];
     if (ids.length === 0) return EMPTY_PROFILE;
 
+    // How much of the side's damage each champion carries, where the file has it for every one of
+    // them (own data, 2.1): a Leona brings far less AP than a Syndra. Otherwise one head, one share.
+    const amounts = ids.map((id) => damageAmount(this.meta.champion(id)));
+    const byAmount = amounts.every((amount) => amount !== null);
+
     let physical = 0;
     let magic = 0;
+    let damageTotal = 0;
     let damageKnown = 0;
     let frontline = 0;
     let ranged = 0;
@@ -90,22 +96,33 @@ export class CompAnalyzer {
     let traitsKnown = 0;
     let staticKnown = 0;
 
-    for (const id of ids) {
+    ids.forEach((id, index) => {
       const champion = this.meta.champion(id);
-      switch (champion?.damage) {
-        case DamageType.Physical:
-          physical += 1;
-          damageKnown++;
-          break;
-        case DamageType.Magic:
-          magic += 1;
-          damageKnown++;
-          break;
-        case DamageType.Mixed:
-          physical += 0.5;
-          magic += 0.5;
-          damageKnown++;
-          break;
+      const amount = amounts[index];
+      if (byAmount && amount) {
+        physical += amount.physical;
+        magic += amount.magic;
+        damageTotal += amount.physical + amount.magic;
+        damageKnown++;
+      } else {
+        switch (champion?.damage) {
+          case DamageType.Physical:
+            physical += 1;
+            damageTotal += 1;
+            damageKnown++;
+            break;
+          case DamageType.Magic:
+            magic += 1;
+            damageTotal += 1;
+            damageKnown++;
+            break;
+          case DamageType.Mixed:
+            physical += 0.5;
+            magic += 0.5;
+            damageTotal += 1;
+            damageKnown++;
+            break;
+        }
       }
 
       if (champion && hasStaticData(champion)) {
@@ -115,17 +132,17 @@ export class CompAnalyzer {
       }
 
       const trait = this.traits.for(champion?.key);
-      if (!trait.isKnown) continue;
+      if (!trait.isKnown) return;
       traitsKnown++;
       maxEngage = Math.max(maxEngage, trait.engage);
       maxPeel = Math.max(maxPeel, trait.peel);
       totalCc += trait.cc;
       if (trait.scaling === 'late') lateScaling++;
       if (trait.waveclear >= STRONG_WAVECLEAR) strongWaveclear++;
-    }
+    });
 
-    const physicalShare = damageKnown > 0 ? physical / damageKnown : 0;
-    const magicShare = damageKnown > 0 ? magic / damageKnown : 0;
+    const physicalShare = damageTotal > 0 ? physical / damageTotal : 0;
+    const magicShare = damageTotal > 0 ? magic / damageTotal : 0;
     const findings = evaluate(damageKnown, physicalShare, magicShare, frontline, ranged, maxEngage, maxPeel, totalCc, traitsKnown, staticKnown, strongWaveclear);
 
     return {
@@ -361,6 +378,15 @@ function evaluate(
   if (strongWaveclear === 0 && traitsKnown >= 4) findings.push({ issue: 'littleWaveclear', text: 'wenig Waveclear', severity: 0.5 });
 
   return findings;
+}
+
+/** Physical and magic damage per game, when the file has both and they are not nothing. */
+function damageAmount(champion: ChampionEntry | null | undefined): { physical: number; magic: number } | null {
+  const physical = champion?.physicalDamage;
+  const magic = champion?.magicDamage;
+  if (typeof physical !== 'number' || typeof magic !== 'number') return null;
+  if (!Number.isFinite(physical) || !Number.isFinite(magic) || physical < 0 || magic < 0 || physical + magic <= 0) return null;
+  return { physical, magic };
 }
 
 const severity = (excess: number, scale: number): number => clamp(excess / Math.max(scale, 0.0001), 0, 1);

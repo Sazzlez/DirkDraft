@@ -27,6 +27,16 @@ public sealed class ChampionEntry
     /// <summary>Reported by OP.GG for every champion.</summary>
     public DamageType Damage { get; set; }
 
+    /// <summary>
+    /// Physical damage to champions per game, on average over every game counted — how much of a
+    /// team's damage this champion carries, not only of which kind. Own data only (2.1); null in
+    /// OP.GG files and older own files, where the model counts heads instead.
+    /// </summary>
+    public double? PhysicalDamage { get; set; }
+
+    /// <summary>Magic damage to champions per game, as <see cref="PhysicalDamage"/>.</summary>
+    public double? MagicDamage { get; set; }
+
     /// <summary>Riot's own class tags: Tank, Fighter, Mage, Assassin, Marksman, Support.</summary>
     public List<string> Tags { get; set; } = [];
 

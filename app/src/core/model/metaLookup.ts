@@ -18,6 +18,12 @@ export interface ChampionEntry {
   key: string;
   name: string;
   damage: DamageType;
+  /**
+   * Damage to champions per game, on average, physical and magic (own data, 2.1). Absent in OP.GG
+   * files and older own files; the comp then counts heads.
+   */
+  physicalDamage?: number | null;
+  magicDamage?: number | null;
   tags: string[];
   attackRange: number;
   defense: number;

@@ -272,7 +272,12 @@ public sealed class RiotMetaTally
         }
 
         var damage = _champions.ToDictionary(p => p.Key, p => DamageOf(p.Value));
-        return new MetaRows(Matches, lanes, duels, duos, damage, versus);
+        var perGame = _champions
+            .Where(p => p.Value.Games > 0)
+            .ToDictionary(p => p.Key, p => new DamagePerGame(
+                Math.Round((double)p.Value.Physical / p.Value.Games),
+                Math.Round((double)p.Value.Magic / p.Value.Games)));
+        return new MetaRows(Matches, lanes, duels, duos, damage, versus, perGame);
     }
 
     /// <summary>Physical, magic or mixed from the champion's own damage to champions.</summary>
@@ -340,4 +345,8 @@ public sealed record MetaRows(
     IReadOnlyList<MatchupStat> Duels,
     IReadOnlyList<SynergyStat> Duos,
     IReadOnlyDictionary<int, DamageType> Damage,
-    IReadOnlyList<VersusStat>? Versus = null);
+    IReadOnlyList<VersusStat>? Versus = null,
+    IReadOnlyDictionary<int, DamagePerGame>? DamagePerGame = null);
+
+/// <summary>A champion's damage to champions per game, on average, rounded to whole points.</summary>
+public readonly record struct DamagePerGame(double Physical, double Magic);

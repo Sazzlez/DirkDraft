@@ -26,6 +26,8 @@ public static class RiotMetaExport
         var duels = rows.Duels.ToList();
         var duos = rows.Duos.ToList();
 
+        DamagePerGame? PerGame(int id) => rows.DamagePerGame is { } map && map.TryGetValue(id, out var value) ? value : null;
+
         var entries = champions
             .Select(champion => new ChampionEntry
             {
@@ -33,6 +35,8 @@ public static class RiotMetaExport
                 Key = champion.Key,
                 Name = champion.Name,
                 Damage = rows.Damage.GetValueOrDefault(champion.Id, DamageType.Unknown),
+                PhysicalDamage = PerGame(champion.Id)?.Physical,
+                MagicDamage = PerGame(champion.Id)?.Magic,
                 Tags = [.. champion.Tags],
                 AttackRange = champion.AttackRange,
                 Defense = champion.Defense,

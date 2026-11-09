@@ -260,6 +260,29 @@ describe('CompAnalyzerTests', () => {
     expect(withWaveclear - without).toBeCloseTo(0.2, 10);
   });
 
+  it('DamageShares_FollowTheDamageDealt_WhereTheFileHasIt', () => {
+    // Average damage to champions per game, as the collector exports it since 2.1.
+    const m = new MetaBuilder()
+      .champion(1, 'Leona', { damage: DamageType.Magic, physicalDamage: 3000, magicDamage: 6000 })
+      .champion(2, 'Syndra', { damage: DamageType.Magic, physicalDamage: 500, magicDamage: 24000 })
+      .champion(3, 'Zed', { damage: DamageType.Physical, physicalDamage: 22000, magicDamage: 0 })
+      .champion(4, 'Jinx', { damage: DamageType.Physical, physicalDamage: 23000, magicDamage: 1000 })
+      .champion(5, 'Old', { damage: DamageType.Magic })
+      .build();
+    const a = new CompAnalyzer(m, TraitTable.empty);
+
+    // By heads Leona would be a third of the AP; by damage she brings 7.000 of 55.000.
+    const leona = a.analyze([1, 3, 4]);
+    expect(leona.magicShare).toBeCloseTo(7000 / 55000, 10);
+    expect(leona.physicalShare + leona.magicShare).toBeCloseTo(1, 10);
+    expect(hasIssue(leona, 'noMagicDamage')).toBe(true);
+    expect(hasIssue(a.analyze([2, 3, 4]), 'noMagicDamage')).toBe(false);
+
+    // One champion without numbers (an older file, a new champion): the whole side counts heads.
+    const mixed = a.analyze([3, 4, 5]);
+    expect(mixed.magicShare).toBeCloseTo(1 / 3, 10);
+  });
+
   it('DuplicateChampions_AreCountedOnce', () => {
     const profile = analyzer().analyze([Ad1, Ad1, Ad1, Ad2]);
 

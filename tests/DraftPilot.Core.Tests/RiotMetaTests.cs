@@ -370,4 +370,34 @@ public sealed class RiotMetaTests
         Assert.Contains("\"versus\":[", System.Text.Json.JsonSerializer.Serialize(snapshot, MetaJson.Default.MetaSnapshot));
         Assert.Contains("8 gezählte Champions", snapshot.Warnings.Single()); // ten counted, two in Data Dragon
     }
+
+    [Fact]
+    public void TheExport_CarriesDamagePerGame_AndOldFilesStayWithoutIt()
+    {
+        var tally = new RiotMetaTally();
+        for (var i = 0; i < 4; i++)
+            tally.Add(Game(blueWins: i % 2 == 0));
+        // A fifth game where Ahri deals more: the file carries the average, rounded.
+        tally.Add(new MatchReading("16.22", 0, 420, true,
+            [Player(11, Lane.Mid, true, 200, physical: 300, magic: 2001)], []));
+
+        const string dragon = """
+            {"data":{
+              "Aatrox":{"id":"Aatrox","key":"1","name":"Aatrox","tags":["Fighter"],"info":{"defense":4},"stats":{"attackrange":175}},
+              "Ahri":{"id":"Ahri","key":"11","name":"Ahri","tags":["Mage"],"info":{"defense":4},"stats":{"attackrange":550}}}}
+            """;
+        var snapshot = RiotMetaExport.Build(tally.Rows(), RiotMetaExport.ParseDataDragon(dragon), "16.22", "platinum", "euw1", DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch);
+
+        var ahri = snapshot.Champions.Single(c => c.Id == 11);
+        Assert.Equal(60, ahri.PhysicalDamage);   // 300 / 5
+        Assert.Equal(1200, ahri.MagicDamage);    // (4 × 1000 + 2001) / 5 = 1200,2
+        Assert.Equal(1000, snapshot.Champions.Single(c => c.Id == 1).PhysicalDamage);
+        Assert.Contains("\"magicDamage\":1200", System.Text.Json.JsonSerializer.Serialize(snapshot, MetaJson.Default.MetaSnapshot));
+
+        // An OP.GG file or one written before 2.1 has no numbers: the fields stay out of the file.
+        var old = new MetaSnapshot { Champions = [new ChampionEntry { Id = 1, Key = "Aatrox", Name = "Aatrox", Damage = DamageType.Physical }] };
+        var json = System.Text.Json.JsonSerializer.Serialize(old, MetaJson.Default.MetaSnapshot);
+        Assert.DoesNotContain("physicalDamage", json);
+        Assert.DoesNotContain("magicDamage", json);
+    }
 }

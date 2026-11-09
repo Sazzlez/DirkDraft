@@ -66,7 +66,7 @@ export class MetaBuilder {
   champion(
     id: number,
     name: string,
-    options: { damage?: DamageType; tags?: string[]; attackRange?: number; defense?: number } = {},
+    options: { damage?: DamageType; tags?: string[]; attackRange?: number; defense?: number; physicalDamage?: number; magicDamage?: number } = {},
   ): this {
     this.snapshot.champions.push({
       id,
@@ -76,6 +76,8 @@ export class MetaBuilder {
       tags: [...(options.tags ?? [])],
       attackRange: options.attackRange ?? 0,
       defense: options.defense ?? 0,
+      ...(options.physicalDamage !== undefined ? { physicalDamage: options.physicalDamage } : {}),
+      ...(options.magicDamage !== undefined ? { magicDamage: options.magicDamage } : {}),
     });
     return this;
   }

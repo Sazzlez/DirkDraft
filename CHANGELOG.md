@@ -17,6 +17,10 @@ Kopien melden sie beim nächsten Start.
   Kandidaten mit gutem Waveclear bekommen den Chip „guter Waveclear“ und ein kleines Plus innerhalb
   der Teamcomp-Wertung (+0,8 Punkte; die Obergrenze von etwa 4 Punkten für die ganze Comp bleibt).
   Gemessen ist das noch nicht, die Messung nach dem Sammeln prüft es.
+- **AD/AP nach Schaden statt nach Köpfen.** Eine Leona bringt nicht so viel AP wie eine Syndra. Die
+  Daten tragen jetzt je Champion den durchschnittlichen Schaden an Champions je Spiel, und die
+  AD/AP-Anteile in der Comp-Kachel und in den Befunden („AP-Schaden fehlt“) richten sich danach. Wo
+  die Zahl fehlt (ältere Datei, neuer Champion), wird für diese Seite wie bisher nach Köpfen gezählt.
 - **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items
   stehen ohnehin in der Matchup-Kachel und in der Spielansicht.
 - **Ein Klick auf einen Teammate, der gelockt hat, zeigt sein Matchup** wie das eigene nach dem
