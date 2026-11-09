@@ -53,6 +53,11 @@ Kopien melden sie beim nächsten Start.
   gesetzt, und dein eigener ist markiert. In den Bann-Vorschlägen steht außerdem, wenn ein Champion
   euren Plan bedroht: „bedroht euren Teamfight-Plan“ (Disengage) oder „bedroht euren Poke-Plan“
   (hartes Engage). Zählt nicht in den Bann-Wert.
+- **Plan vor dem Draft.** In der Comp-Kachel lässt sich ein Plan wählen — Teamfight, Pick, Poke,
+  Protect oder Splitpush. Picks, die ihn bringen, tragen „passt zum gewählten Plan“ und bekommen ein
+  kleines Plus in der Teamcomp, auch schon vor dem ersten Pick. Ohne Wahl bleibt alles wie bisher:
+  der erkannte Plan steht nur als Hinweis da. Ein zweiter Klick hebt die Wahl auf; mit dem Draft ist
+  sie vorbei, gespeichert wird nichts.
 - Die Chips sprechen League: „Frontline“ statt „steht vorne“, „Peel“ statt „schützt deine Carrys“,
   „Disengage“ statt „hält ihr Engage auf“. Der Hinweis darunter erklärt weiter, was gemeint ist.
 - **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items

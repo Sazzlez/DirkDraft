@@ -138,6 +138,8 @@ export interface DraftFrame {
   pickHint?: PickHint | null;
   /** New in 2.1 (D1): the open seats planned together, in team mode only. */
   teamPlan?: { picks: { cellId: number; lane: LaneName; item: FrameItem }[]; first: number | null; last: number | null } | null;
+  /** New in 2.1 (D4): the plan the team chose for this draft. */
+  chosenPlan?: Plan | null;
   /** New in 2.1 (D3): the team's ban set, in team mode while bans are left. */
   teamBans?: { championId: number; lane: LaneName; score: number | null; by: number | null }[] | null;
 }
@@ -223,6 +225,13 @@ export class DraftEngine {
    * teammate's seat and never bans (1.5's ownership filter). Reset with every new draft, because
    * the free rotation and the account can change between drafts.
    */
+  /** D4: the plan the team chose for this draft; reset with every new draft, never stored. */
+  private chosenPlan: Plan | null = null;
+
+  choosePlan(plan: Plan | null): void {
+    this.chosenPlan = plan;
+  }
+
   /** D1: plan the own team's open seats together (setting "Team-Modus", off by default). */
   private teamMode = false;
 
@@ -269,6 +278,7 @@ export class DraftEngine {
     if (isNewDraft || !state.isActive) {
       this.selectable = null;
       this.manualLanes.clear();
+      this.chosenPlan = null;
     }
     this.wasActive = state.isActive;
     this.lastProgress = progress;
@@ -301,7 +311,7 @@ export class DraftEngine {
     const enemyPredictions = predictor.predict(state.enemies, manual);
     const allyPredictions = predictor.predict(state.allies, manual);
     const comp = new CompAnalyzer(meta, this.traits, this.shred);
-    const recommender = new Recommender(meta, this.traits, this.shred);
+    const recommender = new Recommender(meta, this.traits, this.shred, this.chosenPlan);
 
     let picks: FrameSet | null = null;
     let bans: FrameSet | null = null;
@@ -404,6 +414,7 @@ export class DraftEngine {
       aramBench: bench,
       gap,
       pickHint,
+      chosenPlan: this.chosenPlan,
       teamPlan: this.teamMode && state.isActive && usesLanes(state.queue) ? frameTeamPlan(planTeam(recommender, meta, state, enemyPredictions, allyPredictions, this.selectable)) : null,
       teamBans:
         this.teamMode && bans && state.phase !== 'finalization'

@@ -6,6 +6,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { spellSlots } from '../core/loadout';
+import type { Plan } from '../core/model/compAnalyzer';
 import { DataRefresher } from '../core/refresh';
 import type { Lane, ViewModel } from '../core/view';
 import { loadAssets } from '../data/assets';
@@ -225,6 +226,13 @@ export async function runImport(confirm: (pageName: string) => Promise<boolean>)
 export function chooseSeat(cellId: number): void {
   if (!inShell) return;
   session.selectSeat(cellId);
+  render();
+}
+
+/** D4: the plan for this draft from the comp tile; null gives it back to the detection. */
+export function choosePlan(plan: Plan | null): void {
+  if (!inShell) return;
+  session.choosePlan(plan);
   render();
 }
 

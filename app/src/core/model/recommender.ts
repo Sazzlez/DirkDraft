@@ -216,8 +216,10 @@ export class Recommender {
     private readonly meta: MetaLookup,
     private readonly traits: TraitTable,
     shred: TankShred = TankShred.none,
+    /** D4: the plan the team chose for this draft. */
+    private readonly chosenPlan: Plan | null = null,
   ) {
-    this.comp = new CompAnalyzer(meta, traits, shred);
+    this.comp = new CompAnalyzer(meta, traits, shred, chosenPlan);
   }
 
   recommend(
@@ -232,7 +234,7 @@ export class Recommender {
     const seat = this.prepare(state, target, enemyLanes, allyLanes);
     const items =
       target.action === 'ban'
-        ? this.scoreBans(state, seat.lane, seat.allies, new Set([...seat.hoveredByOthers, ...seat.bannedByOthers]), enemyLanes, limit, seat.allyComp.plan)
+        ? this.scoreBans(state, seat.lane, seat.allies, new Set([...seat.hoveredByOthers, ...seat.bannedByOthers]), enemyLanes, limit, this.chosenPlan ?? seat.allyComp.plan)
         : top(this.scorePicks(state, seat, enemyLanes, selectable), limit);
     return { cellId: target.slot.cellId, lane: seat.lane, action: target.action, items, allyComp: seat.allyComp, enemyComp: seat.enemyComp };
   }

@@ -129,6 +129,8 @@ export interface GoldenFrame {
   /** New in 2.1 (engine.ts): the own team's gaps for the seat about to pick. */
   gap?: { cellId: number; count: number; findings: { issue: string; text: string; severity: number }[] } | null;
   /** New in 2.1 (engine.ts, pickHintOf). */
+  /** New in 2.1 (engine.ts, D4). */
+  chosenPlan?: Plan | null;
   /** New in 2.1 (engine.ts, D3). */
   teamBans?: { championId: number; lane: string; score: number | null; by: number | null }[] | null;
   /** New in 2.1 (engine.ts, D1). */
@@ -426,7 +428,7 @@ export class GoldenAdapter {
   }
 
   /** B3: what each line-up is built around, and what that side wants from the game. */
-  private plans(own: Plan | null, enemy: Plan | null): CompView['plans'] {
+  private plans(own: Plan | null, enemy: Plan | null, chosen = false): CompView['plans'] {
     if (!own && !enemy) return null;
     const name = (plan: Plan | null) => (plan ? PLAN_NAMES[plan] : 'noch offen');
     const detail =
@@ -435,7 +437,7 @@ export class GoldenAdapter {
         : own
           ? `Ihr wollt ${PLAN_WANTS[own]}.`
           : `Sie wollen ${PLAN_WANTS[enemy!]}.`;
-    return { text: `Euer Plan: ${name(own)} · Ihr Plan: ${name(enemy)}`, detail };
+    return { text: `Euer Plan: ${name(own)}${chosen ? ' (gewählt)' : ''} · Ihr Plan: ${name(enemy)}`, detail };
   }
 
   /** The own team's gaps for the seat about to pick; the whole team once nobody is left to pick. */
@@ -508,7 +510,11 @@ export class GoldenAdapter {
       allyDamage: damage(a),
       enemyDamage: damage(e),
       enemyGap: gapsOf(e.findings).length > 0 ? { lead: 'Dem Gegnerteam fehlt', items: gapItems(gapsOf(e.findings)), tone: 'good' } : null,
-      plans: this.plans(a.plan ?? null, e.plan ?? null),
+      plans: this.plans(frame.chosenPlan ?? a.plan ?? null, e.plan ?? null, !!frame.chosenPlan),
+      planChoice:
+        frame.state.isActive && frame.state.usesLanes
+          ? (Object.keys(PLAN_NAMES) as Plan[]).map((plan) => ({ plan, label: PLAN_NAMES[plan], active: plan === frame.chosenPlan }))
+          : null,
       timing: a.findings.some((f) => f.issue === 'mixedTiming')
         ? {
             text: `Gemischtes Timing: ${a.earlyScalingCount ?? 0}× Early Game, ${a.lateScalingCount}× Late Game`,

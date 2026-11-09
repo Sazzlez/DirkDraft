@@ -2,6 +2,8 @@
 // every number, verdict and sentence is decided in the core, so a replay, a test and the live
 // client all produce the same screen from the same draft.
 
+import type { Plan } from './model/compAnalyzer';
+
 export type Lane = 'top' | 'jungle' | 'mid' | 'adc' | 'support';
 
 export const LANES: readonly Lane[] = ['top', 'jungle', 'mid', 'adc', 'support'];
@@ -200,6 +202,8 @@ export interface CompView {
   enemyGap: GapLine | null;
   /** "Euer Plan: Teamfight · Ihr Plan: Poke" and what each side wants (B3); null while neither is clear. */
   plans: { text: string; detail: string } | null;
+  /** D4: the plan for this draft, chosen by hand; null outside champ select. A second click clears it. */
+  planChoice: { plan: Plan; label: string; active: boolean }[] | null;
   /** "Gemischtes Timing: 1× Early Game, 2× Late Game" — a hint, the traits are coarse. */
   timing: { text: string; hint: string } | null;
 }

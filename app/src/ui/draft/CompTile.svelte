@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { CompView } from '../../core/view';
   import GapSentence from './GapSentence.svelte';
+  import { choosePlan } from '../../live/bridge';
   import { percent } from '../../core/format';
   import Tile from '../Tile.svelte';
 
@@ -15,6 +16,19 @@
       <b>{comp.plans.text}</b>
       {comp.plans.detail}
     </p>
+  {/if}
+  {#if comp.planChoice}
+    <div class="choose" role="group" aria-label="Plan für diesen Draft wählen">
+      <span class="lbl">Plan wählen</span>
+      {#each comp.planChoice as option (option.plan)}
+        <button
+          class:active={option.active}
+          aria-pressed={option.active}
+          title={option.active ? 'Wahl aufheben — dann gilt wieder der erkannte Plan' : `${option.label} als Plan für diesen Draft wählen`}
+          onclick={() => choosePlan(option.active ? null : option.plan)}>{option.label}</button
+        >
+      {/each}
+    </div>
   {/if}
 
   <div class="grid">
@@ -128,6 +142,40 @@
     font-size: 13px;
     font-weight: 600;
     line-height: 1.35;
+  }
+
+  .choose {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: -4px 0 12px;
+  }
+
+  .choose .lbl {
+    align-self: center;
+    margin-right: 2px;
+    font: var(--t-caption);
+    font-size: 11px;
+    color: var(--fg3);
+  }
+
+  .choose button {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--fg2);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .choose button:hover {
+    background: var(--card-strong);
+    color: var(--fg);
+  }
+
+  .choose button.active {
+    background: var(--blue);
+    color: #fff;
   }
 
   .plans {

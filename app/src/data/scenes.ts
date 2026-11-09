@@ -36,6 +36,7 @@ export const SCENES: Scene[] = [
   { id: 'mate', title: 'Teammate gelockt', moment: 'teammate' },
   { id: 'team', title: 'Team-Modus', moment: 'picking' },
   { id: 'teambansmode', title: 'Team-Modus · Banns', moment: 'banning' },
+  { id: 'plan', title: 'Plan gewählt', moment: 'planning' },
   { id: 'locked', title: 'Gelockt', moment: 'locked' },
   { id: 'loading', title: 'Finalisierung', moment: 'loading' },
   { id: 'aram', title: 'ARAM-Bank', moment: 'aramBench' },
@@ -221,6 +222,17 @@ export async function sceneView(id: string): Promise<ViewModel> {
       live.onPhase('ChampSelect');
       const frame = lastActive(s.recordings.get('live-ranked')!, (f) => f.state.turn?.action === 'ban' && !!f.state.turn.isLocalPlayer && (f.state.allyBanIntents?.length ?? 0) >= 1);
       live.onSession((sessionOf.get(frame) as Record<string, unknown> | undefined) ?? null);
+      return { ...live.view(), sampleNote: SAMPLE };
+    }
+    // D4: Teamfight chosen as the plan in the planning phase.
+    case 'plan': {
+      const live = new LiveSession();
+      live.setData({ meta: s.meta.snapshot, builds: null, aram: null, situational: null, fresh: true, changed: false, problems: [] });
+      live.onStatus(CONNECTED_STATUS);
+      live.onPhase('ChampSelect');
+      const frame = lastActive(s.recordings.get('live-ranked')!, (f) => f.state.phase === 'planning');
+      live.onSession((sessionOf.get(frame) as Record<string, unknown> | undefined) ?? null);
+      live.choosePlan('teamfight');
       return { ...live.view(), sampleNote: SAMPLE };
     }
     case 'locked': {

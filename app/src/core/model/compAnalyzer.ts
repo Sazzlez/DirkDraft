@@ -95,6 +95,8 @@ export class CompAnalyzer {
     private readonly meta: MetaLookup,
     private readonly traits: TraitTable,
     private readonly shred: TankShred = TankShred.none,
+    /** D4: the plan the team chose for this draft; null leaves it to the detection (B3). */
+    private readonly chosenPlan: Plan | null = null,
   ) {}
 
   analyze(championIds: readonly number[]): CompProfile {
@@ -196,7 +198,8 @@ export class CompAnalyzer {
   /** `lane`: the seat's lane, for what the candidate builds there (B4); Unknown reads any lane. */
   fit(candidateId: number, profile: CompProfile, enemies: CompProfile, reasons: Reason[], lane: Lane = Lane.Unknown): number | null {
     const champion = this.meta.champion(candidateId);
-    if (!champion || (profile.count === 0 && enemies.count < MINIMUM_ENEMIES_TO_JUDGE)) return null;
+    // Nothing to judge yet — unless the team chose a plan before the draft (D4).
+    if (!champion || (profile.count === 0 && enemies.count < MINIMUM_ENEMIES_TO_JUDGE && !this.chosenPlan)) return null;
 
     const trait = this.traits.for(champion.key);
     if (champion.damage === DamageType.Unknown && !hasStaticData(champion) && !trait.isKnown) return null;
@@ -322,8 +325,20 @@ export class CompAnalyzer {
       );
     }
 
+    // D4: a plan the team chose — a small pro inside the term's cap for the picks that bring it.
+    if (trait.isKnown && this.chosenPlan && planShare(trait, champion)[this.chosenPlan] >= 2) {
+      score += 0.2;
+      reasons.push(
+        pro(
+          `passt zum gewählten Plan (${PLAN_NAMES[this.chosenPlan]})`,
+          `Ihr habt ${PLAN_NAMES[this.chosenPlan]} als Plan gewählt — ${PLAN_WANTS[this.chosenPlan]}. Dieser Pick bringt genau das. ` +
+            'Ein kleines Plus in der Teamcomp; gemessen ist der Plan noch nicht.',
+        ),
+      );
+    }
+
     // Fits the plan the team is built around: a hint only, it adds nothing to the score (B3).
-    if (trait.isKnown && profile.plan && planShare(trait, champion)[profile.plan] >= 2) {
+    if (!this.chosenPlan && trait.isKnown && profile.plan && planShare(trait, champion)[profile.plan] >= 2) {
       reasons.push(
         neutral(
           `passt zu eurem ${PLAN_NAMES[profile.plan]}-Plan`,

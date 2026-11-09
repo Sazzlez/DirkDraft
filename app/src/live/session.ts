@@ -21,6 +21,7 @@ import { GoldenAdapter, type GoldenFrame } from '../data/golden';
 import { dataLine, dataLineShort, type DataSet } from '../data/remote';
 import { draftStateFrom } from '../core/model/draftState';
 import { patchesBetween, patchLine } from '../core/model/patchVersion';
+import type { Plan } from '../core/model/compAnalyzer';
 import { TankShred } from '../core/model/tankShred';
 import { draftSteps, simultaneousTurn } from '../core/steps';
 
@@ -324,6 +325,13 @@ export class LiveSession {
     this.teamMode = on;
     this.engine?.setTeamMode(on);
     if (this.session) this.onSession(this.session, this.sessionAt);
+  }
+
+  /** D4: the plan for this draft, or null to leave it to the detection; gone with the draft. */
+  choosePlan(plan: Plan | null): void {
+    if (!this.engine || !this.session || !this.frame?.state.isActive) return;
+    this.engine.choosePlan(plan);
+    this.onSession(this.session, this.sessionAt);
   }
 
   /** A click on an ally seat: its list until the clock passes to someone else (1.5's TurnTracker). */
