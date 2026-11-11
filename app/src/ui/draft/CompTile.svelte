@@ -18,16 +18,19 @@
     </p>
   {/if}
   {#if comp.planChoice}
-    <div class="choose" role="group" aria-label="Plan für diesen Draft wählen">
-      <span class="lbl">Plan wählen</span>
-      {#each comp.planChoice as option (option.plan)}
-        <button
-          class:active={option.active}
-          aria-pressed={option.active}
-          title={option.active ? 'Wahl aufheben — dann gilt wieder der erkannte Plan' : `${option.label} als Plan für diesen Draft wählen`}
-          onclick={() => choosePlan(option.active ? null : option.plan)}>{option.label}</button
-        >
-      {/each}
+    <!-- Set apart until a plan is chosen, so it is not forgotten; calm once one is. -->
+    <div class="choose" class:set={comp.planChoice.some((option) => option.active)} role="group" aria-label="Plan für diesen Draft wählen">
+      <span class="lbl">{comp.planChoice.some((option) => option.active) ? 'Euer Plan für diesen Draft' : 'Plan für diesen Draft wählen'}</span>
+      <span class="opts">
+        {#each comp.planChoice as option (option.plan)}
+          <button
+            class:active={option.active}
+            aria-pressed={option.active}
+            title={option.active ? 'Wahl aufheben — dann gilt wieder der erkannte Plan' : `${option.label} als Plan für diesen Draft wählen`}
+            onclick={() => choosePlan(option.active ? null : option.plan)}>{option.label}</button
+          >
+        {/each}
+      </span>
     </div>
   {/if}
 
@@ -165,38 +168,66 @@
     line-height: 1.35;
   }
 
+  /* Open: a blue box, blue being what can be clicked (label 5,0:1 dark, 4,7:1 light). Chosen: calm,
+     only the chosen plan stays blue. */
   .choose {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin: -4px 0 12px;
+    margin: -2px 0 12px;
+    padding: 10px;
+    border-radius: var(--r-m);
+    background: var(--blue-wash);
+    box-shadow: inset 0 0 0 1px var(--blue-line);
+  }
+
+  .choose.set {
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--separator);
   }
 
   .choose .lbl {
-    align-self: center;
-    margin-right: 2px;
-    font: var(--t-caption);
-    font-size: 11px;
-    color: var(--fg3);
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--blue-text);
+  }
+
+  .choose.set .lbl {
+    color: var(--fg2);
+  }
+
+  .opts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
   .choose button {
-    min-height: 24px;
-    padding: 3px 10px;
+    min-height: 28px;
+    padding: 4px 12px;
     border-radius: 999px;
-    background: var(--card);
-    color: var(--fg2);
-    font-size: 11px;
-    font-weight: 500;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue-text) 60%, transparent);
+    color: var(--blue-text);
+    font-size: 12px;
+    font-weight: 600;
   }
 
   .choose button:hover {
-    background: var(--card-strong);
+    background: var(--blue-wash);
+  }
+
+  .choose.set button:not(.active) {
+    box-shadow: inset 0 0 0 1px var(--separator);
+    color: var(--fg2);
+  }
+
+  .choose.set button:not(.active):hover {
+    background: var(--card-hover);
     color: var(--fg);
   }
 
   .choose button.active {
     background: var(--blue-strong);
+    box-shadow: none;
     color: #fff;
   }
 

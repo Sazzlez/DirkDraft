@@ -86,7 +86,8 @@ Kopien melden sie beim nächsten Start.
   Protect oder Splitpush. Picks, die ihn bringen, tragen „passt zum gewählten Plan“ und bekommen ein
   kleines Plus in der Teamcomp, auch schon vor dem ersten Pick. Ohne Wahl bleibt alles wie bisher:
   der erkannte Plan steht nur als Hinweis da. Ein zweiter Klick hebt die Wahl auf; mit dem Draft ist
-  sie vorbei, gespeichert wird nichts.
+  sie vorbei, gespeichert wird nichts. Solange kein Plan gewählt ist, steht die Auswahl in einem
+  blauen Kasten, damit sie nicht untergeht; danach tritt sie zurück.
 - Die Chips sprechen League: „Frontline“ statt „steht vorne“, „Peel“ statt „schützt deine Carrys“,
   „Disengage“ statt „hält ihr Engage auf“. Der Hinweis darunter erklärt weiter, was gemeint ist.
 - Das Draft-Urteil sagt „Gegner skalieren besser“ statt „Sie skalieren besser“, ebenso bei Engage
