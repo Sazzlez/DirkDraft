@@ -12,6 +12,9 @@
 </script>
 
 <Tile title="Draft-Chance">
+  {#if chance.ally === null}
+    <p class="empty">{chance.verdict}.</p>
+  {:else}
   <div class="gauge">
     <svg viewBox="0 0 150 84" aria-hidden="true">
       <path d={arc} class="track" />
@@ -24,9 +27,16 @@
     </svg>
     <p class="verdict">{chance.verdict}.</p>
   </div>
+  {/if}
 </Tile>
 
 <style>
+  .empty {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--fg2);
+  }
+
   .gauge {
     display: flex;
     flex-direction: column;
