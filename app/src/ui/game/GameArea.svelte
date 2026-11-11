@@ -60,14 +60,16 @@
     {/if}
   </div>
 
-  <div class="skill">
-    {#if game.nextSkill}
+  <!-- The build tile's skill grid marks the next point. This line stands in only without the grid: no build
+       from the champ select, e.g. DirkDraft opened mid-game. Left out whole: an empty box would still take a gap. -->
+  {#if game.nextSkill && !build}
+    <div class="skill">
       <section class="next-skill">
         <span class="key">{game.nextSkill.key}</span>
         <span>{game.nextSkill.now ? 'Jetzt skillen' : `Nächster Skillpunkt, auf Stufe ${game.nextSkill.level}`}</span>
       </section>
-    {/if}
-  </div>
+    </div>
+  {/if}
 
   <div class="path">
     <Tile title="Dein Build" sub="{owned} von {total} Items">
@@ -502,7 +504,7 @@
     }
   }
 
-  /* Narrow: next buy, skill point, hints, build path, enemies — one column in that order. */
+  /* Narrow: next buy, skill point (only without the build's grid), hints, build path, enemies — one column in that order. */
   @container app (max-width: 719px) {
     .head {
       padding: 0 12px 10px;
