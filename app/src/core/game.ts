@@ -140,6 +140,8 @@ export interface PathStep {
   slot: 'Start' | 'Schuhe' | 'Support' | 'Kern' | 'Spät';
   itemId: number;
   owned: boolean;
+  /** A situational item standing in the plan's place for this game (core/situational). */
+  situational?: boolean;
 }
 
 export interface NextBuy {
@@ -152,6 +154,8 @@ export interface NextBuy {
   towards: number | null;
   /** The support quest is done: the planned upgrade is waiting to be picked in the shop. */
   supportChoice: boolean;
+  /** The buy is a situational item, or a part of one. */
+  situational?: boolean;
 }
 
 /** One purchase of the shopping list. */
@@ -161,6 +165,8 @@ export interface Buy {
   cost: number;
   /** The plan's item this buy works towards, when it is a part of it; null for the item itself. */
   towards: number | null;
+  /** The buy is a situational item, or a part of one. */
+  situational?: boolean;
 }
 
 export interface EnemyView {
@@ -396,6 +402,10 @@ function nextBuyOf(order: readonly PathStep[], owned: readonly number[], basket:
   return { itemId: target.itemId, cost: remainingCost(target.itemId, [...owned], items), affordable: false, towards: null, supportChoice: false };
 }
 
+function markSituational(buy: NextBuy | null, situational: ReadonlySet<number>): NextBuy | null {
+  return buy && situational.has(buy.towards ?? buy.itemId) ? { ...buy, situational: true } : buy;
+}
+
 function nextSkillOf(order: string, data: LiveGameData): GameModel['nextSkill'] {
   const abilities = data.activePlayer?.abilities ?? {};
   const current: Record<Skill, number> = { Q: 0, W: 0, E: 0, R: 0 };
@@ -436,6 +446,8 @@ export function gameModel(
   meta: MetaLookup,
   plan: RiotBuildPlan | null,
   items: ReadonlyMap<number, ItemInfo>,
+  /** The plan's items that are situational for this game: marked in the path and in the basket. */
+  situational: ReadonlySet<number> = new Set(),
 ): GameModel | null {
   const me = ownRow(data);
   if (!me || !data.activePlayer) return null;
@@ -443,10 +455,12 @@ export function gameModel(
   const gameTime = data.gameData?.gameTime ?? 0;
   const gold = Math.floor(data.activePlayer.currentGold ?? 0);
   const owned = ownedItems(me);
-  const steps = pathOf(plan, owned, gameTime, items);
+  const steps = pathOf(plan, owned, gameTime, items).map((step) => (situational.has(step.itemId) ? { ...step, situational: true } : step));
   const order = buyOrder(steps, plan?.bootsAfterItems ?? null);
   const bootsWorth = plan?.bootsWorth ?? null;
-  const basket = basketOf(order, owned, gold, items, bootsWorth === null ? null : itemWorth(owned, items) >= bootsWorth);
+  const basket = basketOf(order, owned, gold, items, bootsWorth === null ? null : itemWorth(owned, items) >= bootsWorth).map((buy) =>
+    situational.has(buy.towards ?? buy.itemId) ? { ...buy, situational: true } : buy,
+  );
 
   const enemies: EnemyView[] = (data.allPlayers ?? [])
     .filter((p) => p.team && me.team && p.team !== me.team)
@@ -466,7 +480,7 @@ export function gameModel(
     gold,
     championId: championIdOf(me, meta),
     path: steps,
-    nextBuy: nextBuyOf(order, owned, basket, items),
+    nextBuy: markSituational(nextBuyOf(order, owned, basket, items), situational),
     basket,
     goldLeft: gold - basket.reduce((sum, buy) => sum + buy.cost, 0),
     nextSkill: plan ? nextSkillOf(plan.skillOrder, data) : null,

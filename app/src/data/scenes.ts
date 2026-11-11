@@ -383,9 +383,9 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
   const game: GameView = {
     // Sample numbers: situational.json comes with the collector on GitHub.
     ...gameView(model!, (id) => a.champion(id), 'Darius vs Jax · Toplane', 'Draft 51 : 49', [
-      { itemId: 3065, slot: SLOT.Late, situation: SITUATION.Magic, timesMoreOften: 2.8, winRate: 0.532, otherRate: 0.511, games: 2410 },
-      { itemId: 3111, slot: SLOT.Boots, situation: SITUATION.HardCc, timesMoreOften: 1.9, winRate: 0.524, otherRate: 0.509, games: 5120 },
-      { itemId: 3036, slot: SLOT.Late, situation: SITUATION.EnemyArmor, timesMoreOften: 3.4, winRate: 0.518, otherRate: 0.507, games: 1380 },
+      { itemId: 3065, slot: SLOT.Late, situation: SITUATION.Magic, timesMoreOften: 2.8, winRate: 0.532, otherRate: 0.511, games: 2410, share: 0.21 },
+      { itemId: 3111, slot: SLOT.Boots, situation: SITUATION.HardCc, timesMoreOften: 1.9, winRate: 0.524, otherRate: 0.509, games: 5120, share: 0.34 },
+      { itemId: 3036, slot: SLOT.Late, situation: SITUATION.EnemyArmor, timesMoreOften: 3.4, winRate: 0.518, otherRate: 0.507, games: 1380, share: 0.12 },
     ]),
     sample: 'Beispieldaten — im Spiel liest die Ansicht Riots Live-Client-Schnittstelle.',
   };

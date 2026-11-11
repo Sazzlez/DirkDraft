@@ -35,7 +35,7 @@
             <span class="pick">
               <Icon kind="item" id={buy.item.id} size={26} title={buy.item.name} />
               <b>{buy.item.name}</b>
-              <span class="num">{count(buy.cost)} Gold{#if buy.then}{' · '}für {buy.then.name}{/if}</span>
+              <span class="num">{count(buy.cost)} Gold{#if buy.then}{' · '}für {buy.then.name}{/if}{#if buy.situational}{' · '}<span class="sit">situativ</span>{/if}</span>
             </span>
           {/each}
           <span class="num">Rest {count(game.goldLeft)} Gold</span>
@@ -45,7 +45,7 @@
       <section class="next">
         <Icon kind="item" id={game.nextBuy.item.id} size={44} />
         <span class="t">
-          <span class="kicker">{game.nextBuy.supportChoice ? 'Support-Quest erfüllt' : 'Nächster Kauf'}</span>
+          <span class="kicker">{game.nextBuy.supportChoice ? 'Support-Quest erfüllt' : 'Nächster Kauf'}{#if game.nextBuy.situational}{' · '}<span class="sit">situativ</span>{/if}</span>
           <b>{game.nextBuy.item.name}</b>
           {#if game.nextBuy.supportChoice}
             <span>Jetzt im Shop als Upgrade wählen</span>
@@ -77,8 +77,8 @@
             <span class="k">{group.slot}</span>
             <span class="icons">
               {#each group.items as item, i (i)}
-                <span class="has" class:owned={item.owned}>
-                  <Icon kind="item" id={item.id} size={34} dim={item.owned} ring={item.next ? 'target' : null} title={item.name} />
+                <span class="has" class:owned={item.owned} class:swapped={item.situational}>
+                  <Icon kind="item" id={item.id} size={34} dim={item.owned} ring={item.next ? 'target' : null} title={item.situational ? `${item.name} · situativ` : item.name} />
                   {#if item.owned}<svg class="tick" viewBox="0 0 12 12"><path d="m2.5 6.2 2.2 2.2 4.8-4.8" /></svg>{/if}
                 </span>
               {/each}
@@ -86,6 +86,9 @@
           </div>
         {/each}
       </div>
+      {#if game.path.some((group) => group.items.some((item) => item.situational))}
+        <p class="tiny legend"><i class="dot"></i>Situatives Item: steht für dieses Spiel anstelle eines Items aus deinem Plan.</p>
+      {/if}
       {#if build}
         <div class="skills">
           <span class="k">Skills · Stufe {game.level}</span>
@@ -98,12 +101,11 @@
   {#if game.situational}
     <div class="situational">
       <Tile title="Situative Items">
-        {#snippet accessory()}<span class="badge">Alternative</span>{/snippet}
         {#each game.situational as s (s.item.id)}
           <div class="alt">
             <Icon kind="item" id={s.item.id} size={34} title={s.item.name} />
             <span class="t">
-              <b>{s.item.name}</b>
+              <b>{s.item.name}<span class="badge" class:in={s.adopted}>{s.adopted ? 'im Build' : 'Alternative'}</span></b>
               <span>{s.reason}{#if s.instead}{' · '}statt {s.instead.name}{/if}</span>
               <span class="num stats">{s.stats}</span>
             </span>
@@ -111,7 +113,7 @@
         {:else}
           <p class="tiny">Gegen diese Gegner ist nichts klar besser als dein Build. Bleib dabei.</p>
         {/each}
-        <p class="tiny">Was Platin-Spieler deines Champions in derselben Lage häufiger kaufen, sofern es nicht schlechter abschneidet. Der Build oben bleibt dein Plan; das hier ist eine Alternative für dieses Spiel.</p>
+        <p class="tiny">Was Platin-Spieler deines Champions in derselben Lage häufiger kaufen, sofern es nicht schlechter abschneidet. Kaufen sie es dort klar öfter als ein Item aus deinem Plan, steht es für dieses Spiel an dessen Stelle im Build; alles andere bleibt eine Alternative.</p>
       </Tile>
     </div>
   {/if}
@@ -256,6 +258,34 @@
     font-size: 14px;
   }
 
+  /* A situational item in the plan's place: the orange of "Team-Bedarf", a dot on the path icon. */
+  .sit {
+    color: var(--orange);
+    font-weight: 600;
+  }
+
+  .has.swapped::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    z-index: 1;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--orange);
+    box-shadow: 0 0 0 2px var(--card);
+  }
+
+  .legend .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--orange);
+  }
+
   .then {
     margin-left: auto;
     display: flex;
@@ -368,8 +398,8 @@
     color: var(--fg3);
   }
 
-  /* Situational alternatives: set apart from the plan by a dashed teal rim and the badge, so they
-     never read as part of the build itself. */
+  /* The situational tile: set apart from the plan by a teal rim. Each row says by its badge whether
+     the item is in this game's build or an alternative beside it. */
   .situational :global(.tile) {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--teal, #2fd6c5) 45%, transparent);
     background: color-mix(in srgb, var(--teal, #2fd6c5) 6%, var(--card));
@@ -385,6 +415,17 @@
     font-weight: 600;
     color: var(--teal, #2fd6c5);
     background: color-mix(in srgb, var(--teal, #2fd6c5) 14%, transparent);
+  }
+
+  .alt .badge {
+    margin-left: 8px;
+    height: 18px;
+    vertical-align: 1px;
+  }
+
+  .alt .badge.in {
+    color: var(--orange);
+    background: color-mix(in srgb, var(--orange) 16%, transparent);
   }
 
   .alt {

@@ -29,9 +29,11 @@ Oben zwei Bereiche, die von selbst wechseln (ein Klick hält bis zum nächsten M
   Hover, Banns, Draft-Chance und Comp-Vergleich. Nach dem Lock: dein Matchup mit Build und dem Knopf
   **„Runen und Zauber übernehmen"**; ein Klick auf einen gelockten Teammate zeigt sein Matchup.
   In ARAM und Mayhem: „Behalten oder tauschen?" für deine Bank.
-- **Spiel** — nächster Kauf gegen dein Gold, Build-Pfad, nächster Skillpunkt, Gegner-Items mit
-  Schadensart und „Situative Items": bis zu drei Items, die gegen genau diese Gegner deutlich öfter
-  gekauft werden, als Alternative neben dem Build.
+- **Spiel** — „Jetzt kaufen": alles, was dein Gold gerade hergibt, in Reihenfolge; Build-Pfad,
+  nächster Skillpunkt, Gegner-Items mit Schadensart und „Situative Items": Items, die gegen genau
+  diese Gegner deutlich öfter gekauft werden. Kaufen Spieler deines Champions eines davon in der Lage
+  klar öfter als ein Item aus dem Plan, steht es für dieses Spiel an dessen Stelle im Build und in
+  der Einkaufsliste, markiert als situativ; die übrigen bleiben Alternativen daneben.
 
 Das Fenster passt sich der Breite an: breit ab 1.100 Pixeln, mittel ab 720, schmal ab 340 — schmal
 passt es neben den Client. X legt es in den Infobereich (Rechtsklick auf das Symbol: Öffnen ·

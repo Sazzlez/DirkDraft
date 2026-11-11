@@ -271,15 +271,16 @@ export interface GameView {
   gold: number;
   me: ChampionRef;
   title: string;
-  nextBuy: { item: ItemRef; cost: number; affordable: boolean; then: ItemRef | null; supportChoice: boolean } | null;
+  nextBuy: { item: ItemRef; cost: number; affordable: boolean; then: ItemRef | null; supportChoice: boolean; situational: boolean } | null;
   /**
    * Everything the gold at hand buys right now, in order (core/game basketOf); `then`: the plan's
    * item a part is for. Empty when nothing is affordable.
    */
-  basket: { item: ItemRef; cost: number; then: ItemRef | null }[];
+  basket: { item: ItemRef; cost: number; then: ItemRef | null; situational: boolean }[];
   /** Gold left after the basket. */
   goldLeft: number;
-  path: { slot: string; items: (ItemRef & { owned: boolean; next: boolean })[] }[];
+  /** `situational`: an item that stands in the plan's place for this game's enemies. */
+  path: { slot: string; items: (ItemRef & { owned: boolean; next: boolean; situational: boolean })[] }[];
   /** The plan's next point; `now`: a point is open right now (level above the points spent). */
   nextSkill: { key: 'Q' | 'W' | 'E' | 'R'; level: number; now: boolean } | null;
   /** Points spent so far: the skill grid marks that many levels as taken. */
@@ -297,8 +298,10 @@ export interface GameView {
 
 export interface SituationalView {
   item: ItemRef;
-  /** The base build's choice for that slot, which the suggestion is an alternative to. */
+  /** The base build's choice the item stands against: replaced by it, or kept with it as the alternative. */
   instead: ItemRef | null;
+  /** In the build for this game, in the place of `instead`; else an alternative beside the build. */
+  adopted: boolean;
   /** "Gegen viel magischen Schaden" */
   reason: string;
   /** "58 % statt 51 % · 2.400 Spiele" */

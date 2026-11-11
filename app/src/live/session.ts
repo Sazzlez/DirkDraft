@@ -5,14 +5,14 @@
 // Left out on the user's word (07.11.2026): a postgame and "Mein Pool".
 
 import { DraftEngine } from '../core/engine';
-import { gameModel, championIdOf, enemyItemsOf, isBoots, isFinished, type LiveGameData } from '../core/game';
+import { gameModel, championIdOf, enemyItemsOf, isBoots, isFinished, ownsItem, type LiveGameData } from '../core/game';
 import { aramBuildFile, aramStatsFrom } from '../core/aram';
 import { Lane, laneFromKey } from '../core/model/lane';
 import { MetaLookup } from '../core/model/metaLookup';
 import { TraitTable } from '../core/model/traits';
 import { momentOf, type GameflowPhase } from '../core/moment';
 import { aramPlan, riotPlan, type RiotBuildPlan } from '../core/riotBuilds';
-import { SLOT, SituationTracker, sameStateEdge, situationalSuggestions, situationsOf, type Slot } from '../core/situational';
+import { SLOT, SituationTracker, SwapTracker, sameStateEdge, situationalBuild, situationalSuggestions, situationsOf, type RatedSuggestion, type Slot } from '../core/situational';
 import { LANE_NAMES, type BuildView, type ChampionRef, type DataStatus, type Lane as ViewLane, type ViewModel } from '../core/view';
 import { assets } from '../data/assets';
 import { aramBuild, buildFromRiot } from '../data/builds';
@@ -75,6 +75,8 @@ export class LiveSession {
   private version: { current: string | null; available: string | null } = { current: null, available: null };
   private game: LiveGameData | null = null;
   private readonly situations = new SituationTracker();
+  /** The situational items put into this game's build; they stay for the game. */
+  private readonly swaps = new SwapTracker();
   /** The own pick of the last draft, for the build and the game after it. */
   private picked: Picked | null = null;
   /** 1.5's showUnowned: suggest champions the account does not own too. */
@@ -134,7 +136,10 @@ export class LiveSession {
   onPhase(phase: string): void {
     // A new game: also when the app starts in the middle of one (no GameStart seen).
     const playing = (p: string | null) => p === 'GameStart' || p === 'InProgress' || p === 'Reconnect';
-    if (playing(phase) && !playing(this.phase)) this.situations.reset();
+    if (playing(phase) && !playing(this.phase)) {
+      this.situations.reset();
+      this.swaps.reset();
+    }
     // Back in the lobby or the queue: the last draft is over for good.
     if (phase === 'Lobby' || phase === 'Matchmaking' || phase === 'None') {
       this.lastActive = null;
@@ -501,34 +506,41 @@ export class LiveSession {
     // The game's own word for the mode: ARAM, or KIWI for Mayhem.
     const gameMode = game.gameData?.gameMode;
     const mode: Mode = gameMode === 'KIWI' ? 'mayhem' : gameMode === 'ARAM' ? 'aram' : 'lanes';
-    const plan = championId ? this.planFor(championId, lane, mode) : null;
-    const model = gameModel(game, meta, plan, items);
-    if (!model) {
+    const basePlan = championId ? this.planFor(championId, lane, mode) : null;
+    // Read once with the base plan: the enemies decide which situations are on.
+    const first = gameModel(game, meta, basePlan, items);
+    if (!first) {
       return { ...base, build, emptyText: 'Sobald das Spiel läuft: nächster Kauf gegen dein Gold, der nächste Skillpunkt und was die Gegner bauen.' };
     }
 
-    const enemyIds = model.enemies.map((e) => e.championId).filter((id) => id > 0);
-    const totals = enemyItemsOf(model.enemies.flatMap((e) => e.items), items);
+    const enemyIds = first.enemies.map((e) => e.championId).filter((id) => id > 0);
+    const totals = enemyItemsOf(first.enemies.flatMap((e) => e.items), items);
     const situations = this.situations.update(situationsOf(enemyIds, meta, this.traits, totals));
-    // Neither what is owned nor what the plan already holds is an alternative to the plan.
     const ownedIds = (me?.items ?? []).map((i) => i.itemID);
-    const exclude = new Set([...ownedIds, ...(plan ? [...(plan.boots[0]?.ids ?? []), ...(plan.core[0]?.ids ?? []), ...plan.late.flatMap((o) => o.ids)] : [])]);
     // Boots drop out once a pair is bought, the core once three items are finished.
     const slots: Slot[] = [];
     if (!ownedIds.some((id) => isBoots(id, items))) slots.push(SLOT.Boots);
     if (ownedIds.filter((id) => isFinished(id, items)).length < 3) slots.push(SLOT.Core);
     slots.push(SLOT.Late);
     // Situational items are counted per lane on the Rift; on the Howling Abyss there is nothing to say.
-    const situational = this.data?.situational && mode === 'lanes'
-      ? situationalSuggestions(this.data.situational, meta, championId, plan?.lane ?? lane, situations, exclude, 3, slots)
-      : null;
+    // With a plan, the clear ones take their place in it for this game (core/situational); without
+    // one there is nothing to take a place in, and they stay a list.
+    const file = mode === 'lanes' ? (this.data?.situational ?? null) : null;
+    const built = file && basePlan ? situationalBuild(file, meta, basePlan, championId, situations, ownedIds, (id) => ownsItem(id, ownedIds, items), slots, this.swaps) : null;
+    const situational: RatedSuggestion[] | null = built
+      ? built.suggestions
+      : file
+        ? situationalSuggestions(file, meta, championId, lane, situations, new Set(ownedIds), 3, slots).map((s) => ({ ...s, instead: null, adopt: false }))
+        : null;
+    const plan = built?.plan ?? basePlan;
+    const model = built && built.swaps.length > 0 ? (gameModel(game, meta, plan, items, new Set(built.swaps.map((swap) => swap.itemId))) ?? first) : first;
     this.diagnosticLine =
       `Spiel: Champion ${championId}, Lane ${plan?.lane ?? lane}, Slots ${slots.join('/')} · Lagen ${situations.join(',')} · ` +
       (situational === null
         ? 'keine situativen Daten'
         : situational.length === 0
           ? 'kein situativer Vorschlag'
-          : `Vorschläge ${situational.map((s) => `${s.itemId}@${s.slot}/${s.situation} (${s.timesMoreOften.toFixed(1)}×, ${s.games})`).join(', ')}`);
+          : `Vorschläge ${situational.map((s) => `${s.itemId}@${s.slot}/${s.situation} (${s.timesMoreOften.toFixed(1)}×, ${s.games}${s.adopt ? `, statt ${s.instead}` : ''})`).join(', ')}`);
 
     const champion = this.adapter.champion(championId);
     const opponent = this.picked?.championId === championId ? this.adapter.champion(this.picked.opponentId) : null;

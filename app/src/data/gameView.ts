@@ -1,7 +1,7 @@
 // The game moment (core/game) as the game area shows it: names, pictures, sentences.
 
 import type { GameModel } from '../core/game';
-import { SITUATION_TEXT, SLOT, type SituationalSuggestion } from '../core/situational';
+import { SITUATION_TEXT, SLOT, type RatedSuggestion, type SituationalSuggestion } from '../core/situational';
 import { DamageType } from '../core/model/metaLookup';
 import type { ChampionRef, GameView, ItemRef, Tone } from '../core/view';
 import { itemName } from './assets';
@@ -40,7 +40,7 @@ export function gameView(
   champion: (id: number) => ChampionRef | null,
   title: string,
   draftLine: string | null,
-  situational: SituationalSuggestion[] | null = null,
+  situational: (SituationalSuggestion | RatedSuggestion)[] | null = null,
 ): GameView {
   const me = champion(model.championId) ?? { id: model.championId, key: '', name: `#${model.championId}` };
 
@@ -51,7 +51,7 @@ export function gameView(
       slot,
       items: model.path
         .filter((s) => s.slot === slot)
-        .map((s) => ({ ...item(s.itemId), owned: s.owned, next: !s.owned && s.itemId === nextId })),
+        .map((s) => ({ ...item(s.itemId), owned: s.owned, next: !s.owned && s.itemId === nextId, situational: s.situational === true })),
     }))
     .filter((group) => group.items.length > 0);
 
@@ -78,9 +78,10 @@ export function gameView(
           affordable: model.nextBuy.affordable,
           then: model.nextBuy.towards ? item(model.nextBuy.towards) : null,
           supportChoice: model.nextBuy.supportChoice,
+          situational: model.nextBuy.situational === true,
         }
       : null,
-    basket: model.basket.map((buy) => ({ item: item(buy.itemId), cost: buy.cost, then: buy.towards ? item(buy.towards) : null })),
+    basket: model.basket.map((buy) => ({ item: item(buy.itemId), cost: buy.cost, then: buy.towards ? item(buy.towards) : null, situational: buy.situational === true })),
     goldLeft: model.goldLeft,
     path,
     nextSkill: model.nextSkill ? { key: model.nextSkill.key, level: model.nextSkill.level, now: model.nextSkill.now } : null,
@@ -100,10 +101,13 @@ export function gameView(
           const next = (slot: 'Kern' | 'Spät') =>
             model.path.find((p) => p.slot === slot && !p.owned) ?? model.path.filter((p) => p.slot === slot).at(-1);
           const base = s.slot === SLOT.Boots ? model.path.find((p) => p.slot === 'Schuhe') : next(s.slot === SLOT.Core ? 'Kern' : 'Spät');
+          // A rated suggestion names the plan item it stands against itself.
+          const instead = 'instead' in s ? s.instead : (base?.itemId ?? null);
           const text = SITUATION_TEXT[s.situation];
           return {
             item: item(s.itemId),
-            instead: base ? item(base.itemId) : null,
+            instead: instead ? item(instead) : null,
+            adopted: 'adopt' in s && s.adopt,
             reason: text.charAt(0).toUpperCase() + text.slice(1),
             stats: situationalStats(s),
           };

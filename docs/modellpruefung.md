@@ -550,6 +550,46 @@ Eine Partie ist kein Beleg. **Nachzutragen, sobald die Zählung einige Tage läu
 dem ersten Item“, und ob die Regel „Stiefel zuerst, sobald der Itemwert die Stufe der Hälfte
 erreicht“ zu dem passt, was Spieler mit knappem Gold tatsächlich kaufen (Teil oder Stiefel).
 
+## 20. Situative Items im Build (11.11.2026, Nutzerwunsch)
+
+Bis 2.0 galt: situative Items stehen neben dem Build, nie an seiner Stelle. Seit dem 11.11.2026
+übernimmt ein situatives Item von selbst den Platz eines Plan-Items, markiert als situativ
+(`core/situational.ts`: `rateSuggestions`, `situationalBuild`, `SwapTracker`).
+
+**Regel.** Ein Vorschlag steht gegen das Plan-Item seines Platzes (Schuhe, Kern, Items 4–6), das
+Spieler des Champions in dieser Lage am seltensten kaufen, unter den noch offenen. Er übernimmt den
+Platz nur, wenn er dort selbst klar öfter gekauft wird (zwei Standardfehler). „1,6-mal so oft wie
+sonst“ bei 6 % des Platzes ist eine Alternative; Mercury's Treads mit 55 % gegen Plated Steelcaps
+mit 39 % ist das, was Spieler in der Lage tun.
+
+**Zwei Sicherungen**, beide wegen desselben Effekts: Lagen aus den Items der Gegner (viel Rüstung,
+viel Magieresistenz, Heilung) gibt es erst spät im Spiel, früh gekaufte Items haben dort kaum Käufe.
+
+- Ersetzt wird nur ein Plan-Item mit eigenem Anteil in der Lage (mindestens 5 %). Ohne das verlor
+  Garens erstes Item (Stridebreaker, 0 % „gegen Magieresistenz“) seinen Platz an Infinity Edge.
+- Das erste Item wird wegen einer Lage aus Gegner-Items nie ersetzt. Ohne das verlor Vaynes Blade of
+  the Ruined King (8 % der Kern-Käufe, sobald die Gegner sich heilen) seinen Platz an Infinity Edge.
+
+**Wie oft.** 171 Champion-Lanes ab 2.000 Spielen, jede Lage einzeln, alle Plan-Items offen (also die
+Obergrenze): 545 Vorschläge, 72 übernehmen einen Platz.
+
+| Platz | Vorschläge | übernommen |
+|---|---:|---:|
+| Schuhe | 180 | 45 |
+| Kern | 242 | 18 |
+| Items 4–6 | 123 | 9 |
+
+Ohne die Sicherungen und ohne die zwei Standardfehler waren es 227. Beispiele, die bleiben: Sion,
+Ornn und Malphite gegen viel magischen Schaden Hollow Radiance statt Thornmail oder Frozen Heart;
+Viego gegen viel Rüstung Lord Dominik's statt The Collector; Tahm Kench gegen Heilung Thornmail statt
+Riftmaker.
+
+**Schwachstelle.** Die Lagen aus Gegner-Items messen zum Teil nur „später im Spiel“: Wukongs Death's
+Dance übernimmt bei Rüstung, bei Magieresistenz und bei Heilung denselben Platz. Bei Champions mit
+zwei Bauweisen mischt es sich (Shaco: Rabadon's statt Guardian Angel). Die Lagen aus der Aufstellung
+(viel AD, viel AP, Tanks, Kontrolle) sind davon frei. Wenn das stört: Übernahme auf diese Lagen und
+die Schuhe begrenzen (`ITEM_SITUATIONS`).
+
 ## Was offen bleibt (2.0)
 
 - **ARAM:** Die erste `aram.json` kommt mit dem Lauf vom 07.11. nachmittags; eine lokale Probe hatte

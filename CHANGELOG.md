@@ -22,6 +22,14 @@ Kopien melden sie beim nächsten Start.
   Hälfte der Spieler; das Paar steht an der Stelle, an der die meisten es kaufen. Bis die Zahlen da
   sind (und für Champions mit zu wenigen Spielen): Paar nach dem ersten Item, Stiefel mit dem Gold,
   das nach den Teilen übrig bleibt. Im Build-Pfad stehen die Schuhe weiter als eigener Platz vorn.
+- **Situative Items stehen jetzt von selbst im Build.** Bisher standen sie nur als Alternative daneben,
+  und die Einkaufsliste folgte weiter dem Grundbuild. Jetzt gilt: Kaufen Spieler deines Champions ein
+  Item in der Lage klar öfter als ein Item aus dem Plan, übernimmt es dessen Platz für dieses Spiel —
+  gegen viel magischen Schaden etwa Mercury's Treads statt Plated Steelcaps (Irelia: 55 % gegen 39 %).
+  Im Build-Pfad trägt es einen orangen Punkt, in der Einkaufsliste steht „situativ“, die Kachel sagt
+  „im Build · statt …“. Was seltener gekauft wird als das Plan-Item, bleibt eine Alternative. Einmal
+  übernommen, bleibt ein Item für das Spiel im Build, auch nach dem Kauf. Das erste Item wird wegen
+  der Items der Gegner nie ersetzt. Zahlen in `docs/modellpruefung.md`, Messung 20.
 - **Situative Items passen zum Champion.** Talon bekam Rabadon's Deathcap und Irelia Zhonya's
   vorgeschlagen, weil andere Champions ihrer Klasse sie kaufen. Verglichen wird jetzt Gleiches mit
   Gleichem, und vorgeschlagen wird nur, was Spieler des Champions selbst schon gekauft haben

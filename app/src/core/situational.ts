@@ -1,5 +1,8 @@
-// Situational items: alternatives to the base build for this game's enemies, measured in our own
-// Platinum games (situational.json) — never a rule of thumb.
+// Situational items: what the base build gives way to for this game's enemies, measured in our own
+// Platinum games (situational.json) — never a rule of thumb. Since 11.11.2026 an item that the
+// champion's players clearly buy instead of one of the plan's in the situation takes that item's
+// place for the game, marked as situational (rateSuggestions, situationalBuild); the others stay
+// alternatives beside the build (docs/modellpruefung.md, Messung 20).
 //
 // The signal is what players of the champion buy differently in this situation: an item bought
 // clearly more often when the enemies stack armor than otherwise is what experience reacts with.
@@ -19,6 +22,7 @@
 // with; both must stay in step.
 
 import type { MetaLookup } from './model/metaLookup';
+import type { PlanOption, RiotBuildPlan } from './riotBuilds';
 import { DamageType, isTagged } from './model/metaLookup';
 import { hasHardCc, type TraitTable } from './model/traits';
 
@@ -164,6 +168,8 @@ export interface SituationalSuggestion {
   otherRate: number;
   /** Buys of the item in this situation, own champion and class. */
   games: number;
+  /** The item's share of its slot's buys in this situation (the champion leaning on its class). */
+  share: number;
 }
 
 /** Pseudo-games pulling a champion's buy share and win rate towards its class's. */
@@ -352,6 +358,7 @@ export function situationalSuggestions(
           winRate: g.winRate,
           otherRate: g.otherRate,
           games: a.games,
+          share: a.shareIn,
           score: a.z,
         });
       }
@@ -365,6 +372,192 @@ export function situationalSuggestions(
     .sort((a, b) => b.score - a.score || a.itemId - b.itemId)
     .slice(0, take)
     .map(({ score: _score, ...rest }) => rest);
+}
+
+/**
+ * An item's share of its slot's buys in a situation — the champion leaning on its class with
+ * CLASS_PRIOR pseudo games, as the suggestions count it — and the buys that share rests on. What a
+ * suggestion's own share is compared with before it takes a plan item's place.
+ */
+export function situationShare(
+  file: RiotSituationalFile,
+  meta: MetaLookup,
+  championId: number,
+  lane: number,
+  slot: Slot,
+  situation: Situation,
+  item: number,
+): { share: number; games: number } {
+  const champion = meta.champion(championId);
+  const classIndex = champion?.tags[0] ? file.classNames.indexOf(champion.tags[0]) : -1;
+  const own = Index.of(file.rows);
+  const cls = Index.of(file.classes);
+  const total = own.all(championId, lane, slot, situation, 0);
+  const bought = own.all(championId, lane, slot, situation, item);
+  const classTotal = classIndex >= 0 ? cls.all(classIndex, lane, slot, situation, 0) : NONE;
+  const classBought = classIndex >= 0 ? cls.all(classIndex, lane, slot, situation, item) : NONE;
+  return {
+    share: share(bought, total, CLASS_PRIOR, classTotal.games > 0 ? classBought.games / classTotal.games : 0),
+    games: total.games + Math.min(CLASS_PRIOR, classTotal.games),
+  };
+}
+
+/** The situations made of what the enemies have built; they exist only once a game is under way. */
+export const ITEM_SITUATIONS: readonly Situation[] = [SITUATION.EnemyArmor, SITUATION.EnemyMagicResist, SITUATION.EnemySustain];
+
+/** A suggestion with the plan's item it stands against, and whether it takes that place. */
+export type RatedSuggestion = SituationalSuggestion & { instead: number | null; adopt: boolean };
+
+/** A situational item in the place of one of the plan's: the suggestion that took it. */
+export type Swap = RatedSuggestion & { instead: number };
+
+/**
+ * Which of the plan's items each suggestion stands against, and whether it takes its place
+ * (rule of 11.11.2026: situational items join the build by themselves, marked as such).
+ *
+ * A suggestion stands against the item of its slot — the boots, the core, the late items — that the
+ * champion's players buy least in this situation, among those still open. It takes that place only
+ * when it is itself bought clearly more often there (MINIMUM_ADOPTION_Z standard errors): "bought
+ * 1,6 times as often against magic resist" at 6 % of the slot is an alternative, not what players
+ * do; Mercury's Treads at 55 % against Plated Steelcaps' 39 % when the enemies deal magic damage is
+ * (Irelia, file of 11.11.2026).
+ *
+ * Two guards, both against the same thing — a situation made of the enemies' items exists only late
+ * in a game, so an item bought early has few buys in it or none:
+ * - Only plan items with a share of their own in the situation can be replaced (MINIMUM_SHARE, as a
+ *   suggestion needs). Stridebreaker stood at 0 % "against magic resist" and would have lost its
+ *   place as Garen's first item to anything.
+ * - The first item never gives way to such a situation (`firstItem`): Blade of the Ruined King, 8 %
+ *   of Vayne's core buys once the enemies heal, is what the few who buy it that late have — not a
+ *   sign that players drop it.
+ * One suggestion per plan item, the clearest first.
+ */
+export function rateSuggestions(
+  file: RiotSituationalFile,
+  meta: MetaLookup,
+  championId: number,
+  lane: number,
+  suggestions: readonly SituationalSuggestion[],
+  /** The plan's items of a slot that can still be replaced: not owned, not situational themselves. */
+  open: (slot: Slot) => readonly number[],
+  /** The plan's first item. */
+  firstItem: number | null = null,
+): RatedSuggestion[] {
+  const taken = new Set<number>();
+  return suggestions.map((suggestion) => {
+    let instead: number | null = null;
+    let least = { share: Number.POSITIVE_INFINITY, games: 0 };
+    for (const item of open(suggestion.slot)) {
+      if (taken.has(item) || (item === firstItem && ITEM_SITUATIONS.includes(suggestion.situation))) continue;
+      const bought = situationShare(file, meta, championId, lane, suggestion.slot, suggestion.situation, item);
+      if (bought.share >= MINIMUM_SHARE && bought.share < least.share) {
+        least = bought;
+        instead = item;
+      }
+    }
+    let adopt = false;
+    if (instead !== null && least.games > 0) {
+      // Both shares are of the same buys; the difference of two shares of n buys.
+      const pooled = (suggestion.share + least.share) / 2;
+      const error = Math.sqrt((Math.max(1e-9, pooled * (1 - pooled)) * 2) / least.games);
+      adopt = (suggestion.share - least.share) / error >= MINIMUM_ADOPTION_Z;
+    }
+    if (adopt) taken.add(instead!);
+    return { ...suggestion, instead, adopt };
+  });
+}
+
+/**
+ * Keeps the swaps of one game: a situational item, once in the build, stays in it. The suggestions
+ * forget an item the moment it is bought (it is no alternative any more), and a later situation may
+ * push it out of their list — the build must not fall back to the item it replaced, least of all
+ * after the purchase. Reset at the start of every game.
+ */
+export class SwapTracker {
+  private readonly swaps = new Map<number, Swap>();
+
+  /** Adds the new swaps; an item replaced or brought in once is not swapped again. */
+  update(found: readonly Swap[]): Swap[] {
+    for (const swap of found) {
+      const known = [...this.swaps.values()];
+      if (this.swaps.has(swap.instead) || known.some((s) => s.itemId === swap.itemId || s.itemId === swap.instead || s.instead === swap.itemId)) continue;
+      this.swaps.set(swap.instead, swap);
+    }
+    return this.current;
+  }
+
+  get current(): Swap[] {
+    return [...this.swaps.values()];
+  }
+
+  reset(): void {
+    this.swaps.clear();
+  }
+}
+
+/** The plan with the swaps made: each replaced item gives its place to the situational one. */
+export function applySwaps(plan: RiotBuildPlan, swaps: readonly Swap[]): RiotBuildPlan {
+  if (swaps.length === 0) return plan;
+  const to = new Map(swaps.map((swap) => [swap.instead, swap.itemId]));
+  const swapped = (option: PlanOption): PlanOption => (option.ids.some((id) => to.has(id)) ? { ...option, ids: option.ids.map((id) => to.get(id) ?? id) } : option);
+  const first = (options: PlanOption[]): PlanOption[] => options.map((option, index) => (index === 0 ? swapped(option) : option));
+  return { ...plan, boots: first(plan.boots), core: first(plan.core), late: plan.late.map(swapped) };
+}
+
+/** How many suggestions are looked at for a place in the build; the tile shows fewer. */
+const RATED_SUGGESTIONS = 12;
+
+export interface SituationalBuild {
+  /** The plan for this game: the base plan with the situational items in their places. */
+  plan: RiotBuildPlan;
+  /** The situational items now in the plan, bought or not. */
+  swaps: Swap[];
+  /** For the tile: the swaps still to buy first, then the alternatives that stay beside the build. */
+  suggestions: RatedSuggestion[];
+}
+
+/**
+ * The build for this game's enemies: the suggestions for the situations at hand, each rated against
+ * the plan (rateSuggestions), the clear ones put in the plan's place and kept there (the tracker),
+ * the others left as alternatives.
+ *
+ * `owned`: the inventory's item ids. `has`: whether a plan item counts as owned (a transformed or
+ * upgraded item stands for its original, core/game ownsItem). `slots`: the slots still open — boots
+ * drop out once a pair is bought.
+ */
+export function situationalBuild(
+  file: RiotSituationalFile,
+  meta: MetaLookup,
+  plan: RiotBuildPlan,
+  championId: number,
+  situations: readonly Situation[],
+  owned: readonly number[],
+  has: (itemId: number) => boolean,
+  slots: readonly Slot[],
+  tracker: SwapTracker,
+  take = 3,
+): SituationalBuild {
+  const base = [...(plan.boots[0]?.ids ?? []), ...(plan.core[0]?.ids ?? []), ...plan.late.flatMap((o) => o.ids)];
+  const before = tracker.current;
+  const brought = new Set(before.map((swap) => swap.itemId));
+  const current = applySwaps(plan, before);
+  // Neither what is owned nor what the plan holds — its own items or the ones brought in — is an alternative to it.
+  const exclude = new Set([...owned, ...base, ...brought]);
+  const found = situationalSuggestions(file, meta, championId, plan.lane, situations, exclude, RATED_SUGGESTIONS, slots);
+
+  const open = (slot: Slot): number[] => {
+    if (!slots.includes(slot)) return [];
+    const group = slot === SLOT.Boots ? (current.boots[0]?.ids ?? []) : slot === SLOT.Core ? (current.core[0]?.ids ?? []) : current.late.flatMap((o) => o.ids);
+    return group.filter((id) => !brought.has(id) && !has(id));
+  };
+  const rated = rateSuggestions(file, meta, championId, plan.lane, found, open, plan.core[0]?.ids[0] ?? null);
+  const swaps = tracker.update(rated.filter((r): r is Swap => r.adopt && r.instead !== null));
+
+  const inPlan = new Set(swaps.map((swap) => swap.itemId));
+  // Still to buy: not owned, and its slot not filled otherwise (another pair of boots, three other items).
+  const toBuy = swaps.filter((swap) => !has(swap.itemId) && slots.includes(swap.slot));
+  const beside = rated.filter((r) => !inPlan.has(r.itemId)).map((r) => ({ ...r, adopt: false }));
+  return { plan: applySwaps(plan, swaps), swaps, suggestions: [...toBuy, ...beside].slice(0, Math.max(take, toBuy.length)) };
 }
 
 /**

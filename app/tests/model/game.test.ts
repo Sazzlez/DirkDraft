@@ -254,6 +254,20 @@ describe('the shopping list', () => {
     expect(buys({ gold: 400, items: [3047, 1036] }).list).toEqual([[1036, 350, 3071]]);
   });
 
+  it('marks a situational item in the path, in the list and as the next buy', () => {
+    // Mercury's Treads stand in the plan's place for this game.
+    const swapped = { ...plan, boots: [option([3111])] };
+    const model = gameModel(game({ gold: 1200, items: [3071] }), meta, swapped, ITEMS, new Set([3111]))!;
+    expect(model.path.find((s) => s.slot === 'Schuhe')).toMatchObject({ itemId: 3111, situational: true });
+    expect(model.path.find((s) => s.slot === 'Kern')!.situational).toBeUndefined();
+    expect(model.basket[0]).toMatchObject({ itemId: 3111, situational: true });
+    expect(model.nextBuy).toMatchObject({ itemId: 3111, situational: true });
+    // Its parts are marked too; the plan's own items are not.
+    const parts = gameModel(game({ gold: 400, items: [3071] }), meta, swapped, ITEMS, new Set([3111]))!;
+    expect(parts.basket[0]).toMatchObject({ itemId: 1001, towards: 3111, situational: true });
+    expect(gameModel(game({ gold: 1200, items: [3071] }), meta, plan, ITEMS)!.basket[0]!.situational).toBeUndefined();
+  });
+
   it('values the inventory as the collector does', () => {
     // Doran's Blade and a Long Sword; potion, trinket and the support quest are worth nothing.
     expect(itemWorth([1055, 2003, 2003, 3340, 3867, 3876, 1036], ITEMS)).toBe(800);

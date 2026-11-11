@@ -4,8 +4,14 @@ import { describe, expect, it } from 'vitest';
 import { Lane } from '../../src/core/model/lane';
 import { DamageType } from '../../src/core/model/metaLookup';
 import { TraitTable } from '../../src/core/model/traits';
+import type { RiotBuildPlan } from '../../src/core/riotBuilds';
 import {
+  applySwaps,
   boughtFromAhead,
+  rateSuggestions,
+  situationalBuild,
+  situationShare,
+  SwapTracker,
   MINIMUM_OWN_BUYS,
   SITUATION,
   SLOT,
@@ -271,5 +277,118 @@ describe('the same game state', () => {
     expect(sameStateEdge(ahri, 103, Lane.Mid, L, [3041], [3089])).toBeNull();
     // The other way round it is an ordinary comparison.
     expect(sameStateEdge(ahri, 103, Lane.Mid, L, [3089], [3041])).toBeLessThan(0);
+  });
+});
+
+describe('a situational item in the plan\'s place', () => {
+  // The Darius file from above: against magic damage Spirit Visage is 40 % of the late slot,
+  // Sterak's 30 % (as everywhere), and item 7000 is never bought there.
+  const suggestions = () => situationalSuggestions(file, meta, 1, TOP, [A, M], new Set());
+  const option = (ids: number[]) => ({ ids, text: null, games: 100, winRate: 0.5 });
+  const plan: RiotBuildPlan = {
+    championId: 1,
+    lane: TOP,
+    inPlaceOf: null,
+    patch: '16.22',
+    games: 4000,
+    winRate: 0.5,
+    runes: null,
+    spells: null,
+    starters: [],
+    boots: [option([3047])],
+    core: [option([9001, 9002, 9003])],
+    late: [option([3053]), option([7000])],
+    supportChoice: null,
+    supportOptions: [],
+    skillOrder: '',
+    skillMax: '',
+    bootsAfterItems: null,
+    bootsWorth: null,
+  };
+  const all = [SLOT.Boots, SLOT.Core, SLOT.Late];
+
+  it('counts an item\'s share of its slot in the situation', () => {
+    // 400 of 1.000 late buys against magic damage, and the 50 pseudo games of a class that is not there.
+    expect(situationShare(file, meta, 1, TOP, L, M, 3065)).toEqual({ share: 400 / 1050, games: 1000 });
+    expect(situationShare(file, meta, 1, TOP, L, M, 7000).share).toBe(0);
+  });
+
+  it('replaces the plan item players buy least there, when it is itself bought clearly more often', () => {
+    const [rated] = rateSuggestions(file, meta, 1, TOP, suggestions(), (slot) => (slot === L ? [3053, 7000] : []));
+    expect(rated).toMatchObject({ itemId: 3065, instead: 3053, adopt: true });
+  });
+
+  it('stays an alternative next to a plan item that is bought as often or more', () => {
+    // Sterak's as the suggestion's rival is at 30 %; make the suggestion the rarer one.
+    const rarer = suggestions().map((s) => ({ ...s, share: 0.2 }));
+    expect(rateSuggestions(file, meta, 1, TOP, rarer, () => [3053])[0]).toMatchObject({ instead: 3053, adopt: false });
+    // A hair more often is not clearly more often.
+    const hair = suggestions().map((s) => ({ ...s, share: 0.3 }));
+    expect(rateSuggestions(file, meta, 1, TOP, hair, () => [3053])[0]).toMatchObject({ instead: 3053, adopt: false });
+  });
+
+  it('never takes the place of an item without buys of its own in the situation, or of the first item late in a game', () => {
+    // 7000 is never bought against magic damage: nothing to compare with, so nothing to replace.
+    expect(rateSuggestions(file, meta, 1, TOP, suggestions(), () => [7000])[0]).toMatchObject({ instead: null, adopt: false });
+    // A situation made of the enemies' items leaves the first item alone …
+    const late = suggestions().map((s) => ({ ...s, situation: SITUATION.EnemyMagicResist }));
+    const magicResist: RiotSituationalFile = { ...file, rows: file.rows.map((r) => (r[3] === M ? [...r.slice(0, 3), SITUATION.EnemyMagicResist, ...r.slice(4)] : r)) };
+    expect(rateSuggestions(magicResist, meta, 1, TOP, late, () => [3053], 3053)[0]).toMatchObject({ instead: null, adopt: false });
+    expect(rateSuggestions(magicResist, meta, 1, TOP, late, () => [3053], 9001)[0]).toMatchObject({ instead: 3053, adopt: true });
+    // … a line-up known from the first minute does not.
+    expect(rateSuggestions(file, meta, 1, TOP, suggestions(), () => [3053], 3053)[0]).toMatchObject({ instead: 3053, adopt: true });
+  });
+
+  it('gives each plan item to one suggestion only', () => {
+    const twice = [...suggestions(), ...suggestions().map((s) => ({ ...s, itemId: 8888 }))];
+    const rated = rateSuggestions(file, meta, 1, TOP, twice, () => [3053]);
+    expect(rated.map((r) => [r.itemId, r.instead, r.adopt])).toEqual([[3065, 3053, true], [8888, null, false]]);
+  });
+
+  it('puts the swap into the plan and keeps it there for the game', () => {
+    const tracker = new SwapTracker();
+    const built = situationalBuild(file, meta, plan, 1, [A, M], [], () => false, all, tracker);
+    expect(built.plan.late.map((o) => o.ids[0])).toEqual([3065, 7000]);
+    expect(built.plan.boots[0]!.ids).toEqual([3047]);
+    expect(built.swaps.map((s) => [s.itemId, s.instead])).toEqual([[3065, 3053]]);
+    // The tile lists it as part of the build.
+    expect(built.suggestions.map((s) => [s.itemId, s.adopt])).toEqual([[3065, true]]);
+    // The base plan itself is untouched.
+    expect(plan.late.map((o) => o.ids[0])).toEqual([3053, 7000]);
+
+    // Bought: no suggestion any more, but the build does not fall back to Sterak's.
+    const bought = situationalBuild(file, meta, plan, 1, [A, M], [3065], (id) => id === 3065, all, tracker);
+    expect(bought.plan.late.map((o) => o.ids[0])).toEqual([3065, 7000]);
+    expect(bought.suggestions).toEqual([]);
+    expect(bought.swaps).toHaveLength(1);
+
+    // Not bought, but the slot is filled otherwise (three other items, here: the late slot closed):
+    // it stays in the plan and leaves the tile.
+    const filled = situationalBuild(file, meta, plan, 1, [A, M], [], () => false, [SLOT.Boots, SLOT.Core], tracker);
+    expect(filled.plan.late.map((o) => o.ids[0])).toEqual([3065, 7000]);
+    expect(filled.suggestions).toEqual([]);
+
+    // A new game starts from the base plan.
+    tracker.reset();
+    expect(situationalBuild(file, meta, plan, 1, [A], [], () => false, all, tracker).plan.late.map((o) => o.ids[0])).toEqual([3053, 7000]);
+  });
+
+  it('leaves a plan item alone once it is owned or its slot is closed', () => {
+    // Sterak's is bought already: Spirit Visage stays an alternative with nothing to stand against.
+    const owned = situationalBuild(file, meta, plan, 1, [A, M], [3053], (id) => id === 3053, all, new SwapTracker());
+    expect(owned.plan.late.map((o) => o.ids[0])).toEqual([3053, 7000]);
+    expect(owned.suggestions.map((s) => [s.itemId, s.instead, s.adopt])).toEqual([[3065, null, false]]);
+  });
+
+  it('swaps an item once: what was replaced or brought in is not swapped again', () => {
+    const tracker = new SwapTracker();
+    const [first] = rateSuggestions(file, meta, 1, TOP, suggestions(), () => [3053]);
+    const swap = { ...first!, instead: 3053 };
+    expect(tracker.update([swap])).toHaveLength(1);
+    expect(tracker.update([{ ...swap, itemId: 8888 }])).toHaveLength(1); // Sterak's is gone already
+    expect(tracker.update([{ ...swap, instead: 7000 }])).toHaveLength(1); // Spirit Visage is in already
+    expect(tracker.update([{ ...swap, itemId: 8888, instead: 3065 }])).toHaveLength(1); // nothing replaces a situational item
+    expect(applySwaps(plan, tracker.current).late.map((o) => o.ids[0])).toEqual([3065, 7000]);
+    expect(applySwaps(plan, [])).toBe(plan);
   });
 });
