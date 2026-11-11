@@ -71,7 +71,9 @@ Spielen werden zum Schnitt des Champions gegen alle Gegner auf der Lane gezogen,
 Lane-Matchup im Draft.
 
 **Solange zu wenig gezählt ist** (erste Woche nach der Sammler-Erweiterung, seltene Paare) rechnet
-die Skala nur aus Level und Itemwert und sagt das darunter.
+die Skala nur aus Level und Itemwert; dann fehlt die Zeile „Dieses Duell“. Eine Quellzeile darunter,
+einen Untertitel und den Hinweis auf Leben, Mana und Jungler zeigt die Kachel nicht
+(Nutzerwunsch 11.11.2026).
 
 ### Lanes
 
