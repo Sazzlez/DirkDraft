@@ -44,8 +44,8 @@ volle Fünfer von Hand. Auslöser ist die Testrunde des Nutzers im Duo.
    Session schreiben. Keine Namen, keine IDs in der Seite.
 3. **Kern:** `engine.ts` bekommt die Party-Plätze; `planTeam` und `planTeamBans` filtern darauf.
    Randoms bleiben wie heute (Hover gilt als vergeben, Klick zeigt ihre Liste). Einstellung
-   „Team-Modus“ wird zu automatisch / aus. „Früh dran — Pick-Reihenfolge tauschen?“ nur, wenn nach dem
-   Platz noch ein Premade pickt.
+   „Team-Modus“ wird zu automatisch / aus. („Früh dran — Pick-Reihenfolge tauschen?“ ist seit dem
+   11.11.2026 auf Nutzerwunsch entfernt und kommt nicht zurück.)
 4. **Anzeige:** Markierung der Premade-Plätze in `TeamColumn` (ohne Namen), Etikett „dein Duo“ an der
    Synergie-Begründung, Team-Plan-Kachel mit „geplant für euch 3“.
 5. **Rechnung unverändert:** Die Partner-Synergie wird beschriftet, nicht höher gewichtet (das wäre

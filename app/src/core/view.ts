@@ -151,8 +151,8 @@ export interface PickTileView {
   footnote: string | null;
 }
 
-/** An early pick with open counters, or the comp gap for a counter or last pick. */
-export type PickNote = { kind: 'early'; title: string; detail: string } | { kind: 'gap'; line: GapLine };
+/** The comp gap for a counter or last pick. */
+export type PickNote = { kind: 'gap'; line: GapLine };
 
 export interface HoverView {
   champion: ChampionRef;

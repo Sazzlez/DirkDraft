@@ -28,9 +28,7 @@
     </div>
   {/if}
 
-  {#if tile.note?.kind === 'early'}
-    <p class="note early"><b>{tile.note.title}</b> {tile.note.detail}</p>
-  {:else if tile.note?.kind === 'gap'}
+  {#if tile.note?.kind === 'gap'}
     <p class="note gap tone-{tile.note.line.tone}"><GapSentence line={tile.note.line} /></p>
   {/if}
 
@@ -105,17 +103,6 @@
     background: var(--card);
     font-size: 12.5px;
     line-height: 1.4;
-  }
-
-  .note.early {
-    color: var(--fg2);
-  }
-
-  .note.early b {
-    display: block;
-    margin-bottom: 2px;
-    color: var(--orange-text);
-    font-size: 13px;
   }
 
   .note.gap {

@@ -334,29 +334,19 @@ export class GoldenAdapter {
       tied: set.tied,
       items: rows(set).map((row) => (row.champion.id === safest ? { ...row, badge: 'sicherer Blind Pick' } : row)),
       hover: isBan ? null : this.hover(frame),
-      note: hint ? this.pickNote(hint, frame, toLane(set.lane)) : null,
+      note: hint ? this.pickNote(hint, frame) : null,
       footnote: isBan
         ? 'Bann-Wert: so viel Winrate nimmt der Bann dem Gegner, mal der Chance, dass er den Champion überhaupt pickt.'
         : 'Balken: Beitrag jedes Kriteriums in Prozentpunkten über 50 %. Rot zieht ab.',
     };
   }
 
-  /** B1: early with open counters → swap or take the safe pick; counter or last pick → the comp gap. */
-  private pickNote(hint: NonNullable<GoldenFrame['pickHint']>, frame: GoldenFrame, lane: Lane | null): PickNote | null {
-    if (hint.risky && hint.laterAlly) {
-      const name = this.champion(hint.risky.championId)?.name ?? '';
-      let detail =
-        `${name} hat noch ${hint.risky.counters} offene Counter${lane ? ` auf ${LANE_NAMES[lane]}` : ''}. ` +
-        (frame.target?.cellId === frame.state.localCellId
-          ? 'Wer später pickt, sieht den Lane-Gegner vorher; ein Teammate, der nach dir dran ist, kann mit dir tauschen.'
-          : 'Wer später pickt, sieht den Lane-Gegner vorher; ein Teammate, der nach ihm dran ist, kann mit ihm tauschen.');
-      if (hint.safest) {
-        const safe = this.champion(hint.safest.championId)?.name ?? '';
-        const k = hint.safest.counters;
-        detail += ` Vorne gleichauf hat ${safe} ${k === 0 ? 'keinen offenen Counter' : k === 1 ? 'nur einen offenen Counter' : `nur ${k} offene Counter`}.`;
-      }
-      return { kind: 'early', title: 'Früh dran — Pick-Reihenfolge tauschen?', detail };
-    }
+  /**
+   * B1: counter or last pick → the comp gap. An early pick with open counters got "Früh dran —
+   * Pick-Reihenfolge tauschen?" here until 11.11.2026; removed at the user's request. The safe pick
+   * keeps its badge in the list (pickTile).
+   */
+  private pickNote(hint: NonNullable<GoldenFrame['pickHint']>, frame: GoldenFrame): PickNote | null {
     if (!hint.gapFirst) return null;
     const line = this.gapLine(frame);
     return line ? { kind: 'gap', line } : null;

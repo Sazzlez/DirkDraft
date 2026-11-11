@@ -52,10 +52,8 @@ Kopien melden sie beim nächsten Start.
   Daten tragen jetzt je Champion den durchschnittlichen Schaden an Champions je Spiel, und die
   AD/AP-Anteile in der Comp-Kachel und in den Befunden („AP-Schaden fehlt“) richten sich danach. Wo
   die Zahl fehlt (ältere Datei, neuer Champion), wird für diese Seite wie bisher nach Köpfen gezählt.
-- **Pick-Position.** Pickst du früh, ist dein Lane-Gegner noch offen und haben dein Hover oder der
-  Top-Vorschlag zwei oder mehr offene Counter, steht über der Liste „Früh dran — Pick-Reihenfolge
-  tauschen?“ (nur wenn nach dir noch ein Teammate pickt). In der Gleichauf-Gruppe bekommt der Pick
-  mit den wenigsten offenen Countern das Etikett „sicherer Blind Pick“. Ist der Lane-Gegner bekannt
+- **Pick-Position.** Pickst du früh und ist dein Lane-Gegner noch offen, bekommt in der
+  Gleichauf-Gruppe der Pick mit den wenigsten offenen Countern das Etikett „sicherer Blind Pick“. Ist der Lane-Gegner bekannt
   oder pickst du als Letzter deines Teams, steht dort stattdessen, was eurem Team noch fehlt.
 - **Timing im eigenen Team.** Will euer Team teils früh, teils spät gewinnen (mindestens ein Early-
   und ein Late-Game-Champion, zusammen drei), zeigt die Comp-Kachel „Gemischtes Timing“, und Picks,

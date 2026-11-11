@@ -74,7 +74,7 @@ describe('pick position', () => {
     expect(known.pickHint).toMatchObject({ gapFirst: true });
   });
 
-  it('shows the swap question and the safe pick in the list', () => {
+  it('marks the safe pick in the list and asks no swap question', () => {
     // Malphite hovered top: two open counters in the reference data, while the leading tie group
     // holds picks with none.
     const frame = new DraftEngine(snapshot).update(blindTop().hovering(0, 54).build()).frame as unknown as GoldenFrame;
@@ -83,8 +83,8 @@ describe('pick position', () => {
 
     expect(hint.risky).toEqual({ championId: 54, counters: 2 });
     expect(hint.safest).not.toBeNull();
-    expect(tile.note).toMatchObject({ kind: 'early', title: 'Früh dran — Pick-Reihenfolge tauschen?' });
-    expect(tile.note!.kind === 'early' && tile.note!.detail).toContain('Malphite hat noch 2 offene Counter auf Toplane');
+    // "Früh dran — Pick-Reihenfolge tauschen?" is gone (user's wish, 11.11.2026); the badge stays.
+    expect(tile.note).toBeNull();
     const badged = tile.items.filter((row) => row.badge !== null);
     expect(badged.map((row) => row.champion.id)).toEqual([hint.safest!.championId]);
     expect(badged[0]!.badge).toBe('sicherer Blind Pick');

@@ -507,8 +507,8 @@ in der Lage, mit 13 eigenen Käufen von Zhonya's.
 
 ## 18. Offene Counter bei dieser Datenmenge (11.11.2026)
 
-Die Hinweise aus 2.1 („N offene Counter“, „Früh dran — Pick-Reihenfolge tauschen?“, „sicherer Blind
-Pick“, Reihenfolge im Team-Plan) hängen an `openCounters`: ein freier Champion zählt als Counter ab
+Die Hinweise aus 2.1 („N offene Counter“, „sicherer Blind Pick“, Reihenfolge im Team-Plan; „Früh
+dran — Pick-Reihenfolge tauschen?“ ist seit 11.11.2026 auf Nutzerwunsch entfernt) hängen an `openCounters`: ein freier Champion zählt als Counter ab
 +0,08 Log-Odds (2 Punkte) über der Erwartung des Paars, nach Glättung.
 
 **Befund.** Auf `meta.json` vom 11.11.2026 bewegt ein Lane-Matchup nach Glättung im Median 0,2
