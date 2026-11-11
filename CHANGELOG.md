@@ -15,7 +15,10 @@ Kopien melden sie beim nächsten Start.
   einzelner Kauf, und zwar immer zuerst ein fertiges Paar Schuhe. Jetzt steht dort alles, was das Gold
   hergibt, in Reihenfolge: mit 650 Gold beim ersten Recall „Stiefel + Langschwert“ statt „Boots of
   Swiftness — noch 350 Gold“, darunter der Rest. Teile zählen einzeln: Braucht ein Rezept zwei
-  Langschwerter und eins ist da, wird das zweite vorgeschlagen.
+  Langschwerter und eins ist da, wird das zweite vorgeschlagen. Die Liste steht oben in der
+  Build-Kachel und sieht aus wie im Shop: Teil + Teil → Item, darunter eine Goldleiste, die zeigt,
+  was jeder Kauf von deinem Gold nimmt und was übrig bleibt. Reicht das Gold für nichts, zeigt die
+  Leiste, wie weit es noch bis zum nächsten Kauf ist.
 - **Wann die Schuhe dran sind, zählt der Sammler jetzt mit.** Je Champion und Lane: nach wie vielen
   fertigen Items das Paar gekauft wird, und wie viel die Items wert sind, wenn die ersten Stiefel
   gekauft werden. Die Stiefel kommen auf die Liste, sobald dein Inventar so viel wert ist wie bei der

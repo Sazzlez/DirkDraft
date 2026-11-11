@@ -4,6 +4,7 @@
   import Icon from '../Icon.svelte';
   import Tile from '../Tile.svelte';
   import SkillGrid from '../build/SkillGrid.svelte';
+  import BuyStrip from './BuyStrip.svelte';
 
   let { game, build }: { game: GameView; build: BuildView | null } = $props();
   const owned = $derived(game.path.flatMap((p) => p.items).filter((i) => i.owned).length);
@@ -25,41 +26,6 @@
 
 <div class="layout">
   <div class="col left">
-  <div class="buy">
-    <!-- Several buys fit the gold at hand: the whole list. Else the one next buy, as before. -->
-    {#if game.basket.length > 1 && !game.nextBuy?.supportChoice}
-      <section class="next list">
-        <span class="t">
-          <span class="kicker">Jetzt kaufen</span>
-          {#each game.basket as buy, i (i)}
-            <span class="pick">
-              <Icon kind="item" id={buy.item.id} size={26} title={buy.item.name} />
-              <b>{buy.item.name}</b>
-              <span class="num">{count(buy.cost)} Gold{#if buy.then}{' · '}für {buy.then.name}{/if}{#if buy.situational}{' · '}<span class="sit">situativ</span>{/if}</span>
-            </span>
-          {/each}
-          <span class="num">Rest {count(game.goldLeft)} Gold</span>
-        </span>
-      </section>
-    {:else if game.nextBuy}
-      <section class="next">
-        <Icon kind="item" id={game.nextBuy.item.id} size={44} />
-        <span class="t">
-          <span class="kicker">{game.nextBuy.supportChoice ? 'Support-Quest erfüllt' : 'Nächster Kauf'}{#if game.nextBuy.situational}{' · '}<span class="sit">situativ</span>{/if}</span>
-          <b>{game.nextBuy.item.name}</b>
-          {#if game.nextBuy.supportChoice}
-            <span>Jetzt im Shop als Upgrade wählen</span>
-          {:else}
-            <span class="num">{count(game.nextBuy.cost)} Gold · {game.nextBuy.affordable ? 'kaufbar' : `noch ${count(game.nextBuy.cost - game.gold)} Gold`}</span>
-          {/if}
-        </span>
-        {#if game.nextBuy.then}
-          <span class="then">danach <Icon kind="item" id={game.nextBuy.then.id} size={26} title={game.nextBuy.then.name} /></span>
-        {/if}
-      </section>
-    {/if}
-  </div>
-
   <!-- The build tile's skill grid marks the next point. This line stands in only without the grid: no build
        from the champ select, e.g. DirkDraft opened mid-game. Left out whole: an empty box would still take a gap. -->
   {#if game.nextSkill && !build}
@@ -73,6 +39,7 @@
 
   <div class="path">
     <Tile title="Dein Build" sub="{owned} von {total} Items">
+      {#if game.basket.length > 0 || game.nextBuy}<BuyStrip {game} />{/if}
       <div class="track">
         {#each game.path as group (group.slot)}
           <div class="g">
@@ -213,25 +180,9 @@
   .enemies { order: 1; }
   .hints { order: 2; }
 
-  .next {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    border-radius: var(--r-l);
-    background: var(--blue-wash);
-    box-shadow: inset 0 0 0 1px var(--blue-line);
-  }
-
   .t {
     display: flex;
     flex-direction: column;
-  }
-
-  .kicker {
-    font-size: 11.5px;
-    font-weight: 600;
-    color: var(--blue-text);
   }
 
   .t b {
@@ -241,29 +192,6 @@
   .t .num {
     font-size: 11.5px;
     color: var(--fg2);
-  }
-
-  .next.list .t {
-    flex: 1;
-    min-width: 0;
-    gap: 6px;
-  }
-
-  .pick {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-  }
-
-  .pick b {
-    font-size: 14px;
-  }
-
-  /* A situational item in the plan's place: the orange of "Team-Bedarf", a dot on the path icon. */
-  .sit {
-    color: var(--orange-text);
-    font-weight: 600;
   }
 
   .has.swapped::before {
@@ -286,15 +214,6 @@
     margin-right: 6px;
     border-radius: 50%;
     background: var(--orange);
-  }
-
-  .then {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 11.5px;
-    color: var(--fg2);
   }
 
   .next-skill {
@@ -527,15 +446,10 @@
       display: contents;
     }
 
-    .buy { order: 1; }
     .skill { order: 2; }
     .hints { order: 3; }
     .path { order: 4; }
     .situational { order: 5; }
     .enemies { order: 6; }
-
-    .then {
-      display: none;
-    }
   }
 </style>
