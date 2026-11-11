@@ -7,8 +7,6 @@
   import BuyStrip from './BuyStrip.svelte';
 
   let { game, build }: { game: GameView; build: BuildView | null } = $props();
-  const owned = $derived(game.path.flatMap((p) => p.items).filter((i) => i.owned).length);
-  const total = $derived(game.path.flatMap((p) => p.items).length);
 </script>
 
 <div class="head">
@@ -38,7 +36,7 @@
   {/if}
 
   <div class="path">
-    <Tile title="Dein Build" sub="{owned} von {total} Items">
+    <Tile title="Dein Build">
       {#if game.basket.length > 0 || game.nextBuy}<BuyStrip {game} />{/if}
       <div class="track">
         {#each game.path as group (group.slot)}
