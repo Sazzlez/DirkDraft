@@ -4,7 +4,18 @@ import { describe, expect, it } from 'vitest';
 import { Lane } from '../../src/core/model/lane';
 import { DamageType } from '../../src/core/model/metaLookup';
 import { TraitTable } from '../../src/core/model/traits';
-import { SITUATION, SLOT, SituationTracker, situationalSuggestions, situationsOf, type RiotSituationalFile } from '../../src/core/situational';
+import {
+  boughtFromAhead,
+  MINIMUM_OWN_BUYS,
+  SITUATION,
+  SLOT,
+  SituationTracker,
+  sameStateEdge,
+  situationalSuggestions,
+  situationsOf,
+  WIN_MORE_MINIMUM_BUYS,
+  type RiotSituationalFile,
+} from '../../src/core/situational';
 import { enemyItemsOf, type ItemInfo } from '../../src/core/game';
 import { MetaBuilder } from './helpers';
 
@@ -145,5 +156,120 @@ describe('situational suggestions', () => {
   it('need enough games', () => {
     const thin: RiotSituationalFile = { ...file, rows: file.rows.map((r) => [...r.slice(0, 6), Math.round(r[6]! / 100), Math.round(r[7]! / 100)]) };
     expect(situationalSuggestions(thin, meta, 1, TOP, [A, M], new Set())).toEqual([]);
+  });
+});
+
+// The class's word against the champion's own record. Talon (jungle, Assassin) with 6.455 late-slot
+// games and never a Rabadon's Deathcap; his class buys it in 40 % of the late slots against heavy
+// magic resist and in 8 % otherwise (Akali, Katarina). After the file of 11.11.2026, where it was
+// 20 % against 8 % and the suggestion read "125 times as often".
+const JG = Lane.Jungle;
+const MR = SITUATION.EnemyMagicResist;
+const assassins = new MetaBuilder().champion(91, 'Talon', { damage: DamageType.Physical, tags: ['Assassin'] }).build();
+const split = (owner: number, situation: number, item: number, games: number, rate = 0.5): number[][] =>
+  [E, AH, BH].map((state) => [owner, JG, L, situation, state, item, Math.round(games / 3), Math.round((games / 3) * rate)]);
+const classRows = [...split(0, A, 0, 60000), ...split(0, A, 3089, 5760), ...split(0, MR, 0, 3000), ...split(0, MR, 3089, 1200), ...split(0, A, 6694, 9000), ...split(0, MR, 6694, 900)];
+const talon = (own: number[][]): RiotSituationalFile => ({ ...file, classNames: ['Assassin'], rows: own, classes: classRows });
+
+describe('a champion leaning on its class', () => {
+  it('is not told to buy what its own players never buy', () => {
+    // 77 late slots against magic resist, 6.455 otherwise, no Rabadon's in either.
+    const f = talon([...split(91, A, 0, 6532), ...split(91, MR, 0, 77)]);
+    expect(situationalSuggestions(f, assassins, 91, JG, [A, MR], new Set())).toEqual([]);
+  });
+
+  it('compares like with like: the class in the situation against the class otherwise', () => {
+    // A few buys of his own, so the item is his at all — 1 % of his late slots, none of the 78
+    // against magic resist. The class's 40 % against 8 % then counts on both sides with the same
+    // weight (50 of 128 games): 0,39 · 40 % against 0,39 · 8 % + 0,61 · 1 %, about four times as
+    // often. Before, the class stood against his own 1 % alone: fourteen times.
+    const f = talon([...split(91, A, 0, 6532), ...split(91, MR, 0, 78), ...split(91, A, 3089, 66), ...split(91, MR, 3089, 0)]);
+    const list = situationalSuggestions(f, assassins, 91, JG, [A, MR], new Set());
+    expect(list.map((s) => s.itemId)).toEqual([3089]);
+    expect(list[0]!.timesMoreOften).toBeGreaterThan(3.5);
+    expect(list[0]!.timesMoreOften).toBeLessThan(5);
+  });
+
+  it('says nothing where the class buys the item no more often in the situation', () => {
+    // Serpent's Fang (6694): 30 % of the class's late slots against magic resist, 15 % otherwise —
+    // and Talon's own 15 % everywhere. With few games in the situation the old rule compared the
+    // class there with Talon alone otherwise; with many it sees his own flat share.
+    const many = talon([...split(91, A, 0, 9000), ...split(91, MR, 0, 3000), ...split(91, A, 6694, 1350), ...split(91, MR, 6694, 450)]);
+    expect(situationalSuggestions(many, assassins, 91, JG, [A, MR], new Set())).toEqual([]);
+  });
+
+  it('needs a handful of own buys', () => {
+    const rows = (buys: number) => talon([...split(91, A, 0, 300), ...split(91, MR, 0, 0), ...split(91, A, 3089, buys)]);
+    expect(situationalSuggestions(rows(MINIMUM_OWN_BUYS - 2), assassins, 91, JG, [A, MR], new Set())).toEqual([]);
+    expect(situationalSuggestions(rows(MINIMUM_OWN_BUYS + 1), assassins, 91, JG, [A, MR], new Set()).map((s) => s.itemId)).toEqual([3089]);
+  });
+});
+
+describe('the same game state', () => {
+  // Jinx's boots on 11.11.2026, after the pattern of Taliyah's: one pair wins 64 % against the most
+  // played pair's 48 % over all games, and 67/91/30 % against 50/77/16 % within the states.
+  const boots: RiotSituationalFile = {
+    ...file,
+    rows: [
+      [163, Lane.Mid, SLOT.Boots, A, E, 0, 883, 450],
+      [163, Lane.Mid, SLOT.Boots, A, AH, 0, 454, 354],
+      [163, Lane.Mid, SLOT.Boots, A, BH, 0, 535, 107],
+      [163, Lane.Mid, SLOT.Boots, A, E, 3009, 52, 35],
+      [163, Lane.Mid, SLOT.Boots, A, AH, 3009, 23, 21],
+      [163, Lane.Mid, SLOT.Boots, A, BH, 3009, 23, 7],
+      [163, Lane.Mid, SLOT.Boots, A, E, 3158, 484, 242],
+      [163, Lane.Mid, SLOT.Boots, A, AH, 3158, 204, 157],
+      [163, Lane.Mid, SLOT.Boots, A, BH, 3158, 225, 36],
+    ],
+  };
+
+  it('compares two items state by state', () => {
+    const edge = sameStateEdge(boots, 163, Lane.Mid, SLOT.Boots, [3009], [3158])!;
+    expect(edge).toBeGreaterThan(2);
+    expect(edge).toBeLessThan(4);
+    expect(sameStateEdge(boots, 163, Lane.Mid, SLOT.Boots, [3158], [3009])).toBeCloseTo(-edge, 12);
+  });
+
+  it('counts several items on a side together', () => {
+    const one = sameStateEdge(boots, 163, Lane.Mid, SLOT.Boots, [3009], [3158])!;
+    expect(sameStateEdge(boots, 163, Lane.Mid, SLOT.Boots, [3009, 9999], [3158])).toBeCloseTo(one, 12);
+  });
+
+  it('has nothing to say without both sides in one state', () => {
+    expect(sameStateEdge(boots, 163, Lane.Mid, SLOT.Boots, [3009], [9999])).toBeNull();
+    expect(sameStateEdge(boots, 163, Lane.Mid, L, [3009], [3158])).toBeNull();
+  });
+
+  // Ahri's fourth to sixth item on 11.11.2026: Mejai's wins 73 % against Rabadon's 59 % over all
+  // games, and still 57/84/30 % against 54/80/25 % within the states — with the players who were
+  // ahead themselves. Bought 14 % of the time from ahead and 5 % from behind.
+  const ahri: RiotSituationalFile = {
+    ...file,
+    rows: [
+      [103, Lane.Mid, L, A, E, 0, 1060, 572],
+      [103, Lane.Mid, L, A, AH, 0, 2242, 1816],
+      [103, Lane.Mid, L, A, BH, 0, 1409, 352],
+      [103, Lane.Mid, L, A, E, 3041, 91, 52],
+      [103, Lane.Mid, L, A, AH, 3041, 313, 263],
+      [103, Lane.Mid, L, A, BH, 3041, 73, 22],
+      [103, Lane.Mid, L, A, E, 3089, 383, 207],
+      [103, Lane.Mid, L, A, AH, 3089, 867, 694],
+      [103, Lane.Mid, L, A, BH, 3089, 526, 132],
+    ],
+  };
+
+  it('knows the items bought from ahead, over all champions', () => {
+    expect([...boughtFromAhead(ahri)]).toEqual([3041]);
+    expect([...boughtFromAhead(boots)]).toEqual([]);
+    // Too few buys to take the ratio at its word.
+    const thin: RiotSituationalFile = { ...ahri, rows: ahri.rows.map((r) => (r[5] === 3041 ? [...r.slice(0, 6), Math.round(r[6]! / 2), Math.round(r[7]! / 2)] : r)) };
+    expect(thin.rows.filter((r) => r[5] === 3041).reduce((n, r) => n + r[6]!, 0)).toBeLessThan(WIN_MORE_MINIMUM_BUYS);
+    expect([...boughtFromAhead(thin)]).toEqual([]);
+  });
+
+  it('never calls an item bought from ahead clear', () => {
+    expect(sameStateEdge(ahri, 103, Lane.Mid, L, [3041], [3089])).toBeNull();
+    // The other way round it is an ordinary comparison.
+    expect(sameStateEdge(ahri, 103, Lane.Mid, L, [3089], [3041])).toBeLessThan(0);
   });
 });

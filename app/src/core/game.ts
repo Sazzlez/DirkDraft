@@ -233,13 +233,29 @@ function pathOf(plan: RiotBuildPlan | null, owned: readonly number[], gameTime: 
   return steps;
 }
 
+/**
+ * The order things are bought in, which is not the order the path shows them in: the finished boots
+ * come after the first core item, not before it. The path lists boots first because they are a slot
+ * of their own; as the next buy they sent every first recall to a finished pair (Jinx at six minutes
+ * with 1.300 gold: Boots of Swiftness, no part of her first item). A convention, not a count — the
+ * build file does not say when boots are bought; basic boots on the way are the player's call.
+ */
+export function buyOrder(steps: readonly PathStep[]): PathStep[] {
+  const boots = steps.filter((s) => s.slot === 'Schuhe');
+  const firstCore = steps.findIndex((s) => s.slot === 'Kern');
+  if (boots.length === 0 || firstCore < 0) return [...steps];
+  const rest = steps.filter((s) => s.slot !== 'Schuhe');
+  const after = rest.findIndex((s) => s.slot === 'Kern') + 1;
+  return [...rest.slice(0, after), ...boots, ...rest.slice(after)];
+}
+
 function nextBuyOf(steps: PathStep[], owned: readonly number[], gold: number, items: ReadonlyMap<number, ItemInfo>): NextBuy | null {
   // The support upgrade can be picked only once the quest is done (Bounty of Worlds in the
   // inventory) — then it comes first, at no cost; before that it is no buy at all.
   const questDone = owned.includes(SUPPORT_QUEST_DONE);
   const choice = steps.find((s) => s.slot === 'Support' && !s.owned);
   if (choice && questDone) return { itemId: choice.itemId, cost: remainingCost(choice.itemId, [...owned], items), affordable: true, towards: null, supportChoice: true };
-  const target = steps.find((s) => !s.owned && s.slot !== 'Support');
+  const target = buyOrder(steps).find((s) => !s.owned && s.slot !== 'Support');
   if (!target) return null;
   const cost = remainingCost(target.itemId, [...owned], items);
   if (gold >= cost) return { itemId: target.itemId, cost, affordable: true, towards: null, supportChoice: false };

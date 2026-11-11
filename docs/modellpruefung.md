@@ -401,6 +401,135 @@ Lane-Stärke hinaus, auf den Trainingsspielen angepasst; 46.277 Spiele.
 - Auf den zurückgehaltenen Spielen bringen die vier Regeln zusammen 0,0001 im Log-Loss. Keine Regel
   bekommt ein Gewicht; mit dem endgültigen Lauf nachmessen.
 
+## 16. Build-Wahl: Zufallstreffer statt „beste Winrate“ (11.11.2026)
+
+Daten: `builds.json` und `situational.json` vom 11.11.2026 (108.362 Spiele, Patch 16.22), 308
+Champion-Lanes ab 300 Spielen. Rechnung in `app/src/core/riotBuilds.ts`, Tests in
+`app/tests/model/ownData.test.ts`.
+
+**Befund.** Die Regel aus Messung 11 (Rate je Option zur Rate ihres Slots geglättet, beste zuerst)
+wählte dünne Optionen, sobald κ endlich wurde:
+
+| | Schuhe | Kern | Item 4 |
+|---|---:|---:|---:|
+| Plan ≠ meistgespielte Option (von 308) | 190 | 232 | 227 |
+| gewählte Option unter 5 % der Käufe des Slots | 54 | 11 | 21 |
+| Anteil der gewählten Option an den Spielen des Slots, Median | 25 % | 14 % | 16 % |
+
+Jinx: Boots of Swiftness (35 Spiele, 60 %) statt Berserker's Greaves (11.994, 51 %). Xin Zhao: Ionian
+Boots aus 6 von 2.693. Mejai's stand bei 55 Champion-Lanes im Plan, bei Ahri als viertes Item.
+
+**Ursache.** Die meistgespielte Option *ist* die Rate des Slots, zu der geglättet wird. Jede Option
+knapp darüber stand deshalb vor ihr, egal wie wenige Spiele sie hatte; die Glättung zieht sie nur
+näher heran, nie darunter.
+
+**Neue Regel.**
+1. Die meistgespielte Option führt.
+2. Eine andere übernimmt nur, wenn sie klar besser ist: zwei Standardfehler auf den geglätteten
+   Raten (`LEAD_SIGMA`), also rund 98 % Wahrscheinlichkeit, dass sie wirklich besser ist. Drei
+   Standardfehler auf den rohen Raten reichen nicht: Bei rund 20.000 Optionen nimmt der Zufall diese
+   Hürde etwa 27-mal, und es kamen genau solche Fälle durch (Cassiopeia: Blitz und Barriere aus 13
+   Spielen mit 12 Siegen).
+3. Schuhe, Kern und Items 4–6 werden im laufenden Spiel gekauft; wer vorn liegt, kauft anders und
+   gewinnt ohnehin öfter. Dort muss der Vorsprung auch im selben Spielstand halten (ausgeglichen,
+   vorn, hinten; aus `situational.json`), gezählt an den Items, in denen sich zwei Optionen
+   unterscheiden. Ohne diese Zahlen bleibt die meistgespielte Option. Zwei Kerne aus denselben Items
+   in anderer Reihenfolge lassen sich so nicht vergleichen und bleiben beim meistgespielten.
+4. Ein Item, das vor allem aus der Führung gekauft wird, ist nie „klar besser“. Über alle Champions
+   wird Mejai's 4,6-mal so oft vorn wie hinten gekauft, das nächste Item (Endless Hunger) 1,5-mal;
+   die Grenze liegt bei 2 (`WIN_MORE_RATIO`). Der Spielstand zählt das Gold des Teams und trennt
+   deshalb nicht, wer im Team vorn liegt: Mejai's gewinnt bei Twisted Fate auch innerhalb von „vorn“
+   89 % gegen 71 % mit Zhonya's.
+
+**Schätzung von κ.** Die Momentschätzung zog je Option das Rauschen μ(1−μ)/g ab. Die Rate des Slots
+ist aber aus denselben Spielen gezählt, das Rauschen um sie ist μ(1−μ)·(1/g − 1/G). In einer
+Simulation ohne jeden Unterschied zwischen den Optionen (gleiche Spielzahlen wie in der Datei, 20
+Ziehungen) ergab die alte Formel eine Streuung von −1,1² bis −1,7² Punkten statt 0 (Item 6, der
+dünnste Slot: −3,6²), die neue höchstens +0,5² (Item 6: +0,9²). Folge auf der Datei:
+
+| Slot | κ alt | κ neu | wahre Streuung (neu) |
+|---|---:|---:|---:|
+| Runen | ∞ | 2.051 | 1,1 Pkt |
+| Zauber | ∞ | 5.862 | 0,7 Pkt |
+| Start | ∞ | 3.724 | 0,8 Pkt |
+| Schuhe | 14.863 | 1.714 | 1,2 Pkt |
+| Kern | 828 | 459 | 2,3 Pkt |
+| Item 4 | 512 | 314 | 2,8 Pkt |
+| Item 5 | ∞ | 481 | 2,3 Pkt |
+| Item 6 | ∞ | 392 | 2,5 Pkt |
+| Support-Item | 59.670 | 2.016 | 1,1 Pkt |
+| Skill-Reihenfolge | ∞ | 2.098 | 1,1 Pkt |
+| Skill-Priorität | 3.741 | 1.330 | 1,4 Pkt |
+
+„Kein Slot trägt einen messbaren Unterschied“ (Messung 11) war zum Teil dieses Artefakt.
+
+**Ergebnis mit der neuen Regel** (dieselben 308 Champion-Lanes): Plan ≠ meistgespielt bei Runen 0,
+Zaubern 0, Start 1, Schuhen 2, Kern 2, Items 4–6 2, Support-Item 1, Skill-Reihenfolge 1,
+Skill-Priorität 4. Jede dieser Abweichungen stützt sich auf mindestens 270 Spiele (Katarina: Kraken
+Slayer, Terminus, Death's Dance aus 270 mit 63 % gegen 1.086 mit 52 %; Kai'Sa: Gluttonous Greaves
+2.926 mit 53 % gegen Berserker's 19.725 mit 49 %; Blitzcrank: Solstice Sleigh 2.514 mit 54 % gegen
+3.412 mit 50 %). Keine gewählten Schuhe unter 5 % der Käufe; der gewählte Kern hat im Median 41 % der
+Spiele des Slots. Mejai's steht noch bei 8 Champion-Lanes, dort ist es die meistgespielte freie
+Option.
+
+**Offen.** Innerhalb eines Slots gewinnt die 1.000 Gold teurere Option seltener: Kern −3,0, Item 4
+−2,8, Schuhe −3,9 Punkte je 1.000 Gold. Das ist so groß wie die gemessene Streuung dieser Slots und
+spricht für einen Einfluss des Zeitpunkts (wer drei billige Items fertig hat, ist früher fertig).
+Der Vergleich im selben Spielstand fängt einen Teil ab; den Preis als eigene Größe zu messen steht aus.
+
+## 17. Situative Items: Klasse gegen Champion (11.11.2026)
+
+Rechnung in `app/src/core/situational.ts`, Tests in `app/tests/model/situational.test.ts`.
+
+**Befund.** Hat ein Champion in einer Lage wenige Spiele, lehnt sich sein Kaufanteil dort an seine
+Klasse an (50 Pseudospiele). Der Anteil „sonst“ kam dagegen fast nur vom Champion selbst, weil dort
+Tausende Spiele gegen dieselben 50 stehen. Verglichen wurde also die Klasse in der Lage mit dem
+Champion außerhalb. Talon bekam Rabadon's Deathcap („125-mal so oft“), weil andere Assassinen es
+gegen Magieresistenz kaufen und er selbst nie; Irelia Zhonya's, Kog'Maw Infinity Edge. In manchen
+Fällen kauft sogar die Klasse das Item in der Lage seltener als sonst (Annie: Rylai's 8,4 % gegen
+12,7 %).
+
+Gezählt je Champion-Lane und Lage, bis zu drei Vorschläge:
+
+| | ab 100 Spielen | ab 2.000 Spielen |
+|---|---:|---:|
+| Vorschläge vorher | 1.970 | 666 |
+| davon vom Champion in der Lage nie gekauft | 864 | 25 |
+| Vorschläge nachher | 899 | 535 |
+| davon vom Champion in der Lage nie gekauft | 1 | 0 |
+
+**Neue Regel.** Die Klasse zählt auf beiden Seiten mit demselben Gewicht, nämlich dem, das die
+Spiele des Champions in der Lage ihr lassen. Ohne eigene Spiele in der Lage steht dann das Verhältnis
+der Klasse da, mit vielen das eigene. Und ein Item braucht mindestens fünf eigene Käufe des Champions
+auf dieser Lane in diesem Slot (`MINIMUM_OWN_BUYS`): Die Klasse weiß, wann ein Item gekauft wird,
+nicht, ob der Champion es überhaupt baut. Der eine verbleibende Fall ist Katarina Top ohne ein Spiel
+in der Lage, mit 13 eigenen Käufen von Zhonya's.
+
+## 18. Offene Counter bei dieser Datenmenge (11.11.2026)
+
+Die Hinweise aus 2.1 („N offene Counter“, „Früh dran — Pick-Reihenfolge tauschen?“, „sicherer Blind
+Pick“, Reihenfolge im Team-Plan) hängen an `openCounters`: ein freier Champion zählt als Counter ab
++0,08 Log-Odds (2 Punkte) über der Erwartung des Paars, nach Glättung.
+
+**Befund.** Auf `meta.json` vom 11.11.2026 bewegt ein Lane-Matchup nach Glättung im Median 0,2
+Punkte; 95 % liegen unter 0,9 (Bot 1,1), der größte Wert ist 3,1 (Kayle gegen Garen). Von 329
+Champion-Lanes haben 4 einen offenen Counter und keine zwei. Die Hinweise erscheinen deshalb nicht.
+
+**Lässt sich die Schwelle senken?** Geprüft: ein Counter nach Beweislage statt nach geglätteter
+Größe (gemessene Rate über der Erwartung, in Standardfehlern), über alle 12.862 Duell-Richtungen:
+
+| Schwelle | markiert | durch Zufall erwartet |
+|---|---:|---:|
+| 2 Standardfehler | 312 | 293 |
+| 2,5 | 91 | 80 |
+| 3 | 16 | 17 |
+
+Auf jeder Stufe sind es so viele, wie der Zufall allein liefert. Über die Lane-Stärke hinaus trägt
+die Datei also noch keine erkennbaren Counter, wie schon Messung 14 zeigt. Eine niedrigere Schwelle
+würde Rauschen als Counter ausgeben. **Nichts geändert.** Die Hinweise melden sich von selbst, sobald
+Paare genug Spiele haben (drei Patches zusammen, Phase 2) oder Messung 14 einer Lane weniger Glättung
+zugesteht.
+
 ## Was offen bleibt (2.0)
 
 - **ARAM:** Die erste `aram.json` kommt mit dem Lauf vom 07.11. nachmittags; eine lokale Probe hatte

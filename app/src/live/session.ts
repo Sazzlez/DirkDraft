@@ -12,7 +12,7 @@ import { MetaLookup } from '../core/model/metaLookup';
 import { TraitTable } from '../core/model/traits';
 import { momentOf, type GameflowPhase } from '../core/moment';
 import { aramPlan, riotPlan, type RiotBuildPlan } from '../core/riotBuilds';
-import { SLOT, SituationTracker, situationalSuggestions, situationsOf, type Slot } from '../core/situational';
+import { SLOT, SituationTracker, sameStateEdge, situationalSuggestions, situationsOf, type Slot } from '../core/situational';
 import { LANE_NAMES, type BuildView, type ChampionRef, type DataStatus, type Lane as ViewLane, type ViewModel } from '../core/view';
 import { assets } from '../data/assets';
 import { aramBuild, buildFromRiot } from '../data/builds';
@@ -460,7 +460,14 @@ export class LiveSession {
     const builds = this.data?.builds;
     if (!builds || !this.meta) return null;
     const asked = lane === Lane.Unknown ? this.meta.mainLane(championId) : lane;
-    return riotPlan(builds, championId, asked);
+    // Boots and items follow a win rate only where it holds within the game state.
+    const situational = this.data?.situational;
+    const slotOf = { boots: SLOT.Boots, late: SLOT.Late, core: SLOT.Core } as const;
+    const sameState = situational
+      ? (champion: number, on: Lane, slot: 'boots' | 'late' | 'core', items: readonly number[], base: readonly number[]) =>
+          sameStateEdge(situational, champion, on, slotOf[slot], items, base)
+      : null;
+    return riotPlan(builds, championId, asked, sameState);
   }
 
   private buildFor(champion: ChampionRef, lane: ViewLane | null, opponent: ChampionRef | null, mode: Mode): BuildView | null {

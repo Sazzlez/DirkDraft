@@ -5,6 +5,22 @@ Kopien melden sie beim nächsten Start.
 
 ## 2.1.0 — unveröffentlicht
 
+- **Der Build wählt keine Zufallstreffer mehr.** Mit wachsender Datenmenge standen dünne Optionen im
+  Plan: Jinx bekam Boots of Swiftness aus 35 Spielen statt Berserker's Greaves aus 11.994, Ahri
+  Mejai's als viertes Item. Jetzt führt die meistgespielte Option. Eine andere übernimmt nur, wenn
+  sie klar besser ist, und bei Schuhen und Items nur, wenn das auch im selben Spielstand gilt
+  (ausgeglichen, vorn, hinten). Mejai's wird fast nur aus der Führung gekauft und zählt deshalb nie
+  als „besser“. Zahlen in `docs/modellpruefung.md`, Messung 16.
+- **Nächster Kauf: erst das erste Item, dann die Schuhe.** Bisher stand ein fertiges Paar Schuhe vor
+  dem ersten Item; beim ersten Recall hieß es „Boots of Swiftness“ statt eines Teils fürs erste Item.
+  Jetzt kommt das erste Kern-Item zuerst, dann die Schuhe, dann der Rest. Im Build-Pfad stehen die
+  Schuhe weiter als eigener Platz vorn.
+- **Situative Items passen zum Champion.** Talon bekam Rabadon's Deathcap und Irelia Zhonya's
+  vorgeschlagen, weil andere Champions ihrer Klasse sie kaufen. Verglichen wird jetzt Gleiches mit
+  Gleichem, und vorgeschlagen wird nur, was Spieler des Champions selbst schon gekauft haben
+  (Messung 17).
+- Die Glättung der Build-Zahlen ist neu gemessen (Messung 16). Sie hatte in sechs Slots „kein
+  Unterschied“ gemeldet, wo es einen gibt.
 - **Keine doppelten Bans mehr.** In Ranked bannt das ganze Team gleichzeitig. Was ein Teammate gerade
   als Ban hovert, fehlt jetzt in deinen Ban-Vorschlägen, und die Ban-Reihe zeigt seinen Hover blass
   hinter den fertigen Bans. Dein eigener Ban-Hover bleibt in deiner Liste.

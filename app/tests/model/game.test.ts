@@ -1,7 +1,7 @@
 // The game moment from the Live Client Data API: next buy against gold, next skill point, enemies.
 
 import { describe, expect, it } from 'vitest';
-import { gameModel, remainingCost, type ItemInfo, type LiveGameData } from '../../src/core/game';
+import { buyOrder, gameModel, remainingCost, type ItemInfo, type LiveGameData } from '../../src/core/game';
 import { Lane } from '../../src/core/model/lane';
 import { DamageType } from '../../src/core/model/metaLookup';
 import type { RiotBuildPlan } from '../../src/core/riotBuilds';
@@ -149,6 +149,28 @@ describe('next buy', () => {
     const model = gameModel(game({ gold: 5000, items: [3111] }), meta, plan, ITEMS)!;
     expect(model.path.find((s) => s.slot === 'Schuhe')?.owned).toBe(true);
     expect(model.nextBuy?.itemId).toBe(3071);
+  });
+
+  it('builds the first core item before the finished boots, and the boots before the second', () => {
+    const two = { ...plan, core: [option([3071, 3004])] };
+    // First recall, 1.150 gold, no boots: a part of the first item, not a pair of boots.
+    expect(gameModel(game({ gold: 1150 }), meta, two, ITEMS)!.nextBuy).toEqual({ itemId: 3044, cost: 1100, affordable: true, towards: 3071, supportChoice: false });
+    // Basic boots bought on the way change nothing about the target.
+    expect(gameModel(game({ gold: 1150, items: [1001] }), meta, two, ITEMS)!.nextBuy?.towards).toBe(3071);
+    // The first item is done: now the pair, then the second item.
+    expect(gameModel(game({ gold: 1200, items: [3071] }), meta, two, ITEMS)!.nextBuy?.itemId).toBe(3047);
+    expect(gameModel(game({ gold: 3000, items: [3071, 3047] }), meta, two, ITEMS)!.nextBuy?.itemId).toBe(3004);
+    // The path still shows the boots as a slot of their own, first.
+    expect(gameModel(game({ gold: 0 }), meta, two, ITEMS)!.path.map((s) => s.slot)).toEqual(['Schuhe', 'Kern', 'Kern']);
+  });
+
+  it('keeps the order of a plan without boots or without a core', () => {
+    const steps = [
+      { slot: 'Schuhe' as const, itemId: 3047, owned: false },
+      { slot: 'Spät' as const, itemId: 3071, owned: false },
+    ];
+    expect(buyOrder(steps)).toEqual(steps);
+    expect(buyOrder([steps[1]!])).toEqual([steps[1]!]);
   });
 
   it('suggests the start only in the first minutes', () => {

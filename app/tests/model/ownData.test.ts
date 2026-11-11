@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { Lane } from '../../src/core/model/lane';
 import { MetaLookup } from '../../src/core/model/metaLookup';
 import { termHint } from '../../src/core/model/recommender';
-import { riotPlan, slotWeights, type BuildCount, type ChampionBuildStats, type RiotBuildFile } from '../../src/core/riotBuilds';
+import { clearance, LEAD_SIGMA, riotPlan, slotWeights, type BuildCount, type ChampionBuildStats, type RiotBuildFile } from '../../src/core/riotBuilds';
 import { MetaBuilder } from './helpers';
 
 function ownMeta(): MetaLookup {
@@ -114,14 +114,86 @@ describe('builds from own data', () => {
     expect(plan.runes!.games).toBe(180);
   });
 
+  // Sixty rows where option B wins 60 % over hundreds of games and A 40 %: a spread no noise explains.
+  const spread = (slotName: 'boots' | 'core' | 'fourth' | 'starters', a: number[], b: number[]) =>
+    [...Array(60)].map((_, i) => stats(1000 + i, Lane.Top, 1000, { core, [slotName]: [count(a, 600, 240), count(b, 400, 240)] }));
+
   it('follows the rates once the file shows options truly differ', () => {
-    // Sixty rows where option B wins 60 % over hundreds of games and A 40 %: a spread no noise explains.
-    const rows = [...Array(60)].map((_, i) =>
-      stats(1000 + i, Lane.Top, 1000, { core, boots: [count([3047], 600, 240), count([3111], 400, 240)] }),
-    );
-    const f = file(rows);
+    const f = file(spread('starters', [1055, 2003], [1054, 2003]));
+    expect(Number.isFinite(slotWeights(f).starters)).toBe(true);
+    expect(riotPlan(f, 1000, Lane.Top)!.starters.map((o) => o.ids[0])).toEqual([1054, 1055]);
+  });
+
+  it('follows them for boots and items only where they hold within the same game state', () => {
+    const f = file(spread('boots', [3047], [3111]));
     expect(Number.isFinite(slotWeights(f).boots)).toBe(true);
-    expect(riotPlan(f, 1000, Lane.Top)!.boots[0]!.ids).toEqual([3111]);
+    // No counts by game state: the most played pair stays, however clear the slot looks.
+    expect(riotPlan(f, 1000, Lane.Top)!.boots[0]!.ids).toEqual([3047]);
+    // The lead explains most of the difference: 1,8 standard errors within the states.
+    expect(riotPlan(f, 1000, Lane.Top, () => 1.8)!.boots[0]!.ids).toEqual([3047]);
+    // Nothing to compare (an item bought from ahead, or no state with both).
+    expect(riotPlan(f, 1000, Lane.Top, () => null)!.boots[0]!.ids).toEqual([3047]);
+    // Clear within the states too.
+    const asked: unknown[][] = [];
+    const clear = riotPlan(f, 1000, Lane.Top, (...args) => (asked.push(args), 4))!;
+    expect(clear.boots[0]!.ids).toEqual([3111]);
+    expect(asked).toContainEqual([1000, Lane.Top, 'boots', [3111], [3047]]);
+
+    const late = file(spread('fourth', [3089], [3041]));
+    expect(riotPlan(late, 1000, Lane.Top)!.late[0]!.ids).toEqual([3089]);
+    expect(riotPlan(late, 1000, Lane.Top, (_c, _l, slotKind) => (slotKind === 'late' ? 4 : null))!.late[0]!.ids).toEqual([3041]);
+  });
+
+  it('compares two cores by the items that tell them apart, and never by their order alone', () => {
+    const cores = (b: number[]) => {
+      const rows = [...Array(60)].map((_, i) => stats(1000 + i, Lane.Top, 1000, { core: [count([1, 2, 3], 600, 240), count(b, 400, 240)] }));
+      return file(rows);
+    };
+    const asked: unknown[][] = [];
+    const plan = riotPlan(cores([1, 4, 2]), 1000, Lane.Top, (...args) => (asked.push(args), 4))!;
+    expect(plan.core[0]!.ids).toEqual([1, 4, 2]);
+    expect(asked).toContainEqual([1000, Lane.Top, 'core', [4], [3]]);
+    // The same three items in another order: no counts by game state can tell them apart.
+    expect(riotPlan(cores([1, 3, 2]), 1000, Lane.Top, () => 4)!.core[0]!.ids).toEqual([1, 2, 3]);
+    expect(riotPlan(cores([1, 4, 2]), 1000, Lane.Top)!.core[0]!.ids).toEqual([1, 2, 3]);
+  });
+
+  it('keeps the most played option against a thin one a hair above the slot\'s rate (Jinx, 11.11.2026)', () => {
+    // The slot spreads (κ finite), and Boots of Swiftness won 21 of 35 against Berserker's 6.165 of 11.994.
+    const jinx = stats(222, Lane.Adc, 12761, { core, boots: [count([3006], 11994, 6165), count([3009], 35, 21), count([3013], 648, 333)] });
+    const f = file([...spread('boots', [3047], [3111]), jinx]);
+    expect(Number.isFinite(slotWeights(f).boots)).toBe(true);
+    expect(riotPlan(f, 222, Lane.Adc, () => 4)!.boots[0]!.ids).toEqual([3006]);
+    // Twelve wins in thirteen games against 103 in 233 are three standard errors on the raw rates
+    // and one on the smoothed ones (the record of Cassiopeia's Flash and Barrier in the same file).
+    const cass = stats(69, Lane.Top, 300, { core, starters: [count([1056, 2003], 233, 103), count([1082, 2003], 13, 12)] });
+    const g = file([...spread('starters', [1055, 2003], [1054, 2003]).map((row) => ({ ...row, starters: [count([1055, 2003], 600, 282), count([1054, 2003], 400, 218)] })), cass]);
+    expect(Number.isFinite(slotWeights(g).starters)).toBe(true);
+    expect(riotPlan(g, 69, Lane.Top)!.starters[0]!.ids).toEqual([1056, 2003]);
+  });
+
+  it('counts how clearly one option is better on the smoothed rates', () => {
+    const a = count([1], 400, 240);
+    const b = count([2], 600, 240);
+    // κ = 0 would be the plain two-proportion test; κ pseudo games pull both to the slot's 48 %.
+    const kappa = 500;
+    const estimate = (o: BuildCount) => (o.wins + kappa * 0.48) / (o.games + kappa);
+    expect(clearance(a, b, 0.48, kappa)).toBeCloseTo((estimate(a) - estimate(b)) / Math.sqrt(0.48 * 0.52 * (1 / 900 + 1 / 1100)), 12);
+    expect(clearance(a, b, 0.48, kappa)).toBeGreaterThan(LEAD_SIGMA);
+    expect(clearance(b, a, 0.48, kappa)).toBeLessThan(0);
+    // No spread in the slot: nothing is clear, whatever the records say.
+    expect(clearance(a, b, 0.48, Number.POSITIVE_INFINITY)).toBe(0);
+  });
+
+  it('measures the spread against the noise around the slot\'s own rate', () => {
+    // 53 % and 47 % over 200 games each: 3 points off a rate counted from the same 400 games. Noise
+    // alone gives 2,5 points there (not 3,5, as against a rate known from elsewhere) — a spread.
+    const rows = [...Array(120)].map((_, i) => stats(2000 + i, Lane.Top, 400, { core, boots: [count([3047], 200, 106), count([3111], 200, 94)] }));
+    const kappa = slotWeights(file(rows)).boots;
+    expect(kappa).toBeCloseTo(0.25 / (0.03 ** 2 - 0.25 * (1 / 200 - 1 / 400)) - 1, 6);
+    // And none where the options sit exactly at the noise.
+    const flat = [...Array(120)].map((_, i) => stats(3000 + i, Lane.Top, 400, { core, boots: [count([3047], 200, 105), count([3111], 200, 95)] }));
+    expect(slotWeights(file(flat)).boots).toBe(Number.POSITIVE_INFINITY);
   });
 
   it('counts a spell pair and a rune page once, whatever their order', () => {
