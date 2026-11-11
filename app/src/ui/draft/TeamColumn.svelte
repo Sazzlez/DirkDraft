@@ -242,8 +242,8 @@
     display: inline-flex;
     align-items: center;
     gap: 1px;
-    padding: 5px 5px;
-    margin: -5px -2px;
+    padding: 5px 3px;
+    margin: -5px 0;
     border-radius: 6px;
   }
 
@@ -323,8 +323,22 @@
       padding: 8px 2px;
     }
 
+    /* Long names ("Heimerdinger") fit the narrower slot. */
+    .name {
+      font-size: 12px;
+      letter-spacing: -0.02em;
+    }
+
     .conf.only-uncertain,
     .who {
+      display: none;
+    }
+  }
+
+  /* "Botlane 100 % ⌄" needs 96 px; below ~1.320 px a slot has less. A sure lane keeps its name and
+     the menu arrow, as below 1.100 already; an unsure one keeps its percentage. */
+  @container app (max-width: 1319px) {
+    .conf.only-uncertain {
       display: none;
     }
   }
