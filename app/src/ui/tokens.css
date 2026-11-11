@@ -25,6 +25,11 @@
   --gold-text: #c89b3c;
   /* Under small white text (badges, chosen chips): 4.9:1 where the fill gives 3.7:1. */
   --blue-strong: #0a6fd8;
+  /* The four criteria in the pick bars: apart in lightness too, not by hue alone. */
+  --series-lane: #0a84ff;
+  --series-matchup: #64d2ff;
+  --series-synergy: #d68cff;
+  --series-need: #ff9f0a;
 
   /* The desktop behind the window. In the Tauri shell Mica/Acrylic supplies it; in the browser a
      tint stands in, so the glass reads the same in screenshots. */
@@ -88,6 +93,10 @@
   --purple-text: #8944ab;
   --gold-text: #806326;
   --blue-strong: #0066d6;
+  --series-lane: #0062cc;
+  --series-matchup: #38b6d8;
+  --series-synergy: #b07ad9;
+  --series-need: #c26a00;
   --stage: radial-gradient(70% 55% at 8% 0%, rgba(120, 170, 255, 0.45), transparent 70%),
     radial-gradient(55% 50% at 100% 12%, rgba(120, 230, 220, 0.35), transparent 70%),
     radial-gradient(70% 60% at 60% 110%, rgba(200, 170, 255, 0.35), transparent 70%), #e9ecf3;

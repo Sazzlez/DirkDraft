@@ -92,10 +92,10 @@
     vertical-align: 0;
   }
 
-  .lane { background: var(--blue); }
-  .matchup { background: var(--teal); }
-  .synergy { background: var(--purple); }
-  .comp { background: var(--orange); }
+  .lane { background: var(--series-lane); }
+  .matchup { background: var(--series-matchup); }
+  .synergy { background: var(--series-synergy); }
+  .comp { background: var(--series-need); }
 
   /* The pick position (B1): one line above the list, before the hover. */
   .note {

@@ -42,13 +42,13 @@
   i {
     display: block;
     height: 100%;
-    background: var(--blue);
+    background: var(--series-lane);
   }
 
   .matchup,
-  .enemies { background: var(--teal); }
-  .synergy { background: var(--purple); }
-  .comp { background: var(--orange); }
+  .enemies { background: var(--series-matchup); }
+  .synergy { background: var(--series-synergy); }
+  .comp { background: var(--series-need); }
   .ban { background: var(--fg2); }
   .neg { background: var(--red); margin-left: auto; }
 </style>

@@ -207,9 +207,9 @@
   }
 
   .axis i.matchup,
-  .axis i.enemies { background: var(--teal); }
-  .axis i.synergy { background: var(--purple); }
-  .axis i.comp { background: var(--orange); }
+  .axis i.enemies { background: var(--series-matchup); }
+  .axis i.synergy { background: var(--series-synergy); }
+  .axis i.comp { background: var(--series-need); }
   .axis i.ban { background: var(--fg2); }
   .axis i.neg { background: var(--red); }
 
