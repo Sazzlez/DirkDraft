@@ -58,6 +58,10 @@
         <span class="none">noch nichts aufgedeckt</span>
       {/if}
     {/each}
+    {#if comp.allyDamage || comp.enemyDamage}
+      <span></span>
+      <span class="key"><i class="ad"></i>AD <i class="ap"></i>AP</span>
+    {/if}
   </div>
 
   {#if comp.enemyGap}<p class="verdict tone-{comp.enemyGap.tone}"><GapSentence line={comp.enemyGap} /></p>{/if}
@@ -128,6 +132,23 @@
 
   .ap {
     background: var(--purple);
+  }
+
+  .key {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+  }
+
+  .key i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .key i.ap {
+    margin-left: 6px;
   }
 
   .none {
