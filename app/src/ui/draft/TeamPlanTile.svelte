@@ -62,13 +62,11 @@
     text-overflow: ellipsis;
   }
 
+  /* Seat, lane and flex lanes wrap rather than lose their end, in the narrow side column too. */
   .who {
     font: var(--t-caption);
     font-size: 11px;
     color: var(--fg2);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .tag {
@@ -107,12 +105,5 @@
     margin: 6px 0 0;
     font: var(--t-caption);
     color: var(--fg3);
-  }
-
-  /* Narrow: seat, lane and flex lanes wrap instead of being cut. */
-  @container app (max-width: 479px) {
-    .who {
-      white-space: normal;
-    }
   }
 </style>
