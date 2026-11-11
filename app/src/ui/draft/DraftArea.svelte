@@ -82,16 +82,22 @@
     margin: 0 auto;
   }
 
-  /* auto-fit: two tiles share the row instead of leaving a third column empty (medium width). */
+  /* Two columns of at least 210 px, filled top to bottom and balanced: a grid row
+     stretched to its taller tile and left a hole under the shorter one. */
   .side {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-    gap: 12px;
+    columns: 210px 2;
+    column-gap: 12px;
+    margin-bottom: -12px;
   }
 
-  /* The team plan needs the whole side column: five rows with names and lanes. */
+  .side > :global(*) {
+    break-inside: avoid;
+    margin-bottom: 12px;
+  }
+
+  /* The team plan needs the whole width: five rows with names and lanes. */
   .wide {
-    grid-column: 1 / -1;
+    column-span: all;
   }
 
   @container app (max-width: 1099px) {
@@ -111,8 +117,12 @@
     }
 
     .side {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 10px;
+      columns: 1;
+      margin-bottom: -10px;
+    }
+
+    .side > :global(*) {
+      margin-bottom: 10px;
     }
   }
 </style>
