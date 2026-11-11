@@ -436,6 +436,7 @@
     .layout {
       display: flex;
       flex-direction: column;
+      align-items: stretch;
       padding: 0 12px 12px;
       gap: 10px;
     }
