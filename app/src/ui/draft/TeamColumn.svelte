@@ -323,12 +323,6 @@
       padding: 8px 2px;
     }
 
-    /* Long names ("Heimerdinger") fit the narrower slot. */
-    .name {
-      font-size: 12px;
-      letter-spacing: -0.02em;
-    }
-
     .conf.only-uncertain,
     .who {
       display: none;
@@ -340,6 +334,12 @@
   @container app (max-width: 1319px) {
     .conf.only-uncertain {
       display: none;
+    }
+
+    /* Long names ("Heimerdinger") fit the narrower slot. */
+    .name {
+      font-size: 12px;
+      letter-spacing: -0.02em;
     }
   }
 </style>
