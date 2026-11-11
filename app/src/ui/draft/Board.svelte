@@ -218,10 +218,4 @@
       box-shadow: 0 0 0 2px var(--window);
     }
   }
-
-  @container app (max-width: 380px) {
-    .strip :global(.icon) {
-      --s: 28px !important;
-    }
-  }
 </style>
