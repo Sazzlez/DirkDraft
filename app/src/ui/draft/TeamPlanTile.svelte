@@ -108,4 +108,11 @@
     font: var(--t-caption);
     color: var(--fg3);
   }
+
+  /* Narrow: seat, lane and flex lanes wrap instead of being cut. */
+  @container app (max-width: 479px) {
+    .who {
+      white-space: normal;
+    }
+  }
 </style>

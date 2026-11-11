@@ -253,5 +253,10 @@
     .axis {
       display: none;
     }
+
+    /* Narrow: the reason wraps instead of losing its end ("bringt fehlenden AD-…"). */
+    .reason {
+      white-space: normal;
+    }
   }
 </style>
