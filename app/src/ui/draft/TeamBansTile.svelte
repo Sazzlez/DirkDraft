@@ -79,9 +79,9 @@
     margin-left: 6px;
     padding: 0 6px;
     border-radius: 999px;
-    background: var(--blue);
+    background: var(--blue-strong);
     color: #fff;
-    font-size: 10px;
+    font-size: 10.5px;
     font-weight: 600;
     vertical-align: 1px;
   }

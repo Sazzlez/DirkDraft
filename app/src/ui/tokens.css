@@ -23,6 +23,8 @@
   --teal-text: #64d2ff;
   --purple-text: #d188f6;
   --gold-text: #c89b3c;
+  /* Under small white text (badges, chosen chips): 4.9:1 where the fill gives 3.7:1. */
+  --blue-strong: #0a6fd8;
 
   /* The desktop behind the window. In the Tauri shell Mica/Acrylic supplies it; in the browser a
      tint stands in, so the glass reads the same in screenshots. */
@@ -85,6 +87,7 @@
   --teal-text: #0071a4;
   --purple-text: #8944ab;
   --gold-text: #806326;
+  --blue-strong: #0066d6;
   --stage: radial-gradient(70% 55% at 8% 0%, rgba(120, 170, 255, 0.45), transparent 70%),
     radial-gradient(55% 50% at 100% 12%, rgba(120, 230, 220, 0.35), transparent 70%),
     radial-gradient(70% 60% at 60% 110%, rgba(200, 170, 255, 0.35), transparent 70%), #e9ecf3;

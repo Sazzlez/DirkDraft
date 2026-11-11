@@ -75,7 +75,7 @@
     margin-left: 6px;
     padding: 0 6px;
     border-radius: 999px;
-    font-size: 10px;
+    font-size: 10.5px;
     font-weight: 600;
     vertical-align: 1px;
   }

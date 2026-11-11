@@ -160,7 +160,8 @@
   }
 
   .choose button {
-    padding: 2px 8px;
+    min-height: 24px;
+    padding: 3px 10px;
     border-radius: 999px;
     background: var(--card);
     color: var(--fg2);
@@ -174,7 +175,7 @@
   }
 
   .choose button.active {
-    background: var(--blue);
+    background: var(--blue-strong);
     color: #fff;
   }
 

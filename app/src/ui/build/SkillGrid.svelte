@@ -39,7 +39,7 @@
     flex-direction: column;
     align-items: center;
     gap: 3px;
-    font-size: 9.5px;
+    font-size: 10.5px;
     color: var(--fg3);
   }
 

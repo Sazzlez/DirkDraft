@@ -183,9 +183,9 @@
     transform: translateX(-50%);
     padding: 1px 6px;
     border-radius: 999px;
-    background: var(--blue);
+    background: var(--blue-strong);
     color: #fff;
-    font-size: 9.5px;
+    font-size: 10.5px;
     font-weight: 600;
   }
 
@@ -242,8 +242,9 @@
     display: inline-flex;
     align-items: center;
     gap: 1px;
-    padding: 0 3px;
-    border-radius: 5px;
+    padding: 5px 5px;
+    margin: -5px -2px;
+    border-radius: 6px;
   }
 
   .lane.edit:hover {
