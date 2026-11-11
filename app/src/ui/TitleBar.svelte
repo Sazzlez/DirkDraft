@@ -251,7 +251,7 @@
   }
 
   .ctl.on {
-    color: var(--blue);
+    color: var(--blue-text);
   }
 
   svg {

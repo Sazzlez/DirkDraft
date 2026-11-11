@@ -82,12 +82,12 @@
 
   .tag.first {
     background: var(--green-wash);
-    color: var(--green);
+    color: var(--green-text);
   }
 
   .tag.last {
     background: var(--orange-wash);
-    color: var(--orange);
+    color: var(--orange-text);
   }
 
   .value {

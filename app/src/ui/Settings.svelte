@@ -172,7 +172,7 @@
   .done {
     padding: 5px 12px;
     border-radius: 8px;
-    color: var(--blue);
+    color: var(--blue-text);
     font-weight: 600;
   }
 
@@ -185,7 +185,7 @@
     padding: 5px 12px;
     border-radius: 8px;
     background: var(--blue-wash);
-    color: var(--blue);
+    color: var(--blue-text);
     font-weight: 600;
   }
 

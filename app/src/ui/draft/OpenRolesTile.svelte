@@ -31,7 +31,7 @@
     padding: 0 10px;
     border-radius: 12px;
     background: var(--orange-wash);
-    color: var(--orange);
+    color: var(--orange-text);
     font-size: 12px;
     font-weight: 600;
   }

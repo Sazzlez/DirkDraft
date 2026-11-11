@@ -194,7 +194,7 @@
   .timing {
     margin: -4px 0 12px;
     font-size: 12px;
-    color: var(--orange);
+    color: var(--orange-text);
   }
 
   .verdict {

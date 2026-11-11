@@ -72,7 +72,7 @@
     padding: 6px 12px;
     border-radius: var(--r-m);
     background: var(--orange-wash);
-    color: var(--orange);
+    color: var(--orange-text);
     font: var(--t-caption);
   }
 

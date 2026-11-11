@@ -43,7 +43,7 @@
     margin-bottom: 2px;
     font-size: 11.5px;
     font-weight: 600;
-    color: var(--green);
+    color: var(--green-text);
   }
 
   .row {
@@ -79,7 +79,7 @@
 
   em {
     font-style: normal;
-    color: var(--blue);
+    color: var(--blue-text);
     font-weight: 500;
     font-size: 12px;
   }

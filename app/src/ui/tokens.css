@@ -15,6 +15,15 @@
   --purple: #bf5af2;
   --gold: #c89b3c;
 
+  /* The same tones as text: lightened where the fill falls under 4.5:1 on a card or a tinted row. */
+  --blue-text: #54a9ff;
+  --green-text: #30d158;
+  --orange-text: #ff9f0a;
+  --red-text: #ff7f77;
+  --teal-text: #64d2ff;
+  --purple-text: #d188f6;
+  --gold-text: #c89b3c;
+
   /* The desktop behind the window. In the Tauri shell Mica/Acrylic supplies it; in the browser a
      tint stands in, so the glass reads the same in screenshots. */
   --stage: radial-gradient(70% 55% at 8% 0%, rgba(30, 96, 210, 0.42), transparent 70%),
@@ -69,6 +78,13 @@
   --red: #d70015;
   --teal: #0071a4;
   --purple: #8944ab;
+  --blue-text: #0066d6;
+  --green-text: #207936;
+  --orange-text: #9f5700;
+  --red-text: #d70015;
+  --teal-text: #0071a4;
+  --purple-text: #8944ab;
+  --gold-text: #806326;
   --stage: radial-gradient(70% 55% at 8% 0%, rgba(120, 170, 255, 0.45), transparent 70%),
     radial-gradient(55% 50% at 100% 12%, rgba(120, 230, 220, 0.35), transparent 70%),
     radial-gradient(70% 60% at 60% 110%, rgba(200, 170, 255, 0.35), transparent 70%), #e9ecf3;
@@ -151,10 +167,10 @@ button:focus-visible {
   border-radius: var(--r-s);
 }
 
-.tone-good { color: var(--green); }
-.tone-warn { color: var(--orange); }
-.tone-bad { color: var(--red); }
-.tone-info { color: var(--teal); }
+.tone-good { color: var(--green-text); }
+.tone-warn { color: var(--orange-text); }
+.tone-bad { color: var(--red-text); }
+.tone-info { color: var(--teal-text); }
 .tone-neutral { color: var(--fg2); }
 
 @media (prefers-reduced-motion: reduce) {

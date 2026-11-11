@@ -192,7 +192,7 @@
   }
 
   .chip.gold {
-    color: var(--gold);
+    color: var(--gold-text);
   }
 
   .layout {
@@ -231,7 +231,7 @@
   .kicker {
     font-size: 11.5px;
     font-weight: 600;
-    color: var(--blue);
+    color: var(--blue-text);
   }
 
   .t b {
@@ -262,7 +262,7 @@
 
   /* A situational item in the plan's place: the orange of "Team-Bedarf", a dot on the path icon. */
   .sit {
-    color: var(--orange);
+    color: var(--orange-text);
     font-weight: 600;
   }
 
@@ -426,7 +426,7 @@
   }
 
   .alt .badge.in {
-    color: var(--orange);
+    color: var(--orange-text);
     background: color-mix(in srgb, var(--orange) 16%, transparent);
   }
 
@@ -490,12 +490,12 @@
     padding: 2px 7px;
     border-radius: 9px;
     background: var(--orange-wash);
-    color: var(--orange);
+    color: var(--orange-text);
   }
 
   .dt.magic {
     background: var(--purple-wash);
-    color: var(--purple);
+    color: var(--purple-text);
   }
 
   @container app (max-width: 1099px) {

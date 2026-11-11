@@ -103,7 +103,7 @@
   }
 
   .note {
-    color: var(--orange);
+    color: var(--orange-text);
   }
 
   .bench-head {

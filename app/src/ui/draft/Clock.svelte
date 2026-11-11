@@ -43,7 +43,7 @@
   }
 
   .turn.mine {
-    color: var(--blue);
+    color: var(--blue-text);
   }
 
   .steps {
@@ -81,7 +81,7 @@
   }
 
   .steps .now {
-    color: var(--teal);
+    color: var(--teal-text);
     font-weight: 600;
   }
 

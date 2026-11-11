@@ -56,7 +56,7 @@
   }
 
   .r b {
-    color: var(--teal);
+    color: var(--teal-text);
   }
 
   .derived b {
@@ -75,7 +75,7 @@
   }
 
   .next {
-    color: var(--teal);
+    color: var(--teal-text);
     font-weight: 600;
   }
 

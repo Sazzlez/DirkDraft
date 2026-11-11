@@ -124,7 +124,7 @@
     padding: 1px 7px;
     border-radius: 999px;
     background: var(--green-wash);
-    color: var(--green);
+    color: var(--green-text);
     font-size: 10.5px;
     font-weight: 600;
     letter-spacing: 0;

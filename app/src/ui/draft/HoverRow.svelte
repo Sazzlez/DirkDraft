@@ -40,7 +40,7 @@
   .kicker {
     font: var(--t-caption);
     font-weight: 600;
-    color: var(--blue);
+    color: var(--blue-text);
   }
 
   .name {

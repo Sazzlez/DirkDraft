@@ -215,7 +215,7 @@
   }
 
   .me .name {
-    color: var(--blue);
+    color: var(--blue-text);
   }
 
   .who,
@@ -262,11 +262,11 @@
   }
 
   .lane.warn {
-    color: var(--orange);
+    color: var(--orange-text);
   }
 
   .lane.manual {
-    color: var(--blue);
+    color: var(--blue-text);
   }
 
   .conf {
@@ -299,7 +299,7 @@
   }
 
   .menu button.on {
-    color: var(--blue);
+    color: var(--blue-text);
     font-weight: 600;
   }
 
@@ -310,7 +310,7 @@
 
   .warning {
     font-size: 10.5px;
-    color: var(--red);
+    color: var(--red-text);
   }
 
   @container app (max-width: 1099px) {

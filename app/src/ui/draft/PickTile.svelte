@@ -114,7 +114,7 @@
   .note.early b {
     display: block;
     margin-bottom: 2px;
-    color: var(--orange);
+    color: var(--orange-text);
     font-size: 13px;
   }
 
@@ -127,7 +127,7 @@
     margin: 14px 4px 6px;
     font: var(--t-caption);
     font-weight: 600;
-    color: var(--green);
+    color: var(--green-text);
   }
 
   .more {
@@ -136,7 +136,7 @@
     gap: 6px;
     width: 100%;
     padding: 12px 4px 4px;
-    color: var(--blue);
+    color: var(--blue-text);
     font-size: 13px;
     font-weight: 500;
     text-align: left;
