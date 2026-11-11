@@ -38,7 +38,7 @@
   </div>
 
   {#if view.side.length > 0}
-    <div class="side">
+    <div class="side" class:single={view.side.length === 1}>
       {#each view.side as tile, i (i)}
         {#if tile.kind === 'team'}
           <div class="wide"><TeamPlanTile team={tile.team} /></div>
@@ -93,6 +93,11 @@
   .side > :global(*) {
     break-inside: avoid;
     margin-bottom: 12px;
+  }
+
+  /* A tile alone takes the whole width. */
+  .side.single {
+    columns: auto;
   }
 
   /* The team plan needs the whole width: five rows with names and lanes. */
