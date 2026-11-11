@@ -91,6 +91,8 @@ Kopien melden sie beim nächsten Start.
   sie vorbei, gespeichert wird nichts.
 - Die Chips sprechen League: „Frontline“ statt „steht vorne“, „Peel“ statt „schützt deine Carrys“,
   „Disengage“ statt „hält ihr Engage auf“. Der Hinweis darunter erklärt weiter, was gemeint ist.
+- Das Draft-Urteil sagt „Gegner skalieren besser“ statt „Sie skalieren besser“, ebenso bei Engage
+  und beim Plan der Gegner: „Sie“ las sich wie eine Anrede.
 - **Oben nur noch zwei Bereiche, Draft und Spiel.** Der Build-Tab ist weg: Runen, Zauber und Items
   stehen ohnehin in der Matchup-Kachel und in der Spielansicht.
 - **Ein Klick auf einen Teammate, der gelockt hat, zeigt sein Matchup** wie das eigene nach dem

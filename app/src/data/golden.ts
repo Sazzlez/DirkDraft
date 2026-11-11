@@ -436,7 +436,7 @@ export class GoldenAdapter {
         ? `Ihr wollt ${PLAN_WANTS[own]}; sie wollen ${PLAN_WANTS[enemy]}.`
         : own
           ? `Ihr wollt ${PLAN_WANTS[own]}.`
-          : `Sie wollen ${PLAN_WANTS[enemy!]}.`;
+          : `Gegner wollen ${PLAN_WANTS[enemy!]}.`;
     return { text: `Euer Plan: ${name(own)}${chosen ? ' (gewählt)' : ''} · Ihr Plan: ${name(enemy)}`, detail };
   }
 
@@ -549,8 +549,8 @@ export class GoldenAdapter {
     const e = frame.comp.enemies;
     const lines: VerdictLine[] = [];
     if (a.maxEngage >= 2 && e.maxEngage < 2) lines.push({ icon: 'engage', tone: 'good', title: 'Ihr habt mehr Engage', detail: 'Ihr könnt Kämpfe eröffnen, sie kaum.' });
-    else if (e.maxEngage >= 2 && a.maxEngage < 2) lines.push({ icon: 'engage', tone: 'warn', title: 'Sie haben mehr Engage', detail: 'Peel und Abstand halten zählen.' });
-    if (e.lateScalingCount > a.lateScalingCount) lines.push({ icon: 'scaling', tone: 'warn', title: 'Sie skalieren besser', detail: 'Früh Druck machen, Objectives nehmen.' });
+    else if (e.maxEngage >= 2 && a.maxEngage < 2) lines.push({ icon: 'engage', tone: 'warn', title: 'Gegner haben mehr Engage', detail: 'Peel und Abstand halten zählen.' });
+    if (e.lateScalingCount > a.lateScalingCount) lines.push({ icon: 'scaling', tone: 'warn', title: 'Gegner skalieren besser', detail: 'Früh Druck machen, Objectives nehmen.' });
     else if (a.lateScalingCount > e.lateScalingCount) lines.push({ icon: 'scaling', tone: 'good', title: 'Ihr skaliert besser', detail: 'Ruhig spielen, spät gewinnt ihr Kämpfe.' });
     if (e.physicalShare >= 0.65) lines.push({ icon: 'damage', tone: 'info', title: 'Viel AD beim Gegner', detail: 'Armor zuerst lohnt sich.' });
     else if (e.magicShare >= 0.65) lines.push({ icon: 'damage', tone: 'info', title: 'Viel AP beim Gegner', detail: 'MR zuerst lohnt sich.' });
