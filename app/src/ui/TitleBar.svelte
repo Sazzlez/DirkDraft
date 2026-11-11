@@ -353,6 +353,19 @@
     }
   }
 
+  /* Just above the narrow layout the data line lacked 12 px: a tighter pill without the status dot
+     gives them (the text says the age, the tooltip the rest). */
+  @container app (min-width: 720px) and (max-width: 799px) {
+    .pill {
+      padding: 0 8px;
+      margin-right: 4px;
+    }
+
+    .pill .dot-small {
+      display: none;
+    }
+  }
+
   @container app (max-width: 719px) {
     .bar {
       grid-template-columns: 1fr auto;
