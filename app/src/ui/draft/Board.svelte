@@ -202,6 +202,11 @@
       display: inline-flex;
     }
 
+    /* Ten avatars and "vs" fit from the smallest window (340 px) up: 24 px there, 32 px from ~440. */
+    .mini :global(.icon) {
+      --s: clamp(24px, calc((100cqi - 120px) / 10), 32px) !important;
+    }
+
     .flag {
       position: absolute;
       right: -1px;
