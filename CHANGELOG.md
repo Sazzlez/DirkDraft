@@ -101,6 +101,16 @@ Kopien melden sie beim nächsten Start.
   Matchup, kein Rauschen-Hinweis unter der Draft-Chance, kein „n× so oft gekauft wie sonst“ bei den
   Items. Die Kacheln im Spiel heißen jetzt „Situative Items“ und „Gegner“, und der Schadenshinweis
   sagt ausdrücklich, dass es um das Gegnerteam geht.
+- **Besser lesbar.** Kleine graue Texte (Fußnoten, „Teammate 2“, Skill-Stufen) und farbige Texte
+  erreichen jetzt überall mindestens 4,5:1 Kontrast, hell wie dunkel; keine Schrift ist mehr kleiner
+  als 10,5 px. Das Lane-Menü unter den Gegnern und die Plan-Knöpfe lassen sich leichter treffen. Die
+  vier Balkenfarben (Lane, Matchup, Synergie, Team-Bedarf) unterscheiden sich jetzt auch in der
+  Helligkeit.
+- Die Nebenkacheln im Draft schließen in zwei Spalten ohne Lücke aneinander. Die Draft-Chance zeigt
+  keine leere Skala mehr, solange nichts vergleichbar ist, und die AD/AP-Balken im Comp-Vergleich
+  haben eine Legende.
+- Im Spiel steht der nächste Skillpunkt nur noch im Skill-Raster der Build-Kachel. Die Zeile „Jetzt
+  skillen“ erscheint nur noch, wenn es kein Raster gibt (DirkDraft erst im Spiel geöffnet).
 - Nach einem Update zeigt auch die Taskleiste das neue Icon. Bisher blieb dort das alte aus 1.x
   stehen, weil Windows es für denselben Programmpfad zwischenspeichert.
 
