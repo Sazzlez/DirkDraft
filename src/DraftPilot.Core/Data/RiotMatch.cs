@@ -19,6 +19,11 @@ namespace DraftPilot.Core.Data;
 /// <param name="Items">Finished items in the order they were first bought, each counted once.</param>
 /// <param name="SupportChoice">The support quest's final item, 0 when there was none.</param>
 /// <param name="SkillOrder">Skill points in order, one letter each (Q, W, E, R), at most eighteen.</param>
+/// <param name="WorthBeforeBoots">
+/// What the items held were worth going into the shop visit in which the first boots of any kind were
+/// bought (basic Boots or a pair): the inventory <see cref="RiotMatchReader.ShopVisitMs"/> before that
+/// purchase. -1 for a game without boots or without a timeline.
+/// </param>
 public sealed record ParticipantBuild(
     int ChampionId,
     Lane Lane,
@@ -37,10 +42,17 @@ public sealed record ParticipantBuild(
     IReadOnlyList<int>? Augments = null,
     IReadOnlyList<long>? ItemTimesMs = null,
     long BootsTimeMs = 0,
-    int ParticipantId = 0)
+    int ParticipantId = 0,
+    int WorthBeforeBoots = -1)
 {
     /// <summary>When each of <see cref="Items"/> was bought, ms into the game; empty without a timeline.</summary>
     public IReadOnlyList<long> ItemTimes => ItemTimesMs ?? [];
+
+    /// <summary>
+    /// How many finished items were bought before the pair of boots; -1 for a game without a pair or
+    /// without a timeline (no purchase time).
+    /// </summary>
+    public int ItemsBeforeBoots => Boots > 0 && BootsTimeMs > 0 ? ItemTimes.Count(time => time < BootsTimeMs) : -1;
 
     /// <summary>
     /// The finished items and boots owned at a moment — what an enemy's inventory looked like when
@@ -180,6 +192,13 @@ public static class RiotMatchReader
     public const int StartingWindowMs = 90_000;
 
     /// <summary>
+    /// How far back from a purchase the same shop visit reaches. In the fixture game the buys of one
+    /// visit lie within six seconds of each other (Blasting Wand, then Boots two seconds later); thirty
+    /// seconds cover a slow shopper and stay well short of the next recall.
+    /// </summary>
+    public const int ShopVisitMs = 30_000;
+
+    /// <summary>
     /// The ten players' PUUIDs, for finding more active players of the same rank while a run lasts.
     /// Deliberately not part of <see cref="ParticipantBuild"/> or <see cref="MatchReading"/>: what
     /// is counted and stored never carries a player, and this list never leaves the collector's memory.
@@ -288,6 +307,8 @@ public static class RiotMatchReader
             var own = events.Where(e => e.ParticipantId == id).ToList();
             var purchases = Purchases(own);
             var boots = purchases.FirstOrDefault(p => items.IsBoots(p.ItemId));
+            // The first boots of any kind: basic Boots, or a pair bought in one go.
+            var firstBoots = purchases.FirstOrDefault(p => p.ItemId == ItemCatalog.BasicBoots || items.IsBoots(p.ItemId));
             // First purchase of each finished item, in order, with its time.
             var finished = purchases.Where(p => items.IsFinished(p.ItemId)).DistinctBy(p => p.ItemId).ToList();
 
@@ -315,7 +336,10 @@ public static class RiotMatchReader
                 Augments: [.. Enumerable.Range(1, 6).Select(slot => Int(participant, $"playerAugment{slot}")).Where(augment => augment > 0)],
                 ItemTimesMs: [.. finished.Select(p => p.Timestamp)],
                 BootsTimeMs: boots?.Timestamp ?? 0,
-                ParticipantId: id));
+                ParticipantId: id,
+                WorthBeforeBoots: firstBoots is null
+                    ? -1
+                    : Moment(id, Math.Max(0, firstBoots.Timestamp - ShopVisitMs), events, frames, items).ItemGold));
         }
 
         const int minuteTen = (int)(RiotGames.LaneAtMs / 60_000);

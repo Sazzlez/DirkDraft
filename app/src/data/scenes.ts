@@ -350,6 +350,8 @@ function planFromGolden(p: GoldenPlan): RiotBuildPlan {
     supportOptions: [],
     skillOrder: p.skillOrder.join(''),
     skillMax: p.skillPriority.replace(/[^QWE]/g, ''),
+    bootsAfterItems: null,
+    bootsWorth: null,
   };
 }
 

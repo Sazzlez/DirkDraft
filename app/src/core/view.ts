@@ -272,6 +272,13 @@ export interface GameView {
   me: ChampionRef;
   title: string;
   nextBuy: { item: ItemRef; cost: number; affordable: boolean; then: ItemRef | null; supportChoice: boolean } | null;
+  /**
+   * Everything the gold at hand buys right now, in order (core/game basketOf); `then`: the plan's
+   * item a part is for. Empty when nothing is affordable.
+   */
+  basket: { item: ItemRef; cost: number; then: ItemRef | null }[];
+  /** Gold left after the basket. */
+  goldLeft: number;
   path: { slot: string; items: (ItemRef & { owned: boolean; next: boolean })[] }[];
   /** The plan's next point; `now`: a point is open right now (level above the points spent). */
   nextSkill: { key: 'Q' | 'W' | 'E' | 'R'; level: number; now: boolean } | null;

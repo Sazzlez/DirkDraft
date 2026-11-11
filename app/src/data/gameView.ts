@@ -80,6 +80,8 @@ export function gameView(
           supportChoice: model.nextBuy.supportChoice,
         }
       : null,
+    basket: model.basket.map((buy) => ({ item: item(buy.itemId), cost: buy.cost, then: buy.towards ? item(buy.towards) : null })),
+    goldLeft: model.goldLeft,
     path,
     nextSkill: model.nextSkill ? { key: model.nextSkill.key, level: model.nextSkill.level, now: model.nextSkill.now } : null,
     skillPoints: model.skillPoints,

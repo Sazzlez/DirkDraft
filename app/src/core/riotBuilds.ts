@@ -50,6 +50,16 @@ export interface ChampionBuildStats {
   supportChoice: BuildCount[];
   skillOrder: BuildCount[];
   skillMax: BuildCount[];
+  /**
+   * When the pair of boots was bought: finished items before it, as text "0" to "3" (three or more).
+   * Since 11.11.2026; absent in older files.
+   */
+  bootsAfter?: BuildCount[];
+  /**
+   * When the first boots of any kind were bought: what the items held were worth going into that shop
+   * visit, in steps of 500 gold as text ("0", "500", … "4000"). Since 11.11.2026.
+   */
+  bootsWorth?: BuildCount[];
 }
 
 export interface RiotBuildFile {
@@ -95,6 +105,16 @@ export interface RiotBuildPlan {
   skillOrder: string;
   /** "QEW": which basic ability is maxed first, second, third. */
   skillMax: string;
+  /**
+   * How many finished items most players of the champion buy before the pair of boots (0 to 3); null
+   * where the file does not count it or the row is too thin.
+   */
+  bootsAfterItems: number | null;
+  /**
+   * What the items held are worth when half the players have bought their first boots — the lower
+   * bound of that 500-gold step, the worth going into the shop visit; null as above.
+   */
+  bootsWorth: number | null;
 }
 
 /** Alternatives below this are not shown; the best option needs only one game. */
@@ -221,7 +241,51 @@ function merged(file: RiotBuildFile, championId: number, lane: Lane): ChampionBu
     supportChoice: sum('supportChoice'),
     skillOrder: sum('skillOrder'),
     skillMax: sum('skillMax'),
+    bootsAfter: steps(rows.flatMap((row) => row.bootsAfter ?? [])),
+    bootsWorth: steps(rows.flatMap((row) => row.bootsWorth ?? [])),
   };
+}
+
+/** The timing steps of several brackets, summed by their text. */
+function steps(options: readonly BuildCount[]): BuildCount[] {
+  const map = new Map<string, BuildCount>();
+  for (const option of options) {
+    const key = option.text ?? '';
+    if (!/^\d+$/.test(key) || !(option.games > 0)) continue;
+    const entry = map.get(key);
+    if (entry) {
+      entry.games += option.games;
+      entry.wins += option.wins;
+    } else {
+      map.set(key, { ids: [], text: key, games: option.games, wins: option.wins });
+    }
+  }
+  return [...map.values()];
+}
+
+/** Games a timing needs before it is taken at its word, as a row needs for a plan of its own. */
+export const MINIMUM_TIMING_GAMES = MINIMUM_ROW_GAMES;
+
+/** The most counted step ("after one item"); the earlier one on a tie. Null below the minimum. */
+function mostCounted(options: readonly BuildCount[] | undefined): number | null {
+  const list = options ?? [];
+  if (list.reduce((n, o) => n + o.games, 0) < MINIMUM_TIMING_GAMES) return null;
+  let best: BuildCount | null = null;
+  for (const o of list) if (!best || o.games > best.games || (o.games === best.games && Number(o.text) < Number(best.text))) best = o;
+  return best ? Number(best.text) : null;
+}
+
+/** The step by which half the games are counted (the median), by its lower bound. Null below the minimum. */
+function halfwayStep(options: readonly BuildCount[] | undefined): number | null {
+  const list = [...(options ?? [])].sort((a, b) => Number(a.text) - Number(b.text));
+  const games = list.reduce((n, o) => n + o.games, 0);
+  if (games < MINIMUM_TIMING_GAMES) return null;
+  let seen = 0;
+  for (const o of list) {
+    seen += o.games;
+    if (seen * 2 >= games) return Number(o.text);
+  }
+  return null;
 }
 
 /**
@@ -374,6 +438,8 @@ function planOf(file: RiotBuildFile, championId: number, stats: ChampionBuildSta
     supportOptions: slot(stats.supportChoice, choice('supportChoice')),
     skillOrder: ranked(stats.skillOrder, choice('skillOrder'))[0]?.text ?? '',
     skillMax: ranked(stats.skillMax, choice('skillMax'))[0]?.text ?? '',
+    bootsAfterItems: mostCounted(stats.bootsAfter),
+    bootsWorth: halfwayStep(stats.bootsWorth),
   };
 }
 

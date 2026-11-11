@@ -153,6 +153,98 @@ public class RiotBuildTests
     }
 
     [Fact]
+    public void WhenTheBootsWereBought_IsReadOffTheTimeline()
+    {
+        var reading = RiotMatchReader.Read(Match, Timeline, Items);
+
+        // Kayle: Blasting Wand at 4:28, basic Boots at 4:30 — she went into that visit with Doran's
+        // Blade alone (450; potion and trinket are worth nothing). Boots of Swiftness came at 10:51,
+        // right after Nashor's Tooth.
+        var kayle = reading.Participants.Single(p => p.ChampionId == Kayle);
+        Assert.Equal(450, kayle.WorthBeforeBoots);
+        Assert.Equal(1, kayle.ItemsBeforeBoots);
+
+        // Jax never bought basic Boots: Mercury's Treads in one go at 13:24, with Scorchclaw Pup,
+        // Trinity Force and a Null-Magic Mantle in the bag (450 + 3.333 + 400).
+        var jax = reading.Participants.Single(p => p.ChampionId == 24);
+        Assert.Equal(4183, jax.WorthBeforeBoots);
+        Assert.Equal(1, jax.ItemsBeforeBoots);
+
+        // Bel'Veth: basic Boots only at 17:47, Plated Steelcaps at 22:01 after Kraken Slayer and Rageblade.
+        var belveth = reading.Participants.Single(p => p.ChampionId == 200);
+        Assert.Equal(4975, belveth.WorthBeforeBoots);
+        Assert.Equal(2, belveth.ItemsBeforeBoots);
+
+        // Ambessa played the whole game without boots.
+        var ambessa = reading.Participants.Single(p => p.ChampionId == 799);
+        Assert.Equal(-1, ambessa.WorthBeforeBoots);
+        Assert.Equal(-1, ambessa.ItemsBeforeBoots);
+    }
+
+    [Theory]
+    [InlineData(0, "0")]
+    [InlineData(450, "0")]
+    [InlineData(499, "0")]
+    [InlineData(500, "500")]
+    [InlineData(1150, "1000")]
+    [InlineData(4183, "4000")]
+    [InlineData(9000, "4000")]
+    public void TheWorthAtTheFirstBoots_IsCountedInStepsOf500(int worth, string step)
+        => Assert.Equal(step, RiotBuildTally.BootsWorthKey(worth));
+
+    [Fact]
+    public void TheTally_CountsWhenTheBootsWereBought()
+    {
+        var reading = RiotMatchReader.Read(Match, Timeline, Items);
+        var tally = new RiotBuildTally();
+        foreach (var participant in reading.Participants)
+            tally.Add(participant, "gold");
+
+        var stats = tally.Export(keep: 10);
+        var kayle = stats.Single(s => s.ChampionId == Kayle);
+        Assert.Equal("1", kayle.BootsAfter.Single().Text);
+        Assert.Equal("0", kayle.BootsWorth.Single().Text);
+        Assert.Equal(1, kayle.BootsWorth.Single().Wins);
+        Assert.Equal("4000", stats.Single(s => s.ChampionId == 24).BootsWorth.Single().Text);
+        Assert.Equal("2", stats.Single(s => s.ChampionId == 200).BootsAfter.Single().Text);
+
+        // No boots, no vote.
+        var ambessa = stats.Single(s => s.ChampionId == 799);
+        Assert.Empty(ambessa.BootsAfter);
+        Assert.Empty(ambessa.BootsWorth);
+
+        // A build without a timeline (no purchase times) says nothing either, though it has boots.
+        var blind = new RiotBuildTally();
+        blind.Add(new ParticipantBuild(1, Lane.Top, true, [], [], [], 3047, [], 0, string.Empty), "gold");
+        Assert.Empty(blind.Export(keep: 10).Single().BootsAfter);
+        Assert.Empty(blind.Export(keep: 10).Single().BootsWorth);
+    }
+
+    [Fact]
+    public void TheExport_NeverCutsTheTimingSteps()
+    {
+        var tally = new RiotBuildTally();
+        // Six games, each at another worth and with another number of items before the boots.
+        for (var i = 0; i < 6; i++)
+        {
+            var times = Enumerable.Range(0, i).Select(item => 100_000L * (item + 1)).ToArray();
+            tally.Add(
+                new ParticipantBuild(1, Lane.Top, true, [], [], [], 3047, [.. Enumerable.Range(0, i).Select(item => 4000 + item)], 0, string.Empty,
+                    ItemTimesMs: times, BootsTimeMs: 1_000_000, WorthBeforeBoots: i * 500),
+                "gold");
+        }
+
+        var stats = tally.Export(keep: 2).Single();
+
+        // Six steps of worth, though only two options are kept per slot.
+        List<int> steps = [.. stats.BootsWorth.Select(o => int.Parse(o.Text ?? "-1", System.Globalization.CultureInfo.InvariantCulture)).Order()];
+        Assert.Equal([0, 500, 1000, 1500, 2000, 2500], steps);
+        // Zero to two items before the boots, and three, four and five counted as three.
+        Assert.Equal(4, stats.BootsAfter.Count);
+        Assert.Equal(3, stats.BootsAfter.Single(o => o.Text == "3").Games);
+    }
+
+    [Fact]
     public void TheExport_KeepsTheMostPlayedAndDropsTheThin()
     {
         var tally = new RiotBuildTally();

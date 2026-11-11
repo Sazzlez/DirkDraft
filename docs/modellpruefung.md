@@ -530,6 +530,26 @@ würde Rauschen als Counter ausgeben. **Nichts geändert.** Die Hinweise melden 
 Paare genug Spiele haben (drei Patches zusammen, Phase 2) oder Messung 14 einer Lane weniger Glättung
 zugesteht.
 
+## 19. Kaufzeitpunkt der Schuhe (11.11.2026, noch ohne Zahlen)
+
+Die Einkaufsliste im Spiel (`core/game.ts`, `basketOf`) braucht zwei Angaben, die `builds.json` bisher
+nicht hatte: an welcher Stelle der Kaufreihenfolge das Paar Schuhe steht und ab wann die einfachen
+Stiefel dazukommen. Der Sammler zählt beides seit dem 11.11.2026 (`bootsAfter`, `bootsWorth`,
+Format in `docs/redesign/daten.md`).
+
+Bisher nur an der einen Partie der Tests nachgezählt (`Fixtures/Riot`, zehn Spieler, neun mit Schuhen):
+
+- Paar nach einem fertigen Item: 8 von 9, nach zwei: 1.
+- Erste Schuhe beim Stand „nur Startitems“ (Stufe 0): 4 von 9; zwei Spieler erst ab 4.000 Gold Itemwert.
+- Im selben Shop-Besuch kamen die Stiefel nach den Teilen: Blasting Wand, zwei Sekunden später
+  Stiefel; Lost Chapter, dann Stiefel. Daher die Regel für Dateien ohne Zählung: Stiefel mit dem
+  Gold, das nach den Teilen bleibt.
+
+Eine Partie ist kein Beleg. **Nachzutragen, sobald die Zählung einige Tage läuft:** Verteilung von
+`bootsAfter` und `bootsWorth` je Lane, Anteil der Champion-Lanes mit einer anderen Stelle als „nach
+dem ersten Item“, und ob die Regel „Stiefel zuerst, sobald der Itemwert die Stufe der Hälfte
+erreicht“ zu dem passt, was Spieler mit knappem Gold tatsächlich kaufen (Teil oder Stiefel).
+
 ## Was offen bleibt (2.0)
 
 - **ARAM:** Die erste `aram.json` kommt mit dem Lauf vom 07.11. nachmittags; eine lokale Probe hatte

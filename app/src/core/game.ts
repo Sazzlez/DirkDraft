@@ -66,6 +66,25 @@ export const isSupportUpgrade = (id: number, items: ReadonlyMap<number, ItemInfo
 const hasTag = (info: ItemInfo | undefined, tag: string): boolean =>
   !!info?.tags?.some((t) => t.toLowerCase() === tag.toLowerCase());
 
+/** World Atlas and Runic Compass, the support quest's first two steps (16.22.1). */
+const SUPPORT_QUEST_STEPS: readonly number[] = [3865, 3866, SUPPORT_QUEST_DONE];
+
+/**
+ * What the items held are worth: their shop prices, without what is used up, free or handed to every
+ * support (potions, wards, the trinket, the support quest) — ItemCatalog.CountsForWorth, the rule
+ * the collector counts the boots' timing with; both must stay in step.
+ */
+export function itemWorth(owned: readonly number[], items: ReadonlyMap<number, ItemInfo>): number {
+  let worth = 0;
+  for (const id of owned) {
+    const info = items.get(id);
+    if (!info || hasTag(info, 'Consumable') || hasTag(info, 'Trinket')) continue;
+    if (SUPPORT_QUEST_STEPS.includes(id) || isSupportUpgrade(id, items)) continue;
+    worth += info.total;
+  }
+  return worth;
+}
+
 /**
  * A pair of boots past the basic ones: built from basic boots, directly or through another pair.
  * The tier-3 upgrades (Gunmetal Greaves from Berserker's, …) come from a pair, not from 1001, and
@@ -135,6 +154,15 @@ export interface NextBuy {
   supportChoice: boolean;
 }
 
+/** One purchase of the shopping list. */
+export interface Buy {
+  itemId: number;
+  /** What it costs at that point of the list, with what is owned by then counted in. */
+  cost: number;
+  /** The plan's item this buy works towards, when it is a part of it; null for the item itself. */
+  towards: number | null;
+}
+
 export interface EnemyView {
   championId: number;
   items: number[];
@@ -149,6 +177,13 @@ export interface GameModel {
   championId: number;
   path: PathStep[];
   nextBuy: NextBuy | null;
+  /**
+   * Everything the gold at hand buys right now, in order: the plan's next item or its parts, the
+   * boots when they are due, then on with what is left. Empty when nothing is affordable.
+   */
+  basket: Buy[];
+  /** Gold left after the basket. */
+  goldLeft: number;
   /** The next skill point by the plan, and whether it can be spent now. */
   nextSkill: { key: Skill; level: number; now: boolean } | null;
   /** Skill points already spent (Q + W + E + R levels). */
@@ -233,49 +268,132 @@ function pathOf(plan: RiotBuildPlan | null, owned: readonly number[], gameTime: 
   return steps;
 }
 
+/** Finished items before the pair of boots where the build file does not count it: one. */
+export const BOOTS_AFTER_ITEMS = 1;
+
 /**
- * The order things are bought in, which is not the order the path shows them in: the finished boots
- * come after the first core item, not before it. The path lists boots first because they are a slot
- * of their own; as the next buy they sent every first recall to a finished pair (Jinx at six minutes
- * with 1.300 gold: Boots of Swiftness, no part of her first item). A convention, not a count — the
- * build file does not say when boots are bought; basic boots on the way are the player's call.
+ * The order things are bought in, which is not the order the path shows them in: the pair of boots
+ * comes after as many finished items as most players of the champion buy before it (the plan's
+ * bootsAfterItems, counted by the collector since 11.11.2026) — after the first where the file does
+ * not say. The path lists boots first because they are a slot of their own; as the next buy they
+ * sent every first recall to a finished pair (Jinx at six minutes with 1.300 gold: Boots of
+ * Swiftness, no part of her first item).
  */
-export function buyOrder(steps: readonly PathStep[]): PathStep[] {
+export function buyOrder(steps: readonly PathStep[], bootsAfter: number | null = null): PathStep[] {
   const boots = steps.filter((s) => s.slot === 'Schuhe');
-  const firstCore = steps.findIndex((s) => s.slot === 'Kern');
-  if (boots.length === 0 || firstCore < 0) return [...steps];
   const rest = steps.filter((s) => s.slot !== 'Schuhe');
-  const after = rest.findIndex((s) => s.slot === 'Kern') + 1;
-  return [...rest.slice(0, after), ...boots, ...rest.slice(after)];
+  const isItem = (s: PathStep) => s.slot === 'Kern' || s.slot === 'Spät';
+  if (boots.length === 0 || !rest.some(isItem)) return [...steps];
+  const after = Math.max(0, bootsAfter ?? BOOTS_AFTER_ITEMS);
+  // Behind the item with that number; with fewer items in the plan, at the end.
+  let at = after === 0 ? rest.findIndex(isItem) : rest.length;
+  let seen = 0;
+  for (let i = 0; i < rest.length && after > 0; i++) {
+    if (isItem(rest[i]!) && ++seen === after) {
+      at = i + 1;
+      break;
+    }
+  }
+  return [...rest.slice(0, at), ...boots, ...rest.slice(at)];
 }
 
-function nextBuyOf(steps: PathStep[], owned: readonly number[], gold: number, items: ReadonlyMap<number, ItemInfo>): NextBuy | null {
+/**
+ * The most expensive part of an item that the gold buys and that is not there yet — recursively, so
+ * a half-built part is offered rather than its parent, and by instance: of two Long Swords in a
+ * recipe, one owned leaves one to buy.
+ */
+function affordablePart(target: number, inventory: readonly number[], gold: number, items: ReadonlyMap<number, ItemInfo>): number | null {
+  let best: { id: number; cost: number } | null = null;
+  const pool = [...inventory];
+  const visit = (id: number, depth: number) => {
+    if (depth > 6) return;
+    for (const part of items.get(id)?.from ?? []) {
+      const at = pool.indexOf(part);
+      if (at >= 0) {
+        pool.splice(at, 1);
+        continue;
+      }
+      if (!items.has(part)) continue;
+      const price = remainingCost(part, [...pool], items);
+      if (price <= gold && (!best || price > best.cost)) best = { id: part, cost: price };
+      visit(part, depth + 1);
+    }
+  };
+  visit(target, 0);
+  const chosen = best as { id: number; cost: number } | null;
+  return chosen ? chosen.id : null;
+}
+
+/**
+ * The shopping list for the gold at hand. Step by step: the next item of the buy order if the gold
+ * covers it, else its most expensive affordable part, then on with what is left — a recall with 650
+ * gold is a Long Sword and Boots, not one of them and 300 gold carried back to lane.
+ *
+ * When the basic Boots join the list is the plan's bootsWorth, counted by the collector:
+ * - `bootsDue` true: the items held are worth as much as when half the champion's players have
+ *   bought their first boots. Then Boots come first, before any part — at this point of the build
+ *   players have them.
+ * - false: not yet. Gold that buys nothing else stays unspent.
+ * - null: the file does not say (before 11.11.2026, or too few games). Then Boots are bought with
+ *   what is left once no part fits — a convention, the way the fixture game's players shop.
+ * Never before the starting items, and never on top of boots of any kind.
+ */
+function basketOf(order: readonly PathStep[], owned: readonly number[], gold: number, items: ReadonlyMap<number, ItemInfo>, bootsDue: boolean | null): Buy[] {
+  const basket: Buy[] = [];
+  let inventory = [...owned];
+  let left = gold;
+  const bootsStep = order.find((s) => s.slot === 'Schuhe');
+  const basicBoots = items.get(BASIC_BOOTS)?.total ?? 0;
+  const done = (s: PathStep) => ownsItem(s.itemId, inventory, items) || (s.slot === 'Schuhe' && inventory.some((id) => isBoots(id, items)));
+  const take = (itemId: number, towards: number | null) => {
+    const after = [...inventory];
+    const cost = remainingCost(itemId, after, items);
+    after.push(itemId);
+    inventory = after;
+    left -= cost;
+    basket.push({ itemId, cost, towards });
+  };
+  /** Basic Boots fit: the plan has boots, none are there, the start is bought and the gold covers them. */
+  const bootsFit = (target: PathStep | undefined) =>
+    !!bootsStep && target?.slot !== 'Start' && basicBoots > 0 && left >= basicBoots && !inventory.some((id) => id === BASIC_BOOTS || isBoots(id, items));
+
+  // A dozen buys are more than six slots hold; the bound only keeps a broken recipe from looping.
+  for (let round = 0; round < 12; round++) {
+    const target = order.find((s) => s.slot !== 'Support' && !done(s));
+    if (bootsDue === true && bootsFit(target)) {
+      take(BASIC_BOOTS, bootsStep!.itemId);
+      continue;
+    }
+    if (target && items.has(target.itemId)) {
+      if (remainingCost(target.itemId, [...inventory], items) <= left) {
+        take(target.itemId, null);
+        continue;
+      }
+      const part = affordablePart(target.itemId, inventory, left, items);
+      if (part !== null) {
+        take(part, target.itemId);
+        continue;
+      }
+    }
+    // Nothing of the plan fits any more.
+    if (bootsDue === null && bootsFit(target)) take(BASIC_BOOTS, bootsStep!.itemId);
+    break;
+  }
+  return basket;
+}
+
+function nextBuyOf(order: readonly PathStep[], owned: readonly number[], basket: readonly Buy[], items: ReadonlyMap<number, ItemInfo>): NextBuy | null {
   // The support upgrade can be picked only once the quest is done (Bounty of Worlds in the
   // inventory) — then it comes first, at no cost; before that it is no buy at all.
   const questDone = owned.includes(SUPPORT_QUEST_DONE);
-  const choice = steps.find((s) => s.slot === 'Support' && !s.owned);
+  const choice = order.find((s) => s.slot === 'Support' && !s.owned);
   if (choice && questDone) return { itemId: choice.itemId, cost: remainingCost(choice.itemId, [...owned], items), affordable: true, towards: null, supportChoice: true };
-  const target = buyOrder(steps).find((s) => !s.owned && s.slot !== 'Support');
+  // The first buy of the list, or the target the gold does not reach yet.
+  const first = basket[0];
+  if (first) return { itemId: first.itemId, cost: first.cost, affordable: true, towards: first.towards, supportChoice: false };
+  const target = order.find((s) => !s.owned && s.slot !== 'Support');
   if (!target) return null;
-  const cost = remainingCost(target.itemId, [...owned], items);
-  if (gold >= cost) return { itemId: target.itemId, cost, affordable: true, towards: null, supportChoice: false };
-
-  // Not enough for the whole item: the most expensive component that is affordable and not owned —
-  // recursively, so a half-built component is offered rather than its parent.
-  let best: { id: number; cost: number } | null = null;
-  const visit = (id: number) => {
-    for (const component of items.get(id)?.from ?? []) {
-      if (owned.includes(component)) continue;
-      const price = remainingCost(component, [...owned], items);
-      if (price <= gold && (!best || price > best.cost)) best = { id: component, cost: price };
-      visit(component);
-    }
-  };
-  visit(target.itemId);
-  const chosen = best as { id: number; cost: number } | null;
-  return chosen
-    ? { itemId: chosen.id, cost: chosen.cost, affordable: true, towards: target.itemId, supportChoice: false }
-    : { itemId: target.itemId, cost, affordable: false, towards: null, supportChoice: false };
+  return { itemId: target.itemId, cost: remainingCost(target.itemId, [...owned], items), affordable: false, towards: null, supportChoice: false };
 }
 
 function nextSkillOf(order: string, data: LiveGameData): GameModel['nextSkill'] {
@@ -326,6 +444,9 @@ export function gameModel(
   const gold = Math.floor(data.activePlayer.currentGold ?? 0);
   const owned = ownedItems(me);
   const steps = pathOf(plan, owned, gameTime, items);
+  const order = buyOrder(steps, plan?.bootsAfterItems ?? null);
+  const bootsWorth = plan?.bootsWorth ?? null;
+  const basket = basketOf(order, owned, gold, items, bootsWorth === null ? null : itemWorth(owned, items) >= bootsWorth);
 
   const enemies: EnemyView[] = (data.allPlayers ?? [])
     .filter((p) => p.team && me.team && p.team !== me.team)
@@ -345,7 +466,9 @@ export function gameModel(
     gold,
     championId: championIdOf(me, meta),
     path: steps,
-    nextBuy: nextBuyOf(steps, owned, gold, items),
+    nextBuy: nextBuyOf(order, owned, basket, items),
+    basket,
+    goldLeft: gold - basket.reduce((sum, buy) => sum + buy.cost, 0),
     nextSkill: plan ? nextSkillOf(plan.skillOrder, data) : null,
     skillPoints: (['Q', 'W', 'E', 'R'] as const).reduce((n, k) => n + (data.activePlayer?.abilities?.[k]?.abilityLevel ?? 0), 0),
     enemies,

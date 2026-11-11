@@ -11,10 +11,17 @@ Kopien melden sie beim nächsten Start.
   sie klar besser ist, und bei Schuhen und Items nur, wenn das auch im selben Spielstand gilt
   (ausgeglichen, vorn, hinten). Mejai's wird fast nur aus der Führung gekauft und zählt deshalb nie
   als „besser“. Zahlen in `docs/modellpruefung.md`, Messung 16.
-- **Nächster Kauf: erst das erste Item, dann die Schuhe.** Bisher stand ein fertiges Paar Schuhe vor
-  dem ersten Item; beim ersten Recall hieß es „Boots of Swiftness“ statt eines Teils fürs erste Item.
-  Jetzt kommt das erste Kern-Item zuerst, dann die Schuhe, dann der Rest. Im Build-Pfad stehen die
-  Schuhe weiter als eigener Platz vorn.
+- **„Jetzt kaufen“ ist eine Einkaufsliste fürs Gold, das du gerade hast.** Bisher stand dort ein
+  einzelner Kauf, und zwar immer zuerst ein fertiges Paar Schuhe. Jetzt steht dort alles, was das Gold
+  hergibt, in Reihenfolge: mit 650 Gold beim ersten Recall „Stiefel + Langschwert“ statt „Boots of
+  Swiftness — noch 350 Gold“, darunter der Rest. Teile zählen einzeln: Braucht ein Rezept zwei
+  Langschwerter und eins ist da, wird das zweite vorgeschlagen.
+- **Wann die Schuhe dran sind, zählt der Sammler jetzt mit.** Je Champion und Lane: nach wie vielen
+  fertigen Items das Paar gekauft wird, und wie viel die Items wert sind, wenn die ersten Stiefel
+  gekauft werden. Die Stiefel kommen auf die Liste, sobald dein Inventar so viel wert ist wie bei der
+  Hälfte der Spieler; das Paar steht an der Stelle, an der die meisten es kaufen. Bis die Zahlen da
+  sind (und für Champions mit zu wenigen Spielen): Paar nach dem ersten Item, Stiefel mit dem Gold,
+  das nach den Teilen übrig bleibt. Im Build-Pfad stehen die Schuhe weiter als eigener Platz vorn.
 - **Situative Items passen zum Champion.** Talon bekam Rabadon's Deathcap und Irelia Zhonya's
   vorgeschlagen, weil andere Champions ihrer Klasse sie kaufen. Verglichen wird jetzt Gleiches mit
   Gleichem, und vorgeschlagen wird nur, was Spieler des Champions selbst schon gekauft haben

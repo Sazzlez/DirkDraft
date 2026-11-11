@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Serialization;
 using DraftPilot.Core.Draft;
 
@@ -66,6 +67,20 @@ public sealed class ChampionBuildStats
 
     /// <summary>Which ability was maxed first, second, third, e.g. <c>QEW</c>.</summary>
     public List<BuildCount> SkillMax { get; set; } = [];
+
+    /// <summary>
+    /// When the pair of boots was bought: how many finished items came before it, as text —
+    /// <c>0</c> to <c>3</c>, three standing for three or more. Not a choice between builds but its
+    /// timing; the win rates are counted along and say nothing by themselves.
+    /// </summary>
+    public List<BuildCount> BootsAfter { get; set; } = [];
+
+    /// <summary>
+    /// When the first boots of any kind were bought: what the items held were worth going into that
+    /// shop visit, in steps of <see cref="RiotBuildTally.BootsWorthStep"/> gold as text — <c>0</c>
+    /// (below 500: the starting items), <c>500</c>, … up to <c>4000</c> and above.
+    /// </summary>
+    public List<BuildCount> BootsWorth { get; set; } = [];
 }
 
 /// <summary>
@@ -155,7 +170,27 @@ public sealed class RiotBuildTally
 
         if (game.SkillMax is { Length: 3 } max)
             bucket.Count(Slot.SkillMax, [], max, game.Win);
+
+        // When the boots were bought — the pair by finished items before it, the first boots by what
+        // the inventory was worth. Only games whose timeline says so.
+        if (game.ItemsBeforeBoots >= 0)
+            bucket.Count(Slot.BootsAfter, [], Math.Min(game.ItemsBeforeBoots, MostItemsBeforeBoots).ToString(CultureInfo.InvariantCulture), game.Win);
+        if (game.WorthBeforeBoots >= 0)
+            bucket.Count(Slot.BootsWorth, [], BootsWorthKey(game.WorthBeforeBoots), game.Win);
     }
+
+    /// <summary>Finished items before the boots are counted up to this many; more is the same answer, "after the core".</summary>
+    public const int MostItemsBeforeBoots = 3;
+
+    /// <summary>The step, in gold, the inventory's worth at the first boots is counted in.</summary>
+    public const int BootsWorthStep = 500;
+
+    /// <summary>The highest step; anything above counts there.</summary>
+    public const int BootsWorthCap = 4000;
+
+    /// <summary>The step a worth falls in, by its lower bound: 1.150 gold is <c>1000</c>.</summary>
+    public static string BootsWorthKey(int worth)
+        => (Math.Clamp(worth, 0, BootsWorthCap) / BootsWorthStep * BootsWorthStep).ToString(CultureInfo.InvariantCulture);
 
     /// <summary>Counts already in a file, e.g. from the collector's previous run.</summary>
     public void Add(IEnumerable<ChampionBuildStats> stored)
@@ -206,7 +241,9 @@ public sealed class RiotBuildTally
                     .OrderByDescending(option => option.Games)
                     .ThenByDescending(option => option.Wins)
                     .ThenBy(option => option.Key, StringComparer.Ordinal)
-                    .Take(keep)
+                    // The timing slots are a handful of steps, not a long tail of choices: cut, the
+                    // steps left would no longer add up to the games they were counted from.
+                    .Take((slot is Slot.BootsAfter or Slot.BootsWorth) ? int.MaxValue : keep)
                     .Select(Copy));
             }
 
@@ -232,6 +269,8 @@ public sealed class RiotBuildTally
         Slot.SupportChoice => stats.SupportChoice,
         Slot.SkillOrder => stats.SkillOrder,
         Slot.SkillMax => stats.SkillMax,
+        Slot.BootsAfter => stats.BootsAfter,
+        Slot.BootsWorth => stats.BootsWorth,
         _ => throw new ArgumentOutOfRangeException(nameof(slot)),
     };
 
@@ -248,6 +287,8 @@ public sealed class RiotBuildTally
         SupportChoice,
         SkillOrder,
         SkillMax,
+        BootsAfter,
+        BootsWorth,
     }
 
     private sealed class Bucket

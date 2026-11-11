@@ -26,7 +26,22 @@
 <div class="layout">
   <div class="col left">
   <div class="buy">
-    {#if game.nextBuy}
+    <!-- Several buys fit the gold at hand: the whole list. Else the one next buy, as before. -->
+    {#if game.basket.length > 1 && !game.nextBuy?.supportChoice}
+      <section class="next list">
+        <span class="t">
+          <span class="kicker">Jetzt kaufen</span>
+          {#each game.basket as buy, i (i)}
+            <span class="pick">
+              <Icon kind="item" id={buy.item.id} size={26} title={buy.item.name} />
+              <b>{buy.item.name}</b>
+              <span class="num">{count(buy.cost)} Gold{#if buy.then}{' · '}für {buy.then.name}{/if}</span>
+            </span>
+          {/each}
+          <span class="num">Rest {count(game.goldLeft)} Gold</span>
+        </span>
+      </section>
+    {:else if game.nextBuy}
       <section class="next">
         <Icon kind="item" id={game.nextBuy.item.id} size={44} />
         <span class="t">
@@ -222,6 +237,23 @@
   .t .num {
     font-size: 11.5px;
     color: var(--fg2);
+  }
+
+  .next.list .t {
+    flex: 1;
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .pick {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .pick b {
+    font-size: 14px;
   }
 
   .then {

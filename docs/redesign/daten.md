@@ -6,7 +6,7 @@ einem Riot-Schlüssel selbst zählt, und liegen als vier Dateien im Branch `data
 | Datei | Inhalt | Quelle |
 |---|---|---|
 | `meta.json` | Lane-Winrate, Pick-, Bann- und Rollenrate je Champion und Lane; jedes Duell (beide Richtungen); jedes Duo; Gegner auf anderen Lanes (`versus`, ab 30 Spielen, eine Zeile je Paar); Schadensart; Grundlinien und Duell-Linie | Solo/Duo, Platin, EUW |
-| `builds.json` | Runen, Spells, Start, Schuhe, Kern, Items 4–6, Support-Item, Skill-Reihenfolge je Champion und Lane | dieselben Spiele |
+| `builds.json` | Runen, Spells, Start, Schuhe, Kern, Items 4–6, Support-Item, Skill-Reihenfolge je Champion und Lane; seit 11.11.2026 dazu der Kaufzeitpunkt der Schuhe (unten) | dieselben Spiele |
 | `situational.json` | Stiefel, Kern (Items 1–3) und Items 4–6 je Champion, Lane und Gegner-Lage (viel AD, viel AP, 2+ Tanks, viel harte Kontrolle), mit dem Gesamtwert des Platzes zum Vergleich; dazu dieselben Zahlen je Klasse | dieselben Spiele |
 | `aram.json` | Winrate je Champion (Bank), ARAM-Builds — auch für Mayhem | normales ARAM (Queue 450), Spieler aus den Platin-Ranglisten |
 
@@ -77,6 +77,24 @@ zur Rate des Slots geglättet, mit einem Gewicht, das die Datei selbst misst (wa
 Optionen über alle Zeilen). Auf den ersten 6.185 Spielen war diese Streuung in jedem Slot null; dann
 entscheidet die Spielzahl. Gleiche Zauberpaare (beide Tastenfolgen) und Runenseiten (Nebenrunen in
 beliebiger Reihenfolge) zählen als eine Option. Details: `docs/modellpruefung.md`, Messungen 10–12.
+
+**Kaufzeitpunkt der Schuhe** (`builds.json`, seit 11.11.2026, aus der Zeitleiste, ohne zusätzliche
+Riot-Anfrage). Zwei Zählungen je Champion und Lane, als Optionen mit Text wie die Skill-Reihenfolge:
+
+- `bootsAfter`: Wie viele fertige Items vor dem Paar Schuhe gekauft wurden — `"0"` bis `"3"` (drei oder
+  mehr). Die App stellt das Paar in der Kaufreihenfolge an die meistgezählte Stelle.
+- `bootsWorth`: Was die Items wert waren, als die ersten Schuhe gekauft wurden (einfache Stiefel oder
+  gleich ein Paar) — der Itemwert 30 Sekunden davor, also beim Betreten des Shops, in Stufen von 500
+  Gold: `"0"` (nur Startitems), `"500"`, … `"4000"` (und mehr). Itemwert nach derselben Regel wie beim
+  Lane-Vergleich (`ItemCatalog.CountsForWorth`; in der App `core/game.ts` `itemWorth`). Die App nimmt
+  die Stufe, bis zu der die Hälfte der Spieler gekauft hat: Ist das eigene Inventar so viel wert,
+  kommen die Stiefel auf die Einkaufsliste.
+
+Beide Zählungen werden beim Export nicht auf die meistgespielten Optionen gekürzt, sonst stimmte die
+Hälfte nicht mehr. Die Siegzahlen stehen wie überall dabei, werden aber nicht gelesen: Wer früh Schuhe
+kauft, liegt oft hinten oder vorn, das sagt nichts über den Zeitpunkt. Ältere Dateien haben die Felder
+nicht; dann gilt in der App: Paar nach dem ersten Item, Stiefel mit dem Gold, das nach den Teilen
+übrig bleibt. Unter 30 gezählten Spielen ebenso.
 
 In keiner Datei stehen Spielernamen, PUUIDs oder Match-IDs. Die Spielerlisten, über die der Sammler
 neue Spiele findet, leben nur im Speicher eines Laufs.

@@ -272,6 +272,34 @@ describe('builds from own data', () => {
     expect(plan.skillOrder).toBe('QEWQQRQEQERE EWW');
   });
 
+  it('reads when the boots are bought: the most counted place for the pair, the halfway worth for the first boots', () => {
+    const timed = stats(222, Lane.Adc, 500, {
+      core,
+      bootsAfter: [count([], 40, 20, '0'), count([], 300, 150, '1'), count([], 90, 45, '2'), count([], 20, 10, '3')],
+      // 30 % by the first step, 40 % by the second, 80 % by the third: half the players by "1000".
+      bootsWorth: [count([], 150, 75, '0'), count([], 50, 25, '500'), count([], 200, 100, '1000'), count([], 100, 50, '1500')],
+    });
+    const plan = riotPlan(file([timed]), 222, Lane.Adc)!;
+    expect(plan.bootsAfterItems).toBe(1);
+    expect(plan.bootsWorth).toBe(1000);
+
+    // Both brackets of a champion count together; steps that are no numbers are passed over.
+    const second = { ...stats(222, Lane.Adc, 500, { bootsWorth: [count([], 700, 350, '0'), count([], 9, 4, 'früh')] }), tier: 'gold' };
+    expect(riotPlan(file([timed, second]), 222, Lane.Adc)!.bootsWorth).toBe(0);
+  });
+
+  it('says nothing about the boots\' timing on a file that does not count it, or on too few games', () => {
+    const plain = riotPlan(file([stats(222, Lane.Adc, 500, { core })]), 222, Lane.Adc)!;
+    expect(plain.bootsAfterItems).toBeNull();
+    expect(plain.bootsWorth).toBeNull();
+    const thin = riotPlan(file([stats(222, Lane.Adc, 500, { core, bootsAfter: [count([], 20, 10, '2')], bootsWorth: [count([], 29, 10, '500')] })]), 222, Lane.Adc)!;
+    expect(thin.bootsAfterItems).toBeNull();
+    expect(thin.bootsWorth).toBeNull();
+    // A tie goes to the earlier place.
+    const tie = riotPlan(file([stats(222, Lane.Adc, 500, { core, bootsAfter: [count([], 50, 25, '2'), count([], 50, 25, '1')] })]), 222, Lane.Adc)!;
+    expect(tie.bootsAfterItems).toBe(1);
+  });
+
   it('has no plan for a champion without any games', () => {
     expect(riotPlan(file([]), 122, Lane.Top)).toBeNull();
   });
