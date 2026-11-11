@@ -32,7 +32,9 @@
 
   --fg: #f5f5f7;
   --fg2: rgba(235, 235, 245, 0.62);
-  --fg3: rgba(235, 235, 245, 0.32);
+  --fg3: rgba(235, 235, 245, 0.55);
+  /* Decoration only (rings, empty dots, strokes): too faint for text. */
+  --fg4: rgba(235, 235, 245, 0.32);
   --track: rgba(255, 255, 255, 0.08);
 
   --blue-wash: rgba(10, 132, 255, 0.16);
@@ -78,8 +80,9 @@
   --edge: inset 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.05);
   --separator: rgba(60, 60, 67, 0.12);
   --fg: #1d1d1f;
-  --fg2: rgba(60, 60, 67, 0.72);
-  --fg3: rgba(60, 60, 67, 0.38);
+  --fg2: rgba(60, 60, 67, 0.8);
+  --fg3: rgba(60, 60, 67, 0.73);
+  --fg4: rgba(60, 60, 67, 0.38);
   --track: rgba(60, 60, 67, 0.1);
   --blue-wash: rgba(0, 122, 255, 0.1);
   --blue-line: rgba(0, 122, 255, 0.32);

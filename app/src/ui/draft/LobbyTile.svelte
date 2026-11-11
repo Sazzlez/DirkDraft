@@ -75,7 +75,7 @@
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: var(--fg3);
+    background: var(--fg4);
   }
 
   .dot.good {

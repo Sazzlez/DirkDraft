@@ -53,7 +53,7 @@
   }
 
   .needle {
-    stroke: var(--fg3);
+    stroke: var(--fg4);
     stroke-width: 1.5;
     opacity: 0;
   }

@@ -195,7 +195,7 @@
     top: -3px;
     bottom: -3px;
     width: 1px;
-    background: var(--fg3);
+    background: var(--fg4);
   }
 
   .axis i {

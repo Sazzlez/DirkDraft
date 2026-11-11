@@ -86,12 +86,12 @@
 
   .empty {
     background: transparent;
-    box-shadow: inset 0 0 0 1.5px var(--fg3);
+    box-shadow: inset 0 0 0 1.5px var(--fg4);
   }
 
   .champion.empty {
     box-shadow: none;
-    border: 1.5px dashed var(--fg3);
+    border: 1.5px dashed var(--fg4);
   }
 
   .dim {

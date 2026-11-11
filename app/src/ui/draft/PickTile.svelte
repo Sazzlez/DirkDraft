@@ -147,7 +147,7 @@
     height: 12px;
     margin-left: auto;
     fill: none;
-    stroke: var(--fg3);
+    stroke: var(--fg4);
     stroke-width: 1.5;
   }
 

@@ -165,7 +165,7 @@
     height: 6px;
     border-radius: 50%;
     flex: none;
-    background: var(--fg3);
+    background: var(--fg4);
   }
 
   .dot.ok {
