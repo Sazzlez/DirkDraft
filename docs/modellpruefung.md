@@ -1165,7 +1165,7 @@ sicherer Blind Pick, Flex-Picks für offene Lanes, die Reihenfolge im Team-Plan.
 
 **Patchtag (Punkt 6)** ist nicht messbar, solange der Sammler keinen Patchwechsel gesehen hat.
 
-## 27. Die Stärke-Skala im Spiel (13.11.2026, vorläufig)
+## 27. Die Stärke-Skala im Spiel (13.11.2026)
 
 Die Prüfung aus `docs/lane-vergleich.md` („Prüfung, bevor die Skala erscheint“), mit
 `npm run measure:duels -- <games.json.gz> <meta.json>` (`app/tools/measure/duels.ts`). Bestand:
@@ -1231,9 +1231,60 @@ gelten nicht):
 - Resistenzen gegen die passende Schadensart und Gewichte je Abschnitt sind beide messbar; ihre
   Größe ist erst mit sauberen Leveln zu lesen.
 
-**Nichts in der App geändert.** Offen bis zu den sauberen Zeilen: die Gewichte selbst, die Kalibrierung
-(„+2“ gewinnt so oft, wie es sagt) und die Übersetzung in die sieben Stufen. Die Vorschau-Kachel
-rechnet bis dahin weiter mit Beispielzahlen.
+### Die Skala aus Level und Itemwert, an sauberen Duellen geprüft
+
+Für die Duelle zwischen 10:00 und 11:00 ist das wahre Level bekannt (aus der Erfahrung nach zehn
+Minuten). An ihnen lässt sich die einfache Skala schon heute prüfen, ohne auf die neuen Zeilen zu
+warten: angepasst an den 10.583 Duellen der Trainingsspiele, geprüft an den 2.768 Duellen der
+zurückgehaltenen Spiele. Ohne Seitenvorteil angepasst (jedes Duell auch gespiegelt, Fehlerbalken um √2
+geweitet), Log-Odds ± 95 %:
+
+| Gewichte | Level | 1.000 Gold Itemwert | Duelle |
+|---|---:|---:|---:|
+| Top | +0,32 ± 0,11 | +0,84 ± 0,12 | 2.787 |
+| Jungle | +0,74 ± 0,31 | +0,61 ± 0,21 | 367 |
+| Mid | +0,58 ± 0,13 | +0,92 ± 0,15 | 1.884 |
+| Bot (2 gegen 2, Summen) | +0,18 ± 0,06 | +0,41 ± 0,05 | 5.545 |
+| Top, Jungle und Mid zusammen | +0,46 ± 0,08 | +0,81 ± 0,09 | 5.038 |
+
+Auf den zurückgehaltenen Duellen (Münzwurf 0,6931):
+
+| Variante | Log-Loss | Gewinn gegen Münzwurf | in Standardfehlern | Trefferquote |
+|---|---:|---:|---:|---:|
+| Gewichte je Lane | 0,6092 | +0,0840 | +11,8 | 67,4 % |
+| Top, Jungle, Mid zusammen; Bot eigen | 0,6092 | +0,0839 | +12,0 | 67,2 % |
+
+„Je Lane“ sagt nicht besser vorher als „zusammen“ (0,0 Standardfehler). Nach der Regel des Konzepts
+erscheint die einfachere: **ein Gewichtspaar für Top, Jungle und Mid (0,46 je Level, 0,81 je
+1.000 Gold), eines für die Botlane (0,18 und 0,41 auf die Summen beider Spieler).**
+
+Ein Schritt der Skala sind 0,6 Log-Odds, bei ±3 ist Schluss. So oft gewinnt die Seite, die die Skala
+vorn sieht, das Duell (zurückgehaltene Spiele, Variante „zusammen“):
+
+| Stufe | Duelle | vorhergesagt | gewonnen | ± |
+|---|---:|---:|---:|---:|
+| Ausgeglichen (unter 0,5) | 729 | 53,7 % | 55,7 % | 3,6 |
+| Leicht stärker (0,5 bis 1,5) | 1.101 | 63,7 % | 65,1 % | 3,0 |
+| Stärker (1,5 bis 2,5) | 612 | 75,9 % | 75,8 % | 4,0 |
+| Deutlich stärker (ab 2,5) | 308 | 87,5 % | 85,1 % | 5,6 |
+
+Die Skala besteht damit die Prüfung aus `docs/lane-vergleich.md`: Die oben gesehene Seite gewinnt
+öfter, und so oft, wie die Stufe sagt.
+
+**In der App seit 13.11.2026 (2.1.0):** `app/src/core/strength.ts` rechnet die Kachel „Du gegen
+…“ der Spielansicht aus Level und Itemwert mit diesen Gewichten; der Itemwert nach der Regel des
+Sammlers, nie das Gold in der Tasche.
+
+**Grenzen, die bleiben:**
+
+- Geprüft ist nur das Fenster Minute 10 bis 11 (Level etwa 6 bis 9). Für die ersten Level und das
+  späte Spiel gelten dieselben Gewichte ungeprüft. Die Messung an allen Duellen deutet auf andere
+  Gewichte je Abschnitt (+11,3 Standardfehler, mit fehlerhaftem Level); wie groß der Unterschied ist,
+  zeigt erst die Messung an sauberen Zeilen.
+- Champion-Stärke je Abschnitt und Resistenzen stehen nicht in der Skala. Sie kommen erst, wenn sie
+  an sauberen Zeilen gemessen sind und der Sammler die Champion-Stärke ausgibt.
+- Neu messen, sobald 40.000 Duelle mit −2 gezählt sind (`npm run measure:duels` nimmt sie dann von
+  selbst).
 
 ## Was offen bleibt (2.0)
 

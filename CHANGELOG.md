@@ -5,6 +5,15 @@ Kopien melden sie beim nächsten Start.
 
 ## 2.1.0 — unveröffentlicht
 
+- **Stärke-Skala im Spiel: du gegen deinen Lane-Gegner.** Eine Kachel in der Spielansicht zeigt, wer
+  nach Level und Items gerade stärker ist: „Ausgeglichen“, „Leicht stärker“, „Stärker“ oder „Deutlich
+  stärker“ (genauso als „schwächer“), darunter Level und Itemwert beider Seiten. Auf der Botlane zählen
+  ADC und Support zusammen, zwei gegen zwei. Gerechnet wird nur mit dem, was die Anzeigetafel zeigt —
+  kein Gold in der Tasche, keine Cooldowns. Die Skala beschreibt den Stand und gibt keine Anweisung.
+  Geprüft an 2.768 Lane-Duellen, die die Rechnung nie gesehen hat: Wer „Leicht stärker“ ist, gewinnt
+  das nächste Duell in 65 % der Fälle, „Stärker“ in 76 %, „Deutlich stärker“ in 85 % — so oft, wie die
+  Stufe sagt. Gemessen ist das bisher an Duellen um Minute 10; die frühe und die späte Phase folgen
+  mit den neu gesammelten Duellen (`docs/modellpruefung.md`, Messung 27).
 - **Die Draft-Chance rechnet mit gemessenen Gewichten.** An 145.741 eigenen Platin-Spielen gemessen und an
   29.143 davon geprüft, die das Modell nie gesehen hat: Die Chance lag bisher 4,6-mal zu nah an 50 %,
   weil sie Stärke und Matchups über die Lanes gemittelt hat; gemessen zählt die Summe. Ein Draft, der

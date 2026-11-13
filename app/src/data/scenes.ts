@@ -2,7 +2,7 @@
 // TS model (core/engine) on the reference snapshot. The game has no recording yet; it uses sample
 // data and says so on screen.
 
-import type { ViewModel, Moment, ChampionRef, GameView, BuildView } from '../core/view';
+import type { ViewModel, Moment, ChampionRef, GameView, BuildView, StrengthView } from '../core/view';
 import { LANE_NAMES } from '../core/view';
 import { loadAssets, itemName } from './assets';
 import { DraftEngine, stateFromFrame, type DraftFrame } from '../core/engine';
@@ -10,8 +10,9 @@ import type { AramStat } from '../core/model/advisors';
 import { MetaLookup, type MetaSnapshot } from '../core/model/metaLookup';
 import { laneFromKey } from '../core/model/lane';
 import { gameModel, type LiveGameData } from '../core/game';
+import { strengthOf } from '../core/strength';
 import type { PlanOption, RiotBuildPlan } from '../core/riotBuilds';
-import { gameView } from './gameView';
+import { gameView, strengthView } from './gameView';
 import { SITUATION, SLOT, applySwaps, type RatedSuggestion, type Swap } from '../core/situational';
 import { assets } from './assets';
 import { GoldenAdapter, buildFromPlan, type GoldenFrame, type GoldenPlan } from './golden';
@@ -41,6 +42,8 @@ export const SCENES: Scene[] = [
   { id: 'loading', title: 'Finalisierung', moment: 'loading' },
   { id: 'aram', title: 'ARAM-Bank', moment: 'aramBench' },
   { id: 'game', title: 'Im Spiel', moment: 'game' },
+  { id: 'gamebehind', title: 'Im Spiel · hinten', moment: 'game' },
+  { id: 'gamebot', title: 'Im Spiel · Botlane', moment: 'game' },
   { id: 'nodata', title: 'Ohne Daten', moment: 'lobby' },
   { id: 'gameloading', title: 'Spiel lädt', moment: 'game' },
 ];
@@ -250,6 +253,10 @@ export async function sceneView(id: string): Promise<ViewModel> {
     }
     case 'game':
       return gameScene(a, s.plans, s.meta);
+    case 'gamebehind':
+      return gameScene(a, s.plans, s.meta, 'behind');
+    case 'gamebot':
+      return gameScene(a, s.plans, s.meta, 'bot');
     // The empty states, from the live session itself: first start offline, and a game whose own API
     // does not answer yet.
     case 'nodata': {
@@ -355,7 +362,54 @@ function planFromGolden(p: GoldenPlan): RiotBuildPlan {
   };
 }
 
-function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: MetaLookup): ViewModel {
+/**
+ * The strength scale's three looks, with sample numbers until the collector's duels are measured:
+ * ahead in mid game on top, behind against a level-6 spike, and two against two on the bot lane.
+ */
+function sampleStrength(a: GoldenAdapter, variant: 'ahead' | 'behind' | 'bot'): StrengthView {
+  if (variant === 'behind')
+    return {
+      opponents: [ref(a, 24)],
+      value: -1.9,
+      label: 'Schwächer',
+      rows: [
+        { label: 'Level', mine: '5', theirs: '6', diff: '−1', tone: 'down' },
+        { label: 'Items', mine: '1.650', theirs: '2.300', diff: '−650', tone: 'down' },
+      ],
+      phases: [
+        { label: 'früh · Lvl 1–5', who: 'Darius', tone: 'up', now: false },
+        { label: 'Mitte · 6–10', who: 'offen', tone: 'even', now: true },
+        { label: 'spät · 11+', who: 'Jax', tone: 'down', now: false },
+      ],
+    };
+  if (variant === 'bot')
+    return {
+      opponents: [ref(a, 29), ref(a, 25)],
+      value: 0.2,
+      label: 'Ausgeglichen',
+      rows: [
+        { label: 'Level', mine: '8 + 7', theirs: '8 + 7', diff: '±0', tone: 'even' },
+        { label: 'Items', mine: '5.100', theirs: '4.850', diff: '+250', tone: 'up' },
+      ],
+      phases: null,
+    };
+  return {
+    opponents: [ref(a, 24)],
+    value: 1.3,
+    label: 'Leicht stärker',
+    rows: [
+      { label: 'Level', mine: '9', theirs: '8', diff: '+1', tone: 'up' },
+      { label: 'Items', mine: '3.450', theirs: '2.800', diff: '+650', tone: 'up' },
+    ],
+    phases: [
+      { label: 'früh · Lvl 1–5', who: 'Darius', tone: 'up', now: false },
+      { label: 'Mitte · 6–10', who: 'offen', tone: 'even', now: true },
+      { label: 'spät · 11+', who: 'Jax', tone: 'down', now: false },
+    ],
+  };
+}
+
+function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: MetaLookup, variant: 'ahead' | 'behind' | 'bot' = 'ahead'): ViewModel {
   const darius = ref(a, 122);
   const build = buildFromPlan(plans.matchupGuide, darius);
   const plan = planFromGolden(plans.matchupGuide);
@@ -365,16 +419,22 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
   const owned = [...(plan.boots[0]?.ids ?? []), plan.core[0]?.ids[0] ?? 0, 1036];
   const order = plan.skillOrder.slice(0, 8);
   const abilities = Object.fromEntries((['Q', 'W', 'E', 'R'] as const).map((k) => [k, { abilityLevel: [...order].filter((c) => c === k).length }]));
-  const enemy = (raw: string, items: number[]) => ({ rawChampionName: `game_character_displayname_${raw}`, team: 'CHAOS', items: items.map((itemID) => ({ itemID })) });
+  const enemy = (raw: string, items: number[], position: string, level: number) => ({
+    rawChampionName: `game_character_displayname_${raw}`,
+    team: 'CHAOS',
+    position,
+    level,
+    items: items.map((itemID) => ({ itemID })),
+  });
   const sample: LiveGameData = {
     activePlayer: { riotId: 'Spieler 1', level: 9, currentGold: 1240, abilities },
     allPlayers: [
-      { riotId: 'Spieler 1', rawChampionName: 'game_character_displayname_Darius', team: 'ORDER', items: owned.map((itemID) => ({ itemID })) },
-      enemy('Jax', [3078, 3047]),
-      enemy('Warwick', [3153, 3111]),
-      enemy('Zac', [3068, 3047]),
-      enemy('Twitch', [3153, 3006]),
-      enemy('Morgana', [3190]),
+      { riotId: 'Spieler 1', rawChampionName: 'game_character_displayname_Darius', team: 'ORDER', position: 'TOP', level: 9, items: owned.map((itemID) => ({ itemID })) },
+      enemy('Jax', [3078, 3047], 'TOP', 8),
+      enemy('Warwick', [3153, 3111], 'JUNGLE', 8),
+      enemy('Zac', [3068, 3047], 'MIDDLE', 9),
+      enemy('Twitch', [3153, 3006], 'BOTTOM', 8),
+      enemy('Morgana', [3190], 'UTILITY', 7),
     ],
     gameData: { gameTime: 14 * 60 + 32 },
   };
@@ -388,10 +448,15 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
     { itemId: 3036, slot: SLOT.Late, situation: SITUATION.EnemyArmor, timesMoreOften: 3.4, winRate: 0.518, otherRate: 0.507, games: 1380, share: 0.12, instead: 3742, adopt: false },
   ];
   const swaps = situational.filter((s): s is Swap => s.adopt && s.instead !== null);
-  const model = gameModel(sample, meta, applySwaps(plan, swaps), assets()?.itemInfo ?? new Map(), new Set(swaps.map((s) => s.itemId)));
+  const items = assets()?.itemInfo ?? new Map();
+  const model = gameModel(sample, meta, applySwaps(plan, swaps), items, new Set(swaps.map((s) => s.itemId)));
+  // The first look is the scale as the app reckons it from this sample game (core/strength); the
+  // phases under it are still sample text, and so are the two other looks.
+  const reckoned = variant === 'ahead' ? strengthOf(sample, meta, items) : null;
   const game: GameView = {
     ...gameView(model!, (id) => a.champion(id), 'Darius vs Jax · Toplane', 'Draft 51 : 49', situational),
     sample: 'Beispieldaten — im Spiel liest die Ansicht Riots Live-Client-Schnittstelle.',
+    strength: reckoned ? { ...strengthView(reckoned, (id) => a.champion(id)), phases: sampleStrength(a, 'ahead').phases } : sampleStrength(a, variant),
   };
   return {
     moment: 'game',

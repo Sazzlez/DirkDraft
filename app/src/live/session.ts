@@ -12,6 +12,7 @@ import { MetaLookup } from '../core/model/metaLookup';
 import { TraitTable } from '../core/model/traits';
 import { momentOf, type GameflowPhase } from '../core/moment';
 import { aramPlan, riotPlan, type RiotBuildPlan } from '../core/riotBuilds';
+import { strengthOf } from '../core/strength';
 import { SLOT, SituationTracker, SwapTracker, sameStateEdge, situationalBuild, situationalSuggestions, situationsOf, type RatedSuggestion, type Slot } from '../core/situational';
 import { LANE_NAMES, type BuildView, type ChampionRef, type DataStatus, type Lane as ViewLane, type ViewModel } from '../core/view';
 import { assets } from '../data/assets';
@@ -550,7 +551,15 @@ export class LiveSession {
     return {
       ...base,
       build,
-      game: gameView(model, (id) => this.adapter.champion(id), title, null, situational),
+      // Du gegen den Lane-Gegner: only on the Rift, and only where the game or the draft says who that is.
+      game: gameView(
+        model,
+        (id) => this.adapter.champion(id),
+        title,
+        null,
+        situational,
+        mode === 'lanes' ? strengthOf(game, meta, items, this.picked?.championId === championId ? { lane, opponentId: this.picked.opponentId } : null) : null,
+      ),
     };
   }
 }

@@ -298,6 +298,22 @@ export interface GameView {
    * an empty list means nothing beats the base build clearly here.
    */
   situational: SituationalView[] | null;
+  /** Du gegen den Lane-Gegner (docs/lane-vergleich.md); null without a known opponent. */
+  strength: StrengthView | null;
+}
+
+/** The strength scale: up = stronger than the lane opponent, down = weaker. Describes, never advises. */
+export interface StrengthView {
+  /** The lane opponent, or the enemy duo on the bot lane. */
+  opponents: ChampionRef[];
+  /** −3 … +3, positive = stronger. */
+  value: number;
+  /** "Leicht stärker" */
+  label: string;
+  /** What the scale is made of: "Level 9 : 8 +1", "Items 3.450 : 2.800 +650". */
+  rows: { label: string; mine: string; theirs: string; diff: string; tone: 'up' | 'down' | 'even' }[];
+  /** How this duel usually goes by phase, from the own count; null while too few duels are counted. */
+  phases: { label: string; who: string; tone: 'up' | 'down' | 'even'; now: boolean }[] | null;
 }
 
 export interface SituationalView {

@@ -431,6 +431,78 @@ export async function main(args: string[]): Promise<number> {
     report.push('', 'Gewichte in Log-Odds; ± ist das 95-%-Intervall. Das wahre Level ist hier bis zu 60 Sekunden alt — für beide Seiten gleich, ohne Blick auf den Ausgang.', '');
   }
 
+  // ── The scale from the duels whose true level is known ───────────────────────────────────────
+  // Until marked lines are there, the only clean levels are the ones right after 10:00. Fitted on
+  // the training games' duels of that minute, checked on the held-out games' — per lane, with the
+  // solo lanes pooled, and as the scale's steps would show it.
+  {
+    const clean = all.filter((d) => !d.marked && d.second >= 600 && d.second < 660 && [...d.blue, ...d.red].every((f) => f.xpAtTen > 0));
+    const fitOn = clean.filter((d) => !isHeldOut(d.game));
+    const check = clean.filter((d) => isHeldOut(d.game));
+    const rowOf = (d: Duel): number[] => VARIANTS[PLAIN]!.row(featuresOf(d, fromXp, physical));
+    const fitGroup = (groups: number[]): LogisticFit => {
+      const rows = fitOn.filter((d) => groups.includes(d.group));
+      // Mirrored as well: which side is called blue says nothing, the scale has no side.
+      const x = rows.flatMap((d) => [rowOf(d), rowOf(d).map((v) => -v)]);
+      const y = rows.flatMap((d) => [d.y, 1 - d.y]);
+      return fitLogistic(x, y);
+    };
+    const perLane = [0, 1, 2, 3].map((g) => fitGroup([g]));
+    const solo = fitGroup([0, 1, 2]);
+    const zOf = (fit: LogisticFit, d: Duel): number => {
+      const row = rowOf(d);
+      return fit.coefficients[1]! * row[0]! + fit.coefficients[2]! * row[1]!;
+    };
+    const predictWith = (pick: (d: Duel) => LogisticFit): number[] => check.map((d) => sigmoid(zOf(pick(d), d)));
+    const lanePredictions = predictWith((d) => perLane[d.group]!);
+    const pooledPredictions = predictWith((d) => (d.group === 3 ? perLane[3]! : solo));
+    const coinFlip = check.map(() => 0.5);
+    const a = compare(check, coinFlip, lanePredictions);
+    const b = compare(check, coinFlip, pooledPredictions);
+    const c = compare(check, lanePredictions, pooledPredictions);
+    const hitOf = (p: number[]): string => pct(check.filter((d, i) => p[i]! !== 0.5 && (p[i]! > 0.5 ? 1 : 0) === d.y).length / Math.max(1, check.filter((_, i) => p[i]! !== 0.5).length));
+    const weight = (fit: LogisticFit, j: number): string => `${signed(fit.coefficients[j]!, 2)} ± ${num(1.96 * Math.SQRT2 * fit.standardErrors[j]!, 2)}`;
+    report.push(
+      '## Die Skala aus den Duellen mit wahrem Level (10:00 bis 11:00)',
+      '',
+      `${count(fitOn.length)} Duelle zum Anpassen, ${count(check.length)} aus zurückgehaltenen Spielen. Level laut Erfahrung nach zehn Minuten; ohne Seitenvorteil angepasst (jedes Duell auch gespiegelt, die Fehlerbalken dafür um √2 geweitet).`,
+      '',
+      '| Gewichte | Level | 1.000 Gold | Duelle (Anpassen) |',
+      '|---|---:|---:|---:|',
+      ...[0, 1, 2, 3].map((g) => `| ${GROUPS[g]} | ${weight(perLane[g]!, 1)} | ${weight(perLane[g]!, 2)} | ${count(fitOn.filter((d) => d.group === g).length)} |`),
+      `| Top, Jungle und Mid zusammen | ${weight(solo, 1)} | ${weight(solo, 2)} | ${count(fitOn.filter((d) => d.group < 3).length)} |`,
+      '',
+      '| Variante | Log-Loss (zurückgehalten) | Gewinn gegen Münzwurf | in Standardfehlern | Trefferquote, wo sie eine Seite vorn sieht |',
+      '|---|---:|---:|---:|---:|',
+      `| je Lane | ${num(a.b, 4)} | ${signed(a.gain, 4)} | ${a.error > 0 ? signed(a.gain / a.error, 1) : '–'} | ${hitOf(lanePredictions)} |`,
+      `| Top, Jungle, Mid zusammen; Bot eigen | ${num(b.b, 4)} | ${signed(b.gain, 4)} | ${b.error > 0 ? signed(b.gain / b.error, 1) : '–'} | ${hitOf(pooledPredictions)} |`,
+      '',
+      `„Zusammen“ gegen „je Lane“: ${signed(c.gain, 4)} Log-Loss (${c.error > 0 ? signed(c.gain / c.error, 1) : '–'} Standardfehler).`,
+      '',
+    );
+
+    // As the tile would show it: the step of the side seen ahead, and how often that side made the kill.
+    for (const [name, predictions] of [['je Lane', lanePredictions], ['Top, Jungle, Mid zusammen; Bot eigen', pooledPredictions]] as const) {
+      report.push(`### Stufen der Skala (${name}), ein Schritt = 0,6 Log-Odds`, '', '| Stufe der vorn gesehenen Seite | Duelle | im Mittel vorhergesagt | so oft gewonnen | ± |', '|---|---:|---:|---:|---:|');
+      const labels = ['unter 0,5 (Ausgeglichen)', '0,5 bis 1,5 (Leicht stärker)', '1,5 bis 2,5 (Stärker)', 'ab 2,5 (Deutlich stärker)'];
+      const bins = labels.map(() => ({ n: 0, said: 0, won: 0 }));
+      check.forEach((d, i) => {
+        const p = predictions[i]!;
+        if (p === 0.5) return;
+        const favourite = Math.max(p, 1 - p);
+        const step = Math.log(favourite / (1 - favourite)) / 0.6;
+        const bin = bins[step < 0.5 ? 0 : step < 1.5 ? 1 : step < 2.5 ? 2 : 3]!;
+        bin.n++;
+        bin.said += favourite;
+        bin.won += p > 0.5 === (d.y === 1) ? 1 : 0;
+      });
+      bins.forEach((bin, k) => {
+        if (bin.n > 0) report.push(`| ${labels[k]} | ${count(bin.n)} | ${pct(bin.said / bin.n)} | ${pct(bin.won / bin.n)} | ${num(196 * Math.sqrt(0.25 / bin.n))} |`);
+      });
+      report.push('');
+    }
+  }
+
   // ── The models on held-out games ─────────────────────────────────────────────────────────────
   const train = duels.filter((d) => !isHeldOut(d.game));
   const held = duels.filter((d) => isHeldOut(d.game));

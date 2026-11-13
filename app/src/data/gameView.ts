@@ -3,7 +3,8 @@
 import type { GameModel } from '../core/game';
 import { SITUATION_TEXT, SLOT, type RatedSuggestion, type SituationalSuggestion } from '../core/situational';
 import { DamageType } from '../core/model/metaLookup';
-import type { ChampionRef, GameView, ItemRef, Tone } from '../core/view';
+import type { Strength } from '../core/strength';
+import type { ChampionRef, GameView, ItemRef, StrengthView, Tone } from '../core/view';
 import { itemName } from './assets';
 
 const item = (id: number): ItemRef => ({ id, name: itemName(id) });
@@ -31,6 +32,38 @@ export function situationalStats(s: SituationalSuggestion): string {
   return `Winrate damit ${pct(s.winRate)} (sonst ${pct(s.otherRate)}) · ${s.games.toLocaleString('de-DE')} Spiele`;
 }
 
+/** "Leicht stärker": the scale's step in words. It says how things stand, never what to do. */
+export function strengthLabel(value: number): string {
+  const size = Math.abs(value);
+  if (size < 0.5) return 'Ausgeglichen';
+  const word = value > 0 ? 'stärker' : 'schwächer';
+  if (size < 1.5) return `Leicht ${word}`;
+  return size < 2.5 ? word.charAt(0).toUpperCase() + word.slice(1) : `Deutlich ${word}`;
+}
+
+/** The strength scale (core/strength) as the tile shows it: the opponents' pictures, the step and what it is made of. */
+export function strengthView(strength: Strength, champion: (id: number) => ChampionRef | null): StrengthView {
+  const tone = (diff: number): 'up' | 'down' | 'even' => (diff > 0 ? 'up' : diff < 0 ? 'down' : 'even');
+  const signed = (diff: number): string => (diff === 0 ? '±0' : `${diff > 0 ? '+' : '−'}${Math.abs(diff).toLocaleString('de-DE')}`);
+  return {
+    opponents: strength.theirs.championIds.map((id) => champion(id) ?? { id, key: '', name: `#${id}` }),
+    value: strength.value,
+    label: strengthLabel(strength.value),
+    rows: [
+      { label: 'Level', mine: strength.mine.levels.join(' + '), theirs: strength.theirs.levels.join(' + '), diff: signed(strength.levelDiff), tone: tone(strength.levelDiff) },
+      {
+        label: 'Items',
+        mine: strength.mine.worth.toLocaleString('de-DE'),
+        theirs: strength.theirs.worth.toLocaleString('de-DE'),
+        diff: signed(strength.worthDiff),
+        tone: tone(strength.worthDiff),
+      },
+    ],
+    // How the two champions do in duels by phase: only once the collector exports it (Messung 27).
+    phases: null,
+  };
+}
+
 /**
  * `situational`: suggestions from core/situational, or null when there is no situational data —
  * the tile is then left out rather than saying "nothing better" on no evidence.
@@ -41,6 +74,7 @@ export function gameView(
   title: string,
   draftLine: string | null,
   situational: (SituationalSuggestion | RatedSuggestion)[] | null = null,
+  strength: Strength | null = null,
 ): GameView {
   const me = champion(model.championId) ?? { id: model.championId, key: '', name: `#${model.championId}` };
 
@@ -94,6 +128,7 @@ export function gameView(
     hints,
     draftLine,
     sample: null,
+    strength: strength ? strengthView(strength, champion) : null,
     situational: situational
       ? situational.map((s) => {
           // The base choice it is an alternative to: the planned boots, or the next core or late item

@@ -127,10 +127,13 @@ kommen nur seine Zahlen (Level-Gewicht, Gold-Gewicht, Champion-Stärke je Abschn
 
 ## Prüfung, bevor die Skala erscheint
 
-*Stand 13.11.2026 (`docs/modellpruefung.md`, Messung 27): Die Champion-Stärke je Abschnitt besteht die
-Prüfung, das Paar „X gegen genau Y“ nicht. Die Gewichte für Level und Itemwert sind noch nicht
-gültig — der Sammler zählte dem Sieger den Level-Aufstieg durch den Kill an; behoben, saubere Duelle
-sind an der −2 am Zeilenende zu erkennen. Endgültig messen, sobald 40.000 davon gezählt sind.*
+*Stand 13.11.2026 (`docs/modellpruefung.md`, Messung 27): Die Skala aus Level und Itemwert besteht
+die Prüfung an den Duellen zwischen 10:00 und 11:00, für die das wahre Level bekannt ist (2.768
+zurückgehaltene Duelle; „Leicht stärker“ gewinnt 65 %, „Stärker“ 76 %, „Deutlich stärker“ 85 %), und
+steht seit 2.1.0 in der Spielansicht. Der Sammler zählte dem Sieger bis dahin den Level-Aufstieg durch
+den Kill an; behoben, saubere Duelle sind an der −2 am Zeilenende zu erkennen. Mit 40.000 davon neu
+messen: Gewichte über das ganze Spiel, Champion-Stärke je Abschnitt (besteht vorläufig), Resistenzen.
+Das Paar „X gegen genau Y“ besteht nicht und erscheint nicht.*
 
 Auf zurückgehaltenen Spielen: Gewinnt der Champion, den die Skala oben sieht, das nächste Duell
 tatsächlich öfter — und so oft, wie sie sagt (bei „+2“ etwa so oft, wie die Stufe verspricht)?

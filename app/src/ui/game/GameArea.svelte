@@ -5,6 +5,7 @@
   import Tile from '../Tile.svelte';
   import SkillGrid from '../build/SkillGrid.svelte';
   import BuyStrip from './BuyStrip.svelte';
+  import StrengthTile from './StrengthTile.svelte';
 
   let { game, build }: { game: GameView; build: BuildView | null } = $props();
 </script>
@@ -87,6 +88,11 @@
 
   </div>
   <div class="col right">
+  {#if game.strength}
+  <div class="strength">
+    <StrengthTile strength={game.strength} />
+  </div>
+  {/if}
   <!-- Only with something to say: an empty tile with just its footnote read like a fault (live test 07.11.). -->
   {#if game.hints.length > 0}
   <div class="hints">
@@ -175,6 +181,7 @@
     min-width: 0;
   }
 
+  .strength { order: 0; }
   .enemies { order: 1; }
   .hints { order: 2; }
 
@@ -445,6 +452,7 @@
       display: contents;
     }
 
+    .strength { order: 0; }
     .skill { order: 2; }
     .hints { order: 3; }
     .path { order: 4; }
