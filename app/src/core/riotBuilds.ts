@@ -60,6 +60,15 @@ export interface ChampionBuildStats {
    * visit, in steps of 500 gold as text ("0", "500", … "4000"). Since 11.11.2026.
    */
   bootsWorth?: BuildCount[];
+  /**
+   * Shop visits of players without boots who spent at least the price of Boots, by what their items
+   * were worth going in and what they spent: text "worth/spent", e.g. "1000/650" (spend steps 300,
+   * 650, 1300). `games` counts visits. Since 13.11.2026; not read by the app yet — counted to decide
+   * whether Boots or the largest part comes first (docs/modellpruefung.md, Messung 19).
+   */
+  bootsShop?: BuildCount[];
+  /** Of the visits in bootsShop, those in which boots were bought; the same keys. */
+  bootsBought?: BuildCount[];
 }
 
 export interface RiotBuildFile {

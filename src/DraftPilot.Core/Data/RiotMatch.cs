@@ -22,8 +22,14 @@ namespace DraftPilot.Core.Data;
 /// <param name="WorthBeforeBoots">
 /// What the items held were worth going into the shop visit in which the first boots of any kind were
 /// bought (basic Boots or a pair): the inventory <see cref="RiotMatchReader.ShopVisitMs"/> before that
-/// purchase. -1 for a game without boots or without a timeline.
+/// purchase. -1 for a game without boots or without a timeline, and for a player with free boots.
 /// </param>
+/// <param name="FreeBoots">
+/// The player took Magical Footwear: the boots come by themselves and cannot be bought before. Such a
+/// game says nothing about when boots are bought (18 % of the Platinum games of 13.11.2026, 40 % in
+/// the jungle), so every boots timing leaves it out.
+/// </param>
+/// <param name="BootsVisitList">The shop visits without boots (<see cref="BootsVisit"/>); null without a timeline.</param>
 public sealed record ParticipantBuild(
     int ChampionId,
     Lane Lane,
@@ -43,8 +49,17 @@ public sealed record ParticipantBuild(
     IReadOnlyList<long>? ItemTimesMs = null,
     long BootsTimeMs = 0,
     int ParticipantId = 0,
-    int WorthBeforeBoots = -1)
+    int WorthBeforeBoots = -1,
+    bool FreeBoots = false,
+    IReadOnlyList<BootsVisit>? BootsVisitList = null)
 {
+    /// <summary>
+    /// Every shop visit after the start in which the player had no boots yet and spent at least what
+    /// Boots cost, up to and including the visit in which the first boots were bought. Empty with
+    /// free boots or without a timeline.
+    /// </summary>
+    public IReadOnlyList<BootsVisit> BootsVisits => BootsVisitList ?? [];
+
     /// <summary>When each of <see cref="Items"/> was bought, ms into the game; empty without a timeline.</summary>
     public IReadOnlyList<long> ItemTimes => ItemTimesMs ?? [];
 
@@ -52,7 +67,7 @@ public sealed record ParticipantBuild(
     /// How many finished items were bought before the pair of boots; -1 for a game without a pair or
     /// without a timeline (no purchase time).
     /// </summary>
-    public int ItemsBeforeBoots => Boots > 0 && BootsTimeMs > 0 ? ItemTimes.Count(time => time < BootsTimeMs) : -1;
+    public int ItemsBeforeBoots => Boots > 0 && BootsTimeMs > 0 && !FreeBoots ? ItemTimes.Count(time => time < BootsTimeMs) : -1;
 
     /// <summary>
     /// The finished items and boots owned at a moment — what an enemy's inventory looked like when
@@ -165,6 +180,15 @@ public sealed record PlayerFrame(int Level, long TotalGold, long Xp);
 public sealed record PlayerMoment(int ParticipantId, int Level, int ItemGold, int Armor, int MagicResist);
 
 /// <summary>
+/// One shop visit of a player who has no boots yet and spent at least the price of Boots in it — so
+/// boots were a choice: what the items held were worth going in (<see cref="ItemCatalog.CountsForWorth"/>),
+/// the gold spent in the visit, and whether boots of any kind were among the buys. Counted to
+/// answer what players do with the gold at hand: boots, or a part of the next item
+/// (docs/modellpruefung.md, Messung 19).
+/// </summary>
+public readonly record struct BootsVisit(int Worth, int Spent, bool Bought);
+
+/// <summary>
 /// A kill between lane opponents that nobody else took part in, with how every player of that lane
 /// stood at the moment: top, jungle and mid one against one without helpers; on the bot lane among
 /// the four bot players, the killer's partner the only helper allowed. Who won the duel, at which
@@ -197,6 +221,9 @@ public static class RiotMatchReader
     /// seconds cover a slow shopper and stay well short of the next recall.
     /// </summary>
     public const int ShopVisitMs = 30_000;
+
+    /// <summary>Magical Footwear: free boots after twelve minutes, none to buy before.</summary>
+    public const int MagicalFootwearRune = 8304;
 
     /// <summary>
     /// The ten players' PUUIDs, for finding more active players of the same rank while a run lasts.
@@ -313,12 +340,14 @@ public static class RiotMatchReader
             var finished = purchases.Where(p => items.IsFinished(p.ItemId)).DistinctBy(p => p.ItemId).ToList();
 
             var finalItems = Enumerable.Range(0, 7).Select(slot => Int(participant, $"item{slot}")).Where(item => item > 0).ToList();
+            var runes = Runes(participant);
+            var freeBoots = runes.Contains(MagicalFootwearRune);
 
             participants.Add(new ParticipantBuild(
                 ChampionId: championId,
                 Lane: lane,
                 Win: participant.TryGetProperty("win", out var win) && win.ValueKind == JsonValueKind.True,
-                Runes: Runes(participant),
+                Runes: runes,
                 Spells: [.. new[] { Int(participant, "summoner1Id"), Int(participant, "summoner2Id") }.Where(spell => spell > 0).Order()],
                 Starters: [.. purchases.Where(p => p.Timestamp <= StartingWindowMs && !items.IsTrinket(p.ItemId)).Select(p => p.ItemId).Order()],
                 Boots: boots?.ItemId ?? 0,
@@ -337,9 +366,11 @@ public static class RiotMatchReader
                 ItemTimesMs: [.. finished.Select(p => p.Timestamp)],
                 BootsTimeMs: boots?.Timestamp ?? 0,
                 ParticipantId: id,
-                WorthBeforeBoots: firstBoots is null
+                WorthBeforeBoots: firstBoots is null || freeBoots
                     ? -1
-                    : Moment(id, Math.Max(0, firstBoots.Timestamp - ShopVisitMs), events, frames, items).ItemGold));
+                    : Moment(id, Math.Max(0, firstBoots.Timestamp - ShopVisitMs), events, frames, items).ItemGold,
+                FreeBoots: freeBoots,
+                BootsVisitList: freeBoots ? [] : BootsVisits(id, purchases, own, events, frames, items)));
         }
 
         const int minuteTen = (int)(RiotGames.LaneAtMs / 60_000);
@@ -397,6 +428,83 @@ public static class RiotMatchReader
     /// last minute frame and the level-ups since, the items from purchases, sales, items used up or
     /// built into something else, and undos.
     /// </summary>
+    /// <summary>
+    /// The shop visits without boots (<see cref="BootsVisit"/>). A visit is a run of purchases no more
+    /// than <see cref="ShopVisitMs"/> apart; the one at the start of the game is left out. What a visit
+    /// cost is what the inventory gained in shop prices — a finished item counts only what was paid on
+    /// top of its parts, because the timeline takes the parts away in the same instant.
+    /// </summary>
+    private static List<BootsVisit> BootsVisits(
+        int id, List<TimelineEvent> purchases, List<TimelineEvent> own, List<TimelineEvent> events, List<Dictionary<int, PlayerFrame>> frames, ItemCatalog items)
+    {
+        var visits = new List<BootsVisit>();
+        var bootsPrice = items.Gold(ItemCatalog.BasicBoots);
+        if (bootsPrice <= 0)
+            return visits;
+
+        for (var start = 0; start < purchases.Count;)
+        {
+            var end = start;
+            while (end + 1 < purchases.Count && purchases[end + 1].Timestamp - purchases[end].Timestamp <= ShopVisitMs)
+                end++;
+
+            var bought = false;
+            for (var i = start; i <= end; i++)
+                bought |= purchases[i].ItemId == ItemCatalog.BasicBoots || items.IsBoots(purchases[i].ItemId);
+
+            var entered = purchases[start].Timestamp;
+            if (entered > StartingWindowMs)
+            {
+                var spent = HeldGold(own, purchases[end].Timestamp, items) - HeldGold(own, entered - 1, items);
+                if (spent >= bootsPrice)
+                    visits.Add(new BootsVisit(Moment(id, entered - 1, events, frames, items).ItemGold, spent, bought));
+            }
+
+            // From here on the player has boots.
+            if (bought)
+                break;
+            start = end + 1;
+        }
+
+        return visits;
+    }
+
+    /// <summary>Everything one player holds at a moment, in shop prices (potions and boots included).</summary>
+    private static int HeldGold(List<TimelineEvent> own, long timeMs, ItemCatalog items)
+    {
+        var held = new List<int>();
+        foreach (var e in own)
+        {
+            if (e.Timestamp > timeMs)
+                break;
+            Apply(held, e);
+        }
+
+        return held.Sum(items.Gold);
+    }
+
+    /// <summary>One event's effect on what a player holds.</summary>
+    private static void Apply(List<int> held, TimelineEvent e)
+    {
+        switch (e.Type)
+        {
+            case "ITEM_PURCHASED" when e.ItemId > 0:
+                held.Add(e.ItemId);
+                break;
+            case "ITEM_SOLD" or "ITEM_DESTROYED":
+                held.Remove(e.ItemId);
+                break;
+            case "ITEM_UNDO":
+                // Undoing a purchase takes the item back (before → nothing), undoing a sale
+                // brings it back (nothing → after).
+                if (e.BeforeId > 0)
+                    held.Remove(e.BeforeId);
+                if (e.AfterId > 0)
+                    held.Add(e.AfterId);
+                break;
+        }
+    }
+
     private static PlayerMoment Moment(int id, long timeMs, List<TimelineEvent> events, List<Dictionary<int, PlayerFrame>> frames, ItemCatalog items)
     {
         var level = 1;
@@ -417,26 +525,10 @@ public static class RiotMatchReader
             if (e.ParticipantId != id)
                 continue;
 
-            switch (e.Type)
-            {
-                case "LEVEL_UP":
-                    level = Math.Max(level, e.Level);
-                    break;
-                case "ITEM_PURCHASED" when e.ItemId > 0:
-                    held.Add(e.ItemId);
-                    break;
-                case "ITEM_SOLD" or "ITEM_DESTROYED":
-                    held.Remove(e.ItemId);
-                    break;
-                case "ITEM_UNDO":
-                    // Undoing a purchase takes the item back (before → nothing), undoing a sale
-                    // brings it back (nothing → after).
-                    if (e.BeforeId > 0)
-                        held.Remove(e.BeforeId);
-                    if (e.AfterId > 0)
-                        held.Add(e.AfterId);
-                    break;
-            }
+            if (e.Type == "LEVEL_UP")
+                level = Math.Max(level, e.Level);
+            else
+                Apply(held, e);
         }
 
         var worth = held.Where(items.CountsForWorth).ToList();

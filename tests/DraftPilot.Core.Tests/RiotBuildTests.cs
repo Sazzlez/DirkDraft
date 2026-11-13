@@ -164,18 +164,22 @@ public class RiotBuildTests
         Assert.Equal(450, kayle.WorthBeforeBoots);
         Assert.Equal(1, kayle.ItemsBeforeBoots);
 
-        // Jax never bought basic Boots: Mercury's Treads in one go at 13:24, with Scorchclaw Pup,
-        // Trinity Force and a Null-Magic Mantle in the bag (450 + 3.333 + 400).
+        // Jax never bought basic Boots: he took Magical Footwear, and Mercury's Treads at 13:24 were the
+        // upgrade of the pair the rune gave him (the timeline takes Slightly Magical Footwear away in the
+        // same instant). Until 13.11.2026 he counted as buying his first boots with 4.183 gold of items
+        // (Scorchclaw Pup, Trinity Force, Null-Magic Mantle); a rune that forbids buying boots is no vote
+        // on when to buy them.
         var jax = reading.Participants.Single(p => p.ChampionId == 24);
-        Assert.Equal(4183, jax.WorthBeforeBoots);
-        Assert.Equal(1, jax.ItemsBeforeBoots);
+        Assert.True(jax.FreeBoots);
+        Assert.Equal(-1, jax.WorthBeforeBoots);
+        Assert.Equal(-1, jax.ItemsBeforeBoots);
 
         // Bel'Veth: basic Boots only at 17:47, Plated Steelcaps at 22:01 after Kraken Slayer and Rageblade.
         var belveth = reading.Participants.Single(p => p.ChampionId == 200);
         Assert.Equal(4975, belveth.WorthBeforeBoots);
         Assert.Equal(2, belveth.ItemsBeforeBoots);
 
-        // Ambessa played the whole game without boots.
+        // Ambessa bought no boots the whole game — she kept the pair Magical Footwear gave her.
         var ambessa = reading.Participants.Single(p => p.ChampionId == 799);
         Assert.Equal(-1, ambessa.WorthBeforeBoots);
         Assert.Equal(-1, ambessa.ItemsBeforeBoots);
@@ -205,8 +209,17 @@ public class RiotBuildTests
         Assert.Equal("1", kayle.BootsAfter.Single().Text);
         Assert.Equal("0", kayle.BootsWorth.Single().Text);
         Assert.Equal(1, kayle.BootsWorth.Single().Wins);
-        Assert.Equal("4000", stats.Single(s => s.ChampionId == 24).BootsWorth.Single().Text);
+        // Bel'Veth buys her Boots at 17:47 with two items' worth of parts in the bag.
+        Assert.Equal("4000", stats.Single(s => s.ChampionId == 200).BootsWorth.Single().Text);
         Assert.Equal("2", stats.Single(s => s.ChampionId == 200).BootsAfter.Single().Text);
+
+        // Free boots, no vote: Jax took Magical Footwear and upgraded the pair it gave him at 13:24.
+        // Counted, he read as a player who waits for 4.000 gold of items (until 13.11.2026 he did).
+        var jax = stats.Single(s => s.ChampionId == 24);
+        Assert.True(reading.Participants.Single(p => p.ChampionId == 24).FreeBoots);
+        Assert.Empty(jax.BootsAfter);
+        Assert.Empty(jax.BootsWorth);
+        Assert.Empty(jax.BootsShop);
 
         // No boots, no vote.
         var ambessa = stats.Single(s => s.ChampionId == 799);
@@ -218,6 +231,70 @@ public class RiotBuildTests
         blind.Add(new ParticipantBuild(1, Lane.Top, true, [], [], [], 3047, [], 0, string.Empty), "gold");
         Assert.Empty(blind.Export(keep: 10).Single().BootsAfter);
         Assert.Empty(blind.Export(keep: 10).Single().BootsWorth);
+    }
+
+    [Theory]
+    [InlineData(450, 300, "0/300")]
+    [InlineData(450, 649, "0/300")]
+    [InlineData(1150, 650, "1000/650")]
+    [InlineData(1150, 1299, "1000/650")]
+    [InlineData(2175, 1300, "2000/1300")]
+    [InlineData(5425, 3000, "4000/1300")]
+    public void AShopVisit_IsCountedByWorthAndSpend(int worth, int spent, string key)
+        => Assert.Equal(key, RiotBuildTally.BootsVisitKey(worth, spent));
+
+    [Fact]
+    public void TheReader_FindsTheShopVisitsWithoutBoots()
+    {
+        // Read off the raw timeline by hand (purchases, with the parts a finished item takes away).
+        var reading = RiotMatchReader.Read(Match, Timeline, Items);
+        IReadOnlyList<BootsVisit> Visits(int championId) => reading.Participants.Single(p => p.ChampionId == championId).BootsVisits;
+
+        // Kayle, 4:28: Blasting Wand (850) and Boots (300) on a Doran's Blade (450). One visit, and she has boots.
+        Assert.Equal([new BootsVisit(450, 1150, true)], Visits(Kayle));
+
+        // Bel'Veth shops six times without boots and buys them alone on the seventh:
+        // Recurve Bow · Rectrix and Dagger · Kraken Slayer (3.000 less its parts 1.725) · Recurve Bow ·
+        // Amplifying Tome · Pickaxe · Boots. Before the fifth her jungle pet is gone (13:33, quest done): 450 less.
+        Assert.Equal(
+            [
+                new BootsVisit(450, 700, false),
+                new BootsVisit(1150, 1025, false),
+                new BootsVisit(2175, 1275, false),
+                new BootsVisit(3450, 700, false),
+                new BootsVisit(3700, 400, false),
+                new BootsVisit(4100, 875, false),
+                new BootsVisit(4975, 300, true),
+            ],
+            Visits(200));
+
+        // Ambessa has Magical Footwear: nothing to choose, nothing counted.
+        Assert.Empty(Visits(799));
+    }
+
+    [Fact]
+    public void TheTally_CountsShopVisitsAndTheOnesWithBoots()
+    {
+        var reading = RiotMatchReader.Read(Match, Timeline, Items);
+        var tally = new RiotBuildTally();
+        foreach (var participant in reading.Participants)
+            tally.Add(participant, "gold");
+
+        // A minimum of three games cuts neither list: the rare steps belong to the total.
+        var belveth = tally.Export(keep: 2, minimumGames: 3).Single(s => s.ChampionId == 200);
+        Assert.Equal(7, belveth.BootsShop.Sum(o => o.Games));
+        Assert.Equal(1, belveth.BootsShop.Single(o => o.Text == "4000/300").Games);
+        Assert.Equal(1, belveth.BootsShop.Single(o => o.Text == "3500/300").Games);
+        Assert.Equal(1, belveth.BootsShop.Single(o => o.Text == "0/650").Games);
+        var bought = Assert.Single(belveth.BootsBought);
+        Assert.Equal("4000/300", bought.Text);
+        Assert.Equal(1, bought.Games);
+
+        // Counts from a stored file add up like any other slot.
+        var again = new RiotBuildTally();
+        again.Add(tally.Export(keep: 50));
+        again.Add(tally.Export(keep: 50));
+        Assert.Equal(14, again.Export(keep: 50).Single(s => s.ChampionId == 200).BootsShop.Sum(o => o.Games));
     }
 
     [Fact]

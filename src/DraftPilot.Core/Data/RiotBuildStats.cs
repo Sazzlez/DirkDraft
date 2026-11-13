@@ -81,6 +81,18 @@ public sealed class ChampionBuildStats
     /// (below 500: the starting items), <c>500</c>, … up to <c>4000</c> and above.
     /// </summary>
     public List<BuildCount> BootsWorth { get; set; } = [];
+
+    /// <summary>
+    /// Shop visits of players without boots who spent at least the price of Boots in the visit, by
+    /// what their items were worth going in and by what they spent: <c>worth/spent</c>, the worth in
+    /// the steps of <see cref="BootsWorth"/>, the spend as <c>300</c> (up to 649 gold: Boots or one
+    /// small part, not both), <c>650</c> (up to 1.299) or <c>1300</c> (and more). <c>Games</c> counts
+    /// visits here, not games. Since 13.11.2026.
+    /// </summary>
+    public List<BuildCount> BootsShop { get; set; } = [];
+
+    /// <summary>Of the visits in <see cref="BootsShop"/>, those in which boots were bought; the same keys.</summary>
+    public List<BuildCount> BootsBought { get; set; } = [];
 }
 
 /// <summary>
@@ -177,7 +189,27 @@ public sealed class RiotBuildTally
             bucket.Count(Slot.BootsAfter, [], Math.Min(game.ItemsBeforeBoots, MostItemsBeforeBoots).ToString(CultureInfo.InvariantCulture), game.Win);
         if (game.WorthBeforeBoots >= 0)
             bucket.Count(Slot.BootsWorth, [], BootsWorthKey(game.WorthBeforeBoots), game.Win);
+
+        // What players without boots do with the gold at hand: every visit in which boots were
+        // affordable, and those in which they were bought.
+        foreach (var visit in game.BootsVisits)
+        {
+            var step = BootsVisitKey(visit.Worth, visit.Spent);
+            bucket.Count(Slot.BootsShop, [], step, game.Win);
+            if (visit.Bought)
+                bucket.Count(Slot.BootsBought, [], step, game.Win);
+        }
     }
+
+    /// <summary>
+    /// The lower bounds of the spend steps of a shop visit: Boots cost 300, Boots and the smallest
+    /// part of a damage item 650 (a Long Sword), and from 1.300 a large part fits beside them.
+    /// </summary>
+    public static readonly IReadOnlyList<int> BootsSpendSteps = [300, 650, 1300];
+
+    /// <summary>The key of a shop visit: the worth step, a slash, the spend step — <c>1000/650</c>.</summary>
+    public static string BootsVisitKey(int worth, int spent)
+        => $"{BootsWorthKey(worth)}/{BootsSpendSteps.Last(step => step <= Math.Max(spent, BootsSpendSteps[0])).ToString(CultureInfo.InvariantCulture)}";
 
     /// <summary>Finished items before the boots are counted up to this many; more is the same answer, "after the core".</summary>
     public const int MostItemsBeforeBoots = 3;
@@ -235,15 +267,17 @@ public sealed class RiotBuildTally
 
             foreach (var slot in Enum.GetValues<Slot>())
             {
+                // The timing slots are a handful of steps, not a long tail of choices: cut, by number
+                // or by games, the steps left would no longer add up to what they were counted from
+                // — and a visit count without its rare steps would no longer divide by the right total.
+                var timing = slot is Slot.BootsAfter or Slot.BootsWorth or Slot.BootsShop or Slot.BootsBought;
                 var target = Lists(stats, slot);
                 target.AddRange(bucket.Options(slot)
-                    .Where(option => option.Games >= minimumGames)
+                    .Where(option => timing || option.Games >= minimumGames)
                     .OrderByDescending(option => option.Games)
                     .ThenByDescending(option => option.Wins)
                     .ThenBy(option => option.Key, StringComparer.Ordinal)
-                    // The timing slots are a handful of steps, not a long tail of choices: cut, the
-                    // steps left would no longer add up to the games they were counted from.
-                    .Take((slot is Slot.BootsAfter or Slot.BootsWorth) ? int.MaxValue : keep)
+                    .Take(timing ? int.MaxValue : keep)
                     .Select(Copy));
             }
 
@@ -271,6 +305,8 @@ public sealed class RiotBuildTally
         Slot.SkillMax => stats.SkillMax,
         Slot.BootsAfter => stats.BootsAfter,
         Slot.BootsWorth => stats.BootsWorth,
+        Slot.BootsShop => stats.BootsShop,
+        Slot.BootsBought => stats.BootsBought,
         _ => throw new ArgumentOutOfRangeException(nameof(slot)),
     };
 
@@ -289,6 +325,8 @@ public sealed class RiotBuildTally
         SkillMax,
         BootsAfter,
         BootsWorth,
+        BootsShop,
+        BootsBought,
     }
 
     private sealed class Bucket

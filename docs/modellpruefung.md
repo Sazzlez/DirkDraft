@@ -833,6 +833,36 @@ für das größte Teil des nächsten Items gereicht hätte und was davon gekauft
 Nutzers (Stiefel oder größtes Teil zuerst, `basketOf`, `bootsDue`) ist damit nicht entschieden;
 **nichts geändert.**
 
+### Nachtrag 13.11.2026: der Sammler zählt Shop-Besuche (Entscheidung des Nutzers)
+
+Der Nutzer hat entschieden, die Frage den Daten zu überlassen. Der Sammler zählt deshalb jetzt je
+Champion und Lane jeden Shop-Besuch nach dem Start, bei dem der Spieler noch keine Stiefel hatte und
+mindestens den Preis der Stiefel ausgegeben hat — Stiefel waren also eine Wahl:
+
+- `bootsShop`: alle solchen Besuche, nach Itemwert beim Betreten des Shops (Stufen wie `bootsWorth`)
+  und nach ausgegebenem Gold: `300` (bis 649: Stiefel oder ein kleines Teil, nicht beides), `650`
+  (bis 1.299), `1300` (und mehr). Schlüssel etwa `1000/650`.
+- `bootsBought`: davon die Besuche, in denen Stiefel gekauft wurden.
+
+Ein Besuch ist eine Folge von Käufen mit höchstens 30 Sekunden Abstand. Was er gekostet hat, ist, was
+das Inventar an Ladenpreis gewonnen hat (ein fertiges Item zählt nur den Aufpreis auf seine Teile).
+Gezählt wird bis einschließlich des Besuchs mit den ersten Stiefeln. Auswertung: `npm run
+measure:builds`, Abschnitt „Was Spieler ohne Stiefel mit ihrem Gold kaufen“ — die Spalte „300–649
+Gold“ ist die Antwort auf „Teil oder Stiefel bei knappem Gold“, und die Itemwert-Stufe, ab der mehr als
+die Hälfte Stiefel kauft, ist die, ab der „Stiefel zuerst“ dem entspricht, was Spieler tun. Die
+Zählung beginnt mit dem ersten Lauf des Sammlers auf diesem Stand und braucht einige Tage.
+
+**Ein Zählfehler, dabei gefunden und behoben: Magisches Schuhwerk.** Wer die Rune nimmt, bekommt
+Stiefel geschenkt und kann vorher keine kaufen. Solche Spieler zählten bisher mit: als Käufer „erst
+ab 4.000 Gold Itemwert“ (wenn sie das geschenkte Paar aufwerten) oder gar nicht. Die Rune steht in
+18,4 % der gezählten Runenseiten — **Jungle 39,9 %, Bot 30,5 %**, Top 7,8 %, Mid 7,0 %, Support 5,4 %.
+Die Tabellen oben sind deshalb für Jungle und Bot verzerrt: Dass Jungler „zur Hälfte erst ab 2.500
+Gold“ kaufen, liegt zu einem guten Teil an der Rune, nicht an der Gewohnheit. Seit dem 13.11.2026
+lassen `bootsAfter`, `bootsWorth` und die neue Zählung Spieler mit der Rune aus
+(`ParticipantBuild.FreeBoots`). Der Bestand mischt bis zum nächsten Patch alte und neue Zählung; die
+Verteilungen sind danach neu zu lesen. Für die App heißt das: Bei Champions, deren Spieler die Rune
+oft nehmen, kommen die Stiefel bisher zu spät auf die Einkaufsliste.
+
 ## 20. Situative Items im Build (11.11.2026, Nutzerwunsch)
 
 Bis 2.0 galt: situative Items stehen neben dem Build, nie an seiner Stelle. Seit dem 11.11.2026
@@ -976,6 +1006,7 @@ Support 3.300 — die Momentenschätzung aus Messung 14, gerundet). Was dafür s
 - Geändert ist es trotzdem, weil die Streuung je Lane selbst gemessen ist (zwei Verfahren, gleiche
   Reihenfolge) und ein Gewicht für alle das Top-Duell nachweislich zu schwach zählt. Es ist eine
   Konstante; wer sie nicht will, setzt alle fünf auf 1.000 und verliert in der Vorhersage nichts.
+  **Vom Nutzer am 13.11.2026 bestätigt: so lassen.**
 - Folge für die offenen Counter (Messung 18): 10 Champion-Lanes haben jetzt einen, 2 zwei oder mehr
   (vorher 14 und 0); auf Support keiner mehr, auf Top fünf. Größte Abweichung: Kayle gegen Garen,
   57,4 % aus 509 Spielen, geglättet +3,6 Punkte (vorher +2,9 für Twitch gegen Jinx).
@@ -1081,8 +1112,11 @@ Spielers mit dem seltensten Champion des Spiels. Median 78.148 Punkte.
 
 Offen ist außerdem, wo die Korrektur gelten soll: Sie beschreibt einen durchschnittlichen Spieler auf
 dem Champion, also die Vorschläge für den eigenen Platz — nicht die Gegner und Mitspieler, die ihren
-Champion gewählt haben und im Mittel so erfahren sind wie die gezählten Spieler. Entscheidung des
-Nutzers, vor dem Bau.
+Champion gewählt haben und im Mittel so erfahren sind wie die gezählten Spieler.
+
+**Entscheidung des Nutzers (13.11.2026): nicht gewünscht** — weder die Korrektur der Zahl noch ein
+Hinweis. Die Messung bleibt hier stehen, gebaut wird nichts. Die Mastery-Stichprobe des Sammlers
+läuft unverändert weiter, solange der Nutzer sie nicht abbestellt.
 
 ## 25. Runen, Zauber und Start passend zum Matchup (13.11.2026, Konzept §5 Punkt 3)
 

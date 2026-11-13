@@ -45,6 +45,8 @@ Kopien melden sie beim nächsten Start.
   Hälfte der Spieler; das Paar steht an der Stelle, an der die meisten es kaufen. Bis die Zahlen da
   sind (und für Champions mit zu wenigen Spielen): Paar nach dem ersten Item, Stiefel mit dem Gold,
   das nach den Teilen übrig bleibt. Im Build-Pfad stehen die Schuhe weiter als eigener Platz vorn.
+  Spieler mit „Magisches Schuhwerk“ zählen dabei nicht mehr mit: Sie bekommen ihre Stiefel geschenkt
+  und standen bisher als sehr späte Käufer in der Zählung (im Jungle 40 % der Spiele, auf Bot 31 %).
 - **Situative Items stehen jetzt von selbst im Build.** Bisher standen sie nur als Alternative daneben,
   und die Einkaufsliste folgte weiter dem Grundbuild. Jetzt gilt: Kaufen Spieler deines Champions ein
   Item in der Lage klar öfter als ein Item aus dem Plan, übernimmt es dessen Platz für dieses Spiel —

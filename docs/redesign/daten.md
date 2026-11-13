@@ -90,8 +90,21 @@ Riot-Anfrage). Zwei Zählungen je Champion und Lane, als Optionen mit Text wie d
   die Stufe, bis zu der die Hälfte der Spieler gekauft hat: Ist das eigene Inventar so viel wert,
   kommen die Stiefel auf die Einkaufsliste.
 
-Beide Zählungen werden beim Export nicht auf die meistgespielten Optionen gekürzt, sonst stimmte die
-Hälfte nicht mehr. Die Siegzahlen stehen wie überall dabei, werden aber nicht gelesen: Wer früh Schuhe
+Seit dem 13.11.2026 dazu, für die Frage „Stiefel oder das größte Teil zuerst“ (`docs/modellpruefung.md`,
+Messung 19; die App liest sie noch nicht):
+
+- `bootsShop`: Shop-Besuche nach dem Start, bei denen der Spieler noch keine Stiefel hatte und
+  mindestens den Preis der Stiefel ausgegeben hat. Text `Itemwert/Ausgabe`, der Itemwert beim Betreten
+  in den Stufen von `bootsWorth`, die Ausgabe als `300` (bis 649 Gold), `650` (bis 1.299) oder `1300`
+  — etwa `"1000/650"`. `games` zählt hier Besuche, nicht Spiele.
+- `bootsBought`: davon die Besuche, in denen Stiefel gekauft wurden; dieselben Schlüssel.
+
+Spieler mit der Rune „Magisches Schuhwerk“ (Stiefel geschenkt, vorher keine kaufbar) zählen seit dem
+13.11.2026 in keiner der vier Zählungen mit; davor standen sie als späte Käufer in `bootsAfter` und
+`bootsWorth`.
+
+Alle vier Zählungen werden beim Export weder auf die meistgespielten Optionen noch nach Mindestspielen
+gekürzt, sonst stimmten die Hälfte und die Anteile nicht mehr. Die Siegzahlen stehen wie überall dabei, werden aber nicht gelesen: Wer früh Schuhe
 kauft, liegt oft hinten oder vorn, das sagt nichts über den Zeitpunkt. Ältere Dateien haben die Felder
 nicht; dann gilt in der App: Paar nach dem ersten Item, Stiefel mit dem Gold, das nach den Teilen
 übrig bleibt. Unter 30 gezählten Spielen ebenso.

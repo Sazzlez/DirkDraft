@@ -472,6 +472,58 @@ export async function main(argv: string[]): Promise<number> {
     '',
   );
 
+  // What players without boots do with the gold at hand (counted since 13.11.2026).
+  const visits = new Map<string, { shop: number; bought: number }>();
+  let visitRows = 0;
+  for (const row of builds.builds) {
+    if (row.lane === Lane.Unknown || !(row.bootsShop && row.bootsShop.length > 0)) continue;
+    visitRows++;
+    const add = (list: readonly BuildCount[] | undefined, field: 'shop' | 'bought') => {
+      for (const o of list ?? []) {
+        const [worth, spent] = (o.text ?? '').split('/');
+        if (worth === undefined || spent === undefined) continue;
+        for (const key of [`${row.lane}:${worth}:${spent}`, `all:${worth}:${spent}`, `${row.lane}:any:${spent}`, `all:any:${spent}`]) {
+          const entry = visits.get(key) ?? { shop: 0, bought: 0 };
+          entry[field] += o.games;
+          visits.set(key, entry);
+        }
+      }
+    };
+    add(row.bootsShop, 'shop');
+    add(row.bootsBought, 'bought');
+  }
+  report.push('### Was Spieler ohne Stiefel mit ihrem Gold kaufen (`bootsShop`, `bootsBought`)', '');
+  if (visitRows === 0) {
+    report.push('Die Datei zählt die Shop-Besuche noch nicht (der Sammler zählt sie ab dem ersten Lauf mit dem Stand vom 13.11.2026).', '');
+  } else {
+    const spends = ['300', '650', '1300'];
+    const spendName: Record<string, string> = { '300': '300–649 Gold', '650': '650–1.299 Gold', '1300': 'ab 1.300 Gold' };
+    const cell = (key: string) => {
+      const v = visits.get(key);
+      return v && v.shop >= 30 ? `${pct(v.bought / v.shop, 0)} (${count(v.shop)})` : v ? `— (${count(v.shop)})` : '—';
+    };
+    report.push(
+      `${count(visitRows)} Champion-Lanes. Gezählt ist jeder Shop-Besuch nach dem Start, bei dem der Spieler noch keine Stiefel hatte und mindestens den Preis der Stiefel ausgegeben hat ` +
+        '— Stiefel waren also möglich. Spieler mit „Magisches Schuhwerk“ zählen nicht. In den Zellen: Anteil der Besuche, in denen Stiefel gekauft wurden (Besuche in Klammern; unter 30 kein Anteil).',
+      '',
+      '**Je Lane und ausgegebenem Gold:**',
+      '',
+      `| Lane | ${spends.map((s) => spendName[s]).join(' | ')} |`,
+      '|---|---:|---:|---:|',
+      ...[...ALL_LANES, null].map((lane) => `| ${lane === null ? 'alle' : LANE_NAMES[lane]} | ${spends.map((s) => cell(`${lane ?? 'all'}:any:${s}`)).join(' | ')} |`),
+      '',
+      '**Je Itemwert beim Betreten des Shops (alle Lanes):**',
+      '',
+      `| Itemwert | ${spends.map((s) => spendName[s]).join(' | ')} |`,
+      '|---|---:|---:|---:|',
+      ...worthSteps.map((w) => `| ab ${count(w)} | ${spends.map((s) => cell(`all:${w}:${s}`)).join(' | ')} |`),
+      '',
+      'Lesart: Mit 300–649 Gold reicht es für Stiefel oder ein kleines Teil, nicht für beides — dort steht, was Spieler mit knappem Gold wählen. ' +
+        'Die Stufe, ab der mehr als die Hälfte Stiefel kauft, ist die, ab der „Stiefel zuerst“ dem entspricht, was Spieler tun.',
+      '',
+    );
+  }
+
   // ---- Messung 20 -------------------------------------------------------------------------------
   report.push('## Messung 20: Situative Items im Build', '');
   const situations = [SITUATION.Physical, SITUATION.Magic, SITUATION.Tanks, SITUATION.HardCc, SITUATION.EnemyArmor, SITUATION.EnemyMagicResist, SITUATION.EnemySustain] as const;
