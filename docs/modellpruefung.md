@@ -996,6 +996,140 @@ offene Counter. Das Modell kennt weiter weder die Pick-Reihenfolge noch den Spie
 das Gitter von Modell C weg). Der C#-Kern (`Tools -- recommend`) rechnet weiter das Modell von 2.0;
 die App ist seit 2.0 der TypeScript-Kern.
 
+## 22. Erfolgskontrolle (13.11.2026, Konzept §5 Punkt 7)
+
+Werkzeug für die Messungen 22 bis 26: `npm run measure:phase4 -- <games.json.gz> <meta.json>
+<builds.json> <matchups.json.gz> [--before-matchups alt.json.gz]` (`app/tools/measure/phase4.ts`),
+Bericht in `build/measure-phase4.md`.
+
+Gewinnen Spieler öfter, deren Champion das Modell in ihrem Draft weit oben gesehen hätte? 2.000
+zurückgehaltene Spiele, Raten nur aus den Trainingsspielen: jeder Platz mit jedem freien Champion
+seiner Lane besetzt, der Rest des Drafts bleibt, gerechnet mit `draftModel.ts`.
+
+| Platz des gespielten Champions in der Liste | Spieler | gewonnen |
+|---|---:|---|
+| oberstes Zehntel | 2.955 | 52,3 ± 1,8 % |
+| bis zum obersten Viertel | 3.210 | 50,9 ± 1,7 % |
+| obere Hälfte darunter | 4.975 | 51,8 ± 1,4 % |
+| untere Hälfte, oberes Viertel | 4.241 | 48,8 ± 1,5 % |
+| unterstes Viertel | 4.039 | 46,7 ± 1,5 % |
+
+**Ja.** Wer aus dem obersten Viertel der Liste gespielt hat, gewann 51,6 %, wer aus dem untersten,
+46,7 %: rund 5 Punkte Unterschied. Am deutlichsten im Jungle (+8,9 ± 4,4) und auf Top (+7,5 ± 4,4),
+auf Mid nicht zu sehen (+1,0 ± 4,7). Das ist kein Beweis, dass der Pick den Unterschied macht — wer
+starke Champions spielt, sitzt im Mittel auch in einem stärkeren Draft —, aber die Liste ordnet in
+die richtige Richtung, auf Spielen, die sie nie gesehen hat.
+
+## 23. Lane-Zuordnung der Gegner (13.11.2026, Konzept §5 Punkt 5)
+
+291.482 Teams aus den Spielzeilen, mit den Lanes, die Riot aufgezeichnet hat. Dieselbe Rechnung wie in
+der App für Gegner ohne Lane-Angabe (`LanePredictor`, Rollenraten aus `meta.json`), erst mit einem
+aufgedeckten Champion, dann mit mehr. Die Platz-Priors der App zählen hier nicht mit, weil Riot die
+Pick-Reihenfolge nicht herausgibt.
+
+| aufgedeckt | Lane richtig | als sicher gezeigt | davon richtig | als unsicher gezeigt | davon richtig |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 84,4 % | 89,8 % | 87,7 % | 10,2 % | 55,3 % |
+| 2 | 85,0 % | 90,2 % | 88,6 % | 9,8 % | 51,7 % |
+| 3 | 86,5 % | 91,4 % | 89,9 % | 8,6 % | 50,1 % |
+| 4 | 88,7 % | 92,4 % | 92,0 % | 7,6 % | 47,4 % |
+| 5 | 91,9 % | 93,8 % | 94,8 % | 6,2 % | 48,0 % |
+
+- Im ganzen Team sind 91,9 % der Plätze richtig, alle fünf bei 82,3 % der Teams. Bot (95,1 %) und
+  Support (94,6 %) am sichersten, Mid (88,9 %) und Top (89,0 %) am wenigsten.
+- **Die Markierung „unsicher“ trifft die Richtigen:** Was die App als sicher zeigt, stimmt zu 88–95 %,
+  was sie als unsicher zeigt, nur zur Hälfte.
+- Die Fehler sind die Flex-Champions: Yone, Yasuo und Akali zwischen Mid und Top, Ekko, Sylas und
+  Qiyana zwischen Mid und Jungle, Darius im Jungle, Lux als Support. Das ist die Mehrdeutigkeit des
+  Champions, kein Fehler der Rechnung: Aus den Champions allein ist nicht mehr zu holen.
+
+**Nichts geändert.** Die Zuordnung braucht keine Nachstellung; das Menü zum Umstellen der Lane bleibt
+der Weg für die Flex-Fälle.
+
+## 24. Erfahrung auf dem Champion (13.11.2026, Konzept §5 Punkt 1)
+
+28.226 Stichproben: in jedem vierten Spiel die Mastery-Punkte eines Spielers auf seinem Champion, des
+Spielers mit dem seltensten Champion des Spiels. Median 78.148 Punkte.
+
+| Mastery-Punkte | Spieler | gewonnen | nach Lane-Stärke erwartet | Unterschied |
+|---|---:|---:|---:|---:|
+| unter 10.000 | 3.656 | 42,0 % | 49,5 % | −7,4 ± 1,6 Pkt |
+| 10.000–30.000 | 4.729 | 49,0 % | 49,6 % | −0,6 ± 1,4 Pkt |
+| 30.000–100.000 | 7.202 | 49,3 % | 49,6 % | −0,3 ± 1,2 Pkt |
+| 100.000–300.000 | 5.850 | 51,7 % | 49,8 % | +1,9 ± 1,3 Pkt |
+| ab 300.000 | 6.789 | 52,7 % | 49,9 % | +2,9 ± 1,2 Pkt |
+
+- **Erfahrung zählt, und zwar viel:** je Verzehnfachung der Mastery-Punkte +4,1 ± 0,8 Punkte Winrate.
+  Zwischen einem Spieler unter 10.000 Punkten und einem ab 300.000 liegen gut 10 Punkte — mehr als
+  zwischen dem besten und dem durchschnittlichen Pick (+3,4, Messung 13). Der große Sprung liegt ganz
+  unten: Wer einen Champion kaum kennt, verliert 7 Punkte; ab 10.000 Punkten ist der Rest gering.
+- **Was davon in der Winrate eines Champions steckt:** Für die 151 Champion-Lanes mit mindestens 100
+  Stichproben, gegenüber dem Median aller Stichproben, zwischen −2,7 und +2,8 Punkten, die mittlere
+  Hälfte zwischen −0,8 und +1,0. Oben die Champions der Mains (Shaco Support 361.936 Punkte im
+  Median, +2,8; Riven Top 265.157, +2,2; Zoe Mid, Gangplank Mid, je +2,1), unten die neuen (Locke
+  Jungle 17.773, −2,7; Zaahen −2,2): Deren Winrate liegt unter dem, was sie mit eingespielten
+  Spielern hätten.
+
+**Noch nicht in der App.** Die Messung trägt eine Korrektur, aber zwei Dinge fehlen dafür:
+
+1. Die App kennt die Stichproben nicht. Der Sammler müsste je Champion-Lane Anzahl und Median der
+   Mastery-Punkte in `meta.json` schreiben (aus den Spielzeilen, ohne neue Riot-Anfrage).
+2. Gemessen sind nur die seltenen Champions; populäre trifft die Stichprobe fast nie (177 von 328
+   Champion-Lanes haben weniger als 100). Eine Korrektur nur für die gemessenen verschöbe sie gegen
+   die ungemessenen. Dafür müsste die Stichprobe breiter werden (etwa abwechselnd der seltenste und
+   ein zufälliger Spieler, ohne zusätzliche Anfragen).
+
+Offen ist außerdem, wo die Korrektur gelten soll: Sie beschreibt einen durchschnittlichen Spieler auf
+dem Champion, also die Vorschläge für den eigenen Platz — nicht die Gegner und Mitspieler, die ihren
+Champion gewählt haben und im Mittel so erfahren sind wie die gezählten Spieler. Entscheidung des
+Nutzers, vor dem Bau.
+
+## 25. Runen, Zauber und Start passend zum Matchup (13.11.2026, Konzept §5 Punkt 3)
+
+`matchups.json.gz` aus dem Artefakt des Sammlers: je Champion, Lane und Lane-Gegner, wie oft welcher
+Keystone, Nebenbaum, Zauber neben Blitz und welches Startitem genommen wurde. „Deutlich öfter gegen
+diesen Gegner“: Matchup ab 50 Spielen, Anteil gegen ihn mindestens 15 % und mindestens 1,5-mal so
+groß wie gegen alle anderen, 3 Standardfehler Abstand.
+
+70.997 Wahlen geprüft, **537 gefunden** in 440 Matchups (Keystone 119, Nebenbaum 79, Zauber 119,
+Startitem 220); der Zufall allein ließe bei 3 Standardfehlern rund 96 erwarten. Auf neuen Spielen
+(gefunden auf dem Stand vom 11.11., 22:15 UTC, geprüft auf den Spielen seither):
+
+| Art | Wahlen | Anteil gegen den Gegner minus Anteil sonst: damals | auf neuen Spielen | davon wieder |
+|---|---:|---:|---:|---:|
+| Keystone | 86 | +14,6 Pkt | +12,3 Pkt | 84 % |
+| Nebenbaum | 72 | +12,6 Pkt | +7,5 Pkt | 59 % |
+| Zauber neben Blitz | 103 | +12,3 Pkt | +8,3 Pkt | 67 % |
+| Startitem | 183 | +20,7 Pkt | +16,9 Pkt | 82 % |
+| alle | 444 | +15,9 Pkt | +12,0 Pkt | 76 % |
+
+**Das Signal ist echt** — anders als bei Countern (Messung 18: 23 %) kommen hier drei Viertel wieder.
+Die deutlichsten Fälle sind die, die jeder Spieler kennt: Doran's Shield gegen Teemo (Darius 72 %
+gegen sonst 20 %, Sett 68 % gegen 19 %, Renekton 70 % gegen 18 %), gegen Vayne und Heimerdinger auf
+Top; Cleanse gegen Ashe (Jinx 22 % gegen 3 %, Yunara 24 % gegen 5 %, Kai'Sa 17 % gegen 3 %).
+
+**Noch nicht in der App.** Die Datei liegt nur im Artefakt eines Laufs, nicht im Branch `data`; der
+Sammler müsste sie veröffentlichen, die App sie laden, und die Build-Ansicht braucht einen Platz dafür
+(„gegen Teemo nehmen 72 % Doran's Shield statt Doran's Blade“, als Hinweis wie die situativen Items).
+Das ist ein Umbau der Anzeige und geht nach der Arbeitsweise des Nutzers zuerst in eine Vorschau.
+
+## 26. Vorausschau im Draft (13.11.2026, Konzept §5 Punkt 2)
+
+Prüfen lässt sich die Vorausschau nicht, weil die Spieldaten weder Pick-Reihenfolge noch Banns kennen.
+Messbar ist, wie weit sie die Zahl bewegen könnte: für 310 Champion-Lanes das erwartete Duell gegen
+alle Lane-Gegner, gewichtet nach Pickrate, und dasselbe ohne die drei schlimmsten Counter (gebannt
+oder vergeben) — der günstigste Fall.
+
+- Das erwartete Duell gegen das ganze Feld liegt 0,05 Punkte neben null: Es steckt in der Lane-Stärke.
+- Ohne die drei schlimmsten Counter steigt die Zahl im Median um 0,07 Punkte, bei 95 % der
+  Champion-Lanes um höchstens 0,17, im größten Fall um 0,33 (Ezreal Bot).
+
+**Kein Term.** Ein Drittelpunkt im besten Fall, nicht prüfbar, ist kleiner als der Fehlerbalken jeder
+Zeile der Liste. Was die Vorausschau als Hinweis leisten kann, steht seit 2.1 schon da: offene Counter,
+sicherer Blind Pick, Flex-Picks für offene Lanes, die Reihenfolge im Team-Plan.
+
+**Patchtag (Punkt 6)** ist nicht messbar, solange der Sammler keinen Patchwechsel gesehen hat.
+
 ## Was offen bleibt (2.0)
 
 - **Seit 2.1 erledigt** (Messung 13 und 21): Die drei geschätzten Gewichte (übrige Gegner 0,35,

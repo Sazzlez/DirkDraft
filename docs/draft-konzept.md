@@ -175,6 +175,12 @@ ganzen Teams („Dein Draft: 52 % → mit Nami 54 %“). Die Begründungszeilen 
 Die Daten für 1 und 3 sammelt der Sammler seit dem 07.11.2026 (Phase 1c). 5, 6 und 7 brauchen nur die
 Spiel-Zeilen. Alles zusammen kommt mit 2.1.
 
+**Stand 13.11.2026** (`docs/modellpruefung.md`, Messung 22 bis 26): 7 gemessen und bestätigt; 5 gemessen,
+nichts zu ändern; 2 gemessen, kein Term (höchstens 0,33 Punkte, nicht prüfbar); 1 und 3 gemessen, beide
+mit klarem Signal, aber noch nicht in der App — 1 braucht den Export im Sammler, eine breitere
+Stichprobe und die Entscheidung, wo die Korrektur gilt, 3 die Datei im Branch `data` und einen Platz in
+der Build-Ansicht; 6 wartet auf den ersten Patchwechsel.
+
 ## 6. Fahrplan
 
 | Phase | Was | Wann |
