@@ -349,6 +349,102 @@ Artefakt vom 09.11. morgens). Kein Gewicht geändert — das kommt mit dem endg�
   (0,0001 im Log-Loss, Gewicht Top 0,16 ± 0,90), weil die Paare erst ein bis fünf Spiele mit Gold
   haben. Mit dem endgültigen Lauf nachmessen.
 
+### Endgültiger Lauf, Phase 2 (13.11.2026)
+
+Daten: Artefakt `games` des Sammler-Laufs 43355006541 und die Dateien des Branches `data` vom
+13.11.2026, 07:22 UTC: 158.087 gezählte Spiele, davon **145.741 Spielzeilen** (Patch 16.22, Platin,
+EUW). 116.598 zum Anpassen, 29.143 zurückgehalten. Berichte: `build/measure-model.md`,
+`build/measure-comp.md`. Nur ein Patch: Seit dem 07.11. gab es keinen Patchwechsel, alles „über drei
+Patches“ ist erst mit 16.23 messbar.
+
+| Modell | Log-Loss | Treffer |
+|---|---|---|
+| Münzwurf | 0,6931 | 50,5 % |
+| A: Draft-Chance wie heute | 0,6912 | 54,0 % |
+| A kalibriert | 0,6877 | 54,1 % |
+| Lane-Stärke allein | 0,6882 | 53,9 % |
+| B ohne Comp: Stärke, Duelle je Lane, Synergie und Gegner-Paare je Art | 0,6875 | 54,0 % |
+| **B: dazu die Comp-Merkmale** | **0,6871** | **54,1 %** |
+| C ohne Paare: Stärken und Comp gemeinsam gelernt | 0,6883 | 53,8 % |
+| C: dazu Synergie und Counter aus gelernten Merkmalen | 0,6883 | 53,8 % |
+
+Ob die Unterschiede mehr als Zufall sind, Spiel für Spiel verglichen (gepaart, 95 %):
+
+| Vergleich | Gewinn im Log-Loss | Abstand |
+|---|---|---|
+| Münzwurf → Lane-Stärke allein | +0,0050 ± 0,0010 | 9,6 σ |
+| Lane-Stärke allein → B ohne Comp | +0,0006 ± 0,0004 | 2,7 σ |
+| B ohne Comp → B | +0,0004 ± 0,0004 | 2,0 σ |
+| A wie heute → B | +0,0041 ± 0,0010 | 8,3 σ |
+| A kalibriert → B | +0,0006 ± 0,0005 | 2,4 σ |
+| C → B | +0,0012 ± 0,0008 | 2,8 σ |
+
+**Ergebnis: Stufe B wird ausgeliefert** — die heutigen Teile mit gemessenen Gewichten und Paar-Arten.
+
+- **Der Draft sagt in Platin 54 % der Sieger richtig voraus** und erklärt 0,9 % der Unsicherheit. Mehr
+  ist mit den zehn Champions allein nicht zu holen; die 55–60 % aus dem Konzept erreicht Platin nicht.
+- **Der größte Gewinn ist die Draft-Chance selbst.** Sie liegt um den Faktor 4,64 ± 0,29 zu nah an
+  50 %, weil sie Stärke und Duelle über die Lanes mittelt; gemessen zählt die Summe (Lane-Stärke
+  0,905 ± 0,068 je Einheit). Das allein bringt 0,0035 der 0,0041.
+- **Paare sind jetzt messbar**, alle fünf Duelle und drei weitere Arten:
+
+  | Teil | Gewicht (1 = zählt, wie die geglättete Rate sagt) |
+  |---|---|
+  | Duell Top | +2,11 ± 0,64 |
+  | Duell Jungle | +1,27 ± 0,61 |
+  | Duell Mid | +1,38 ± 0,53 |
+  | Duell Bot | +0,59 ± 0,38 |
+  | Duell Support | +0,83 ± 0,55 |
+  | Synergie Bot-Duo (ADC + Support) | +0,41 ± 0,27 |
+  | Synergie Jungle + Mid / Jungle + Top / Jungle + Botlane / Mid + Support | −0,06 ± 0,33 / +0,21 ± 0,36 / −0,01 ± 0,21 / +0,16 ± 0,31 |
+  | Synergie übrige Paare | +0,09 ± 0,15 |
+  | Gegner Botlane-Kreuz (ADC ↔ Support) | +0,55 ± 0,27 |
+  | Gegner Jungle ↔ Laner | +0,17 ± 0,18 |
+  | übrige Gegner-Paare | +0,20 ± 0,15 |
+
+  Das Duell auf Top zählt doppelt so viel, wie die Glättung von heute durchlässt, das auf Bot gut
+  halb so viel: dieselbe Reihenfolge wie die Glättung je Lane in Messung 14. Von den Synergien trägt
+  nur das Botlane-Duo; Jungle + Mid, Jungle + Top und die übrigen Paare sind von null nicht zu
+  unterscheiden. Die App zählt heute alle Paare gleich (0,6, gemittelt).
+- **Comp, gemessen** (je Befund im Sieg, Punkte bei 50 %; `build/measure-comp.md`):
+
+  | Befund | Spiele mit Unterschied | Wirkung | in B (log-odds) |
+  |---|---:|---|---|
+  | AP-Schaden fehlt | 3,4 % | −7,0 ± 1,4 Pkt | −0,263 ± 0,064 |
+  | AD-Schaden fehlt | 0,9 % | −7,2 ± 2,8 Pkt | −0,287 ± 0,123 |
+  | kein Engage | 0,7 % | −5,5 ± 3,0 Pkt | −0,198 ± 0,135 |
+  | wenig Waveclear | 26,5 % | −1,2 ± 0,5 Pkt | −0,067 ± 0,030 |
+  | kein Frontline | 17,0 % | −0,5 ± 0,6 Pkt | −0,039 ± 0,029 |
+  | kein Peel / nur Melee | je 0,7 % | +0,4 ± 3,2 / −1,8 ± 3,2 Pkt | nicht messbar |
+  | wenig CC | 5 Spiele | zu selten | — |
+  | Waveclear-Champions, Ranged, Poke, Tank-Shred, Early, Late (je einer bzw. Punkt) | 49–78 % | alle unter ±0,35 Pkt | null |
+  | gemischtes Timing | 21,4 % | +0,2 ± 0,6 Pkt | null |
+
+  Fehlender AP- oder AD-Schaden kostet rund 7 Punkte, fast das Doppelte des Deckels der App
+  (±4 Punkte). „Wenig Waveclear“ aus 2.1 ist bestätigt (−1,2 ± 0,5). Tank-Shred, Timing, Poke und die
+  Zahl der Ranged- oder Waveclear-Champions verschieben den Sieg nicht messbar, und das recht genau.
+  Die Archetyp-Tabelle (Plan gegen Plan) zeigt kein Schere-Stein-Papier: Kein Feld liegt außerhalb
+  seines Fehlerbalkens, außer Teamfight gegen „offen“ (+0,6 ± 0,5).
+- **Früh oder spät** bestätigt die Einordnung, taugt aber nicht als Vorhersage: Die später skalierende
+  Seite liegt in Spielen unter 25 Minuten 3,9 ± 0,7 Punkte unter der Erwartung, ab 35 Minuten
+  1,6 ± 0,7 darüber. Vor dem Spiel hebt sich das auf (Late-Game-Champions je einer: −0,1 ± 0,2).
+- **Kalibrierung von B gut:** In jedem Bereich höchstens 1,8 Punkte zwischen vorhergesagt und
+  tatsächlich (60 %+: 62,2 % vorhergesagt, 64,0 % gewonnen, 822 Spiele).
+- **Modell C verliert gegen B** (2,8 σ). Die gelernten Merkmale für Synergie und Counter bewegen die
+  Vorhersage gar nicht mehr (Streuung 0,0 Punkte); was C lernt, sind Stärken und Comp. Das Gitter der
+  Regularisierung wurde nach unten erweitert, das Optimum liegt innen (L2 0,0003 auf den Stärken).
+  Die Faktorisierung aus Konzept §4 bringt bei dieser Datenmenge nichts.
+- **Der beste Pick bringt** gegenüber dem nach Pickrate gewichteten Durchschnitt **+3,4 Punkte** (Top
+  +3,9, Jungle +3,8, Mid +3,4, Bot +3,0, Support +2,8), nachträglich mit allen zehn Champions bekannt.
+- **Lane-Gold nach 10 Minuten** (78.329 Trainingsspiele mit Gold). Ein Vorsprung von 1.000 Gold ist
+  auf Top 12,8 ± 0,4, Jungle 13,6 ± 0,5, Mid 14,8 ± 0,5, Bot 14,6 ± 0,5 und Support 5,7 ± 0,8 Punkte
+  wert. Das Matchup bestimmt den Gold-Unterschied auf Top (±127 Gold, 14,6 σ), Mid (±97, 12,9 σ) und
+  Support (±54, 10,4 σ); auf Bot kaum (±33, 1,8 σ), im Jungle nicht. Auf zurückgehaltenen Spielen
+  sagen die Matchups über das Gold — ohne jedes angepasste Gewicht — so gut voraus wie die gezählten
+  Duelle mit angepassten Gewichten (beide 0,6876 gegen 0,6882 für die Stärke allein); die Gewichte
+  je Lane passen zu 1 (Top 0,91 ± 0,41, Mid 1,10 ± 0,53). Das Gold nach 10 Minuten ist damit ein
+  zweiter, unabhängiger Beleg für Matchups auf Top und Mid, aber kein besserer als die Siege.
+
 ## 14. Counter je Lane, Hälfte gegen Hälfte (09.11.2026, vorläufig)
 
 Werkzeug: `dotnet run --project src/DraftPilot.Tools -- priors 200 --snapshot meta.json`, Abschnitt
@@ -379,6 +475,35 @@ besser durch als das eine Gewicht von heute (κ = 1.000)?
   Paar, nicht an der Glättung. Mit der vollen Menge (~150.000) und mit Matchups über drei Patches
   nachmessen; erst dann kann eine Lane oder ein gut gezähltes Paar weniger Glättung verdienen.
 
+### Nachmessung Phase 2 (13.11.2026, 158.087 Spiele)
+
+Dasselbe Werkzeug auf `meta.json` vom 13.11.2026 (Ausgabe in `build/phase2/priors.log`).
+
+| Lane | Paare | Median Spiele | τ (Momente) | κ (Momente) | bestes κ, linear | große Abweichungen: kommen wieder | heute behalten |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Top | 1.988 | 40 | 1,86 Pkt | 719 | 600 | 7 % | 7 % |
+| Jungle | 1.975 | 42 | 1,76 Pkt | 804 | 800 | 6 % | 7 % |
+| Mid | 1.741 | 36 | 1,51 Pkt | 1.090 | 1.000 | 5 % | 8 % |
+| Bot | 819 | 51 | 1,21 Pkt | 1.698 | 2.000 | 9 % | 9 % |
+| Support | 1.402 | 42 | 0,86 Pkt | 3.348 | 5.000 | 3 % | 8 % |
+| alle | 7.925 | 41 | 1,48 Pkt | 1.131 | 1.200 | 6 % | 8 % |
+
+- **Duelle streuen jetzt messbar,** auf jeder Lane (am 09.11. standen Mid und Support noch bei null).
+  Über alle Lanes bestätigt sich das Gewicht von heute: Momente 1.131, bestes 1.200, heute 1.000.
+- **Die Lanes unterscheiden sich:** Auf Top streuen Duelle doppelt so weit wie auf Support (1,86
+  gegen 0,86 Punkte). Zwei Verfahren, die sich nichts teilen, ordnen die Lanes gleich: die Momente
+  hier und die Gewichte des Modellvergleichs (Messung 13: Top 2,11, Mid 1,38, Jungle 1,27, Support
+  0,83, Bot 0,59 — ein Gewicht über 1 heißt, die Glättung 1.000 ist dort zu stark).
+- **Große Abweichungen bleiben Zufall:** Von mindestens 8 Punkten bei rund 70 Spielen in einer Hälfte
+  zeigt die andere 3–9 % wieder. Die Glättung, die starke Belege durchlässt, sagt weiter nicht besser
+  voraus (höchstens 0,005 % im Log-Loss).
+- **Duos:** Um die Erwartung aus beiden Lane-Stärken streuen sie nicht messbar (τ = 0, κ = ∞ über
+  12.385 Paare). Das passt zum Modellvergleich: Nur das Botlane-Duo trägt.
+- **Lane-Stärke:** κ nach Momenten 862, bestes 600, flach zwischen 400 und 1.000; bei im Median
+  3.284 Spielen je Zeile ändert das Gewicht nichts mehr. 800 bleibt.
+
+Folge für Phase 3: die Duell-Glättung je Lane statt eines Gewichts für alle (siehe Messung 21).
+
 ## 15. Mechanik-Counter (09.11.2026, vorläufig)
 
 Werkzeug: `npm run measure:model`, Abschnitt „Mechanik-Regeln“ (`app/tools/measure/mechanics.ts`). Die Listen
@@ -400,6 +525,22 @@ Lane-Stärke hinaus, auf den Trainingsspielen angepasst; 46.277 Spiele.
 - Dash-Stopper und Spell Shield zeigen in die erwartete Richtung, liegen aber im Fehlerbalken.
 - Auf den zurückgehaltenen Spielen bringen die vier Regeln zusammen 0,0001 im Log-Loss. Keine Regel
   bekommt ein Gewicht; mit dem endgültigen Lauf nachmessen.
+
+### Nachmessung Phase 2 (13.11.2026, 145.741 Spielzeilen)
+
+| Regel | Begegnungen | je Begegnung im Sieg | Gold nach 10 Min. |
+|---|---:|---|---|
+| Dash-Stopper gegen Dash-Champ | 5.475 | +1,1 ± 1,3 Pkt | — |
+| Spell Shield gegen Hook | 2.809 | +3,6 ± 1,9 Pkt | — |
+| Hook gegen ADC ohne Dash | 16.527 | +0,9 ± 0,8 Pkt | — |
+| Autoattack-Blocker gegen Autoattack-Champ | 8.495 | +1,9 ± 1,1 Pkt | +61 ± 23 Gold (5.641 Spiele) |
+
+- **Spell Shield gegen Hook** (3,7 σ) und **Autoattack-Blocker** (3,4 σ, dazu im Gold) sind jetzt klar
+  zu sehen, Hook gegen ADC ohne Dash knapp (2,0 σ, unter einem Punkt).
+- Für die Vorhersage bringen die vier Regeln trotzdem nichts: 0,6881 gegen 0,6882 im Log-Loss auf den
+  zurückgehaltenen Spielen, die Treffer sinken von 53,9 auf 53,7 %. Was sie beschreiben, steckt zum
+  großen Teil schon in den gezählten Duellen und Gegner-Paaren.
+- **Keine Regel bekommt ein Gewicht.** Die Listen bleiben im Messwerkzeug.
 
 ## 16. Build-Wahl: Zufallstreffer statt „beste Winrate“ (11.11.2026)
 
@@ -477,6 +618,63 @@ Option.
 spricht für einen Einfluss des Zeitpunkts (wer drei billige Items fertig hat, ist früher fertig).
 Der Vergleich im selben Spielstand fängt einen Teil ab; den Preis als eigene Größe zu messen steht aus.
 
+### Nachmessung Phase 2 (13.11.2026, 158.087 Spiele)
+
+Werkzeug: `npm run measure:builds -- <builds.json> <situational.json> <meta.json> <item.json>
+--before-builds … --before-situational …` (`app/tools/measure/builds.ts`; `item.json` ist die von Data
+Dragon, für Namen und Preise). Bericht in `build/measure-builds.md`. Vergleichsstand: die Dateien vom
+11.11.2026, 16:43 UTC (114.585 Spiele). 337 Champion-Lanes ab 300 Spielen.
+
+**κ je Slot** ist stabil; die Regel braucht keine Anpassung:
+
+| Slot | κ bei 114.585 | κ bei 158.087 | wahre Streuung | Plan ≠ meistgespielt |
+|---|---:|---:|---:|---:|
+| Runen | 2.080 | 2.538 | 1,0 Pkt | 0 |
+| Zauber | 5.453 | 5.397 | 0,7 Pkt | 1 |
+| Start | 3.482 | 3.727 | 0,8 Pkt | 0 |
+| Schuhe | 1.781 | 1.873 | 1,2 Pkt | 3 |
+| Kern | 430 | 464 | 2,3 Pkt | 4 |
+| Item 4 | 318 | 339 | 2,7 Pkt | 3 |
+| Item 5 | 483 | 661 | 1,9 Pkt | 0 |
+| Item 6 | 392 | 487 | 2,3 Pkt | 0 |
+| Support-Item | 1.906 | 1.791 | 1,2 Pkt | 1 |
+| Skill-Reihenfolge | 2.244 | 2.566 | 1,0 Pkt | 1 |
+| Skill-Priorität | 1.313 | 1.334 | 1,4 Pkt | 7 |
+
+20 Abweichungen vom Meistgespielten (vorher 13 auf 308 Champion-Lanes); die dünnste stützt sich auf
+397 Spiele (Katarina Mid: Kraken Slayer, Terminus, Death's Dance, 62 % gegen 52 % aus 1.569).
+
+**Halten die Abweichungen auf neuen Spielen?** Die Spielzeilen tragen keine Builds, damit geht es
+nicht. Stattdessen: Die Regel wählt auf dem Stand vom 11.11. (14 Abweichungen auf 312 Champion-Lanes),
+geprüft wird auf den 43.502 Spielen, die seither dazukamen (Zählung jetzt minus Zählung damals, je
+Option). Diese Spiele hat die Wahl nie gesehen.
+
+- 12 von 14 liegen auf den neuen Spielen vorn.
+- Zusammen, nach Genauigkeit gewichtet: **+2,8 ± 1,3 Punkte** auf den neuen Spielen. Roh waren es auf
+  dem alten Stand +5,6: Etwa die Hälfte des Vorsprungs bleibt, wie die Glättung es erwarten lässt.
+- Vier der 14 stehen heute nicht mehr im Plan (Shaco Runen +1,3, Kayn Start −0,4, Kai'Sa Schuhe +2,4,
+  eine Kern-Wahl −0,1 auf den neuen Spielen): Die Regel nimmt sie selbst zurück, sobald der Vorsprung
+  schrumpft.
+
+Die Abweichungen halten. Die Regel bleibt.
+
+**Der Preis als eigene Größe.** Winrate einer Option gegen ihren Preis innerhalb des Slots, in Punkten
+je 1.000 Gold (95 %):
+
+| | alle Käufe | im selben Spielstand |
+|---|---:|---:|
+| Schuhe (builds.json) | −3,2 ± 1,1 | |
+| Kern, ganze Option (builds.json) | −3,0 ± 0,5 | |
+| Item 4 (builds.json) | −2,7 ± 0,5 | |
+| Schuhe, einzeln (situational.json) | −3,2 ± 1,1 | +1,7 ± 1,0 |
+| Kern, einzelne Items 1–3 | −0,8 ± 0,2 | +0,1 ± 0,2 |
+| Items 4–6, einzeln | −1,9 ± 0,4 | −0,6 ± 0,3 |
+
+Der Preis ist kein eigener Effekt: Zwischen Käufen im selben Spielstand verschwindet er (Kern), dreht
+(Schuhe) oder schrumpft auf ein Fünftel der Streuung des Slots (Items 4–6). Wer hinten liegt, kauft
+teurer und verliert ohnehin öfter. Genau diesen Vergleich verlangt Regel 3 schon für Schuhe, Kern und
+Items 4–6. **Nichts geändert.**
+
 ## 17. Situative Items: Klasse gegen Champion (11.11.2026)
 
 Rechnung in `app/src/core/situational.ts`, Tests in `app/tests/model/situational.test.ts`.
@@ -530,6 +728,44 @@ würde Rauschen als Counter ausgeben. **Nichts geändert.** Die Hinweise melden 
 Paare genug Spiele haben (drei Patches zusammen, Phase 2) oder Messung 14 einer Lane weniger Glättung
 zugesteht.
 
+### Nachmessung Phase 2 (13.11.2026, 158.087 Spiele)
+
+Werkzeug: `npm run measure:counters -- <meta.json> --before <meta-alt.json>`
+(`app/tools/measure/counters.ts`), Bericht in `build/measure-counters.md`. Nur Patch 16.22: Der Sammler
+hat seit dem 07.11. keinen Patchwechsel gesehen, die Messung über drei Patches ist noch nicht möglich.
+
+**Was die Regel der App findet.** Ein Lane-Matchup bewegt nach Glättung weiter im Median 0,2 Punkte,
+95 % liegen unter 0,9 (Bot 1,1), der größte Wert ist 2,9 (Twitch gegen Jinx, 58,0 % aus 641 Spielen).
+Von 328 Champion-Lanes haben 14 einen offenen Counter (vorher 4), keine zwei.
+
+**Zufallsvergleich**, 15.850 Duell-Richtungen, Zufallserwartung exakt aus der Binomialverteilung:
+
+| Schwelle | markiert | durch Zufall erwartet | nur Paare ab 200 Spielen: markiert | erwartet |
+|---|---:|---:|---:|---:|
+| 2 Standardfehler | 432 | 355 ± 37 | 76 | 43 ± 13 |
+| 2,5 | 126 | 92 ± 19 | 28 | 12 ± 7 |
+| 3 | 24 | 18 ± 8 | 9 | 3 ± 3 |
+
+Zum ersten Mal liegen die markierten über dem Zufall — aber nur knapp: Bei 2 Standardfehlern sind
+rund vier von fünf Markierungen weiter Zufallstreffer, bei gut gezählten Paaren etwa die Hälfte.
+
+**Auf neuen Spielen** (markiert auf dem Stand vom 11.11., geprüft auf den 43.502 Spielen seither):
+
+| markiert ab | Richtungen | Vorsprung damals | auf neuen Spielen | davon wieder | die Glättung (1.000) behält |
+|---|---:|---:|---:|---:|---:|
+| 2 Standardfehlern | 354 | +9,9 Pkt | +2,3 ± 0,9 Pkt | 23 % | +1,4 Pkt |
+| 2,5 | 91 | +12,0 Pkt | +2,7 ± 1,7 Pkt | 22 % | +1,6 Pkt |
+| 3 | 11 | +12,6 Pkt | +4,0 ± 4,3 Pkt | 32 % | +2,3 Pkt |
+
+Counter sind jetzt nachweisbar: Rund ein Viertel des gemessenen Vorsprungs kommt auf neuen Spielen
+wieder. Die Glättung behält etwas weniger (1,4 gegen 2,3 ± 0,9), der Unterschied liegt im Fehlerbalken.
+
+**Folge.** „Deutlich über der Zufallserwartung“ ist das noch nicht: Eine niedrigere Schwelle würde
+vier Zufallstreffer je echtem Counter benennen. `COUNTER_MINIMUM_EDGE` bleibt bei 0,08. Die Glättung
+je Lane misst Messung 14 neu (unten); mit ihr verschiebt sich, welche Paare die Schwelle erreichen. Die
+Hinweise beginnen von selbst zu erscheinen (14 Champion-Lanes) und werden mit dem nächsten Patch mehr,
+wenn Matchups über drei Patches zählen.
+
 ## 19. Kaufzeitpunkt der Schuhe (11.11.2026, noch ohne Zahlen)
 
 Die Einkaufsliste im Spiel (`core/game.ts`, `basketOf`) braucht zwei Angaben, die `builds.json` bisher
@@ -549,6 +785,53 @@ Eine Partie ist kein Beleg. **Nachzutragen, sobald die Zählung einige Tage läu
 `bootsAfter` und `bootsWorth` je Lane, Anteil der Champion-Lanes mit einer anderen Stelle als „nach
 dem ersten Item“, und ob die Regel „Stiefel zuerst, sobald der Itemwert die Stufe der Hälfte
 erreicht“ zu dem passt, was Spieler mit knappem Gold tatsächlich kaufen (Teil oder Stiefel).
+
+### Nachmessung Phase 2 (13.11.2026)
+
+Der Sammler zählt seit dem Abend des 11.11.: 352.978 Spieler-Spiele mit Schuhen, 423 Champion-Lanes ab
+30. Werkzeug: `npm run measure:builds` (wie Messung 16), Abschnitt „Kaufzeitpunkt der Schuhe“.
+
+**Fertige Items vor dem Paar (`bootsAfter`).**
+
+| Lane | 0 | 1 | 2 | 3+ | Champion-Lanes | meistgezählt 0 | meistgezählt 1 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Top | 35 % | 54 % | 9 % | 1 % | 111 | 13 | 98 |
+| Jungle | 9 % | 65 % | 18 % | 8 % | 82 | 3 | 79 |
+| Mid | 23 % | 72 % | 5 % | 0 % | 96 | 8 | 88 |
+| Bot | 20 % | 67 % | 11 % | 3 % | 54 | 4 | 50 |
+| Support | 42 % | 52 % | 5 % | 1 % | 80 | 19 | 61 |
+| alle | 26 % | 62 % | 10 % | 3 % | 423 | 47 | 376 |
+
+„Nach dem ersten Item“ stimmt für 376 von 423 Champion-Lanes (89 %). Bei 47 (11 %) kommt das Paar
+zuerst, vor allem bei Supports (19 von 80) und auf Top (13 von 111); nach zwei oder drei Items bei
+keiner. Die Annahme für Dateien ohne Zählung (Paar nach dem ersten Item) ist damit die richtige.
+
+**Itemwert beim Kauf der ersten Schuhe (`bootsWorth`).**
+
+| Lane | nur Startitems | bis 1.000 | bis 2.000 | bis 3.000 | darüber | Viertel / Hälfte / drei Viertel der Spieler |
+|---|---:|---:|---:|---:|---:|---|
+| Top | 31 % | 22 % | 18 % | 16 % | 13 % | 0 / 1.000 / 2.500 |
+| Jungle | 21 % | 11 % | 17 % | 23 % | 28 % | 1.000 / 2.500 / 3.500 |
+| Mid | 25 % | 21 % | 24 % | 22 % | 8 % | 500 / 1.500 / 2.500 |
+| Bot | 19 % | 17 % | 17 % | 25 % | 23 % | 1.000 / 2.000 / 3.000 |
+| Support | 51 % | 22 % | 16 % | 8 % | 2 % | 0 / 0 / 1.500 |
+| alle | 29 % | 18 % | 18 % | 19 % | 15 % | 0 / 1.500 / 3.000 |
+
+- Die Lanes unterscheiden sich klar: Supports kaufen zur Hälfte beim ersten Rückruf, Jungler zur
+  Hälfte erst ab 2.500 Gold Itemwert.
+- **Eine scharfe Gewohnheit gibt es nicht.** Bei 347 von 423 Champion-Lanes liegen zwischen dem Viertel
+  und den drei Vierteln der Spieler mindestens 1.500 Gold Itemwert. Die „Stufe der Hälfte“ ist die
+  Mitte einer breiten Verteilung, kein Zeitpunkt, an dem die meisten kaufen. 29 % kaufen die ersten
+  Schuhe schon mit nichts als den Startitems.
+- Die Hälfte liegt bei 59 Champion-Lanes bei 0 (die App setzt dort Stiefel auf die erste
+  Einkaufsliste), bei 125 bei 500–1.000, bei 169 bei 1.500–2.000, bei 70 ab 2.500.
+
+**Was offen bleibt.** Ob Spieler mit knappem Gold das Teil oder die Stiefel nehmen, zeigen diese
+Zählungen nicht: Sie sagen, bei welchem Itemwert gekauft wurde, nicht, was im selben Shop-Besuch sonst
+möglich war. Dafür müsste der Sammler je Besuch mit dem ersten Stiefelkauf mitzählen, ob das Gold auch
+für das größte Teil des nächsten Items gereicht hätte und was davon gekauft wurde. Die Frage des
+Nutzers (Stiefel oder größtes Teil zuerst, `basketOf`, `bootsDue`) ist damit nicht entschieden;
+**nichts geändert.**
 
 ## 20. Situative Items im Build (11.11.2026, Nutzerwunsch)
 
@@ -589,6 +872,40 @@ Dance übernimmt bei Rüstung, bei Magieresistenz und bei Heilung denselben Plat
 zwei Bauweisen mischt es sich (Shaco: Rabadon's statt Guardian Angel). Die Lagen aus der Aufstellung
 (viel AD, viel AP, Tanks, Kontrolle) sind davon frei. Wenn das stört: Übernahme auf diese Lagen und
 die Schuhe begrenzen (`ITEM_SITUATIONS`).
+
+### Nachmessung Phase 2 (13.11.2026, 158.087 Spiele)
+
+Werkzeug: `npm run measure:builds` (wie Messung 16), Abschnitt „Situative Items im Build“. 198
+Champion-Lanes ab 2.000 Spielen, jede Lage einzeln, alle Plan-Items offen: 614 Vorschläge, 88
+übernehmen einen Platz (Schuhe 51, Kern 22, Items 4–6 15). 71 davon kommen aus Lagen der Aufstellung
+(viel AP 55, viel AD 15, Tanks 1), 17 aus Lagen der Gegner-Items (Rüstung 8, Magieresistenz 7,
+Heilung 2).
+
+**Lage oder nur „später im Spiel“?** Die Spielzeilen tragen keine Käufe, und die Spielzeit eines Kaufs
+steht in keiner Datei; der Vergleich „zur selben Spielzeit ohne die Lage“ geht nur mittelbar. Zwei
+Proben, beide aus `situational.json`:
+
+1. *Heben die drei Lagen dieselben Items?* Über 3.317 Items (Kern und Items 4–6, ab 100 Käufen des
+   Champions): Wie viel öfter ein Item in der einen Lage gekauft wird, hängt eng damit zusammen, wie
+   viel öfter in der anderen — Rüstung/Magieresistenz **+0,88**, Rüstung/Heilung **+0,92**,
+   Magieresistenz/Heilung **+0,87**. Zum Vergleich die Aufstellung: viel AD gegen viel AP **−0,95**
+   (wie es sein muss), viel AD gegen Rüstung aus Items −0,01. Rüstung und Magieresistenz verlangen
+   entgegengesetzte Items; dass beide Lagen dieselben heben, heißt: Sie messen vor allem dasselbe
+   Dritte, die Spielzeit.
+2. *Die anderen beiden Lagen als Vergleich zur selben Spielzeit.* Ein Item, das zur Lage gehört,
+   müsste in ihr deutlich öfter gekauft werden als in den beiden anderen, die genauso spät entstehen
+   (mindestens 1,5-mal deren Mittel, die Grenze für einen Vorschlag). Das erfüllen **5 der 17**
+   Übernahmen; bei 5 von 11 Items übernimmt dasselbe Item in zwei oder drei dieser Lagen (Wukong:
+   Death's Dance bei Rüstung, Magieresistenz und Heilung; Viego: Lord Dominik's bei Rüstung und bei
+   Magieresistenz). Unter den fünf, die bestehen, sind solche, die zur Lage nicht passen (Shaco:
+   Rabadon's gegen Magieresistenz, Nilah: Bloodthirster gegen Magieresistenz).
+
+**Folge.** Die Lagen aus Gegner-Items tragen keine Übernahme. Seit dem 13.11.2026 übernimmt ein
+situatives Item einen Platz im Build nur noch aus einer Lage der Aufstellung (viel AD, viel AP, Tanks,
+harte Kontrolle); aus den Lagen der Gegner-Items bleibt es die Alternative neben dem Build, wie bis
+2.0 (`rateSuggestions`, `ITEM_SITUATIONS`). Die Regel des Nutzers vom 11.11. (situative Items
+übernehmen von selbst) gilt weiter, für die 71 von 88 Fälle, in denen die Lage gemessen ist. Für die
+genaue Probe müsste der Sammler die Käufe je Lage zusätzlich nach Spielminute zählen.
 
 ## Was offen bleibt (2.0)
 
