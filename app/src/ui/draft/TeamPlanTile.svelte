@@ -25,7 +25,10 @@
     {/each}
   </div>
   {#if team.order}<p class="order">{team.order}</p>{/if}
-  <p class="note">{team.note}</p>
+  <details class="note">
+    <summary>Wie ist das gerechnet?</summary>
+    <p>{team.note}</p>
+  </details>
 </Tile>
 
 <style>
@@ -102,8 +105,19 @@
   }
 
   .note {
-    margin: 6px 0 0;
+    margin: 4px 0 0;
     font: var(--t-caption);
     color: var(--fg3);
+  }
+
+  .note summary {
+    cursor: pointer;
+    width: fit-content;
+    min-height: 24px;
+    line-height: 24px;
+  }
+
+  .note p {
+    margin: 2px 0 0;
   }
 </style>

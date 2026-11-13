@@ -15,6 +15,17 @@
 
   let { view }: { view: ViewModel } = $props();
   const main = $derived(view.main);
+
+  // What the party picks and bans belongs with the picks, in the main column: the chosen plan above
+  // the list, the team plan and the team bans under it. The side column keeps the comparison of the
+  // two comps, and a chance that cannot be reckoned yet takes no tile.
+  const plan = $derived(view.side.find((tile) => tile.kind === 'plan'));
+  const party = $derived(view.side.filter((tile) => tile.kind === 'team' || tile.kind === 'teamBans'));
+  const side = $derived(
+    view.side.filter(
+      (tile) => tile.kind !== 'plan' && tile.kind !== 'team' && tile.kind !== 'teamBans' && !(tile.kind === 'chance' && tile.chance.ally === null),
+    ),
+  );
 </script>
 
 {#if view.board}
@@ -25,8 +36,11 @@
   <p class="chip" role="note">{view.data.chip}</p>
 {/if}
 
-<div class="tiles" class:solo={view.side.length === 0}>
+<div class="tiles" class:solo={side.length === 0}>
   <div class="main">
+    {#if plan?.kind === 'plan'}
+      <PlanTile plan={plan.plan} />
+    {/if}
     {#if main.kind === 'picks' || main.kind === 'bans'}
       <PickTile tile={main.tile} />
     {:else if main.kind === 'matchup'}
@@ -36,18 +50,19 @@
     {:else if main.kind === 'lobby'}
       <LobbyTile title={main.title} lines={main.lines} text={view.emptyText} />
     {/if}
+    {#each party as tile, i (i)}
+      {#if tile.kind === 'team'}
+        <TeamPlanTile team={tile.team} />
+      {:else if tile.kind === 'teamBans'}
+        <TeamBansTile bans={tile.bans} />
+      {/if}
+    {/each}
   </div>
 
-  {#if view.side.length > 0}
-    <div class="side" class:single={view.side.length === 1}>
-      {#each view.side as tile, i (i)}
-        {#if tile.kind === 'plan'}
-          <div class="wide"><PlanTile plan={tile.plan} /></div>
-        {:else if tile.kind === 'team'}
-          <div class="wide"><TeamPlanTile team={tile.team} /></div>
-        {:else if tile.kind === 'teamBans'}
-          <div class="wide"><TeamBansTile bans={tile.bans} /></div>
-        {:else if tile.kind === 'chance'}
+  {#if side.length > 0}
+    <div class="side" class:single={side.length === 1}>
+      {#each side as tile, i (i)}
+        {#if tile.kind === 'chance'}
           <ChanceTile chance={tile.chance} />
         {:else if tile.kind === 'comp'}
           <CompTile comp={tile.comp} />
@@ -68,6 +83,13 @@
     gap: 14px;
     padding: 0 20px 20px;
     align-items: start;
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
   }
 
   .chip {
@@ -103,11 +125,6 @@
     columns: auto;
   }
 
-  /* The team plan needs the whole width: five rows with names and lanes. */
-  .wide {
-    column-span: all;
-  }
-
   @container app (max-width: 1099px) {
     .tiles {
       grid-template-columns: minmax(0, 1fr);
@@ -121,6 +138,10 @@
 
     .tiles {
       padding: 0 12px 12px;
+      gap: 10px;
+    }
+
+    .main {
       gap: 10px;
     }
 

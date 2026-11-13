@@ -24,7 +24,10 @@
       </div>
     {/each}
   </div>
-  <p class="note">{bans.note}</p>
+  <details class="note">
+    <summary>Wie ist das gerechnet?</summary>
+    <p>{bans.note}</p>
+  </details>
 </Tile>
 
 <style>
@@ -92,8 +95,19 @@
   }
 
   .note {
-    margin: 8px 0 0;
+    margin: 4px 0 0;
     font: var(--t-caption);
     color: var(--fg3);
+  }
+
+  .note summary {
+    cursor: pointer;
+    width: fit-content;
+    min-height: 24px;
+    line-height: 24px;
+  }
+
+  .note p {
+    margin: 2px 0 0;
   }
 </style>
