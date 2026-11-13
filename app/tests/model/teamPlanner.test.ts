@@ -170,6 +170,29 @@ describe('the party', () => {
     expect(off.allies[2]!.party).toBe('dein Duo');
   });
 
+  it('names the synergy with the champion of the duo partner as such, and changes no number for it', () => {
+    // The own seat is the ADC (cell 3); the support (cell 4) has locked Thresh. The test snapshot
+    // counts no synergies, so the recommender's reason is put in by hand, as it would read.
+    const bot = (party: number[]) => {
+      const frame = new DraftEngine(snapshot).update(new SessionBuilder().queue(420).localPlayer(3).party(...party).locked(4, 412).onClock(3, 'pick').build())
+        .frame as unknown as GoldenFrame;
+      frame.picks!.items[0]!.reasons.push({ text: 'starkes Botlane-Duo mit Thresh', tone: 'pro', hint: null });
+      frame.picks!.items[1]!.reasons.push({ text: 'spielt gut mit Jinx', tone: 'pro', hint: null });
+      return frame;
+    };
+    const adapter = new GoldenAdapter(snapshot.champions);
+    const texts = (frame: GoldenFrame) => adapter.pickTile(frame.picks!, frame, 'Picks').items.flatMap((row) => row.reasons.map((r) => r.text));
+
+    expect(texts(bot([4]))).toContain('starkes Botlane-Duo mit Thresh (dein Duo)');
+    // Only the partner's champion, only in a duo, and only where the reason is about him.
+    expect(texts(bot([4]))).toContain('spielt gut mit Jinx');
+    expect(texts(bot([]))).toContain('starkes Botlane-Duo mit Thresh');
+    expect(texts(bot([0]))).toContain('starkes Botlane-Duo mit Thresh');
+    expect(texts(bot([0, 4]))).toContain('starkes Botlane-Duo mit Thresh');
+    expect(texts(bot([])).some((text) => text.includes('dein Duo'))).toBe(false);
+    expect(bot([4]).picks!.items.map((i) => i.score)).toEqual(bot([]).picks!.items.map((i) => i.score));
+  });
+
   it('writes the flag into the frame only where it is true', () => {
     const frame = planFor([2]);
     expect(frame.state.allies.map((slot) => 'inParty' in slot)).toEqual([false, false, true, false, false]);

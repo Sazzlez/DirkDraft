@@ -67,6 +67,9 @@ const allyLabel = (s: GoldenFrame['state'], cellId: number): string => {
   return slot?.inParty && partySize(s) === 2 ? 'dein Duo' : `Teammate ${(slot?.index ?? 0) + 1}`;
 };
 
+/** How the recommender's synergy reasons start, before the partner's champion (recommender.ts). */
+const SYNERGY_REASONS = ['starkes Botlane-Duo mit', 'schwaches Botlane-Duo mit', 'spielt gut mit'];
+
 /** The seats of the own party, the own one included; 0 when the local player queued alone. */
 const partySize = (s: GoldenFrame['state']): number => {
   const others = s.allies.filter((slot) => slot.inParty && slot.cellId !== s.localCellId).length;
@@ -324,6 +327,14 @@ export class GoldenAdapter {
     };
   }
 
+  /** The champion the one teammate of a duo shows (locked or hovered); null without a duo or a champion. */
+  private duoChampion(s: GoldenFrame['state']): string | null {
+    if (partySize(s) !== 2) return null;
+    const mate = s.allies.find((slot) => slot.inParty && slot.cellId !== s.localCellId);
+    const id = mate ? mate.lockedChampionId || mate.hoverChampionId : 0;
+    return id ? (this.champion(id)?.name ?? null) : null;
+  }
+
   /** `lane`: the pick list's lane, for the row's reason; ARAM and bans have none. */
   recommendation(item: GoldenItem, rank: number, leader: GoldenItem, decimals: number, isBan: boolean, tied: boolean, lane: Lane | null = null): RecommendationView {
     const champion = this.champion(item.championId) ?? { id: item.championId, key: '', name: item.name };
@@ -350,7 +361,16 @@ export class GoldenAdapter {
 
   pickTile(set: GoldenSet, frame: GoldenFrame, title: string): PickTileView {
     const isBan = set.action === 'ban';
-    const rows = (s: GoldenSet) => s.items.map((item, i) => this.recommendation(item, i + 1, s.items[0]!, s.decimals, isBan, i < s.tied, toLane(s.lane)));
+    // The synergy with the duo partner's champion is named as such ("starkes Botlane-Duo mit Thresh
+    // (dein Duo)"). A label only: the number behind it is the same as with anyone on that champion.
+    const duo = isBan ? null : this.duoChampion(frame.state);
+    const rows = (s: GoldenSet) =>
+      s.items.map((item, i) => {
+        const row = this.recommendation(item, i + 1, s.items[0]!, s.decimals, isBan, i < s.tied, toLane(s.lane));
+        if (!duo) return row;
+        const named = (text: string) => (SYNERGY_REASONS.some((start) => text === `${start} ${duo}`) ? `${text} (dein Duo)` : text);
+        return { ...row, reason: named(row.reason), reasons: row.reasons.map((r) => ({ ...r, text: named(r.text) })) };
+      });
     // The pick position belongs to the seat the list is for (B1).
     const hint = !isBan && frame.target?.cellId === set.cellId ? (frame.pickHint ?? null) : null;
     const safest = hint?.safest?.championId ?? null;
