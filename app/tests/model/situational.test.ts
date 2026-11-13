@@ -334,8 +334,10 @@ describe('a situational item in the plan\'s place', () => {
     const late = suggestions().map((s) => ({ ...s, situation: SITUATION.EnemyMagicResist }));
     const magicResist: RiotSituationalFile = { ...file, rows: file.rows.map((r) => (r[3] === M ? [...r.slice(0, 3), SITUATION.EnemyMagicResist, ...r.slice(4)] : r)) };
     expect(rateSuggestions(magicResist, meta, 1, TOP, late, () => [3053], 3053)[0]).toMatchObject({ instead: null, adopt: false });
-    expect(rateSuggestions(magicResist, meta, 1, TOP, late, () => [3053], 9001)[0]).toMatchObject({ instead: 3053, adopt: true });
-    // … a line-up known from the first minute does not.
+    // … and takes no other place either (since 13.11.2026): it names the plan item it stands against
+    // and stays the alternative. "Against magic resist" lifts the same items as "against armor".
+    expect(rateSuggestions(magicResist, meta, 1, TOP, late, () => [3053], 9001)[0]).toMatchObject({ instead: 3053, adopt: false });
+    // A line-up known from the first minute takes the place, the first item's too.
     expect(rateSuggestions(file, meta, 1, TOP, suggestions(), () => [3053], 3053)[0]).toMatchObject({ instead: 3053, adopt: true });
   });
 

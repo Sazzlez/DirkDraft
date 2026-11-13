@@ -2,7 +2,9 @@
 // Platinum games (situational.json) — never a rule of thumb. Since 11.11.2026 an item that the
 // champion's players clearly buy instead of one of the plan's in the situation takes that item's
 // place for the game, marked as situational (rateSuggestions, situationalBuild); the others stay
-// alternatives beside the build (docs/modellpruefung.md, Messung 20).
+// alternatives beside the build (docs/modellpruefung.md, Messung 20). Since 13.11.2026 only a
+// situation of the enemy line-up moves an item into the build: the situations made of the enemies'
+// items turned out to measure mostly "later in the game" (same place, Nachmessung Phase 2).
 //
 // The signal is what players of the champion buy differently in this situation: an item bought
 // clearly more often when the enemies stack armor than otherwise is what experience reacts with.
@@ -402,7 +404,16 @@ export function situationShare(
   };
 }
 
-/** The situations made of what the enemies have built; they exist only once a game is under way. */
+/**
+ * The situations made of what the enemies have built; they exist only once a game is under way.
+ *
+ * They suggest, but they never put an item into the build (measured 13.11.2026 on 158.087 games):
+ * how much more often an item is bought "against armor" goes hand in hand with how much more often
+ * it is bought "against magic resist" (correlation +0,88 over 3.317 items; armor/sustain +0,92,
+ * magic resist/sustain +0,87) — two situations that call for opposite items lift the same ones, so
+ * what they share is the minute of the game. The line-up situations do not (heavy AD against heavy
+ * AP: −0,95). Of the 17 takeovers these situations made, 5 stood out against the other two.
+ */
 export const ITEM_SITUATIONS: readonly Situation[] = [SITUATION.EnemyArmor, SITUATION.EnemyMagicResist, SITUATION.EnemySustain];
 
 /** A suggestion with the plan's item it stands against, and whether it takes that place. */
@@ -421,6 +432,9 @@ export type Swap = RatedSuggestion & { instead: number };
  * 1,6 times as often against magic resist" at 6 % of the slot is an alternative, not what players
  * do; Mercury's Treads at 55 % against Plated Steelcaps' 39 % when the enemies deal magic damage is
  * (Irelia, file of 11.11.2026).
+ *
+ * Only a situation of the line-up takes a place (ITEM_SITUATIONS): one made of the enemies' items
+ * leaves its suggestion an alternative, with the plan item it would stand against.
  *
  * Two guards, both against the same thing — a situation made of the enemies' items exists only late
  * in a game, so an item bought early has few buys in it or none:
@@ -456,7 +470,7 @@ export function rateSuggestions(
       }
     }
     let adopt = false;
-    if (instead !== null && least.games > 0) {
+    if (instead !== null && least.games > 0 && !ITEM_SITUATIONS.includes(suggestion.situation)) {
       // Both shares are of the same buys; the difference of two shares of n buys.
       const pooled = (suggestion.share + least.share) / 2;
       const error = Math.sqrt((Math.max(1e-9, pooled * (1 - pooled)) * 2) / least.games);
