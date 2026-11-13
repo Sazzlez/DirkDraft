@@ -3,7 +3,7 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
-## 2.1.0 — unveröffentlicht
+## 2.1.0 — 2026-11-13
 
 - **Stärke-Skala im Spiel: du gegen deinen Lane-Gegner.** Eine Kachel in der Spielansicht zeigt, wer
   nach Level und Items gerade stärker ist: „Ausgeglichen“, „Leicht stärker“, „Stärker“ oder „Deutlich
