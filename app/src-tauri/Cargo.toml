@@ -1,6 +1,6 @@
 [package]
 name = "dirkdraft"
-version = "2.0.0"
+version = "2.1.0"
 description = "DirkDraft 2.0 — Draft- und Spielhilfe für League of Legends"
 edition = "2021"
 publish = false
