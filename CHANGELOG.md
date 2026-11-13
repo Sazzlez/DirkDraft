@@ -5,6 +5,26 @@ Kopien melden sie beim nächsten Start.
 
 ## 2.1.0 — unveröffentlicht
 
+- **Die Draft-Chance rechnet mit gemessenen Gewichten.** An 145.741 eigenen Platin-Spielen gemessen und an
+  29.143 davon geprüft, die das Modell nie gesehen hat: Die Chance lag bisher 4,6-mal zu nah an 50 %,
+  weil sie Stärke und Matchups über die Lanes gemittelt hat; gemessen zählt die Summe. Ein Draft, der
+  als „51 %“ dastand, ist eher einer mit 54 oder 55 %. Dazu zählen jetzt das Botlane-Duo, das
+  Botlane-Kreuz (ADC gegen Support), weitere Gegner-Paare über Lanes hinweg und, was dem Team fehlt.
+  Die Kachel zeigt die Teile in Punkten und die Chance mit dem ersten Vorschlag („mit Ornn 46,1 %“).
+  „55 %“ gewinnt auf den Prüfspielen wirklich rund 55 %. Zahlen in `docs/modellpruefung.md`,
+  Messung 13 und 21.
+- **Die Pick-Liste zählt, was sich in unseren Spielen zeigt.** Drei Gewichte waren geschätzt und sind
+  jetzt gemessen: Gegner außerhalb der eigenen Lane kommen aus gezählten Paaren statt aus geborgten
+  Lane-Matchups; von den Synergien trägt nur das Botlane-Duo, die anderen Paare verschieben die Zahl
+  nicht mehr; fehlender AP- oder AD-Schaden kostet rund 7 Punkte statt höchstens 4, kein Engage 5,5,
+  wenig Waveclear gut einen. Tank-Shred und Timing haben in den Spielen keine Wirkung gezeigt und sind
+  nur noch Hinweise. Matchups sind je Lane geglättet: auf Top zählen sie mehr als bisher, auf Bot und
+  Support weniger.
+- **Situative Items übernehmen nur noch aus Lagen der Aufstellung.** „Die Gegner haben viel Rüstung
+  gebaut“, „viel Magieresistenz“ und „heilen sich“ heben in unseren Spielen dieselben Items — sie
+  messen vor allem, dass das Spiel schon lange läuft. Solche Vorschläge bleiben die Alternative neben
+  dem Build. Gegen viel AD, viel AP, Tanks und harte Kontrolle übernehmen situative Items weiter von
+  selbst (Messung 20).
 - **Der Build wählt keine Zufallstreffer mehr.** Mit wachsender Datenmenge standen dünne Optionen im
   Plan: Jinx bekam Boots of Swiftness aus 35 Spielen statt Berserker's Greaves aus 11.994, Ahri
   Mejai's als viertes Item. Jetzt führt die meistgespielte Option. Eine andere übernimmt nur, wenn

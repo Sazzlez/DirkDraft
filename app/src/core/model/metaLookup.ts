@@ -4,7 +4,7 @@
 
 import { ALL_LANES, Lane, LANE_COUNT } from './lane';
 import { clamp, logit, sigmoid } from './scoreModel';
-import { confidence, LANE_PRIOR, MATCHUP_PRIOR, OWN_LANE_PRIOR, shrink, SYNERGY_PRIOR } from './shrinkage';
+import { confidence, LANE_PRIOR, MATCHUP_PRIOR, OWN_LANE_PRIOR, OWN_MATCHUP_PRIOR, shrink, SYNERGY_PRIOR } from './shrinkage';
 import { expectedLogit, fitSynergyLine, type SynergyLine } from './synergyLine';
 
 export const DamageType = { Unknown: 0, Physical: 1, Magic: 2, Mixed: 3 } as const;
@@ -64,6 +64,19 @@ export interface SynergyStat {
   tier?: number;
 }
 
+/**
+ * Two champions on opposite teams and different lanes (own data, counted since 07.11.2026): one row
+ * per pair, the champion with the lower id first, its win rate against the other.
+ */
+export interface VersusStat {
+  championId: number;
+  lane: Lane;
+  opponentId: number;
+  opponentLane: Lane;
+  winRate: number;
+  play: number;
+}
+
 export interface MetaSnapshot {
   version: number;
   patch: string;
@@ -88,6 +101,8 @@ export interface MetaSnapshot {
   laneStats: LaneStat[];
   matchups: MatchupStat[];
   synergies: SynergyStat[];
+  /** Own data only; absent in OP.GG files and in own files from before 07.11.2026. */
+  versus?: VersusStat[];
   warnings: string[];
 }
 
@@ -141,6 +156,15 @@ export interface SynergyView {
   measured: number;
 }
 
+/** A pair across the teams on different lanes, shrunk towards what both lane strengths predict. */
+export interface VersusView {
+  winRate: number;
+  play: number;
+  /** What the two lane strengths alone predict for the first champion. */
+  expected: number;
+  measured: number;
+}
+
 const rate = (value: number): number => (Number.isFinite(value) ? clamp(value, 0, 1) : 0);
 
 /** Math.Clamp semantics for the measured rate: NaN stays NaN. */
@@ -163,11 +187,23 @@ export class MetaLookup {
   private readonly laneRosters: number[][];
   private readonly matchups: Map<number, MatchupView>;
   private readonly synergies: Map<number, SynergyView>;
+  private readonly versusPairs: Map<string, VersusView>;
   private readonly liveMatchups = new Map<number, MatchupView>();
+  private readonly matchupPriors: readonly number[];
 
-  constructor(snapshot: MetaSnapshot, options: { lanePrior?: number } = {}) {
+  /**
+   * `matchupPrior`: one weight for the duels of every lane instead of the measured ones — for
+   * measuring what the weights per lane are worth (tools/measure/model.ts).
+   */
+  constructor(snapshot: MetaSnapshot, options: { lanePrior?: number; matchupPrior?: number } = {}) {
     this.snapshot = snapshot;
     this.lanePrior = options.lanePrior ?? (snapshot.source === 'riot' ? OWN_LANE_PRIOR : LANE_PRIOR);
+    this.matchupPriors =
+      options.matchupPrior !== undefined
+        ? ALL_LANES.map(() => options.matchupPrior!)
+        : snapshot.source === 'riot'
+          ? OWN_MATCHUP_PRIOR
+          : ALL_LANES.map(() => MATCHUP_PRIOR);
     this.champions = [...snapshot.champions];
     this.champions.forEach((c, i) => this.indexById.set(c.id, i));
 
@@ -188,6 +224,7 @@ export class MetaLookup {
       snapshot.synergyBaseline,
     );
     this.synergies = this.buildSynergies(snapshot);
+    this.versusPairs = this.buildVersus(snapshot);
   }
 
   static empty(): MetaLookup {
@@ -217,6 +254,11 @@ export class MetaLookup {
 
   get warnings(): readonly string[] {
     return this.snapshot.warnings;
+  }
+
+  /** Pseudo games a duel on this lane is shrunk with: measured per lane for own data (shrinkage.ts). */
+  matchupPrior(lane: Lane): number {
+    return this.matchupPriors[lane] ?? MATCHUP_PRIOR;
   }
 
   get isEmpty(): boolean {
@@ -342,7 +384,7 @@ export class MetaLookup {
       const view: MatchupView = {
         winRate: this.shrinkMatchup(stat.championId, stat.opponentId, stat.lane, stat.winRate, stat.play, !fromCompleteList),
         play: stat.play,
-        confidence: confidence(stat.play, MATCHUP_PRIOR),
+        confidence: confidence(stat.play, this.matchupPrior(stat.lane)),
         isInferred: false,
         isLive: true,
         fromCompleteList,
@@ -374,6 +416,33 @@ export class MetaLookup {
     const b = this.indexById.get(partnerId);
     if (a === undefined || b === undefined) return null;
     return this.synergies.get(synergyKey(a, b)) ?? null;
+  }
+
+  /**
+   * The champion on its lane against an enemy on another lane (own data): how the pair has gone,
+   * shrunk like a duo towards what both lane strengths predict. Null where the file has no row for
+   * the pair — it counts them from 30 games on.
+   */
+  versus(championId: number, lane: Lane, opponentId: number, opponentLane: Lane): VersusView | null {
+    if (lane === Lane.Unknown || opponentLane === Lane.Unknown || lane === opponentLane) return null;
+    return this.versusPairs.get(versusKey(championId, lane, opponentId, opponentLane)) ?? null;
+  }
+
+  private buildVersus(snapshot: MetaSnapshot): Map<string, VersusView> {
+    const map = new Map<string, VersusView>();
+    for (const stat of snapshot.versus ?? []) {
+      if (!(stat.play > 0) || stat.lane === Lane.Unknown || stat.opponentLane === Lane.Unknown || stat.lane === stat.opponentLane) continue;
+      const mine = this.laneStat(stat.championId, stat.lane);
+      const theirs = this.laneStat(stat.opponentId, stat.opponentLane);
+      if (!mine || !theirs) continue;
+      const expected = sigmoid(logit(mine.winRate) - logit(theirs.winRate));
+      const winRate = shrink(stat.winRate, stat.play, SYNERGY_PRIOR, expected);
+      const measured = clampRate(stat.winRate);
+      map.set(versusKey(stat.championId, stat.lane, stat.opponentId, stat.opponentLane), { winRate, play: stat.play, expected, measured });
+      // Mirrored after shrinking: the other side is the exact complement.
+      map.set(versusKey(stat.opponentId, stat.opponentLane, stat.championId, stat.lane), { winRate: 1 - winRate, play: stat.play, expected: 1 - expected, measured: 1 - measured });
+    }
+    return map;
   }
 
   private loadLaneStats(snapshot: MetaSnapshot): void {
@@ -430,7 +499,7 @@ export class MetaLookup {
       map.set(key, {
         winRate: this.shrinkMatchup(stat.championId, stat.opponentId, stat.lane, stat.winRate, stat.play, !complete),
         play: stat.play,
-        confidence: confidence(stat.play, MATCHUP_PRIOR),
+        confidence: confidence(stat.play, this.matchupPrior(stat.lane)),
         isInferred: false,
         isLive: false,
         fromCompleteList: complete,
@@ -452,7 +521,7 @@ export class MetaLookup {
       map.set(mirror, {
         winRate: 1 - this.shrinkMatchup(stat.championId, stat.opponentId, stat.lane, stat.winRate, stat.play, !complete),
         play: stat.play,
-        confidence: confidence(stat.play, MATCHUP_PRIOR),
+        confidence: confidence(stat.play, this.matchupPrior(stat.lane)),
         isInferred: true,
         isLive: false,
         fromCompleteList: complete,
@@ -464,7 +533,7 @@ export class MetaLookup {
   }
 
   private shrinkMatchup(championId: number, opponentId: number, lane: Lane, winRate: number, play: number, listed = true): number {
-    return shrink(winRate, play, MATCHUP_PRIOR, sigmoid(this.pairBaseline(championId, opponentId, lane, listed)));
+    return shrink(winRate, play, this.matchupPrior(lane), sigmoid(this.pairBaseline(championId, opponentId, lane, listed)));
   }
 
   private buildSynergies(snapshot: MetaSnapshot): Map<number, SynergyView> {
@@ -507,6 +576,8 @@ function supersedes(candidate: MatchupView, existing: MatchupView): boolean {
 
 // Numeric keys stay below 2^53: lane (3 bits) · 2^40 + index · 2^20 + index.
 const matchupKey = (lane: Lane, a: number, b: number): number => lane * 2 ** 40 + a * 2 ** 20 + b;
+
+const versusKey = (a: number, laneA: Lane, b: number, laneB: Lane): string => `${a}:${laneA}:${b}:${laneB}`;
 
 function synergyKey(a: number, b: number): number {
   return Math.min(a, b) * 2 ** 20 + Math.max(a, b);

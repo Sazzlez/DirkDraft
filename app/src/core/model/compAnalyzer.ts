@@ -196,7 +196,15 @@ export class CompAnalyzer {
 
   /** How much the candidate covers the gaps, -1..+1; null where no rule could fire either way. */
   /** `lane`: the seat's lane, for what the candidate builds there (B4); Unknown reads any lane. */
-  fit(candidateId: number, profile: CompProfile, enemies: CompProfile, reasons: Reason[], lane: Lane = Lane.Unknown): number | null {
+  /**
+   * `measured` (own data, since 13.11.2026): the findings with a measured cost — missing AP or AD,
+   * no frontline, no engage, little waveclear, and "even more AD/AP", which is the same gap from the
+   * other side — are counted by the draft model with their measured weight (draftModel compValue),
+   * so here they only give their reason and add nothing. Timing and tank shred showed no effect in
+   * 145.741 games (docs/modellpruefung.md, Messung 13): they become hints without a weight. What is
+   * left in the score are the rules too rare or too specific to measure yet.
+   */
+  fit(candidateId: number, profile: CompProfile, enemies: CompProfile, reasons: Reason[], lane: Lane = Lane.Unknown, measured = false): number | null {
     const champion = this.meta.champion(candidateId);
     // Nothing to judge yet — unless the team chose a plan before the draft (D4).
     if (!champion || (profile.count === 0 && enemies.count < MINIMUM_ENEMIES_TO_JUDGE && !this.chosenPlan)) return null;
@@ -209,7 +217,7 @@ export class CompAnalyzer {
     let score = 0;
 
     if (hasIssue(profile, 'noMagicDamage') && isMagicish) {
-      score += 0.5 * severityOf(profile, 'noMagicDamage');
+      if (!measured) score += 0.5 * severityOf(profile, 'noMagicDamage');
       reasons.push(
         pro(
           'bringt fehlenden AP-Schaden',
@@ -219,7 +227,7 @@ export class CompAnalyzer {
     }
 
     if (hasIssue(profile, 'noPhysicalDamage') && isPhysicalish) {
-      score += 0.5 * severityOf(profile, 'noPhysicalDamage');
+      if (!measured) score += 0.5 * severityOf(profile, 'noPhysicalDamage');
       reasons.push(
         pro(
           'bringt fehlenden AD-Schaden',
@@ -230,7 +238,7 @@ export class CompAnalyzer {
 
     if (hasStaticData(champion)) {
       if (hasIssue(profile, 'noFrontline') && (isTagged(champion, 'Tank') || champion.defense >= FRONTLINE_DEFENSE)) {
-        score += 0.4;
+        if (!measured) score += 0.4;
         reasons.push(
           pro(
             'Frontline',
@@ -252,7 +260,7 @@ export class CompAnalyzer {
 
     if (trait.isKnown) {
       if (hasIssue(profile, 'noEngage') && hasHardEngage(trait)) {
-        score += 0.45;
+        if (!measured) score += 0.45;
         reasons.push(
           pro(
             'kann engagen',
@@ -283,7 +291,7 @@ export class CompAnalyzer {
 
       // The smallest of the gap rules: a hint by judgement only, like the rest of this term (2.1).
       if (hasIssue(profile, 'littleWaveclear') && trait.waveclear >= STRONG_WAVECLEAR) {
-        score += 0.2;
+        if (!measured) score += 0.2;
         reasons.push(
           pro(
             'guter Waveclear',
@@ -295,18 +303,19 @@ export class CompAnalyzer {
       // Smaller still: the early/late traits are coarse (most champions sit on "mid").
       const majority = timingMajority(profile);
       if (majority && trait.scaling === majority) {
-        score += 0.15;
-        reasons.push(
-          pro(
-            majority === 'late' ? 'passt zum Late Game eures Teams' : 'passt zum Early Game eures Teams',
-            `In eurem Team stehen schon Champions, die früh, und solche, die spät am stärksten sind. Dieser Pick passt zur Mehrheit (${majority === 'late' ? 'Late Game' : 'Early Game'}), so will das Team in derselben Phase gewinnen. Die Einordnung früh/spät ist grob — die meisten Champions stehen auf „mitte“ — und noch nicht gemessen.`,
-          ),
-        );
+        const text = majority === 'late' ? 'passt zum Late Game eures Teams' : 'passt zum Early Game eures Teams';
+        const hint = `In eurem Team stehen schon Champions, die früh, und solche, die spät am stärksten sind. Dieser Pick passt zur Mehrheit (${majority === 'late' ? 'Late Game' : 'Early Game'}), so will das Team in derselben Phase gewinnen.`;
+        if (measured) {
+          reasons.push(neutral(text, `${hint} Zählt nicht in die Prozentzahl: In unseren Spielen gewinnt ein Team mit gemischtem Timing nicht seltener (+0,2 ± 0,6 Punkte).`));
+        } else {
+          score += 0.15;
+          reasons.push(pro(text, `${hint} Die Einordnung früh/spät ist grob — die meisten Champions stehen auf „mitte“ — und noch nicht gemessen.`));
+        }
       }
     }
 
     if (profile.physicalShare >= 0.75 && champion.damage === DamageType.Physical) {
-      score -= 0.2;
+      if (!measured) score -= 0.2;
       reasons.push(
         contra(
           'noch mehr AD-Schaden',
@@ -316,7 +325,7 @@ export class CompAnalyzer {
     }
 
     if (profile.magicShare >= 0.75 && champion.damage === DamageType.Magic) {
-      score -= 0.2;
+      if (!measured) score -= 0.2;
       reasons.push(
         contra(
           'noch mehr AP-Schaden',
@@ -373,15 +382,16 @@ export class CompAnalyzer {
       // The counterpart of the assassin rule, from what players build: through armour, resist and
       // health. Assassins are left out — against two frontliners they already get the contra above.
       if (enemies.frontlineCount >= 2 && !isTagged(champion, 'Assassin') && this.shred.has(candidateId, lane)) {
-        score += 0.25;
-        reasons.push(
-          pro(
-            'Tank-Shred',
-            'Der Gegner hat schon zwei Champs, die vorne stehen und viel aushalten. Dieser Champ baut auf dieser Lane meistens ' +
-              'Items, die durch Rüstung oder Magieresistenz gehen oder nach Leben Schaden machen (etwa Black Cleaver, Lord ' +
-              'Dominik’s, Void Staff, Liandry’s) — gezählt in unseren eigenen Builds.',
-          ),
-        );
+        const hint =
+          'Der Gegner hat schon zwei Champs, die vorne stehen und viel aushalten. Dieser Champ baut auf dieser Lane meistens ' +
+          'Items, die durch Rüstung oder Magieresistenz gehen oder nach Leben Schaden machen (etwa Black Cleaver, Lord ' +
+          'Dominik’s, Void Staff, Liandry’s) — gezählt in unseren eigenen Builds.';
+        if (measured) {
+          reasons.push(neutral('Tank-Shred', `${hint} Zählt nicht in die Prozentzahl: In unseren Spielen bringt ein solcher Champ gegen zwei Frontliner keinen messbaren Vorteil (+0,1 ± 0,2 Punkte).`));
+        } else {
+          score += 0.25;
+          reasons.push(pro('Tank-Shred', hint));
+        }
       }
 
       if (hasIssue(enemies, 'allMelee') && isRanged(champion)) {

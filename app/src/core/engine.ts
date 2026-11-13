@@ -5,6 +5,8 @@
 
 import { estimateBalance, laneMatchups, rankAram, type AramStat } from './model/advisors';
 import { CompAnalyzer, traitCoverage, type CompProfile, type Plan } from './model/compAnalyzer';
+import { draftParts } from './model/draftModel';
+import { sigmoid } from './model/scoreModel';
 import {
   draftStateFrom,
   effectiveChampionId,
@@ -126,7 +128,17 @@ export interface DraftFrame {
   bans: FrameSet | null;
   hover: { championId: number; rank: number; candidates: number; lane: LaneName; leader: FrameItem | null; item: FrameItem; decimals: number } | null;
   comp: { allies: FrameProfile; enemies: FrameProfile };
-  balance: { allyWinRate: number; ratedChampions: number; contestedLanes: number; isComparable: boolean; hasData: boolean };
+  balance: {
+    allyWinRate: number;
+    ratedChampions: number;
+    contestedLanes: number;
+    isComparable: boolean;
+    hasData: boolean;
+    /** Own data (2.1): what the chance is made of, in log-odds from the own side. */
+    parts?: { strength: number; duels: number; duo: number; versus: number; comp: number };
+    /** Own data (2.1): the chance with the list's first pick on the advised seat, while that seat is empty. */
+    withTop?: { championId: number; allyWinRate: number };
+  };
   laneMatchups: { lane: LaneName; allyId: number; enemyId: number; winRate: number | null; play: number; isInferred: boolean; measured: number | null }[];
   aramBench: { own: number; bench: number[]; rerolls: number; tied: number; decimals: number; items: FrameItem[] } | null;
   /**
@@ -355,9 +367,22 @@ export class DraftEngine {
       };
     }
 
-    const balance = estimateBalance(meta, state, allyPredictions, enemyPredictions);
+    const profiles = { allies: comp.analyze(state.allies.map(effectiveChampionId)), enemies: comp.analyze(state.enemies.map(effectiveChampionId)) };
+    const balance = estimateBalance(meta, state, allyPredictions, enemyPredictions, profiles);
 
     const advised = target ? state.allies.find((slot) => slot.cellId === target.slot.cellId) : undefined;
+    // "Your draft: 52 % → with Nami 54 %": the same model with the list's first pick on the empty seat.
+    let withTop: { championId: number; allyWinRate: number } | null = null;
+    const first = picks?.items[0];
+    const pickLane = picks ? laneFromKey(picks.lane) : Lane.Unknown;
+    if (balance.parts && first && advised && effectiveChampionId(advised) === 0 && pickLane !== Lane.Unknown) {
+      const seats = (predictions: LanePredictionResult) => predictions.predictions.filter((p) => p.championId !== 0).map((p) => ({ championId: p.championId, lane: p.lane }));
+      const withPick = draftParts(meta, [...seats(allyPredictions), { championId: first.championId, lane: pickLane }], seats(enemyPredictions), {
+        allies: comp.analyze([...state.allies.map(effectiveChampionId), first.championId]),
+        enemies: profiles.enemies,
+      });
+      withTop = { championId: first.championId, allyWinRate: sigmoid(withPick.total) };
+    }
     const pickHint =
       picks && advised && !isLocked(advised)
         ? pickHintOf(picks, advised.cellId === mine?.cellId && hoverResult ? hoverResult.item : null, advised.cellId, state.allyPickOrder)
@@ -392,8 +417,8 @@ export class DraftEngine {
       bans,
       hover: hoverResult,
       comp: {
-        allies: frameProfile(comp.analyze(state.allies.map(effectiveChampionId))),
-        enemies: frameProfile(comp.analyze(state.enemies.map(effectiveChampionId))),
+        allies: frameProfile(profiles.allies),
+        enemies: frameProfile(profiles.enemies),
       },
       balance: {
         allyWinRate: balance.allyWinRate,
@@ -401,6 +426,10 @@ export class DraftEngine {
         contestedLanes: balance.contestedLanes,
         isComparable: balance.isComparable,
         hasData: balance.ratedChampions > 0 && balance.isComparable,
+        ...(balance.parts
+          ? { parts: { strength: balance.parts.strength, duels: balance.parts.duels, duo: balance.parts.duo, versus: balance.parts.versus, comp: balance.parts.comp } }
+          : {}),
+        ...(withTop ? { withTop } : {}),
       },
       laneMatchups: laneMatchups(meta, allyPredictions, enemyPredictions).map((m) => ({
         lane: laneKey(m.lane),

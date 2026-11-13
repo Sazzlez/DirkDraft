@@ -1,6 +1,8 @@
 // Ports of the small 1.5 advisors: DraftBalance (draft chance), LaneMatchups (the duel rows),
 // AramAdvisor (bench ranking), AugmentAdvisor (Mayhem augments) and BuildChoice (Wilson bound).
 
+import type { CompProfile } from './compAnalyzer';
+import { draftParts, type DraftParts, type DraftSeat } from './draftModel';
 import type { DraftState } from './draftState';
 import { ALL_LANES, Lane } from './lane';
 import type { LanePredictionResult } from './lanePredictor';
@@ -19,19 +21,36 @@ export interface DraftBalance {
   ratedChampions: number;
   contestedLanes: number;
   isComparable: boolean;
+  /** Own data: the parts the chance is made of, in log-odds from the own side (draftModel). */
+  parts?: DraftParts;
 }
 
 export const UNKNOWN_BALANCE: DraftBalance = Object.freeze({ allyWinRate: 0.5, ratedChampions: 0, contestedLanes: 0, isComparable: false });
 
 export const balanceHasData = (b: DraftBalance): boolean => b.ratedChampions > 0 && b.isComparable;
 
+/**
+ * `comp`: the line-up profiles of both sides, for the measured findings (own data only).
+ *
+ * On our own data the chance is the measured draft model (draftModel.ts): the parts are summed, not
+ * averaged over the lanes — averaged, the chance of 2.0 stood 4,6 times too close to 50 % on 29.143
+ * held-out games — and duos, enemy pairs across lanes and the line-up count with their measured
+ * weights. An open seat counts as an average champion. OP.GG files keep the 1.5 estimate below.
+ */
 export function estimateBalance(
   meta: MetaLookup,
   state: DraftState,
   allyLanes: LanePredictionResult,
   enemyLanes: LanePredictionResult,
+  comp: { allies: CompProfile; enemies: CompProfile } | null = null,
 ): DraftBalance {
   if (!state.isActive || meta.isEmpty) return UNKNOWN_BALANCE;
+
+  if (meta.isOwnData) {
+    const parts = draftParts(meta, seatsOf(allyLanes), seatsOf(enemyLanes), comp);
+    if (parts.rated === 0) return UNKNOWN_BALANCE;
+    return { allyWinRate: sigmoid(parts.total), ratedChampions: parts.rated, contestedLanes: parts.contested, isComparable: parts.comparable, parts };
+  }
 
   const ally = sideStrength(meta, allyLanes);
   const enemy = sideStrength(meta, enemyLanes);
@@ -61,6 +80,11 @@ export function estimateBalance(
     contestedLanes: contested,
     isComparable: ally.count > 0 && enemy.count > 0,
   };
+}
+
+/** The champions of a side on their predicted lanes. */
+function seatsOf(lanes: LanePredictionResult): DraftSeat[] {
+  return lanes.predictions.filter((p) => p.championId !== 0).map((p) => ({ championId: p.championId, lane: p.lane }));
 }
 
 function sideStrength(meta: MetaLookup, lanes: LanePredictionResult): { sum: number; count: number } {

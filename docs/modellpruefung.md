@@ -907,8 +907,103 @@ harte Kontrolle); aus den Lagen der Gegner-Items bleibt es die Alternative neben
 übernehmen von selbst) gilt weiter, für die 71 von 88 Fälle, in denen die Lage gemessen ist. Für die
 genaue Probe müsste der Sammler die Käufe je Lage zusätzlich nach Spielminute zählen.
 
+## 21. Das gemessene Draft-Modell in der App (13.11.2026, Phase 3)
+
+Stufe B aus Messung 13 steht in der App: `app/src/core/model/draftModel.ts`, Tests in
+`app/tests/model/draftModel.test.ts`. Es gilt nur für eigene Dateien (`source: "riot"`); OP.GG-Dateien
+rechnen wie 1.5, die Golden-Referenz ist unverändert.
+
+**Die Rechnung.** Die Chance des eigenen Teams ist die Summe (in log-odds) aus:
+
+| Teil | Gewicht | gemessen |
+|---|---|---|
+| Lane-Stärke jedes Champions | 1 | 0,913 ± 0,066 im gemeinsamen Fit; mit den festen Gewichten ist 1 kalibriert (unten) |
+| Duell auf jeder Lane | 1, geglättet je Lane | siehe „Glättung je Lane“ |
+| Botlane-Duo (ADC + Support), beide Seiten | 0,41 | 0,415 ± 0,273 |
+| Botlane-Kreuz (ADC gegen Support) | 0,55 | 0,547 ± 0,271 |
+| übrige Gegner-Paare ohne Jungler | 0,20 | 0,195 ± 0,148 |
+| AP-Schaden fehlt | −0,26 | −0,260 ± 0,064 |
+| AD-Schaden fehlt | −0,295 | −0,295 ± 0,123 |
+| kein Engage | −0,22 | −0,221 ± 0,134 |
+| wenig Waveclear | −0,05 | −0,050 ± 0,024 |
+| kein Frontline | −0,035 | −0,035 ± 0,028 |
+
+Die Gewichte stammen aus „B schlank“: B, neu angepasst nur mit den Teilen, deren Gewicht im vollen
+Fit mindestens zwei Standardfehler von null liegt (auf den Trainingsspielen gewählt). B schlank sagt
+so gut voraus wie B (0,6872 gegen 0,6871, Unterschied 0,0000 ± 0,0001). **Kein Gewicht bekommen:**
+alle Duos außer dem der Botlane, Jungler gegen Laner (+0,17 ± 0,18, knapp unter zwei
+Standardfehlern), die Comp-Merkmale ohne Wirkung (Timing, Tank-Shred, Zahl der Ranged-, Waveclear-,
+Early- und Late-Champions) und Poke: Dessen Gewicht steht im Fit bei −0,009 ± 0,007 je Punkt, in der
+Comp-Messung allein bei −0,02 ± 0,14 Punkten — ein Treffer unter 29 geprüften Teilen, kein Befund.
+
+**Abnahme.** `npm run measure:model` rechnet die Draft-Chance mit genau diesem Code (feste Gewichte,
+nichts angepasst) auf den 29.143 zurückgehaltenen Spielen:
+
+| Vergleich | Gewinn im Log-Loss | Abstand |
+|---|---|---|
+| B → App | +0,0000 ± 0,0002 | 0,2 σ |
+| Draft-Chance wie in 2.0 → App | +0,0041 ± 0,0010 | 8,1 σ |
+| Draft-Chance wie in 2.0, kalibriert → App | +0,0005 ± 0,0005 | 2,3 σ |
+
+Kalibrierung: Steigung 1,04 ± 0,11, Achsenabschnitt +0,02 ± 0,02; in jedem Bereich höchstens 1,7
+Punkte zwischen vorhergesagt und tatsächlich („unter 40 %“: 37,9 % vorhergesagt, 36,5 % gewonnen;
+„ab 60 %“: 62,3 % und 64,0 %). Mit 0,9 auf der Lane-Stärke läge die Chance etwas zu nah an 50 %
+(Steigung 1,11 ± 0,12), deshalb zählt sie voll.
+
+**Was sich in der App ändert** (eigene Daten):
+
+| | bis 2.0 | 2.1 |
+|---|---|---|
+| Draft-Chance | Stärke und Duelle über die Lanes gemittelt; lag 4,6-mal zu nah an 50 % | die Summe oben; ein offener Platz zählt als durchschnittlicher Champion |
+| Pick: Matchup | Duell, Glättung 1.000 | Duell, Glättung je Lane |
+| Pick: Enemy-Team | Duelle von irgendeiner Lane geborgt, gemittelt, × 0,35 (geschätzt) | gezählte Paare über Lanes hinweg (`versus` in `meta.json`), je Art gewichtet |
+| Pick: Synergie | alle Duos gemittelt, × 0,6 (geschätzt) | nur das Botlane-Duo, × 0,41 |
+| Pick: Teamcomp | Regeln × 0,16, höchstens ±4 Punkte | die fünf gemessenen Befunde mit ihrem Gewicht; Peel, nur Melee, CC, Disengage, Assassinen-Regeln, Early gegen Scaling und der gewählte Plan weiter als Regeln unter dem Deckel; Timing und Tank-Shred nur noch Hinweis |
+
+Die Terme eines Picks sind damit genau das, was der Champion zur Chance des Teams beiträgt. Die Kachel
+„Draft-Chance“ zeigt die Teile in Punkten und, solange der beratene Platz leer ist, die Chance mit
+dem ersten Vorschlag („mit Ornn 46,1 %“).
+
+**Glättung der Duelle je Lane** (`OWN_MATCHUP_PRIOR`: Top 700, Jungle 800, Mid 1.100, Bot 1.700,
+Support 3.300 — die Momentenschätzung aus Messung 14, gerundet). Was dafür spricht und was nicht:
+
+- Mit einem Gewicht von 1.000 für alle verlangt der Fit auf Top den Faktor 2,11 ± 0,64 und auf Bot
+  0,59 ± 0,38. Mit der Glättung je Lane liegen alle fünf näher an 1: Top 1,57 ± 0,47, Jungle
+  1,05 ± 0,51, Mid 1,49 ± 0,58, Bot 0,83 ± 0,53, Support 2,21 ± 1,52.
+- Für die Vorhersage des Siegers bringt es **nichts Messbares**: Die App-Chance steht mit beiden
+  Glättungen bei 0,6872 (Unterschied höchstens 0,0001 ± 0,0002). Duelle bewegen die Chance insgesamt
+  zu wenig, als dass ihre Gewichtung auf 29.143 Spielen sichtbar würde.
+- Geändert ist es trotzdem, weil die Streuung je Lane selbst gemessen ist (zwei Verfahren, gleiche
+  Reihenfolge) und ein Gewicht für alle das Top-Duell nachweislich zu schwach zählt. Es ist eine
+  Konstante; wer sie nicht will, setzt alle fünf auf 1.000 und verliert in der Vorhersage nichts.
+- Folge für die offenen Counter (Messung 18): 10 Champion-Lanes haben jetzt einen, 2 zwei oder mehr
+  (vorher 14 und 0); auf Support keiner mehr, auf Top fünf. Größte Abweichung: Kayle gegen Garen,
+  57,4 % aus 509 Spielen, geglättet +3,6 Punkte (vorher +2,9 für Twitch gegen Jinx).
+
+**Comp bei offenen Plätzen.** Gemessen sind die Befunde an vollständigen Teams. Solange Plätze offen
+sind, zählt ein Befund mit dem Anteil des Teams, der feststeht (vier von fünf: 80 %); ein Pick
+bekommt, was das Team mit ihm mehr wert ist als ohne ihn. Als letzter Pick ist der Unterschied
+zwischen „schließt die Lücke“ und „lässt sie offen“ genau der gemessene Wert, davor weniger. Das
+Anteilige ist eine Annahme zwischen null und dem Messwert, nie mehr als gemessen.
+
+**Was nicht gemessen ist und so bleibt wie es war:** die Bann-Rechnung (`BAN_LANE_FOCUS`,
+`BAN_ALLY_SHARE`, Pick- und Bannrate als Tor), die Regeln unter dem Comp-Deckel, der Hinweis auf
+offene Counter. Das Modell kennt weiter weder die Pick-Reihenfolge noch den Spieler.
+
+**Sammler und C#-Kern.** Der Export braucht nichts Neues: `versus` steht seit dem 07.11. in
+`meta.json`, die Gewichte sind Konstanten der App und werden mit `npm run measure:model` nachgemessen
+(`--duel-prior 1000` rechnet zum Vergleich mit einem Duell-Gewicht für alle Lanes, `--skip-c 1` lässt
+das Gitter von Modell C weg). Der C#-Kern (`Tools -- recommend`) rechnet weiter das Modell von 2.0;
+die App ist seit 2.0 der TypeScript-Kern.
+
 ## Was offen bleibt (2.0)
 
+- **Seit 2.1 erledigt** (Messung 13 und 21): Die drei geschätzten Gewichte (übrige Gegner 0,35,
+  Duo-Dämpfung 0,6, Comp 0,16) sind für eigene Daten durch gemessene ersetzt, die Comp-Merkmale aus
+  2.1 sind gemessen. Die beiden Punkte unten dazu gelten nur noch für OP.GG-Dateien.
+- **Über drei Patches** ist nichts gemessen: Der Sammler kennt bisher nur Patch 16.22. Mit 16.23
+  nachmessen: Duelle und Gegner-Paare über die Patches, Patch-Vorwissen für die Lane-Stärke, breitere
+  Fehlerbalken am Patchtag.
 - **ARAM:** Die erste `aram.json` kommt mit dem Lauf vom 07.11. nachmittags; eine lokale Probe hatte
   157 Spiele (Median 8 je Champion). Das ARAM-Gewicht (400) ist aus 1.5 übernommen und erst mit
   einigen Tausend Spielen nachzumessen. Bis dahin liegt die Bank meist gleichauf — das Fenster sagt es.

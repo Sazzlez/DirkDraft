@@ -23,6 +23,19 @@ export const OWN_LANE_PRIOR = 800;
 export const MATCHUP_PRIOR = 1000;
 
 /**
+ * Matchup win rates from our own count, per lane (Top, Jungle, Mid, Bot, Support): duels do not
+ * spread alike on every lane. Measured on the collector's file of 13.11.2026 (158.087 games) with
+ * Tools -- priors: true spread around what both lane strengths predict 1,86 points on Top, 1,76 in
+ * the Jungle, 1,51 on Mid, 1,21 on Bot and 0,86 on Support — κ by the moment estimate 719, 804,
+ * 1.090, 1.698, 3.348, the split-half optimum 600, 800, 1.000, 2.000, 5.000. The model comparison on
+ * held-out games orders the lanes the same way without sharing anything with that estimate: under
+ * one weight of 1.000 the Top duel wants a factor of 2,11 ± 0,64 and the Bot duel 0,59 ± 0,38
+ * (docs/modellpruefung.md, Messung 13, 14 and 21). Over all lanes together the single weight stands
+ * confirmed (moments 1.131, best 1.200). OP.GG files keep MATCHUP_PRIOR for every lane.
+ */
+export const OWN_MATCHUP_PRIOR: readonly number[] = [700, 800, 1100, 1700, 3300];
+
+/**
  * Duo win rates. Measured with Tools -- priors on the Gold file (2.670 pairs): true spread 1,8
  * points around each pair's expectation, 753 by the moment estimate, held-out loss lowest between
  * 600 and 1.000.

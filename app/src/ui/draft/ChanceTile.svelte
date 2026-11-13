@@ -26,6 +26,16 @@
       <text x="75" y="80" class="small">Gegner {chance.enemyText}</text>
     </svg>
     <p class="verdict">{chance.verdict}.</p>
+    {#if chance.withPick}
+      <p class="with">mit {chance.withPick.name} <b class="num">{chance.withPick.text}</b></p>
+    {/if}
+    {#if chance.parts}
+      <ul class="parts">
+        {#each chance.parts as part (part.label)}
+          <li><span>{part.label}</span><b class="num" class:good={part.tone === 'good'} class:bad={part.tone === 'bad'}>{part.text}</b></li>
+        {/each}
+      </ul>
+    {/if}
   </div>
   {/if}
 </Tile>
@@ -84,5 +94,46 @@
     margin: 6px 0 0;
     font-size: 12.5px;
     font-weight: 600;
+  }
+
+  /* Own data: the chance with the first pick of the list, and what the chance is made of (points). */
+  .with {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--fg2);
+  }
+
+  .with b {
+    color: var(--fg);
+    font-weight: 600;
+  }
+
+  .parts {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    align-self: stretch;
+    display: grid;
+    gap: 2px;
+    font-size: 11.5px;
+    color: var(--fg2);
+  }
+
+  .parts li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .parts b {
+    font-weight: 600;
+  }
+
+  .parts .good {
+    color: var(--green-text);
+  }
+
+  .parts .bad {
+    color: var(--red-text);
   }
 </style>

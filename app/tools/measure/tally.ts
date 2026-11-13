@@ -3,7 +3,7 @@
 // games only and read them through the app's own MetaLookup, shrinkage and baselines included.
 
 import { ALL_LANES, Lane } from '../../src/core/model/lane';
-import type { LaneStat, MatchupStat, MetaSnapshot, SynergyStat } from '../../src/core/model/metaLookup';
+import type { LaneStat, MatchupStat, MetaSnapshot, SynergyStat, VersusStat } from '../../src/core/model/metaLookup';
 import type { Game } from './games';
 
 /** MetaExportLimits in RiotMetaStats.cs. */
@@ -101,8 +101,16 @@ export function tally(games: readonly Game[], base: MetaSnapshot): Tally {
     synergies.push({ championId, lane, partnerId, partnerLane, winRate: count.wins / count.games, play: count.games, tier: -1 });
   }
 
+  // One row per pair, the lower id first, from the collector's minimum on — as meta.json carries them.
+  const versusRows: VersusStat[] = [];
+  for (const [key, count] of versus) {
+    if (count.games < VERSUS_MINIMUM_GAMES) continue;
+    const [championId, lane, opponentId, opponentLane] = key.split(':').map(Number) as [number, Lane, number, Lane];
+    versusRows.push({ championId, lane, opponentId, opponentLane, winRate: count.wins / count.games, play: count.games });
+  }
+
   return {
-    snapshot: { ...base, games: games.length, laneStats, matchups, synergies, warnings: [] },
+    snapshot: { ...base, games: games.length, laneStats, matchups, synergies, versus: versusRows, warnings: [] },
     versus,
   };
 }

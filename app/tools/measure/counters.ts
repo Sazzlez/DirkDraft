@@ -175,7 +175,7 @@ export async function main(argv: string[]): Promise<number> {
       '## Halten die markierten Counter auf neuen Spielen?',
       '',
       `Markiert auf dem älteren Stand, geprüft auf den Spielen, die seither dazukamen (Zählung jetzt minus Zählung damals; ${count((snapshot.games ?? 0) - (before.games ?? 0))} Spiele). ` +
-        'Ein echter Counter behält seinen Vorsprung, ein Zufallstreffer fällt auf die Erwartung zurück. „Geglättet erwartet“: was die Glättung der App (1.000) vom alten Vorsprung übrig lässt.',
+        'Ein echter Counter behält seinen Vorsprung, ein Zufallstreffer fällt auf die Erwartung zurück. „Geglättet erwartet“: was die Glättung der App (je Lane) vom alten Vorsprung übrig lässt.',
       '',
       '| markiert ab | Richtungen | neue Spiele | Vorsprung damals | Vorsprung auf neuen Spielen | davon wieder | geglättet erwartet |',
       '|---|---:|---:|---:|---:|---:|---:|',
@@ -199,7 +199,7 @@ export async function main(argv: string[]): Promise<number> {
         // The expectation of the earlier file: the fresh games have not moved it.
         expectedWins += fresh * d.expected;
         oldEdge += fresh * (d.stat.winRate - d.expected);
-        kept += fresh * (d.stat.winRate - d.expected) * (d.stat.play / (d.stat.play + 1000));
+        kept += fresh * (d.stat.winRate - d.expected) * (d.stat.play / (d.stat.play + then.meta.matchupPrior(d.stat.lane)));
       }
       if (games === 0) continue;
       const edge = (wins - expectedWins) / games;

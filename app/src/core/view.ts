@@ -174,6 +174,10 @@ export interface DraftChanceView {
   allyText: string;
   enemyText: string;
   verdict: string;
+  /** Own data (2.1): what moves the chance, in points; absent where nothing does or on OP.GG files. */
+  parts?: { label: string; text: string; tone: 'good' | 'bad' }[];
+  /** Own data (2.1): the chance with the first pick of the list on the seat that picks next. */
+  withPick?: { name: string; text: string };
 }
 
 export interface CompRow {

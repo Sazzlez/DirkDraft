@@ -123,7 +123,15 @@ export interface GoldenFrame {
   bans: GoldenSet | null;
   hover: { championId: number; rank: number; candidates: number; lane: string; leader: GoldenItem | null; item: GoldenItem; decimals: number } | null;
   comp: { allies: GoldenProfile; enemies: GoldenProfile };
-  balance: { allyWinRate: number; ratedChampions: number; contestedLanes: number; isComparable: boolean; hasData: boolean };
+  balance: {
+    allyWinRate: number;
+    ratedChampions: number;
+    contestedLanes: number;
+    isComparable: boolean;
+    hasData: boolean;
+    parts?: { strength: number; duels: number; duo: number; versus: number; comp: number };
+    withTop?: { championId: number; allyWinRate: number };
+  };
   laneMatchups: { lane: string; allyId: number; enemyId: number; winRate: number | null; play: number; isInferred: boolean; measured: number | string | null }[];
   aramBench: { own: number; bench: number[]; rerolls: number; tied: number; decimals: number; items: GoldenItem[] } | null;
   /** New in 2.1 (engine.ts): the own team's gaps for the seat about to pick. */
@@ -476,11 +484,28 @@ export class GoldenAdapter {
       return { ally: null, allyText: '—', enemyText: '—', verdict: 'Noch nicht vergleichbar' };
     }
     const gap = Math.abs(b.allyWinRate - 0.5) * 100;
+    // Own data: the parts in points at 50 %, those that move the chance by a tenth of a point or more.
+    const parts = b.parts
+      ? (
+          [
+            ['Stärke', b.parts.strength],
+            ['Matchups', b.parts.duels],
+            ['Botlane-Duo', b.parts.duo],
+            ['Gegner-Paare', b.parts.versus],
+            ['Comp', b.parts.comp],
+          ] as const
+        )
+          .map(([label, logOdds]) => ({ label, points: logOdds * 25 }))
+          .filter((p) => Math.abs(p.points) >= 0.05)
+          .map((p) => ({ label: p.label, text: points(p.points), tone: p.points > 0 ? ('good' as const) : ('bad' as const) }))
+      : [];
     return {
       ally: b.allyWinRate,
       allyText: percent(b.allyWinRate, 1),
       enemyText: percent(1 - b.allyWinRate, 1),
       verdict: gap < 1 ? 'Ausgeglichen' : b.allyWinRate > 0.5 ? 'Ihr liegt vorn' : 'Der Gegner liegt vorn',
+      ...(parts.length > 0 ? { parts } : {}),
+      ...(b.withTop ? { withPick: { name: this.champion(b.withTop.championId)?.name ?? '', text: percent(b.withTop.allyWinRate, 1) } } : {}),
     };
   }
 

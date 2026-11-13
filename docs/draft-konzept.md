@@ -24,6 +24,10 @@ geschätztes Gewicht schnell einen besseren Vorschlag.
 
 ## 2. Wie 2.0.0 heute rechnet
 
+*Stand 13.11.2026: Phase 2 ist gemessen, Stufe B hat gewonnen und steht für eigene Daten in der App
+(`docs/modellpruefung.md`, Messung 13 und 21). Die Tabelle beschreibt 2.0.0; was 2.1 daraus macht,
+steht dort.*
+
 Fünf Teile verschieben die Winrate und werden addiert. Jeder zählt nur, was er über die anderen
 hinaus erklärt:
 
@@ -178,8 +182,8 @@ Spiel-Zeilen. Alles zusammen kommt mit 2.1.
 | 1 | Sammler: Gegner-Paare über alle Lanes (`versus`, darin Botlane-Kreuz und Jungle gegen Laner), je Spiel eine Zeile (zehn Champions mit Lane, Sieger, Dauer, Gold nach 15 Minuten). Die App rechnet noch wie heute. | **erledigt 07.11.2026** — zählt ab dem Lauf, der in der Nacht auf den 08.11. startet |
 | 1b | Sammler behält die Spiel-Zeilen der letzten drei Patches (für Synergien und Counter über Patches) | **erledigt 07.11.2026** |
 | 1c | Sammler: Mastery-Stichprobe in der Spiel-Zeile (Punkt 1), Runen, Zauber und Start je Lane-Gegner (Punkt 3) | **erledigt 07.11.2026** |
-| 2 | Messen: A, B und C an Prüfspielen vergleichen; Glättungen, Paar-Arten je Lane, Comp-Merkmale (Werkzeuge stehen: `npm run measure:model` für A/B, `npm run measure` für die Comp; Zwischenstand in `docs/modellpruefung.md` §13), früh/spät; dazu, wie viel der beste Pick gegenüber dem Durchschnitt bringt. Ergebnis in `docs/modellpruefung.md` | nach 5–7 Tagen Sammeln (~150.000 Spiele) |
-| 3 | Bestes Modell in Sammler-Export und App, Anzeige der Teile, Team-Chance, dazu Phase 4 (Punkte 1–3, 5–7), Tests, Release 2.1 | nach Phase 2, Release nur mit deinem OK |
+| 2 | **erledigt 13.11.2026** (145.741 Spielzeilen, ein Patch; Ergebnis: Stufe B, `docs/modellpruefung.md` Messung 13–20). Messen: A, B und C an Prüfspielen vergleichen; Glättungen, Paar-Arten je Lane, Comp-Merkmale (Werkzeuge stehen: `npm run measure:model` für A/B, `npm run measure` für die Comp; Zwischenstand in `docs/modellpruefung.md` §13), früh/spät; dazu, wie viel der beste Pick gegenüber dem Durchschnitt bringt. Ergebnis in `docs/modellpruefung.md` | nach 5–7 Tagen Sammeln (~150.000 Spiele) |
+| 3 | Bestes Modell in Sammler-Export und App, Anzeige der Teile, Team-Chance, dazu Phase 4 (Punkte 1–3, 5–7), Tests, Release 2.1 | Modell, Anzeige der Teile und Team-Chance **erledigt 13.11.2026** (Messung 21; der Export braucht nichts Neues); Phase 4 siehe `docs/modellpruefung.md` ab Messung 22; Release nur mit deinem OK |
 
 Bleibt wie es ist: Daten nur aus eigener Zählung, keine Namen anderer Spieler, kein automatisches
 Picken oder Bannen, Pool und Verlauf bleiben draußen. Zusätzliche Riot-Abfragen nur für die

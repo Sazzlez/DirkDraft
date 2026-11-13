@@ -1,8 +1,14 @@
 // Port of DraftPilot.Core.Draft.Recommender and CounterRisk (1.5). Every piece of evidence is a
 // shift in log-odds; picks sum them into a win rate with an error bar, bans into denied points.
 // Texts and numbers match the 1.5 model to the character — the golden tests hold it to that.
+//
+// On our own data (meta.isOwnData) the picks follow the measured draft model instead (draftModel.ts,
+// docs/modellpruefung.md Messung 21): a pick's terms are what the champion adds to the team's chance
+// — its lane strength, its duel, its pairs with the enemies on other lanes, the botlane duo, and the
+// line-up findings it closes or causes. OP.GG files, and with them the golden tests, are untouched.
 
 import { CompAnalyzer, EMPTY_PROFILE, type CompProfile, type Plan } from './compAnalyzer';
+import { BOT_DUO_WEIGHT, compValue, isBotDuo, STRENGTH_WEIGHT, VERSUS_WEIGHT, versusKind, type DraftSeat } from './draftModel';
 import { effectiveChampionId, isLocked, type DraftState, type TurnAction } from './draftState';
 import { ALL_LANES, Lane, laneDisplay } from './lane';
 import type { LanePrediction, LanePredictionResult } from './lanePredictor';
@@ -23,7 +29,7 @@ import {
   SYNERGY_DAMPING,
   tierName,
 } from './scoreModel';
-import { MATCHUP_PRIOR, SYNERGY_PRIOR } from './shrinkage';
+import { SYNERGY_PRIOR } from './shrinkage';
 import { TankShred } from './tankShred';
 import { hasHardEngage, hasPeel, type TraitTable } from './traits';
 import type { RecommendationTarget } from './turnTracker';
@@ -182,6 +188,8 @@ export function openCounters(
 interface Seat {
   lane: Lane;
   allies: number[];
+  /** The allies with the lane each one plays, where it is known (own data: the botlane duo). */
+  allySeats: DraftSeat[];
   hoveredByOthers: ReadonlySet<number>;
   /** What another teammate is about to ban; his ban hover counts as banned. */
   bannedByOthers: ReadonlySet<number>;
@@ -263,10 +271,12 @@ export class Recommender {
     allyLanes: LanePredictionResult | null,
   ): Seat {
     const lane = resolveLane(target, enemyLanes, allyLanes);
-    const allyChampions = state.allies
-      .filter((slot) => slot.cellId !== target.slot.cellId)
-      .map(effectiveChampionId)
-      .filter((id) => id !== 0);
+    const others = state.allies.filter((slot) => slot.cellId !== target.slot.cellId && effectiveChampionId(slot) !== 0);
+    const allyChampions = others.map(effectiveChampionId);
+    const allySeats = others.map((slot) => ({
+      championId: effectiveChampionId(slot),
+      lane: slot.assignedLane !== Lane.Unknown ? slot.assignedLane : (allyLanes?.forCell(slot.cellId)?.lane ?? Lane.Unknown),
+    }));
     const enemyChampions = state.enemies.map(effectiveChampionId).filter((id) => id !== 0);
     // An ally's hover is as good as taken; for bans the advised seat's own hover is excluded too.
     const hoveredByOthers = new Set(
@@ -289,6 +299,7 @@ export class Recommender {
     return {
       lane,
       allies: allyChampions,
+      allySeats,
       hoveredByOthers,
       bannedByOthers,
       openLanes: ALL_LANES.filter((l) => openLanes.has(l)),
@@ -329,18 +340,27 @@ export class Recommender {
         ? this.mainLaneLogOdds(candidate, lane, reasons, budget)
         : this.laneLogOdds(candidate, lane, reasons, budget);
 
-    const compFit = this.comp.fit(candidate, seat.allyComp, seat.enemyComp, reasons, lane);
+    const own = this.meta.isOwnData;
+    const compFit = this.comp.fit(candidate, seat.allyComp, seat.enemyComp, reasons, lane, own);
 
     const counters = openLaneBlocked ? this.addCounterRisk(candidate, lane, openLaneBlocked, reasons) : undefined;
     const flexLanes = this.flexLanes(candidate, seat.openLanes, reasons);
 
-    const terms: ScoreTerm[] = [
-      { kind: 'laneStrength', logOdds: baseTerm },
-      { kind: 'laneMatchup', logOdds: this.laneMatchupLogOdds(candidate, lane, enemyLanes, reasons, budget) },
-      { kind: 'enemyTeam', logOdds: this.offLaneMatchupLogOdds(candidate, lane, enemyLanes, reasons, budget) },
-      { kind: 'synergy', logOdds: this.synergyLogOdds(candidate, seat.allies, reasons, budget) },
-      { kind: 'composition', logOdds: compFit === null ? null : COMP_SCALE * compFit },
-    ];
+    const terms: ScoreTerm[] = own
+      ? [
+          { kind: 'laneStrength', logOdds: baseTerm === null ? null : STRENGTH_WEIGHT * baseTerm },
+          { kind: 'laneMatchup', logOdds: this.laneMatchupLogOdds(candidate, lane, enemyLanes, reasons, budget) },
+          { kind: 'enemyTeam', logOdds: this.versusLogOdds(candidate, lane, enemyLanes, reasons, budget) },
+          { kind: 'synergy', logOdds: this.botDuoLogOdds(candidate, lane, seat.allySeats, reasons, budget) },
+          { kind: 'composition', logOdds: this.measuredComp(candidate, seat, compFit) },
+        ]
+      : [
+          { kind: 'laneStrength', logOdds: baseTerm },
+          { kind: 'laneMatchup', logOdds: this.laneMatchupLogOdds(candidate, lane, enemyLanes, reasons, budget) },
+          { kind: 'enemyTeam', logOdds: this.offLaneMatchupLogOdds(candidate, lane, enemyLanes, reasons, budget) },
+          { kind: 'synergy', logOdds: this.synergyLogOdds(candidate, seat.allies, reasons, budget) },
+          { kind: 'composition', logOdds: compFit === null ? null : COMP_SCALE * compFit },
+        ];
 
     let total = 0;
     for (const term of terms) total += term.logOdds ?? 0;
@@ -590,7 +610,7 @@ export class Recommender {
       variance +=
         probability *
         probability *
-        (logitVariance(matchup.winRate, matchup.play, MATCHUP_PRIOR, sigmoid(baseline)) +
+        (logitVariance(matchup.winRate, matchup.play, this.meta.matchupPrior(lane), sigmoid(baseline)) +
           this.opponentLaneVariance(prediction.championId, lane));
       total += probability * (logit(matchup.winRate) - baseline);
 
@@ -649,7 +669,7 @@ export class Recommender {
       variance +=
         offLane *
         offLane *
-        (logitVariance(view.winRate, view.play, MATCHUP_PRIOR, sigmoid(baseline)) +
+        (logitVariance(view.winRate, view.play, this.meta.matchupPrior(found.lane), sigmoid(baseline)) +
           this.opponentLaneVariance(prediction.championId, found.lane));
       if (winRateDelta(view) > 0.01) favourable++;
     }
@@ -670,6 +690,85 @@ export class Recommender {
       );
     }
     return meanLogOdds;
+  }
+
+  /**
+   * Own data: the enemies on other lanes, from the pairs counted across lanes (meta.versus) instead
+   * of duels borrowed from whatever lane the two ever met on. Each pair by its measured weight — the
+   * botlane cross most (draftModel VERSUS_WEIGHT) — and by how likely the enemy is on that lane.
+   */
+  private versusLogOdds(championId: number, lane: Lane, enemyLanes: LanePredictionResult, reasons: Reason[], budget: ErrorBudget): number | null {
+    if (lane === Lane.Unknown) return null;
+    let total = 0;
+    let variance = 0;
+    let counted = 0;
+    let best: { edge: number; opponent: number; lane: Lane; play: number; measured: number; expected: number } | null = null;
+
+    for (const prediction of enemyLanes.predictions) {
+      if (prediction.championId === 0 || prediction.championId === championId) continue;
+      for (const theirs of ALL_LANES) {
+        if (theirs === lane) continue;
+        const probability = probabilityOnLane(prediction, theirs);
+        if (probability < 0.05) continue;
+        const weight = VERSUS_WEIGHT[versusKind(lane, theirs)];
+        const view = weight > 0 ? this.meta.versus(championId, lane, prediction.championId, theirs) : null;
+        if (!view) continue;
+        const edge = logit(view.winRate) - logit(view.expected);
+        counted++;
+        total += probability * weight * edge;
+        variance += (probability * weight) ** 2 * logitVariance(view.winRate, view.play, SYNERGY_PRIOR, view.expected);
+        if (probability >= 0.6 && (!best || Math.abs(edge) > Math.abs(best.edge)))
+          best = { edge, opponent: prediction.championId, lane: theirs, play: view.play, measured: view.measured, expected: view.expected };
+      }
+    }
+
+    if (counted === 0) return null;
+    budget.add(variance);
+    if (best && Math.abs(best.edge) > 0.04) {
+      const opponent = this.meta.championName(best.opponent);
+      const text = best.edge > 0 ? `gut gegen ${opponent} (${laneDisplay(best.lane)})` : `schwer gegen ${opponent} (${laneDisplay(best.lane)})`;
+      const hint =
+        `Auf ${laneDisplay(lane)} gegen ${opponent} auf ${laneDisplay(best.lane)}: ${netPercent(finiteOr(best.measured, 0.5), 1)} Winrate aus ${netN0(best.play)} Games — ` +
+        `aus der Stärke beider allein wären ${netPercent(best.expected, 1)} zu erwarten. Gezählt wird nur der Unterschied, geglättet und mit dem Gewicht, ` +
+        'das solche Paare in unseren Spielen haben: das Botlane-Kreuz (ADC gegen Support) gut zur Hälfte, andere Paare zu einem Fünftel.';
+      reasons.push(best.edge > 0 ? pro(text, hint) : contra(text, hint));
+    }
+    return total;
+  }
+
+  /**
+   * Own data: of all duos only the botlane's shows in the games (draftModel BOT_DUO_WEIGHT); the
+   * others cannot be told from nothing and count nothing.
+   */
+  private botDuoLogOdds(championId: number, lane: Lane, allySeats: readonly DraftSeat[], reasons: Reason[], budget: ErrorBudget): number | null {
+    const partner = allySeats.find((ally) => isBotDuo(lane, ally.lane));
+    const view = partner ? this.meta.synergy(championId, partner.championId) : null;
+    if (!partner || !view) return null;
+    const edge = logit(view.winRate) - logit(view.expected);
+    budget.add(BOT_DUO_WEIGHT ** 2 * logitVariance(view.winRate, view.play, SYNERGY_PRIOR, view.expected));
+    if (Math.abs(edge) > 0.04) {
+      const name = this.meta.championName(partner.championId);
+      const hint =
+        `Zusammen mit ${name} auf der Botlane liegt die Winrate bei ${netPercent(finiteOr(view.measured, view.winRate), 1)} aus ${netN0(view.play)} Games ` +
+        `— erwartet hätte man aus der Stärke der beiden allein ${netPercent(view.expected, 1)}. Gezählt wird nur der Unterschied, geglättet. ` +
+        'Das Botlane-Duo ist das einzige Paar im Team, bei dem unsere Spiele eine Wirkung über die Stärke der beiden hinaus zeigen.';
+      reasons.push(edge > 0 ? pro(`starkes Botlane-Duo mit ${name}`, hint) : contra(`schwaches Botlane-Duo mit ${name}`, hint));
+    }
+    return BOT_DUO_WEIGHT * edge;
+  }
+
+  /**
+   * Own data: the line-up findings with a measured cost (draftModel COMP_WEIGHT) — what the team is
+   * worth with the candidate against without it, so a pick that closes a gap gains what the gap
+   * costs and one that keeps it open loses a little more of it. On top, under the old cap, the
+   * rules the games are too few to measure (`unmeasured`, from CompAnalyzer.fit).
+   */
+  private measuredComp(candidate: number, seat: Seat, unmeasured: number | null): number | null {
+    const before = seat.allyComp;
+    const after = this.comp.analyze([...seat.allies, candidate]);
+    const measured = compValue(after) - compValue(before);
+    if (unmeasured === null && measured === 0) return null;
+    return measured + COMP_SCALE * (unmeasured ?? 0);
   }
 
   private findAnyLaneMatchup(championId: number, opponentId: number): { lane: Lane; view: MatchupView } | null {

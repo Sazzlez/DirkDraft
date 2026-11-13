@@ -8,14 +8,16 @@
 // Changes no weight: the result goes into docs/modellpruefung.md first.
 //
 //   npm run measure:model -- <games.json.gz> <meta.json> [builds.json] [--out bericht.md] [--patch 16.22] [--sample 1000]
+//       [--duel-prior 1000]  one duel weight for every lane instead of the app's weights per lane
+//       [--skip-c 1]         leave out the factor model's grid (most of the running time)
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { CompAnalyzer } from '../../src/core/model/compAnalyzer';
+import { draftParts } from '../../src/core/model/draftModel';
 import { ALL_LANES, Lane } from '../../src/core/model/lane';
 import { MetaLookup, type MetaSnapshot } from '../../src/core/model/metaLookup';
 import { logit, sigmoid } from '../../src/core/model/scoreModel';
-import { shrink, SYNERGY_PRIOR } from '../../src/core/model/shrinkage';
 import { TankShred } from '../../src/core/model/tankShred';
 import { TraitTable } from '../../src/core/model/traits';
 import type { RiotBuildFile } from '../../src/core/riotBuilds';
@@ -25,7 +27,7 @@ import { DEFAULT_FACTOR, FactorModel, type FactorGame, type FactorOptions } from
 import { conversion, edgeOf, goldDuels, LANE_GOLD_MINIMUM, matchupGold, splitLane } from './laneGold';
 import { fitLogistic, predict, type LogisticFit } from './logistic';
 import { encountersOf, MECHANIC_RULES, mechanicFeatures, mechanicSets } from './mechanics';
-import { tally, versusKey, VERSUS_MINIMUM_GAMES, type Tally } from './tally';
+import { tally } from './tally';
 
 const FOLDS = 5;
 
@@ -59,13 +61,12 @@ export function versusType(mine: Lane, theirs: Lane): number {
 /** The numbers one set of games yields, as the app reads them. */
 interface Numbers {
   meta: MetaLookup;
-  versus: Tally['versus'];
 }
 
-const numbersOf = (games: readonly Game[], base: MetaSnapshot): Numbers => {
-  const counted = tally(games, base);
-  return { meta: new MetaLookup(counted.snapshot), versus: counted.versus };
-};
+/** `duelPrior`: one duel weight for every lane instead of the app's measured ones (--duel-prior). */
+const numbersOf = (games: readonly Game[], base: MetaSnapshot, duelPrior?: number): Numbers => ({
+  meta: new MetaLookup(tally(games, base).snapshot, duelPrior === undefined ? {} : { matchupPrior: duelPrior }),
+});
 
 /** The model's parts for one game, from blue's side. */
 export interface Parts {
@@ -136,15 +137,9 @@ export function partsOf(n: Numbers, game: Game): Parts {
   for (const mine of game.blue)
     for (const theirs of game.red) {
       if (mine.lane === Lane.Unknown || theirs.lane === Lane.Unknown || mine.lane === theirs.lane || mine.championId === theirs.championId) continue;
-      const low = mine.championId < theirs.championId;
-      const count = n.versus.get(low ? versusKey(mine.championId, mine.lane, theirs.championId, theirs.lane) : versusKey(theirs.championId, theirs.lane, mine.championId, mine.lane));
-      const rateMine = laneRate(n, mine);
-      const rateTheirs = laneRate(n, theirs);
-      if (!count || count.games < VERSUS_MINIMUM_GAMES || rateMine === null || rateTheirs === null) continue;
-      // Shrunk like a duo towards what both lane strengths predict (VersusStat: duo limits).
-      const expected = logit(rateMine) - logit(rateTheirs);
-      const observed = low ? count.wins / count.games : 1 - count.wins / count.games;
-      versus[versusType(mine.lane, theirs.lane)]! += logit(shrink(observed, count.games, SYNERGY_PRIOR, sigmoid(expected))) - expected;
+      // Read as the app reads it: shrunk like a duo towards what both lane strengths predict.
+      const view = n.meta.versus(mine.championId, mine.lane, theirs.championId, theirs.lane);
+      if (view) versus[versusType(mine.lane, theirs.lane)]! += logit(view.winRate) - logit(view.expected);
     }
 
   const strengthEdge = blueCount > 0 && redCount > 0 ? blueSum / blueCount - redSum / redCount : 0;
@@ -371,7 +366,7 @@ function args(list: readonly string[]): { files: string[]; options: Record<strin
 export async function main(argv: string[]): Promise<number> {
   const { files, options } = args(argv);
   if (files.length < 2) {
-    console.error('Aufruf: npm run measure:model -- <games.json.gz> <meta.json> [builds.json] [--out bericht.md] [--patch 16.22] [--sample 1000]');
+    console.error('Aufruf: npm run measure:model -- <games.json.gz> <meta.json> [builds.json] [--out bericht.md] [--patch 16.22] [--sample 1000] [--duel-prior 1000] [--skip-c 1]');
     return 2;
   }
   const started = Date.now();
@@ -379,6 +374,8 @@ export async function main(argv: string[]): Promise<number> {
   const base = JSON.parse(readFileSync(files[1]!, 'utf8').replace(/^﻿/, '')) as MetaSnapshot;
   const builds = files[2] ? (JSON.parse(readFileSync(files[2], 'utf8').replace(/^﻿/, '')) as RiotBuildFile) : null;
   const patch = options.patch ?? base.patch;
+  const duelPrior = options['duel-prior'] ? Number(options['duel-prior']) : undefined;
+  const skipC = !!options['skip-c'];
   const games = gamesOf(gamesFile, patch);
   if (games.length < 1000) {
     console.error(`Zu wenige Spiele für Patch ${patch}: ${games.length}.`);
@@ -403,12 +400,12 @@ export async function main(argv: string[]): Promise<number> {
   const testIndex = games.map((_, i) => i).filter((i) => isHeldOut(i));
   const parts = new Map<number, Parts>();
   for (let fold = 0; fold < FOLDS; fold++) {
-    const numbers = numbersOf(trainIndex.filter((_, k) => k % FOLDS !== fold).map((i) => games[i]!), base);
+    const numbers = numbersOf(trainIndex.filter((_, k) => k % FOLDS !== fold).map((i) => games[i]!), base, duelPrior);
     trainIndex.forEach((i, k) => {
       if (k % FOLDS === fold) parts.set(i, partsOf(numbers, games[i]!));
     });
   }
-  const full = numbersOf(trainIndex.map((i) => games[i]!), base);
+  const full = numbersOf(trainIndex.map((i) => games[i]!), base, duelPrior);
   for (const i of testIndex) parts.set(i, partsOf(full, games[i]!));
 
   const names = [
@@ -434,6 +431,19 @@ export async function main(argv: string[]): Promise<number> {
   const bParts = fitLogistic(xTrain.map((v) => v.slice(0, PART_COLUMNS)), yTrain);
   const b = fitLogistic(xTrain, yTrain);
 
+  // B lean: only the parts whose weight stands two standard errors clear of zero in the full fit —
+  // chosen on the training games alone, refitted, then checked like every other model. What ships
+  // should not carry weights the games cannot tell from nothing.
+  const lean = names.map((_, j) => j).filter((j) => j === 0 || Math.abs(b.coefficients[j + 1]!) >= 2 * b.standardErrors[j + 1]!);
+  const bLean = fitLogistic(xTrain.map((v) => lean.map((j) => v[j]!)), yTrain);
+  const pLean = (k: number) => predict(bLean, lean.map((j) => xTest[k]![j]!));
+
+  // The app's own draft chance (core/model/draftModel.ts): fixed weights, nothing fitted here. The
+  // check that what ships predicts as well as the fit it was taken from, and is calibrated.
+  const profilesOf = (game: Game) => ({ allies: analyzer.analyze(game.blue.map((s) => s.championId)), enemies: analyzer.analyze(game.red.map((s) => s.championId)) });
+  const appTest = testIndex.map((i) => draftParts(full.meta, games[i]!.blue, games[i]!.red, profilesOf(games[i]!)).total);
+  const appCal = fitLogistic(appTest.map((v) => [v]), yTest);
+
   const evaluate = (predictRow: (k: number) => number) => {
     let loss = 0;
     let hits = 0;
@@ -443,6 +453,17 @@ export async function main(argv: string[]): Promise<number> {
       if ((p >= 0.5 ? 1 : 0) === yTest[k]) hits++;
     });
     return { loss: loss / testIndex.length, hits: hits / testIndex.length, brier: brier(predictRow, yTest) };
+  };
+  /** Log-loss of `first` minus that of `second`, game by game on the held-out games: mean and standard error. */
+  const paired = (first: (k: number) => number, second: (k: number) => number): { mean: number; error: number } => {
+    const loss = (p: number, y: number) => {
+      const q = Math.min(1 - 1e-12, Math.max(1e-12, p));
+      return y === 1 ? -Math.log(q) : -Math.log(1 - q);
+    };
+    const d = testIndex.map((_, k) => loss(first(k), yTest[k]!) - loss(second(k), yTest[k]!));
+    const mean = d.reduce((s, v) => s + v, 0) / d.length;
+    const variance = d.reduce((s, v) => s + (v - mean) ** 2, 0) / (d.length - 1);
+    return { mean, error: Math.sqrt(variance / d.length) };
   };
   // Model C: learned on the training games at once (factor.ts), a tenth of them held back to choose
   // the regularisation and when to stop; checked on the same held-out games as A and B.
@@ -469,9 +490,9 @@ export async function main(argv: string[]): Promise<number> {
     return trained[trained.length - 1]!;
   };
   // Strengths alone first (no traits), to choose their regularisation; then the pairs on top.
-  const mainOnly = [1e-3, 3e-3, 1e-2, 3e-2].map((l2Strength) => trainC({ ...DEFAULT_FACTOR, rate: 0.005, dims: 0, l2Strength })).sort((x, y) => x.validationLoss - y.validationLoss)[0]!;
-  const withPairs = [2, 4]
-    .flatMap((dims) => [1e-3, 1e-2, 3e-2].map((l2Traits) => trainC({ ...DEFAULT_FACTOR, rate: 0.005, dims, l2Strength: mainOnly.options.l2Strength, l2Traits })))
+  const mainOnly = (skipC ? [3e-4] : [1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2]).map((l2Strength) => trainC({ ...DEFAULT_FACTOR, rate: 0.005, dims: 0, l2Strength })).sort((x, y) => x.validationLoss - y.validationLoss)[0]!;
+  const withPairs = (skipC ? [2] : [2, 4])
+    .flatMap((dims) => (skipC ? [3e-2] : [1e-3, 1e-2, 3e-2]).map((l2Traits) => trainC({ ...DEFAULT_FACTOR, rate: 0.005, dims, l2Strength: mainOnly.options.l2Strength, l2Traits })))
     .sort((x, y) => x.validationLoss - y.validationLoss)[0]!;
   const c = withPairs.model;
 
@@ -482,6 +503,8 @@ export async function main(argv: string[]): Promise<number> {
     ['Lane-Stärke allein, angepasst', evaluate((k) => predict(strengthOnly, [xTest[k]![0]!]))],
     ['B ohne Comp: Stärke, Duelle, Synergie, Gegner-Paare', evaluate((k) => predict(bParts, xTest[k]!.slice(0, PART_COLUMNS)))],
     ['B: dazu die Comp-Merkmale', evaluate((k) => predict(b, xTest[k]!))],
+    [`B schlank: nur die ${lean.length} Teile mit Gewicht ab 2 Standardfehlern`, evaluate(pLean)],
+    ['App: Draft-Chance des Modells in der App, feste Gewichte, nichts angepasst', evaluate((k) => sigmoid(appTest[k]!))],
     ['C ohne Paare: Stärken und Comp gemeinsam gelernt', evaluate((k) => mainOnly.model.probability(factorTest[k]!))],
     ['C: dazu Synergie und Counter aus gelernten Merkmalen', evaluate((k) => c.probability(factorTest[k]!))],
   ];
@@ -507,14 +530,48 @@ export async function main(argv: string[]): Promise<number> {
     '',
     `Lesart: kleiner ist besser. B gegenüber A kalibriert: ${num(models[2]![1].loss - best.loss)} im Log-Loss ` +
       `(positiv = B besser); gegenüber dem Münzwurf erklärt B ${pct((coin - best.loss) / coin)} der Unsicherheit. ` +
-      `C gegenüber B: ${num(best.loss - models[7]![1].loss)} (positiv = C besser), C ohne Paare gegenüber B: ${num(best.loss - models[6]![1].loss)}. ` +
+      `C gegenüber B: ${num(best.loss - models[9]![1].loss)} (positiv = C besser), C ohne Paare gegenüber B: ${num(best.loss - models[8]![1].loss)}. ` +
       `Die Draft-Chance A passt am besten mit Steigung ${num(aCal.coefficients[1]!, 2)} ± ${num(1.96 * aCal.standardErrors[1]!, 2)}: ` +
       'über 1 heißt, sie liegt zu nah an 50 %.',
     '',
   );
 
+  const pB = (k: number) => predict(b, xTest[k]!);
+  const gain = (label: string, worse: (k: number) => number, better: (k: number) => number) => {
+    const d = paired(worse, better);
+    return `| ${label} | ${d.mean >= 0 ? '+' : '−'}${num(Math.abs(d.mean))} ± ${num(1.96 * d.error)} | ${num(d.mean / d.error, 1)} σ |`;
+  };
+  report.push(
+    'Sind die Unterschiede mehr als Zufall? Log-Loss Spiel für Spiel verglichen (gepaart, 95-%-Fehlerbalken; positiv = das zweite Modell ist besser):',
+    '',
+    '| Vergleich | Gewinn im Log-Loss | Abstand |',
+    '|---|---|---|',
+    gain('Münzwurf → Lane-Stärke allein', () => 0.5, (k) => predict(strengthOnly, [xTest[k]![0]!])),
+    gain('Lane-Stärke allein → B ohne Comp', (k) => predict(strengthOnly, [xTest[k]![0]!]), (k) => predict(bParts, xTest[k]!.slice(0, PART_COLUMNS))),
+    gain('B ohne Comp → B', (k) => predict(bParts, xTest[k]!.slice(0, PART_COLUMNS)), pB),
+    gain('A kalibriert → B', (k) => predict(aCal, [parts.get(testIndex[k]!)!.a]), pB),
+    gain('A wie heute → B', (k) => sigmoid(parts.get(testIndex[k]!)!.a), pB),
+    gain('C → B', (k) => c.probability(factorTest[k]!), pB),
+    gain('B → B schlank', pB, pLean),
+    gain('B → App', pB, (k) => sigmoid(appTest[k]!)),
+    gain('A wie heute → App', (k) => sigmoid(parts.get(testIndex[k]!)!.a), (k) => sigmoid(appTest[k]!)),
+    gain('A kalibriert → App', (k) => predict(aCal, [parts.get(testIndex[k]!)!.a]), (k) => sigmoid(appTest[k]!)),
+    gain('A kalibriert → B schlank', (k) => predict(aCal, [parts.get(testIndex[k]!)!.a]), pLean),
+    '',
+  );
+
+  report.push(
+    `Kalibrierung der App-Chance auf den zurückgehaltenen Spielen: Steigung ${num(appCal.coefficients[1]!, 2)} ± ${num(1.96 * appCal.standardErrors[1]!, 2)} ` +
+      `(1 = „55 %“ gewinnt 55 %; unter 1 hieße zu weit von 50 %), Achsenabschnitt ${pts(appCal.coefficients[0]!, appCal.standardErrors[0]!)}.` +
+      (duelPrior === undefined ? ' Duelle mit der Glättung je Lane der App.' : ` Duelle mit einem Gewicht für alle Lanes: ${count(duelPrior)}.`) +
+      (skipC ? ' Modell C nur mit einer Einstellung gerechnet (--skip-c).' : ''),
+    '',
+  );
+
   report.push('## Gemessene Gewichte (B)', '', 'In log-odds je Einheit des Teils, 95-%-Fehlerbalken. 1 hieße: der Teil zählt genau so, wie die gemessene Rate sagt.', '', '| Teil | Gewicht |', '|---|---|');
   names.forEach((name, j) => report.push(`| ${name} | ${pts(b.coefficients[j + 1]!, b.standardErrors[j + 1]!)} |`));
+  report.push('', '### B schlank', '', '| Teil | Gewicht |', '|---|---|');
+  lean.forEach((j, at) => report.push(`| ${names[j]} | ${pts(bLean.coefficients[at + 1]!, bLean.standardErrors[at + 1]!)} |`));
   report.push(
     '',
     `Seitenvorteil Blau: ${pts(b.coefficients[0]!, b.standardErrors[0]!)}. Zum Vergleich A: Die Draft-Chance mittelt Stärke und ` +
@@ -567,12 +624,12 @@ export async function main(argv: string[]): Promise<number> {
   report.push(
     '## Kalibrierung (zurückgehaltene Spiele)',
     '',
-    '| vorhergesagt | Spiele B | B vorhergesagt | B tatsächlich | Spiele C | C vorhergesagt | C tatsächlich |',
-    '|---|---|---|---|---|---|---|',
+    '| vorhergesagt | Spiele B | B vorhergesagt | B tatsächlich | Spiele C | C vorhergesagt | C tatsächlich | Spiele App | App vorhergesagt | App tatsächlich |',
+    '|---|---|---|---|---|---|---|---|---|---|',
   );
   for (const [lo, hi] of bins) {
     const cells: string[] = [];
-    for (const p of [(k: number) => predict(b, xTest[k]!), (k: number) => cTest[k]!]) {
+    for (const p of [(k: number) => predict(b, xTest[k]!), (k: number) => cTest[k]!, (k: number) => sigmoid(appTest[k]!)]) {
       let n = 0;
       let predicted = 0;
       let won = 0;
