@@ -10,7 +10,9 @@ namespace DraftPilot.Core.Data;
 /// stood after ten minutes and every duel between lane opponents — the evidence for the duel scale
 /// in the game view (docs/lane-vergleich.md). Since version 3 every line has the ten-minute numbers
 /// (what a matchup does to the laning phase, docs/modellpruefung.md §13) and a sample of lines the
-/// duels. No player, no match id, no date.
+/// duels. Since version 4 a line with its duels ends in <see cref="LevelsBeforeDuel"/>: its levels
+/// are the ones going into the duel (before, the winner's level-up from the kill was counted in).
+/// No player, no match id, no date.
 /// </summary>
 public static class RiotGames
 {
@@ -26,10 +28,19 @@ public static class RiotGames
         "ohne fremde Hilfe (Bot: unter den vier Bot-Spielern, nur der Partner des Siegers hilft). Itemwert: Ladenpreis " +
         "der gehaltenen Items ohne Tränke, Wards, Schmuck und Support-Quest. Dauer, Gold und Erfahrung 0, wo unbekannt. " +
         "Gold und Erfahrung (ab Platz 15) trägt seit Version 3 jede Zeile mit gelesener Minute 10, die Duelle nur " +
-        "ein Teil davon. Zeilen ohne Minute 10 und alle aus Version 1 enden nach 15 Zahlen, in Version 2 auch die ohne Duelle.";
+        "ein Teil davon. Zeilen ohne Minute 10 und alle aus Version 1 enden nach 15 Zahlen, in Version 2 auch die ohne Duelle. " +
+        "Seit Version 4 endet eine Zeile mit ihren Duellen auf −2: Level und Items sind der Stand unmittelbar vor dem Kill. " +
+        "In Zeilen ohne diese −2 enthält das Level des Siegers (und seines Helfers) den Level-Aufstieg durch den Kill selbst.";
 
     /// <summary>Closes a line whose duels were not kept, so that it never reads as a game without any.</summary>
     public const int NoDuels = -1;
+
+    /// <summary>
+    /// Closes a line with its duels since version 4: the levels are the ones going into each duel.
+    /// Lines without it were counted while the level a kill gives was read as the winner's level
+    /// before it (docs/modellpruefung.md, Messung 27) — whoever measures levels takes only marked lines.
+    /// </summary>
+    public const int LevelsBeforeDuel = -2;
 
     /// <summary>The moment the early-game lead is read at: the end of the laning phase.</summary>
     public const long EarlyLeadAtMs = 15 * 60_000;
@@ -103,6 +114,9 @@ public static class RiotGames
                 result.AddRange([places[m.ParticipantId], m.Level, m.ItemGold, m.Armor, m.MagicResist]);
         }
 
+        // Only a line with duels has levels to vouch for; one without stays as long as it was.
+        if (result.Count > FixedLength)
+            result.Add(LevelsBeforeDuel);
         return [.. result];
     }
 
@@ -131,6 +145,9 @@ public static class RiotGames
     /// version-2 line with the lane part.
     /// </summary>
     public static bool HasDuelSample(int[] line) => line.Length == FixedLength || (line.Length > FixedLength && line[FixedLength] != NoDuels);
+
+    /// <summary>Whether the line's duels carry the levels going into them (version 4, <see cref="LevelsBeforeDuel"/>).</summary>
+    public static bool HasLevelsBeforeDuel(int[] line) => line.Length > FixedLength && line[^1] == LevelsBeforeDuel;
 
     /// <summary>A player's number back as champion and lane.</summary>
     public static (int ChampionId, Lane Lane) Decode(int player) => (player / 8, (Lane)(player % 8 - 1));
@@ -167,9 +184,11 @@ public sealed class RiotGamesFile
 {
     /// <summary>
     /// 2 since 08.11.2026: lanes after ten minutes and the lane duels. 3 since 09.11.2026: the numbers
-    /// after ten minutes in every line, the duels in a sample (<see cref="RiotGames.Format"/>).
+    /// after ten minutes in every line, the duels in a sample (<see cref="RiotGames.Format"/>). 4 since
+    /// 13.11.2026: new lines with duels end in −2, their levels are the ones before the kill; the lines
+    /// counted before stay as they are.
     /// </summary>
-    public int Version { get; set; } = 3;
+    public int Version { get; set; } = 4;
 
     public string Platform { get; set; } = string.Empty;
 

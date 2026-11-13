@@ -1164,6 +1164,76 @@ sicherer Blind Pick, Flex-Picks für offene Lanes, die Reihenfolge im Team-Plan.
 
 **Patchtag (Punkt 6)** ist nicht messbar, solange der Sammler keinen Patchwechsel gesehen hat.
 
+## 27. Die Stärke-Skala im Spiel (13.11.2026, vorläufig)
+
+Die Prüfung aus `docs/lane-vergleich.md` („Prüfung, bevor die Skala erscheint“), mit
+`npm run measure:duels -- <games.json.gz> <meta.json>` (`app/tools/measure/duels.ts`). Bestand:
+16.302 Spielzeilen mit Duellen, 236.844 Lane-Duelle (14,5 je Spiel), Patch 16.22. Vorhergesagt wird,
+welche Seite den Kill macht; geprüft auf den Duellen zurückgehaltener Spiele (2 von 10).
+
+### Ein Fehler im Sammler: das Level des Siegers
+
+Der Sammler las zu jedem Duell Level und Items „bis zum Kill“. Der Level-Aufstieg, den der Kill selbst
+gibt, trägt in Riots Zeitleiste aber **dieselbe Millisekunde wie der Kill** und steht direkt dahinter —
+in vier nachgelesenen Zeitleisten bei 54 von 335 Kills für den Sieger und bei 50 für einen Helfer. Er
+zählte also als Level vor dem Duell.
+
+Gemessen an den Duellen direkt nach 10:00 (die Zeile trägt die Erfahrung nach genau zehn Minuten, also
+das wahre Level unmittelbar davor): In den ersten drei Sekunden steht beim Sieger in 22,1 % der Duelle
+ein Level zu viel, beim Verlierer in 1,0 % (837 Duelle).
+
+Weil der Fehler nur den Sieger trifft, verfälscht er die Gewichte weit stärker als „jedes fünfte
+Duell“. Dieselben 13.351 Duelle zwischen 10:00 und 11:00, einmal mit dem Level der Zeile, einmal mit
+dem Level laut Erfahrung nach zehn Minuten (Log-Odds, ± 95 %):
+
+| Lane | Duelle | Level, wie gezählt | Level, wahr | 1.000 Gold, wie gezählt | 1.000 Gold, wahr |
+|---|---:|---:|---:|---:|---:|
+| Top | 3.484 | +1,92 ± 0,14 | +0,33 ± 0,10 | −0,21 ± 0,13 | +0,86 ± 0,11 |
+| Jungle | 455 | +1,73 ± 0,35 | +0,82 ± 0,28 | +0,46 ± 0,21 | +0,58 ± 0,19 |
+| Mid | 2.390 | +1,98 ± 0,18 | +0,53 ± 0,12 | +0,29 ± 0,15 | +0,92 ± 0,13 |
+| Bot (2 gegen 2, Summen) | 7.022 | +0,85 ± 0,06 | +0,17 ± 0,05 | +0,12 ± 0,05 | +0,42 ± 0,05 |
+| alle | 13.351 | +1,21 ± 0,05 | +0,30 ± 0,04 | +0,09 ± 0,04 | +0,52 ± 0,04 |
+
+Wie gezählt sähe ein Level Vorsprung auf Top nach 87 % aus und Itemwert nach nichts. Wahr ist rund:
+**ein Level 57 %, 1.000 Gold Itemwert 63 %** (alle Lanes; auf Top und Mid wiegt das Gold mehr, rund
+70 %). Der Itemwert ist nicht betroffen (niemand kauft in der Millisekunde des Kills).
+
+**Behoben am 13.11.2026:** Der Sammler liest den Stand eine Millisekunde vor dem Kill
+(`RiotMatchReader.LaneKills`). Zeilen seitdem enden auf −2 (`RiotGames.LevelsBeforeDuel`,
+Spiel-Liste Version 4); die alten bleiben, wie sie sind, und sind daran zu erkennen, dass die −2 fehlt.
+Das Werkzeug misst an den markierten Zeilen, sobald es 40.000 markierte Duelle gibt (rund ein Tag
+Sammeln), vorher an allen und sagt das dazu.
+
+### Was sich trotz des Fehlers schon sagen lässt
+
+Auf allen 236.844 Duellen (Level mit Fehler — die Log-Loss-Werte selbst sind deshalb zu gut und
+gelten nicht):
+
+| Variante | Log-Loss | Gewinn gegen die Zeile davor | in Standardfehlern |
+|---|---:|---:|---:|
+| Level + Itemwert | 0,5176 | | |
+| + Resistenzen gegen die Schadensart des Gegners | 0,5159 | +0,0017 | +6,9 |
+| Level + Itemwert, Gewichte je Abschnitt (Level 1–5, 6–10, 11+) | 0,5118 | +0,0058 gegen die erste | +11,3 |
+| + Champion-Stärke je Lane | 0,5065 | +0,0053 | +11,9 |
+| + Champion-Stärke je Lane und Abschnitt | 0,5037 | +0,0082 gegen „je Abschnitt“ | +14,4 |
+| + das Paar (Champion gegen Champion) | 0,5037 | −0,0000 | −0,4 |
+
+- **Die Champion-Stärke je Abschnitt besteht die Prüfung**, auf jeder Lane einzeln (Top +7,2,
+  Jungle +7,2, Mid +9,1, Bot +7,0 Standardfehler): 2.060 Effekte, zur 0 gezogen mit Streuung 0,30
+  Log-Odds (auf einem inneren Viertel gewählt). Der Fehler im Level hängt nicht am Champion, das
+  Ergebnis sollte halten; es wird an sauberen Zeilen wiederholt. Die größten Effekte passen zum
+  Spiel: spät stark Nasus, Akali, Katarina, Urgot; spät schwach im Duell Xerath, Twisted Fate,
+  Orianna; früh schwach Veigar.
+- **Das Paar bringt nichts darüber hinaus** (9.445 Paare, jede Stärke über 0,06 sagt schlechter
+  vorher). „Champion X gegen genau Champion Y“ erscheint nicht; die Skala kennt nur, wie stark jeder
+  der beiden im Abschnitt allgemein im Duell ist.
+- Resistenzen gegen die passende Schadensart und Gewichte je Abschnitt sind beide messbar; ihre
+  Größe ist erst mit sauberen Leveln zu lesen.
+
+**Nichts in der App geändert.** Offen bis zu den sauberen Zeilen: die Gewichte selbst, die Kalibrierung
+(„+2“ gewinnt so oft, wie es sagt) und die Übersetzung in die sieben Stufen. Die Vorschau-Kachel
+rechnet bis dahin weiter mit Beispielzahlen.
+
 ## Was offen bleibt (2.0)
 
 - **Seit 2.1 erledigt** (Messung 13 und 21): Die drei geschätzten Gewichte (übrige Gegner 0,35,

@@ -416,8 +416,11 @@ public static class RiotMatchReader
                 continue;
             }
 
+            // How they stood going into the duel: the millisecond before. The level the kill itself
+            // gives carries the kill's own timestamp (and is listed after it) — counted in, the winner
+            // would have been a level ahead in every fifth duel only because he won it.
             kills.Add(new LaneKill(kill.Timestamp, killer.ParticipantId, victim.ParticipantId,
-                [.. lane.OrderBy(p => p.ParticipantId).Select(p => Moment(p.ParticipantId, kill.Timestamp, events, frames, items))]));
+                [.. lane.OrderBy(p => p.ParticipantId).Select(p => Moment(p.ParticipantId, kill.Timestamp - 1, events, frames, items))]));
         }
 
         return kills;

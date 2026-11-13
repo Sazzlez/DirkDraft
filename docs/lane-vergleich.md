@@ -127,6 +127,11 @@ kommen nur seine Zahlen (Level-Gewicht, Gold-Gewicht, Champion-Stärke je Abschn
 
 ## Prüfung, bevor die Skala erscheint
 
+*Stand 13.11.2026 (`docs/modellpruefung.md`, Messung 27): Die Champion-Stärke je Abschnitt besteht die
+Prüfung, das Paar „X gegen genau Y“ nicht. Die Gewichte für Level und Itemwert sind noch nicht
+gültig — der Sammler zählte dem Sieger den Level-Aufstieg durch den Kill an; behoben, saubere Duelle
+sind an der −2 am Zeilenende zu erkennen. Endgültig messen, sobald 40.000 davon gezählt sind.*
+
 Auf zurückgehaltenen Spielen: Gewinnt der Champion, den die Skala oben sieht, das nächste Duell
 tatsächlich öfter — und so oft, wie sie sagt (bei „+2“ etwa so oft, wie die Stufe verspricht)?
 Und schlägt die Variante mit Champion-Stärke die reine Level-plus-Items-Variante? Wenn nicht,

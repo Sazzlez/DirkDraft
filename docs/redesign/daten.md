@@ -39,6 +39,11 @@ was ein Matchup in der Lane-Phase tut (`docs/modellpruefung.md` §13); das sind 
 Duelle wären rund 300. Die Duelle bleiben bei jeder achten Zeile; eine Zeile ohne ihre Duelle schließt mit
 −1, damit sie nie als Spiel ohne Duelle gelesen wird. Ohne gelesene Minute 10 endet eine Zeile nach 15 Zahlen.
 
+Seit Version 4 (13.11.2026) endet eine Zeile mit Duellen auf **−2**: Level und Items jedes Duells sind
+der Stand eine Millisekunde vor dem Kill. In den Zeilen davor (ohne −2) enthält das Level des Siegers
+und seines Helfers den Aufstieg durch den Kill selbst, in rund jedem fünften Duell — wer Level misst,
+nimmt nur markierte Zeilen (`RiotGames.HasLevelsBeforeDuel`; `docs/modellpruefung.md`, Messung 27).
+
 Die Zeilen liegen im
 Bestand (der laufende Patch und die zwei davor; ein Wechsel der Region verwirft sie) und als Artefakt `games` jedes Laufs (`games.json.gz`, eine Woche
 aufbewahrt, nie veröffentlicht). Herunterladen: `gh run download <Lauf> -n games`.

@@ -571,11 +571,12 @@ public class RiotBuildTests
             Buy(0, 0, 3865), Buy(4000, 1, 1055), Buy(4000, 1, 2003), Buy(5000, 6, 1054), Buy(5000, 4, 1055), Buy(5000, 9, 1055),
             Up(100000, 1, 2), Up(110000, 6, 2), Up(150000, 1, 3), Buy(170000, 1, 1029),
             Kill(200000, 1, 6),            // A: top, alone
+            Up(200000, 1, 4),              // the level the kill gave: same millisecond, listed after — not his level in the duel
             Kill(210000, 6, 1, 7),         // the red jungler helped: a gank
             Kill(220000, 3, 6),            // mid kills top: no lane duel
             Kill(230000, 0, 8),            // executed by the tower
             Gone(250000, 5, 3865),         // the quest item was never bought by 5: nothing to take away
-            Kill(300000, 4, 9, 5),         // B: bot, the partner helped
+            Kill(300500, 4, 9, 5),         // B: bot, the partner helped (after the frame at 5:00, which is stamped 300010)
             Kill(310000, 10, 5, 7),        // bot with the jungler's help
             Kill(320000, 2, 7),            // C: jungle, alone
             Gone(400000, 1, 1055, "ITEM_SOLD"),
@@ -610,7 +611,8 @@ public class RiotBuildTests
         Assert.Equal(
             [
                 // Top: 1 has Doran's Blade and Cloth (the potion is used up, it counts nothing), level 3
-                // from the level-ups; 6 has Doran's Shield, level 2.
+                // from the level-ups before the kill — the one the kill gave is not counted; 6 has
+                // Doran's Shield, level 2.
                 "200: 1>6 [1 L3 750g 15a 0mr] [6 L2 450g 0a 0mr]",
                 // Bot: all four, levels from the frame at 5:00; the supports' quest item counts nothing.
                 "300: 4>9 [4 L4 450g 0a 0mr] [5 L3 0g 0a 0mr] [9 L4 450g 0a 0mr] [10 L3 0g 0a 0mr]",
@@ -629,7 +631,13 @@ public class RiotBuildTests
         Assert.Equal(4, duels.Count);
         Assert.Equal([200, 0, 5, 0, 3, 750, 15, 0, 5, 2, 450, 0, 0], duels[0]);
         Assert.Equal([300, 3, 8, 3, 4, 450, 0, 0, 4, 3, 0, 0, 0, 8, 4, 450, 0, 0, 9, 3, 0, 0, 0], duels[1]);
-        Assert.Equal(RiotGames.FixedLength + 4 + 13 + 23 + 13 + 13, line.Length);
+        // Four duels, then the mark that the levels are the ones going into them (version 4).
+        Assert.Equal(RiotGames.FixedLength + 4 + 13 + 23 + 13 + 13 + 1, line.Length);
+        Assert.Equal(RiotGames.LevelsBeforeDuel, line[^1]);
+        Assert.True(RiotGames.HasLevelsBeforeDuel(line));
+        Assert.True(RiotGames.HasDuelSample(line));
+        Assert.False(RiotGames.HasLevelsBeforeDuel(RiotGames.Keep(line, withDuels: false)));
+        Assert.False(RiotGames.HasLevelsBeforeDuel(line[..^1]));   // a line counted before 13.11.2026
     }
 
     private static HttpResponseMessage Ok(string body, string? appLimit = null)
