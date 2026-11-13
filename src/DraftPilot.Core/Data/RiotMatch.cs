@@ -240,20 +240,6 @@ public static class RiotMatchReader
                 : [];
     }
 
-    /// <summary>
-    /// Mastery points from Riot's champion-mastery answer (<c>championPoints</c>); null when the answer
-    /// carries none.
-    /// </summary>
-    public static int? MasteryPoints(string masteryJson)
-    {
-        using var document = TryParse(masteryJson);
-        return document is not null
-            && document.RootElement.ValueKind == JsonValueKind.Object
-            && document.RootElement.TryGetProperty("championPoints", out var points)
-            && points.TryGetInt64(out var value)
-                ? (int)Math.Clamp(value, 0, int.MaxValue)
-                : null;
-    }
 
     /// <summary>
     /// A Riot answer as a document, or null when it is missing or not valid JSON. Riot (or the way

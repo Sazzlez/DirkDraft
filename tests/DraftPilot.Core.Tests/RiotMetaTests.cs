@@ -209,18 +209,17 @@ public sealed class RiotMetaTests
     }
 
     [Fact]
-    public void AGameLine_MarksTheAskedPlayerByHisPlaceInTheLine()
+    public void AGameLine_AsksNobodyAboutMasteryAnyMore()
     {
-        // Red listed support first: the asked player (participant 5, red support) sorts to place 9.
+        // Red listed support first: it sorts to place 9. The two places the mastery sample had
+        // (until 13.11.2026) stay in the line, empty.
         var game = Game(blueWins: true, red: [15, 11, 12, 13, 14], redLanes: [Lane.Support, Lane.Top, Lane.Jungle, Lane.Mid, Lane.Adc]);
 
-        var line = RiotGames.Encode(game, masteryIndex: 5, masteryPoints: 123_456)!;
+        var line = RiotGames.Encode(game)!;
 
         Assert.Equal((15, Lane.Support), RiotGames.Decode(line[9]));
-        Assert.Equal(9, line[13]);
-        Assert.Equal(123_456, line[14]);
-        Assert.Equal(123_456, RiotMatchReader.MasteryPoints("""{"championId":15,"championLevel":7,"championPoints":123456}"""));
-        Assert.Null(RiotMatchReader.MasteryPoints("{}"));
+        Assert.Equal(-1, line[13]);
+        Assert.Equal(0, line[14]);
     }
 
     [Fact]

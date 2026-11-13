@@ -1115,8 +1115,9 @@ dem Champion, also die Vorschläge für den eigenen Platz — nicht die Gegner u
 Champion gewählt haben und im Mittel so erfahren sind wie die gezählten Spieler.
 
 **Entscheidung des Nutzers (13.11.2026): nicht gewünscht** — weder die Korrektur der Zahl noch ein
-Hinweis. Die Messung bleibt hier stehen, gebaut wird nichts. Die Mastery-Stichprobe des Sammlers
-läuft unverändert weiter, solange der Nutzer sie nicht abbestellt.
+Hinweis. Die Messung bleibt hier stehen, gebaut wird nichts. Die Mastery-Stichprobe hat der Nutzer
+am selben Tag abbestellt: Der Sammler fragt niemanden mehr (rund ein Zehntel mehr Spiele pro Stunde);
+die Zeilen bis dahin behalten ihre Werte, `npm run measure:phase4` liest sie weiter.
 
 ## 25. Runen, Zauber und Start passend zum Matchup (13.11.2026, Konzept §5 Punkt 3)
 

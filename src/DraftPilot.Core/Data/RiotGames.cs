@@ -18,7 +18,8 @@ public static class RiotGames
 {
     public const string Format =
         "[5 × Blau, 5 × Rot, Blau gewinnt (1/0), Dauer in vollen Minuten, Gold-Vorsprung Blau nach 15 Minuten, " +
-        "Platz des befragten Spielers (0–9, −1 keiner), seine Mastery-Punkte auf dem Champion, " +
+        "Platz des befragten Spielers (0–9, −1 keiner), seine Mastery-Punkte auf dem Champion " +
+        "(nur in Zeilen bis zum 13.11.2026, in jeder vierten; seitdem immer −1 und 0), " +
         "10 × Gold nach 10 Minuten, 10 × Erfahrung nach 10 Minuten (je Platz), " +
         "dann entweder −1 (die Duelle dieser Zeile nicht behalten) " +
         "oder je Lane-Duell: Länge L, danach L Zahlen — Sekunde, Platz Sieger, Platz Verlierer, " +
@@ -48,7 +49,7 @@ public static class RiotGames
     /// <summary>The moment each lane's gold and experience are read at: deep in the laning phase.</summary>
     public const long LaneAtMs = 10 * 60_000;
 
-    /// <summary>The draft part every line has: players, winner, duration, early lead, mastery.</summary>
+    /// <summary>The draft part every line has: players, winner, duration, early lead, and the two places the mastery sample had.</summary>
     public const int DraftLength = 15;
 
     /// <summary>A line with the lane part: the draft part, gold and experience at ten minutes, then the duels.</summary>
@@ -60,17 +61,16 @@ public static class RiotGames
     /// <summary>
     /// One game as a line (<see cref="Format"/>); null when it does not split into two sides of
     /// five. Duration and the early lead let the measurement tell early from late line-ups — what a
-    /// champion is worth depends on when the game is decided. The mastery of one player
-    /// (<paramref name="masteryIndex"/> into <see cref="MatchReading.Participants"/>, −1 for none)
-    /// lets it tell a champion's strength from the experience of the players who pick it.
+    /// champion is worth depends on when the game is decided. Places 13 and 14 held one player's
+    /// mastery until 13.11.2026 (every fourth line); the collector asks nobody any more, they stay
+    /// −1 and 0 so that the lines keep their shape.
     /// </summary>
-    public static int[]? Encode(MatchReading game, int masteryIndex = -1, int masteryPoints = 0)
+    public static int[]? Encode(MatchReading game)
     {
         var sides = game.Participants.GroupBy(player => player.TeamId).OrderBy(side => side.Key).ToList();
         if (sides.Count != 2 || sides.Any(side => side.Count() != 5))
             return null;
 
-        var asked = masteryIndex >= 0 && masteryIndex < game.Participants.Count ? game.Participants[masteryIndex] : null;
         var line = new int[FixedLength];
         line[13] = -1;
         var places = new Dictionary<int, int>();
@@ -79,11 +79,6 @@ public static class RiotGames
         {
             foreach (var player in side.OrderBy(player => (int)player.Lane).ThenBy(player => player.ChampionId))
             {
-                if (ReferenceEquals(player, asked))
-                {
-                    line[13] = index;
-                    line[14] = Math.Max(0, masteryPoints);
-                }
                 if (player.ParticipantId > 0)
                 {
                     places.TryAdd(player.ParticipantId, index);

@@ -158,6 +158,8 @@ ganzen Teams („Dein Draft: 52 % → mit Nami 54 %“). Die Begründungszeilen 
    seiner Mastery auf seinem Champion, und zwar den mit dem seltensten Champion. Das kostet etwa ein
    Zehntel der Spiele pro Stunde. Daraus wird gemessen, wie viel der Winrate auf Erfahrung zurückgeht,
    und die Zahl wird für einen durchschnittlichen Spieler korrigiert.
+   *Gemessen am 13.11.2026 (`docs/modellpruefung.md`, Messung 24); der Nutzer will weder Korrektur
+   noch Hinweis und hat die Abfrage am selben Tag aus dem Sammler genommen.*
 2. **Vorausschau im Draft:** Bewertet wird auch, was nach deinem Pick wahrscheinlich noch kommt: ob
    dein Lane-Partner noch einen guten Partner findet, Picks für mehrere Lanes, verbleibende Counter.
    Gerechnet wird mit Pickraten und den gemessenen Teilen. Prüfen lässt es sich nur an der Logik,
@@ -192,6 +194,7 @@ den ersten Patchwechsel.
 | 3 | Bestes Modell in Sammler-Export und App, Anzeige der Teile, Team-Chance, dazu Phase 4 (Punkte 1–3, 5–7), Tests, Release 2.1 | Modell, Anzeige der Teile und Team-Chance **erledigt 13.11.2026** (Messung 21; der Export braucht nichts Neues); Phase 4 siehe `docs/modellpruefung.md` ab Messung 22; Release nur mit deinem OK |
 
 Bleibt wie es ist: Daten nur aus eigener Zählung, keine Namen anderer Spieler, kein automatisches
-Picken oder Bannen, Pool und Verlauf bleiben draußen. Zusätzliche Riot-Abfragen nur für die
-Mastery-Stichprobe (eine in jedem vierten Spiel); alles andere kommt aus den Spielen, die der Sammler
-ohnehin liest.
+Picken oder Bannen, Pool und Verlauf bleiben draußen. Zusätzliche Riot-Abfragen gibt es keine mehr
+(die Mastery-Stichprobe, eine in jedem vierten Spiel, lief vom 07.11. bis zum 13.11.2026); alles kommt
+aus den Spielen, die der Sammler ohnehin liest. Flex-Spiele sammelt er nicht (Entscheidung des Nutzers
+vom 13.11.2026): Sie gingen voll von den Solo/Duo-Spielen ab.

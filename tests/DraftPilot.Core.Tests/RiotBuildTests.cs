@@ -414,7 +414,6 @@ public class RiotBuildTests
 
         var current = Match.Replace("\"gameVersion\":  \"16.16.804.9184\"", "\"gameVersion\":  \"16.22.123.4567\"");
         var old = Match.Replace("\"gameCreation\":  ", "\"gameCreation\":  1");  // an older patch, created whenever
-        var masteryRefused = false;
 
         var handler = new FakeHandler(request =>
         {
@@ -433,8 +432,6 @@ public class RiotBuildTests
                 "/lol/match/v5/matches/EUW1_300" => Ok(WithPlayers(current, "r")),
                 _ when path.EndsWith("/timeline", StringComparison.Ordinal) => Ok(Timeline),
                 "/lol/match/v5/matches/EUW1_200" => Ok(old),
-                _ when path.StartsWith("/lol/champion-mastery/v4/champion-masteries/by-puuid/r", StringComparison.Ordinal)
-                    => masteryRefused ? new HttpResponseMessage(HttpStatusCode.Forbidden) : Ok("""{"championLevel":5,"championPoints":4321}"""),
                 _ => new HttpResponseMessage(HttpStatusCode.NotFound),
             };
         });
@@ -444,7 +441,7 @@ public class RiotBuildTests
         var saves = 0;
 
         using var stop = new CancellationTokenSource();
-        var collector = new RiotCollector(api, Items, new CollectorOptions { Tiers = ["gold"], Duration = TimeSpan.FromMinutes(1), MaxPages = 1, MasteryEvery = 2 });
+        var collector = new RiotCollector(api, Items, new CollectorOptions { Tiers = ["gold"], Duration = TimeSpan.FromMinutes(1), MaxPages = 1 });
         var report = await collector.RunAsync(state, _ => saves++, stop.Token);
 
         Assert.Equal(2, report.Counted);                       // EUW1_100 once, however often it is listed, and the lead's EUW1_300
@@ -463,11 +460,10 @@ public class RiotBuildTests
         // kills, so it is just the empty lane part). The second keeps no duels, and without a minute-ten
         // frame it ends after the draft (RiotGamesTests: with one it keeps minute ten).
         Assert.Equal([RiotGames.FixedLength, RiotGames.DraftLength], state.Games.Select(line => line.Length));
-        // The second counted game (the lead's) had one player asked about, by his place in the line.
-        Assert.Equal(-1, state.Games[0][13]);
-        Assert.InRange(state.Games[1][13], 0, 9);
-        Assert.Equal(4321, state.Games[1][14]);
-        Assert.Single(handler.Paths, path => path.Contains("/champion-mastery/", StringComparison.Ordinal));
+        // Nobody is asked about his mastery (taken out on 13.11.2026): no such request, and the two
+        // places it had in the line stay empty.
+        Assert.All(state.Games, line => Assert.Equal((-1, 0), (line[13], line[14])));
+        Assert.DoesNotContain(handler.Paths, path => path.Contains("/champion-mastery/", StringComparison.Ordinal));
         Assert.NotEmpty(state.Matchups);
 
         // The player with two games this season was never asked about.
@@ -483,14 +479,11 @@ public class RiotBuildTests
         Assert.DoesNotContain("\"q2\"", stored);
         Assert.DoesNotContain("\"r1\"", stored);
 
-        // A refused mastery request costs the sample, never the run.
-        masteryRefused = true;
         var second = new CollectorState();
         using var secondApi = new RiotApiClient("RGAPI-test", handler, delay: (_, _) => Task.CompletedTask);
-        var secondReport = await new RiotCollector(secondApi, Items, new CollectorOptions { Tiers = ["gold"], Duration = TimeSpan.FromMinutes(1), MaxPages = 1, MasteryEvery = 1, DuelEvery = 1, DuelGamesPerPatch = 1 })
+        var secondReport = await new RiotCollector(secondApi, Items, new CollectorOptions { Tiers = ["gold"], Duration = TimeSpan.FromMinutes(1), MaxPages = 1, DuelEvery = 1, DuelGamesPerPatch = 1 })
             .RunAsync(second, _ => { }, stop.Token);
         Assert.Equal(2, secondReport.Counted);
-        Assert.All(second.Games, line => Assert.Equal(-1, line[13]));
         // Every line would keep its duels, but the patch's share is one.
         Assert.Equal([RiotGames.FixedLength, RiotGames.DraftLength], second.Games.Select(line => line.Length));
     }
@@ -533,7 +526,6 @@ public class RiotBuildTests
         Assert.NotNull(RiotMatchReader.TryReadHeader(Match));
         Assert.Null(RiotMatchReader.TryRead(Match, Timeline[..^40], Items));
         Assert.NotNull(RiotMatchReader.TryRead(Match, Timeline, Items));
-        Assert.Null(RiotMatchReader.MasteryPoints("""{"championPoints": 12"""));
     }
 
     // Prices and stats for the duel test; the item fixture carries no stats.

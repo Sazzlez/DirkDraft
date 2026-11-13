@@ -32,13 +32,6 @@ public sealed record CollectorOptions
     public int? MaxPages { get; init; }
 
     /// <summary>
-    /// In every n-th counted game one player is asked about (champion mastery, one request): the one on
-    /// the rarest champion so far, where a win rate is most likely carried by its mains. 4 costs about
-    /// a tenth of the games per hour; 0 asks nobody.
-    /// </summary>
-    public int MasteryEvery { get; init; } = 4;
-
-    /// <summary>
     /// Every game line keeps gold and experience at ten minutes; every n-th also its lane duels
     /// (<see cref="RiotGames.Format"/>, <see cref="RiotGames.Keep"/>). A Platinum game has about
     /// fifteen duels (measured 08.11.2026: 280 in 19 games), so every line with them would make the
@@ -253,8 +246,6 @@ public sealed class RiotCollector(
         }
         var games = new List<int[]>(state.Games);
         var duelGames = games.Count(RiotGames.HasDuelSample);
-        // A refused mastery request costs the samples of this run, never the run itself.
-        var askMastery = options.MasteryEvery > 0;
         var matchups = new RiotMatchupTally();
         matchups.Add(state.Matchups ?? []);
         var seen = new HashSet<long>(state.Seen);
@@ -377,32 +368,7 @@ public sealed class RiotCollector(
                     meta.Add(reading);
                     matchups.Add(reading);
 
-                    var (masteryIndex, masteryPoints) = (-1, 0);
-                    if (askMastery && (counted + 1) % options.MasteryEvery == 0)
-                    {
-                        var puuids = RiotMatchReader.PlayerIds(matchJson);
-                        if (puuids.Count == reading.Participants.Count)
-                        {
-                            // The rarest champion on its lane so far; the first of equals.
-                            var rarest = Enumerable.Range(0, reading.Participants.Count)
-                                .MinBy(i => meta.LaneGames(reading.Participants[i].ChampionId, reading.Participants[i].Lane));
-                            var sampled = reading.Participants[rarest];
-                            try
-                            {
-                                var masteryJson = await api.GetAsync(options.Platform,
-                                    $"/lol/champion-mastery/v4/champion-masteries/by-puuid/{Uri.EscapeDataString(puuids[rarest])}/by-champion/{sampled.ChampionId}", ct).ConfigureAwait(false);
-                                if (masteryJson is not null && RiotMatchReader.MasteryPoints(masteryJson) is { } points)
-                                    (masteryIndex, masteryPoints) = (rarest, points);
-                            }
-                            catch (RiotApiException ex)
-                            {
-                                askMastery = false;
-                                log?.Invoke($"Mastery-Abfrage für diesen Lauf abgeschaltet: {ex.Message}");
-                            }
-                        }
-                    }
-
-                    if (RiotGames.Encode(reading, masteryIndex, masteryPoints) is { } line)
+                    if (RiotGames.Encode(reading) is { } line)
                     {
                         // Every n-th line keeps its duels, up to the patch's share; counted by the
                         // lines so far, so the choice runs on across runs. Every line keeps minute ten.
