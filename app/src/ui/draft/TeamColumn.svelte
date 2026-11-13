@@ -64,7 +64,7 @@
             {#if slot.hovering}<span class="badge">Hover</span>{/if}
           </span>
           <span class="name">{slot.champion?.name ?? 'offen'}</span>
-          <span class="who">{slot.label}</span>
+          <span class="who" class:party={!!slot.party} title={slot.party ? 'in deiner Party' : undefined}>{slot.party ?? slot.label}</span>
         {/snippet}
         {#if slot.canTarget && onSeat}
           <button
@@ -233,6 +233,12 @@
     color: var(--fg3);
   }
 
+  /* A teammate of the own party: named by what he is to you, never by his name. */
+  .who.party {
+    color: var(--blue-text);
+    font-weight: 600;
+  }
+
   .lanepick {
     position: relative;
     max-width: 100%;
@@ -324,7 +330,7 @@
     }
 
     .conf.only-uncertain,
-    .who {
+    .who:not(.party) {
       display: none;
     }
   }

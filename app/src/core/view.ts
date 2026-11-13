@@ -72,6 +72,8 @@ export interface SlotView {
   /** Set by hand (lane picker); a manual lane is no guess. */
   laneManual: boolean;
   isMe: boolean;
+  /** A teammate who queued with the local player: "dein Duo" or "Party"; null for everyone else. */
+  party: string | null;
   /** The seat the main tile currently advises. */
   isTarget: boolean;
   /** An ally seat a click can make the target (until the clock moves on), as in 1.5. */
@@ -393,6 +395,8 @@ export interface TeamPlanView {
   }[];
   /** "Zuerst Teammate 5 mit Rakan (Flex), zuletzt Du mit Darius (3 offene Counter)." */
   order: string | null;
+  /** "geplant für euch 3" — whom the plan is for; null for a full five. */
+  scope: string | null;
   note: string;
 }
 
@@ -408,6 +412,8 @@ export interface TeamBansView {
     /** The first ban of the set nobody hovers yet: the own one. */
     mine: boolean;
   }[];
+  /** "für euch 2" — whose bans the set is; null for a full five. */
+  scope: string | null;
   note: string;
 }
 

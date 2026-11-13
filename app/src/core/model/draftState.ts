@@ -16,6 +16,11 @@ export interface DraftSlot {
   lockedChampionId: number;
   hoverChampionId: number;
   assignedLane: Lane;
+  /**
+   * Queued together with the local player (the shell compares the lobby with the session before it
+   * scrubs the identities, lcu/scrub.rs). Never a name or an id; absent means no.
+   */
+  inParty?: boolean;
 }
 
 export const effectiveChampionId = (slot: DraftSlot): number =>
@@ -83,6 +88,18 @@ export const INACTIVE: DraftState = Object.freeze({
 
 export function localSlot(state: DraftState): DraftSlot | null {
   return state.allies.find((slot) => slot.cellId === state.localCellId) ?? null;
+}
+
+/**
+ * The seats of the local player's party, the own one included; empty when he queued alone (or the
+ * client did not say). The team mode plans these seats together and leaves the others as they are.
+ */
+export function partyCells(state: DraftState): ReadonlySet<number> {
+  const cells = new Set<number>();
+  for (const slot of state.allies) if (slot.inParty && slot.cellId !== state.localCellId) cells.add(slot.cellId);
+  if (cells.size === 0 || !state.allies.some((slot) => slot.cellId === state.localCellId)) return new Set();
+  cells.add(state.localCellId);
+  return cells;
 }
 
 export function findSlot(state: DraftState, cellId: number): DraftSlot | null {
@@ -286,6 +303,7 @@ function buildSlots(players: unknown[], isAlly: boolean): DraftSlot[] {
       hoverChampionId: num(player, 'championPickIntent'),
       // Riot never exposes enemy positions; guessing them is the LanePredictor's job.
       assignedLane: isAlly ? laneFromLcu(assigned) : Lane.Unknown,
+      ...(isAlly && bool(player, 'inParty') ? { inParty: true } : {}),
     });
   }
   return slots;

@@ -35,8 +35,11 @@ export const SCENES: Scene[] = [
   { id: 'lastpick', title: 'Letzter Pick', moment: 'picking' },
   { id: 'teammate', title: 'Teammate am Zug', moment: 'teammate' },
   { id: 'mate', title: 'Teammate gelockt', moment: 'teammate' },
-  { id: 'team', title: 'Team-Modus', moment: 'picking' },
-  { id: 'teambansmode', title: 'Team-Modus · Banns', moment: 'banning' },
+  { id: 'team', title: 'Team-Modus · 5er', moment: 'picking' },
+  { id: 'teamduo', title: 'Team-Modus · Duo', moment: 'picking' },
+  { id: 'teamtrio', title: 'Team-Modus · 3er', moment: 'picking' },
+  { id: 'teambansmode', title: 'Team-Modus · Banns 5er', moment: 'banning' },
+  { id: 'teambansduo', title: 'Team-Modus · Banns Duo', moment: 'banning' },
   { id: 'plan', title: 'Plan gewählt', moment: 'planning' },
   { id: 'locked', title: 'Gelockt', moment: 'locked' },
   { id: 'loading', title: 'Finalisierung', moment: 'loading' },
@@ -126,6 +129,23 @@ function load(): Promise<Sources> {
   return sources;
 }
 
+/**
+ * A recorded session with the first `mates` teammates marked as the local player's party, as the
+ * shell marks them (lcu/scrub.rs). The recordings themselves know no party.
+ */
+function withParty(session: unknown, mates: number): Record<string, unknown> | null {
+  if (!session || typeof session !== 'object') return null;
+  const copy = JSON.parse(JSON.stringify(session)) as Record<string, unknown>;
+  const team = Array.isArray(copy.myTeam) ? (copy.myTeam as Record<string, unknown>[]) : [];
+  let left = mates;
+  for (const player of team) {
+    if (!player || player.cellId === copy.localPlayerCellId || left <= 0) continue;
+    player.inParty = true;
+    left--;
+  }
+  return copy;
+}
+
 const lastActive = (r: { frames: { frame?: GoldenFrame }[] }, predicate: (f: GoldenFrame) => boolean = () => true): GoldenFrame => {
   const frames = r.frames.map((f) => f.frame).filter((f): f is GoldenFrame => !!f && f.state.isActive && predicate(f));
   const frame = frames[frames.length - 1];
@@ -205,26 +225,30 @@ export async function sceneView(id: string): Promise<ViewModel> {
       if (mate) live.selectSeat(mate.cellId);
       return { ...live.view(), sampleNote: SAMPLE };
     }
-    // Team mode (D1): the open seats planned together, from the live session itself.
-    case 'team': {
+    // Team mode (D1): the open seats of the party planned together, from the live session itself.
+    // The recording knows no party: the scene marks the teammates as the shell would.
+    case 'team':
+    case 'teamduo':
+    case 'teamtrio': {
       const live = new LiveSession();
       live.setData({ meta: s.meta.snapshot, builds: null, aram: null, situational: null, fresh: true, changed: false, problems: [] });
       live.setTeamMode(true);
       live.onStatus(CONNECTED_STATUS);
       live.onPhase('ChampSelect');
       const frame = lastActive(s.recordings.get('live-ranked')!, (f) => f.state.turn?.action === 'pick' && f.state.turn.isLocalPlayer && f.state.allies.every((slot) => !slot.lockedChampionId));
-      live.onSession((sessionOf.get(frame) as Record<string, unknown> | undefined) ?? null);
+      live.onSession(withParty(sessionOf.get(frame), id === 'team' ? 4 : id === 'teamtrio' ? 2 : 1));
       return { ...live.view(), sampleNote: SAMPLE };
     }
     // Team mode in the ban phase (D3): one set of bans for the team, teammates' hovers set.
-    case 'teambansmode': {
+    case 'teambansmode':
+    case 'teambansduo': {
       const live = new LiveSession();
       live.setData({ meta: s.meta.snapshot, builds: null, aram: null, situational: null, fresh: true, changed: false, problems: [] });
       live.setTeamMode(true);
       live.onStatus(CONNECTED_STATUS);
       live.onPhase('ChampSelect');
       const frame = lastActive(s.recordings.get('live-ranked')!, (f) => f.state.turn?.action === 'ban' && !!f.state.turn.isLocalPlayer && (f.state.allyBanIntents?.length ?? 0) >= 1);
-      live.onSession((sessionOf.get(frame) as Record<string, unknown> | undefined) ?? null);
+      live.onSession(withParty(sessionOf.get(frame), id === 'teambansmode' ? 4 : 1));
       return { ...live.view(), sampleNote: SAMPLE };
     }
     // D4: Teamfight chosen as the plan in the planning phase.

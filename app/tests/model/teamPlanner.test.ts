@@ -1,11 +1,12 @@
-// D1, team mode: the open seats planned together. The search must find the best combination (checked
-// against trying every one where that is cheap), never pick a champion twice, and name who best picks
-// first and last.
+// D1, team mode: the open seats of the own party planned together. The search must find the best
+// combination (checked against trying every one where that is cheap), never pick a champion twice,
+// and name who best picks first and last. Whom the plan is for comes from the client: the seats the
+// local player queued with (a duo, three in Flex, a fixed five) — alone there is no plan.
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DraftEngine } from '../../src/core/engine';
-import { draftStateFrom } from '../../src/core/model/draftState';
+import { draftStateFrom, partyCells } from '../../src/core/model/draftState';
 import { LanePredictor, SeatPriors } from '../../src/core/model/lanePredictor';
 import { MetaLookup, type MetaSnapshot } from '../../src/core/model/metaLookup';
 import { Recommender } from '../../src/core/model/recommender';
@@ -18,9 +19,12 @@ import { SessionBuilder } from './helpers';
 
 const snapshot = JSON.parse(readFileSync(new URL('../golden/snapshot.json', import.meta.url), 'utf8').replace(/^﻿/, '')) as MetaSnapshot;
 
-/** Top, jungle and mid open; bot and support locked (Jinx, Thresh); Jax and Viego shown for the enemy. */
-const session = () =>
-  new SessionBuilder().queue(420).localPlayer(0).locked(3, 222).locked(4, 412).locked(5, 24).locked(6, 254).onClock(0, 'pick').build();
+/**
+ * Top, jungle and mid open; bot and support locked (Jinx, Thresh); Jax and Viego shown for the enemy.
+ * A fixed five by default: everyone queued with the local player (cell 0).
+ */
+const session = (party: number[] = [1, 2, 3, 4]) =>
+  new SessionBuilder().queue(420).localPlayer(0).party(...party).locked(3, 222).locked(4, 412).locked(5, 24).locked(6, 254).onClock(0, 'pick').build();
 
 describe('team plan', () => {
   it('finds the same combination as trying every one', () => {
@@ -72,7 +76,7 @@ describe('team plan', () => {
     const frame = new DraftEngine(snapshot);
     frame.setTeamMode(true);
     // Nobody shown yet: every lane open, counters everywhere.
-    const plan = frame.update(new SessionBuilder().queue(420).localPlayer(0).onClock(0, 'pick').build()).frame.teamPlan!;
+    const plan = frame.update(new SessionBuilder().queue(420).localPlayer(0).party(1, 2, 3, 4).onClock(0, 'pick').build()).frame.teamPlan!;
     expect(plan.picks).toHaveLength(5);
     const risk = (cellId: number) => {
       const item = plan.picks.find((p) => p.cellId === cellId)!.item;
@@ -99,5 +103,76 @@ describe('team plan', () => {
     expect(tile.rows.map((r) => r.label)).toEqual(['Du', 'Teammate 2', 'Teammate 3']);
     expect(tile.rows.every((r) => /^\d+ %$/.test(r.value))).toBe(true);
     expect(tile.note).toContain('nicht eingerechnet');
+    // A fixed five needs no "für euch".
+    expect(tile.scope).toBeNull();
+  });
+});
+
+describe('the party', () => {
+  const planFor = (party: number[]) => {
+    const engine = new DraftEngine(snapshot);
+    engine.setTeamMode(true);
+    return engine.update(session(party)).frame;
+  };
+
+  it('is the seats the local player queued with, the own one included', () => {
+    expect([...partyCells(draftStateFrom(session([2])))].sort()).toEqual([0, 2]);
+    expect([...partyCells(draftStateFrom(session([1, 4])))].sort()).toEqual([0, 1, 4]);
+    expect(partyCells(draftStateFrom(session([]))).size).toBe(0);
+    // The shell may flag the own seat too: alone is still alone.
+    expect(partyCells(draftStateFrom(session([0]))).size).toBe(0);
+  });
+
+  it('plans nothing for a player who queued alone, team mode or not', () => {
+    const frame = planFor([]);
+    expect(frame.teamPlan).toBeNull();
+    expect(frame.teamBans).toBeNull();
+    // And the lists are the ones without team mode.
+    expect(frame.picks).toEqual(new DraftEngine(snapshot).update(session([])).frame.picks);
+  });
+
+  it('plans a duo\'s two seats and leaves the others alone', () => {
+    const frame = planFor([2]);
+    expect(frame.teamPlan!.picks.map((p) => p.cellId)).toEqual([0, 2]);
+    expect(new Set(frame.teamPlan!.picks.map((p) => p.item.championId)).size).toBe(2);
+
+    const tile = new GoldenAdapter(snapshot.champions).teamPlan(frame as unknown as GoldenFrame)!;
+    expect(tile.rows.map((r) => r.label)).toEqual(['Du', 'dein Duo']);
+    expect(tile.scope).toBe('geplant für euch 2');
+    expect(tile.note).toContain('eurer Party');
+  });
+
+  it('plans three in Flex, a locked party seat no more', () => {
+    // Cells 0, 1 and 3 queued together; 3 has locked Jinx already.
+    const frame = planFor([1, 3]);
+    expect(frame.teamPlan!.picks.map((p) => p.cellId)).toEqual([0, 1]);
+    expect(new GoldenAdapter(snapshot.champions).teamPlan(frame as unknown as GoldenFrame)!.scope).toBe('geplant für euch 3');
+  });
+
+  it('changes no pick list: the plan stands beside them', () => {
+    const off = new DraftEngine(snapshot).update(session([2])).frame;
+    const on = planFor([2]);
+    expect(on.picks).toEqual(off.picks);
+    expect(on.bans).toEqual(off.bans);
+  });
+
+  it('marks the party seats on the board without a name, and only them', () => {
+    const adapter = new GoldenAdapter(snapshot.champions);
+    const duo = adapter.board(planFor([2]) as unknown as GoldenFrame);
+    expect(duo.allies.map((slot) => slot.party)).toEqual([null, null, 'dein Duo', null, null]);
+    expect(duo.allies.map((slot) => slot.label)).toEqual(['Du', 'Teammate 2', 'dein Duo', 'Teammate 4', 'Teammate 5']);
+    expect(duo.enemies.every((slot) => slot.party === null)).toBe(true);
+    const three = adapter.board(planFor([1, 3]) as unknown as GoldenFrame);
+    expect(three.allies.map((slot) => slot.party)).toEqual([null, 'Party', null, 'Party', null]);
+    expect(three.allies.map((slot) => slot.label)).toEqual(['Du', 'Teammate 2', 'Teammate 3', 'Teammate 4', 'Teammate 5']);
+    // The mark is there without team mode too: it says who is who, the plan is the setting.
+    const off = adapter.board(new DraftEngine(snapshot).update(session([2])).frame as unknown as GoldenFrame);
+    expect(off.allies[2]!.party).toBe('dein Duo');
+  });
+
+  it('writes the flag into the frame only where it is true', () => {
+    const frame = planFor([2]);
+    expect(frame.state.allies.map((slot) => 'inParty' in slot)).toEqual([false, false, true, false, false]);
+    expect(frame.state.enemies.some((slot) => 'inParty' in slot)).toBe(false);
   });
 });

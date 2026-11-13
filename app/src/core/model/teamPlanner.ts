@@ -1,5 +1,6 @@
-// D1, the team mode: the own team's open seats planned together instead of one by one — for a fixed
-// five (Flex). Each open seat brings its best few picks by the usual score; a beam search picks the
+// D1, the team mode: the open seats of the own party planned together instead of one by one — a duo,
+// three in Flex, a fixed five. The seats of the others stay as they are: their hover counts as taken,
+// their lists are their own. Each open seat brings its best few picks by the usual score; a beam search picks the
 // combination with the most win in total, without a champion twice, and counts the synergy between
 // the new picks, damped as everywhere. What the new picks do to each other's comp is left out: the
 // comp term stays the one each seat got against the line-up as it stands.
@@ -42,9 +43,10 @@ export function planTeam(
   enemyLanes: LanePredictionResult,
   allyLanes: LanePredictionResult,
   selectable: ReadonlySet<number> | null,
+  seats: ReadonlySet<number> | null = null,
 ): TeamPlan | null {
   const lists = state.allies
-    .filter((slot) => !isLocked(slot))
+    .filter((slot) => !isLocked(slot) && (!seats || seats.has(slot.cellId)))
     .map((slot) => {
       const own = slot.cellId === state.localCellId ? selectable : null;
       const set = recommender.recommend(state, { slot, action: 'pick', isFollowingTurn: false }, enemyLanes, allyLanes, own, TEAM_CANDIDATES);
@@ -100,6 +102,9 @@ export const TEAM_BANS_PER_LANE = 2;
 /**
  * D3: the team's bans as one set instead of five times the same list. What teammates already hover
  * counts as set; the rest comes from every ally seat's ban list, best first, at most two per lane.
+ *
+ * With `seats` the set is the party's: as many bans as the party has seats, from its seats' lists.
+ * What a teammate outside the party hovers is neither in the set nor proposed a second time.
  */
 export function planTeamBans(
   recommender: Recommender,
@@ -107,12 +112,15 @@ export function planTeamBans(
   state: DraftState,
   enemyLanes: LanePredictionResult,
   allyLanes: LanePredictionResult,
+  seats: ReadonlySet<number> | null = null,
 ): TeamBan[] | null {
-  const left = state.allyBansOpen;
+  const inSet = (cellId: number) => !seats || seats.has(cellId);
+  const left = Math.min(state.allyBansOpen, seats ? seats.size : state.allyBansOpen);
   if (left <= 0) return null;
 
   const pool = new Map<number, { lane: Lane; score: number }>();
   for (const slot of state.allies) {
+    if (!inSet(slot.cellId)) continue;
     const set = recommender.recommend(state, { slot, action: 'ban', isFollowingTurn: false }, enemyLanes, allyLanes, null, 10);
     for (const item of set.items) {
       const known = pool.get(item.championId);
@@ -126,7 +134,12 @@ export function planTeamBans(
     set.push(ban);
     if (ban.lane !== Lane.Unknown) perLane.set(ban.lane, (perLane.get(ban.lane) ?? 0) + 1);
   };
+  const others = new Set<number>();
   for (const intent of state.allyBanIntents) {
+    if (!inSet(intent.cellId)) {
+      others.add(intent.championId);
+      continue;
+    }
     if (set.length >= left || set.some((b) => b.championId === intent.championId) || state.unavailable.has(intent.championId)) continue;
     const known = pool.get(intent.championId);
     add({ championId: intent.championId, lane: known?.lane ?? meta.mainLane(intent.championId), score: known?.score ?? null, by: intent.cellId });
@@ -134,7 +147,7 @@ export function planTeamBans(
   const ranked = [...pool.entries()].sort((a, b) => b[1].score - a[1].score);
   for (const [championId, { lane, score }] of ranked) {
     if (set.length >= left) break;
-    if (set.some((b) => b.championId === championId)) continue;
+    if (set.some((b) => b.championId === championId) || others.has(championId)) continue;
     if (lane !== Lane.Unknown && (perLane.get(lane) ?? 0) >= TEAM_BANS_PER_LANE) continue;
     add({ championId, lane, score, by: null });
   }

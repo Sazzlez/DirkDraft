@@ -8,7 +8,7 @@
   let { bans }: { bans: TeamBansView } = $props();
 </script>
 
-<Tile title="Team-Banns">
+<Tile title={bans.scope ? `Team-Banns · ${bans.scope}` : 'Team-Banns'}>
   <div class="rows">
     {#each bans.rows as row (row.champion.id)}
       <div class="row" class:mine={row.mine} class:set={!!row.by}>

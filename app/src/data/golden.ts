@@ -54,7 +54,24 @@ export interface GoldenSlot {
   lockedChampionId: number;
   hoverChampionId: number;
   assignedLane: string;
+  inParty?: boolean;
 }
+
+/**
+ * How an ally seat is called everywhere: "Du", "dein Duo" for the one teammate the local player
+ * queued with, "Teammate 3" for everyone else — never a name.
+ */
+const allyLabel = (s: GoldenFrame['state'], cellId: number): string => {
+  if (cellId === s.localCellId) return 'Du';
+  const slot = s.allies.find((a) => a.cellId === cellId);
+  return slot?.inParty && partySize(s) === 2 ? 'dein Duo' : `Teammate ${(slot?.index ?? 0) + 1}`;
+};
+
+/** The seats of the own party, the own one included; 0 when the local player queued alone. */
+const partySize = (s: GoldenFrame['state']): number => {
+  const others = s.allies.filter((slot) => slot.inParty && slot.cellId !== s.localCellId).length;
+  return others > 0 ? others + 1 : 0;
+};
 
 export interface GoldenItem {
   championId: number;
@@ -232,6 +249,7 @@ export class GoldenAdapter {
     const s = frame.state;
     const predicted = new Map([...frame.predictions.allies, ...frame.predictions.enemies].map((p) => [p.cellId, p]));
     const unavailable = new Set(s.unavailable);
+    const party = partySize(s);
 
     const slot = (g: GoldenSlot): SlotView => {
       const isMe = g.cellId === s.localCellId;
@@ -245,7 +263,7 @@ export class GoldenAdapter {
       return {
         cellId: g.cellId,
         side: g.isAlly ? 'ally' : 'enemy',
-        label: isMe ? 'Du' : g.isAlly ? `Teammate ${g.index + 1}` : `Gegner ${g.index + 1}`,
+        label: g.isAlly ? allyLabel(s, g.cellId) : `Gegner ${g.index + 1}`,
         champion: this.champion(shown),
         hovering: !g.lockedChampionId && !!g.hoverChampionId,
         lane: s.usesLanes ? lane : null,
@@ -253,6 +271,7 @@ export class GoldenAdapter {
         laneUncertain: !g.isAlly && !!shown && !!prediction?.isUncertain,
         laneManual: !!prediction?.isManual && !toLane(g.assignedLane),
         isMe,
+        party: g.isAlly && !isMe && g.inParty ? (party === 2 ? 'dein Duo' : 'Party') : null,
         isTarget: frame.target?.cellId === g.cellId,
         canTarget: g.isAlly && s.isActive && s.usesLanes,
         laneEditable: s.isActive && s.usesLanes && !toLane(g.assignedLane) && (g.isAlly || !!shown),
@@ -365,10 +384,9 @@ export class GoldenAdapter {
     const bans = frame.teamBans;
     if (!bans || bans.length === 0) return null;
     const s = frame.state;
-    const label = (cellId: number) => {
-      const slot = s.allies.find((a) => a.cellId === cellId);
-      return cellId === s.localCellId ? 'Du' : `Teammate ${(slot?.index ?? 0) + 1}`;
-    };
+    const label = (cellId: number) => allyLabel(s, cellId);
+    const party = partySize(s);
+    const whole = party === 0 || party >= s.allies.length;
     // The own ban: the own hover if there is one, else the first of the set nobody hovers yet.
     const mine = (bans.find((b) => b.by === s.localCellId) ?? bans.find((b) => b.by === null))?.championId ?? null;
     return {
@@ -379,7 +397,10 @@ export class GoldenAdapter {
         by: b.by === null ? null : b.by === s.localCellId ? 'dein Hover' : `${label(b.by)} hovert ihn`,
         mine: b.championId === mine,
       })),
-      note: 'Ein Set für das ganze Team statt fünfmal derselben Liste: die stärksten Banns aller Sitze, höchstens zwei je Lane. Was Teammates schon hovern, ist gesetzt.',
+      scope: whole ? null : `für euch ${party}`,
+      note: whole
+        ? 'Ein Set für das ganze Team statt fünfmal derselben Liste: die stärksten Banns aller Sitze, höchstens zwei je Lane. Was Teammates schon hovern, ist gesetzt.'
+        : 'Ein Set für eure Party statt derselben Liste für jeden: die stärksten Banns eurer Plätze, höchstens zwei je Lane. Was ihr schon hovert, ist gesetzt; was ein anderer Teammate hovert, kommt nicht noch einmal.',
     };
   }
 
@@ -388,10 +409,7 @@ export class GoldenAdapter {
     const plan = frame.teamPlan;
     if (!plan || plan.picks.length === 0) return null;
     const s = frame.state;
-    const label = (cellId: number) => {
-      const slot = s.allies.find((a) => a.cellId === cellId);
-      return cellId === s.localCellId ? 'Du' : `Teammate ${(slot?.index ?? 0) + 1}`;
-    };
+    const label = (cellId: number) => allyLabel(s, cellId);
     const counters = (item: GoldenItem) =>
       item.openCounters === undefined
           ? 'Lane-Gegner bekannt'
@@ -415,13 +433,18 @@ export class GoldenAdapter {
     const first = plan.picks.find((p) => p.cellId === plan.first);
     const last = plan.picks.find((p) => p.cellId === plan.last);
     const name = (p: (typeof plan.picks)[number]) => this.champion(p.item.championId)?.name ?? p.item.name;
+    const party = partySize(s);
+    const whole = party === 0 || party >= s.allies.length;
     return {
       rows,
       order:
         first && last
           ? `Zuerst ${label(first.cellId)} mit ${name(first)} (${whyFirst(first.item)}), zuletzt ${label(last.cellId)} mit ${name(last)} (${counters(last.item)}).`
           : null,
-      note: 'Die beste Kombination für die offenen Plätze, mit der Synergie zwischen den neuen Picks. Wie sich ihre Comp gegenseitig ergänzt, ist nicht eingerechnet.',
+      scope: whole ? null : `geplant für euch ${party}`,
+      note: whole
+        ? 'Die beste Kombination für die offenen Plätze, mit der Synergie zwischen den neuen Picks. Wie sich ihre Comp gegenseitig ergänzt, ist nicht eingerechnet.'
+        : 'Die beste Kombination für die offenen Plätze eurer Party, mit der Synergie zwischen euren Picks. Die anderen Teammates picken für sich: Was sie hovern, gilt als vergeben. Wie sich eure Comp gegenseitig ergänzt, ist nicht eingerechnet.',
     };
   }
 

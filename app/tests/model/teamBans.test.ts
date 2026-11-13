@@ -11,11 +11,15 @@ import { SessionBuilder } from './helpers';
 
 const snapshot = JSON.parse(readFileSync(new URL('../golden/snapshot.json', import.meta.url), 'utf8').replace(/^\uFEFF/, '')) as MetaSnapshot;
 
-/** Everyone banning at once; teammate 3 (cell 2) hovers Malphite, cell 4 has banned Zed already. */
-const banPhase = () =>
+/**
+ * Everyone banning at once; teammate 3 (cell 2) hovers Malphite, cell 4 has banned Zed already.
+ * A fixed five by default: everyone queued with the local player (cell 0).
+ */
+const banPhase = (party: number[] = [1, 2, 3, 4]) =>
   new SessionBuilder()
     .queue(420)
     .localPlayer(0)
+    .party(...party)
     .onClock(0, 'ban')
     .onClock(1, 'ban')
     .action(2, 54, 'ban', false, true)
@@ -42,6 +46,38 @@ describe('team bans', () => {
     expect(tile.rows[0]!.by).toBe('Teammate 3 hovert ihn');
     expect(tile.rows.filter((r) => r.mine)).toHaveLength(1);
     expect(tile.rows.find((r) => r.mine)!.by).toBeNull();
+    expect(tile.scope).toBeNull();
+  });
+
+  it('for a duo: two bans from the duo\'s lists, a hover of the others never twice', () => {
+    // Cell 1 is the duo partner; teammate 3 (cell 2, not in the party) hovers Malphite.
+    const engine = new DraftEngine(snapshot);
+    engine.setTeamMode(true);
+    const frame = engine.update(banPhase([1])).frame;
+    const bans = frame.teamBans!;
+
+    expect(bans).toHaveLength(2);
+    expect(bans.every((b) => b.by === null)).toBe(true);
+    expect(bans.some((b) => b.championId === 54 || b.championId === 238)).toBe(false);
+
+    const tile = new GoldenAdapter(snapshot.champions).teamBans(frame as unknown as GoldenFrame)!;
+    expect(tile.scope).toBe('für euch 2');
+    expect(tile.note).toContain('eure Party');
+  });
+
+  it('for a duo: the partner\'s hover is set', () => {
+    const engine = new DraftEngine(snapshot);
+    engine.setTeamMode(true);
+    const bans = engine.update(banPhase([2])).frame.teamBans!;
+    expect(bans).toHaveLength(2);
+    expect(bans[0]).toMatchObject({ championId: 54, by: 2 });
+    expect(bans[1]!.by).toBeNull();
+  });
+
+  it('nothing for a player who queued alone', () => {
+    const engine = new DraftEngine(snapshot);
+    engine.setTeamMode(true);
+    expect(engine.update(banPhase([])).frame.teamBans).toBeNull();
   });
 
   it('stays off unless switched on', () => {

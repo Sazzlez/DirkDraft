@@ -27,6 +27,8 @@ use super::{install, scrub};
 
 const SESSION: &str = "/lol-champ-select/v1/session";
 const GAMEFLOW: &str = "/lol-gameflow/v1/gameflow-phase";
+/// The lobby the local player queued from: its members are his party (scrub::Party).
+const LOBBY: &str = "/lol-lobby/v2/lobby";
 const LOCKFILE_TICK: Duration = Duration::from_millis(500);
 const LOCKFILE_GRACE: Duration = Duration::from_millis(1500);
 /// How often a missing League installation is looked for again.
@@ -77,6 +79,8 @@ pub enum Update {
 enum Inner {
     Socket(u64, SocketEvent),
     Seed(u64, Option<String>, Option<Read>),
+    /// The party of the draft that asked for it (generation, ask).
+    Party(u64, u64, scrub::Party),
 }
 
 struct Link {
@@ -93,6 +97,14 @@ struct Source<F: Fn(Update)> {
     session_open: bool,
     socket_delivered_session: bool,
     socket_delivered_phase: bool,
+    /// The local player's party for the running draft: asked once with its first session, gone
+    /// with its end. None while not asked or not answered yet.
+    party: Option<scrub::Party>,
+    /// Counts the asks, so a late answer of an ended draft is not taken for the next one.
+    party_ask: u64,
+    party_asked: bool,
+    /// The newest session while the party is being asked; it goes out with the answer.
+    waiting_session: Option<String>,
 }
 
 pub async fn run(explicit_lockfile: Option<PathBuf>, out: impl Fn(Update) + Send + 'static) {
@@ -126,6 +138,10 @@ pub async fn run(explicit_lockfile: Option<PathBuf>, out: impl Fn(Update) + Send
         session_open: false,
         socket_delivered_session: false,
         socket_delivered_phase: false,
+        party: None,
+        party_ask: 0,
+        party_asked: false,
+        waiting_session: None,
     };
     let mut missing_since: Option<Instant> = None;
     let mut tick = tokio::time::interval(LOCKFILE_TICK);
@@ -236,6 +252,12 @@ impl<F: Fn(Update)> Source<F> {
                 }
             }
             Inner::Socket(generation, event) if generation == self.generation => self.socket(event),
+            Inner::Party(generation, ask, party) if generation == self.generation && ask == self.party_ask && self.party_asked => {
+                self.party = Some(party);
+                if let Some(json) = self.waiting_session.take() {
+                    self.session(&json);
+                }
+            }
             _ => {}
         }
     }
@@ -286,13 +308,47 @@ impl<F: Fn(Update)> Source<F> {
     }
 
     fn session(&mut self, json: &str) {
-        if let Some(clean) = scrub::session(json) {
+        if self.party.is_none() {
+            // The first session of a draft waits a moment for the lobby's answer, so the party is
+            // there from the first frame; later sessions meanwhile replace it.
+            if !self.party_asked {
+                self.party_asked = true;
+                self.ask_party();
+            }
+        }
+        let Some(party) = &self.party else {
+            self.waiting_session = Some(json.to_string());
+            return;
+        };
+        if let Some(clean) = scrub::session(json, party) {
             self.session_open = true;
             (self.out)(Update::Session(Some(clean)));
         }
     }
 
+    /// Reads the lobby once; whatever comes back (also nothing) answers the ask, so a session never
+    /// waits longer than the one request.
+    fn ask_party(&mut self) {
+        let Some(link) = &self.link else {
+            self.party = Some(scrub::Party::default());
+            return;
+        };
+        let lcu = link.lcu.clone();
+        let tx = self.tx.clone();
+        let generation = self.generation;
+        let ask = self.party_ask;
+        tokio::spawn(async move {
+            let party = lcu.read(LOBBY).await.body.map(|body| scrub::Party::from_lobby(&body)).unwrap_or_default();
+            let _ = tx.send(Inner::Party(generation, ask, party));
+        });
+    }
+
     fn end_session(&mut self) {
+        // The next draft asks for its own party.
+        self.party = None;
+        self.party_asked = false;
+        self.party_ask += 1;
+        self.waiting_session = None;
         if self.session_open {
             self.session_open = false;
             (self.out)(Update::Session(None));

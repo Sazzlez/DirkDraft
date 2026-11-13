@@ -2,8 +2,12 @@
 // select session loses its chat token and every player identity (port of SessionScrubber.cs); the
 // game's own API gets each name replaced by a stable "Spieler N" (port of LiveGameScrubber.cs), so
 // the page can still find its own row — the active player and their row get the same pseudonym.
+//
+// One thing is read from the identities before they go: which teammates queued together with the
+// local player. The lobby he queued from lists his party; a teammate whose identity is in that list
+// keeps a bare `inParty: true`. No name and no id of anyone reaches the page for it.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde_json::Value;
 
@@ -20,18 +24,57 @@ const PLAYER_FIELDS: [&str; 9] = [
     "nameVisibilityType",
 ];
 
-/// The session without chat token and identities, or None when it is not a JSON object.
-pub fn session(json: &str) -> Option<String> {
+/// The local player's party as the lobby lists it (himself included): kept in memory for one
+/// draft, compared with the session, never passed on.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Party {
+    puuids: HashSet<String>,
+    summoners: HashSet<i64>,
+}
+
+impl Party {
+    /// From the answer of /lol-lobby/v2/lobby; empty for anything that is no lobby.
+    pub fn from_lobby(json: &str) -> Self {
+        let mut party = Self::default();
+        let Ok(value) = serde_json::from_str::<Value>(json) else { return party };
+        for member in value.get("members").and_then(Value::as_array).into_iter().flatten() {
+            if let Some(puuid) = member.get("puuid").and_then(Value::as_str).filter(|p| !p.is_empty()) {
+                party.puuids.insert(puuid.to_string());
+            }
+            if let Some(id) = member.get("summonerId").and_then(Value::as_i64).filter(|id| *id > 0) {
+                party.summoners.insert(id);
+            }
+        }
+        party
+    }
+
+    fn has(&self, player: &serde_json::Map<String, Value>) -> bool {
+        player.get("puuid").and_then(Value::as_str).is_some_and(|p| !p.is_empty() && self.puuids.contains(p))
+            || player.get("summonerId").and_then(Value::as_i64).is_some_and(|id| id > 0 && self.summoners.contains(&id))
+    }
+}
+
+/// The session without chat token and identities, or None when it is not a JSON object. The
+/// teammates found in `party` keep `inParty: true` — never the local player's own seat, never an
+/// enemy.
+pub fn session(json: &str, party: &Party) -> Option<String> {
     let mut value: Value = serde_json::from_str(json).ok()?;
     let session = value.as_object_mut()?;
     for field in SESSION_FIELDS {
         session.remove(field);
     }
+    let local = session.get("localPlayerCellId").and_then(Value::as_i64);
     for team in ["myTeam", "theirTeam"] {
         if let Some(Value::Array(players)) = session.get_mut(team) {
             for player in players.iter_mut().filter_map(Value::as_object_mut) {
+                let mate = team == "myTeam" && local.is_some() && player.get("cellId").and_then(Value::as_i64) != local && party.has(player);
                 for field in PLAYER_FIELDS {
                     player.remove(field);
+                }
+                // Only this file says who is in the party.
+                player.remove("inParty");
+                if mate {
+                    player.insert("inParty".to_string(), Value::Bool(true));
                 }
             }
         }
@@ -113,7 +156,7 @@ mod tests {
         let raw = r#"{"chatDetails":{"token":"jwt"},"gameId":7,"localPlayerCellId":2,
             "myTeam":[{"cellId":2,"championId":122,"gameName":"Ich","tagLine":"EUW","puuid":"p","summonerId":1,"spell1Id":4}],
             "theirTeam":[{"cellId":5,"championId":24,"gameName":"Fremd","puuid":"q"}]}"#;
-        let clean: Value = serde_json::from_str(&session(raw).unwrap()).unwrap();
+        let clean: Value = serde_json::from_str(&session(raw, &Party::default()).unwrap()).unwrap();
         assert!(clean.get("chatDetails").is_none());
         assert!(clean.get("gameId").is_none());
         assert_eq!(clean["localPlayerCellId"], 2);
@@ -123,6 +166,46 @@ mod tests {
         assert!(me.get("gameName").is_none() && me.get("puuid").is_none() && me.get("summonerId").is_none());
         assert!(clean["theirTeam"][0].get("gameName").is_none());
         assert!(!clean.to_string().contains("Fremd"));
+    }
+
+    const DUO: &str = r#"{"localPlayerCellId":1,
+        "myTeam":[{"cellId":0,"championId":1,"puuid":"random-a","summonerId":10,"gameName":"A","nameVisibilityType":"HIDDEN"},
+                  {"cellId":1,"championId":2,"puuid":"me","summonerId":11,"gameName":"Ich","nameVisibilityType":"UNHIDDEN"},
+                  {"cellId":2,"championId":3,"puuid":"duo","summonerId":12,"gameName":"Duo","nameVisibilityType":"UNHIDDEN"},
+                  {"cellId":3,"championId":4,"puuid":"","summonerId":0,"gameName":"","inParty":true}],
+        "theirTeam":[{"cellId":5,"championId":24,"puuid":"duo","summonerId":12}]}"#;
+
+    #[test]
+    fn the_party_becomes_a_bare_flag_on_the_teammates_from_the_lobby() {
+        let lobby = r#"{"members":[{"puuid":"me","summonerId":11,"summonerName":"Ich"},{"puuid":"duo","summonerId":12,"summonerName":"Duo"}]}"#;
+        let text = session(DUO, &Party::from_lobby(lobby)).unwrap();
+        let clean: Value = serde_json::from_str(&text).unwrap();
+        let flags: Vec<bool> = clean["myTeam"].as_array().unwrap().iter().map(|p| p["inParty"] == true).collect();
+        // The duo partner only: not the own seat, not a stranger, and not a flag that came from outside.
+        assert_eq!(flags, [false, false, true, false]);
+        assert!(clean["myTeam"][0].get("inParty").is_none() && clean["myTeam"][3].get("inParty").is_none());
+        // An enemy never, whatever his identity says.
+        assert!(clean["theirTeam"][0].get("inParty").is_none());
+        // And nothing of anyone's identity is left.
+        for word in ["random-a", "\"me\"", "\"duo\"", "Duo", "Ich", "HIDDEN", "puuid", "summonerId"] {
+            assert!(!text.contains(word), "{word} left in {text}");
+        }
+    }
+
+    #[test]
+    fn the_party_matches_by_summoner_id_where_the_puuid_is_missing() {
+        let lobby = r#"{"members":[{"summonerId":11},{"summonerId":12}]}"#;
+        let clean: Value = serde_json::from_str(&session(DUO, &Party::from_lobby(lobby)).unwrap()).unwrap();
+        assert_eq!(clean["myTeam"][2]["inParty"], true);
+        assert!(clean["myTeam"][0].get("inParty").is_none());
+    }
+
+    #[test]
+    fn alone_or_without_a_lobby_nobody_is_in_the_party() {
+        for lobby in [r#"{"members":[{"puuid":"me","summonerId":11}]}"#, "", "null", r#"{"httpStatus":404}"#, r#"{"members":[{"puuid":"","summonerId":0}]}"#] {
+            let clean: Value = serde_json::from_str(&session(DUO, &Party::from_lobby(lobby)).unwrap()).unwrap();
+            assert!(clean["myTeam"].as_array().unwrap().iter().all(|p| p.get("inParty").is_none()), "{lobby}");
+        }
     }
 
     #[test]

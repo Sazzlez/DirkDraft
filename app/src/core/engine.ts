@@ -9,6 +9,7 @@ import { draftParts } from './model/draftModel';
 import { sigmoid } from './model/scoreModel';
 import {
   draftStateFrom,
+  partyCells,
   effectiveChampionId,
   isLocked,
   localSlot,
@@ -43,6 +44,8 @@ export interface FrameSlot {
   assignedLane: LaneName;
   effectiveChampionId: number;
   isLocked: boolean;
+  /** Only on the seats of the local player's party, and only when true. */
+  inParty?: true;
 }
 
 export interface FrameItem {
@@ -244,7 +247,10 @@ export class DraftEngine {
     this.chosenPlan = plan;
   }
 
-  /** D1: plan the own team's open seats together (setting "Team-Modus", off by default). */
+  /**
+   * D1: plan the open seats of the own party together (setting "Team-Modus"). It acts by itself
+   * wherever the client says who queued together, and nowhere else: alone there is nothing to plan.
+   */
   private teamMode = false;
 
   setTeamMode(on: boolean): void {
@@ -322,6 +328,9 @@ export class DraftEngine {
     const manual = this.manualLanes.size > 0 ? this.manualLanes : null;
     const enemyPredictions = predictor.predict(state.enemies, manual);
     const allyPredictions = predictor.predict(state.allies, manual);
+    // The party the team mode plans for: two seats or more, or nothing.
+    const partySeats = this.teamMode ? partyCells(state) : null;
+    const party = partySeats && partySeats.size >= 2 ? partySeats : null;
     const comp = new CompAnalyzer(meta, this.traits, this.shred);
     const recommender = new Recommender(meta, this.traits, this.shred, this.chosenPlan);
 
@@ -444,10 +453,10 @@ export class DraftEngine {
       gap,
       pickHint,
       chosenPlan: this.chosenPlan,
-      teamPlan: this.teamMode && state.isActive && usesLanes(state.queue) ? frameTeamPlan(planTeam(recommender, meta, state, enemyPredictions, allyPredictions, this.selectable)) : null,
+      teamPlan: party && state.isActive && usesLanes(state.queue) ? frameTeamPlan(planTeam(recommender, meta, state, enemyPredictions, allyPredictions, this.selectable, party)) : null,
       teamBans:
-        this.teamMode && bans && state.phase !== 'finalization'
-          ? (planTeamBans(recommender, meta, state, enemyPredictions, allyPredictions)?.map((b) => ({ ...b, lane: laneKey(b.lane) })) ?? null)
+        party && bans && state.phase !== 'finalization'
+          ? (planTeamBans(recommender, meta, state, enemyPredictions, allyPredictions, party)?.map((b) => ({ ...b, lane: laneKey(b.lane) })) ?? null)
           : null,
     };
   }
@@ -462,6 +471,7 @@ export function stateFromFrame(s: DraftFrame['state']): DraftState {
     lockedChampionId: g.lockedChampionId,
     hoverChampionId: g.hoverChampionId,
     assignedLane: laneFromKey(g.assignedLane),
+    ...(g.inParty ? { inParty: true } : {}),
   });
   return {
     isActive: s.isActive,
@@ -493,6 +503,7 @@ const frameSlot = (s: DraftSlot): FrameSlot => ({
   assignedLane: laneKey(s.assignedLane),
   effectiveChampionId: effectiveChampionId(s),
   isLocked: isLocked(s),
+  ...(s.inParty ? { inParty: true as const } : {}),
 });
 
 function frameSet(s: RecommendationSet): FrameSet {

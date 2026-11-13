@@ -8,7 +8,7 @@
   let { team }: { team: TeamPlanView } = $props();
 </script>
 
-<Tile title="Team-Plan">
+<Tile title={team.scope ? `Team-Plan · ${team.scope}` : 'Team-Plan'}>
   <div class="rows">
     {#each team.rows as row (row.cellId)}
       <div class="row" class:me={row.isMe}>

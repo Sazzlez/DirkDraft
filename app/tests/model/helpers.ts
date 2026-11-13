@@ -149,6 +149,8 @@ interface Player {
   championPickIntent: number;
   assignedPosition: string | null;
   team: number;
+  /** As the shell writes it: only on the teammates the local player queued with. */
+  inParty?: boolean;
 }
 
 interface Action {
@@ -191,6 +193,12 @@ export class SessionBuilder {
 
   localPlayer(cellId: number): this {
     this.session.localPlayerCellId = cellId;
+    return this;
+  }
+
+  /** The teammates the local player queued with (the shell's `inParty`, lcu/scrub.rs). */
+  party(...cellIds: number[]): this {
+    for (const cellId of cellIds) this.slot(cellId).inParty = true;
     return this;
   }
 

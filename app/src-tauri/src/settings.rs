@@ -140,7 +140,7 @@ pub const GLASS_EFFECT: (&str, bool) = ("glassEffect", true);
 /// small log (logfile.rs) runs everywhere, so "Diagnose speichern" still helps a friend with a fault.
 pub const DIAGNOSTICS: (&str, bool) = ("diagnostics", false);
 /// 2.1: plan the own team's open seats together, for a fixed five in Flex (D1). Off by default.
-pub const TEAM_MODE: (&str, bool) = ("teamMode", false);
+pub const TEAM_MODE: (&str, bool) = ("teamMode", true);
 /// An empty file of this name next to settings.json switches the recording on by default.
 pub const DIAGNOSTICS_MARKER: &str = "diagnostics.on";
 
@@ -199,9 +199,9 @@ mod tests {
         assert!(settings.set_from_page("flashKey", Value::from("Q")).is_err());
         assert!(settings.set_from_page("showUnowned", Value::from(true)).is_ok());
         assert!(settings.set_from_page("showUnowned", Value::from("ja")).is_err());
-        assert_eq!(page["teamMode"], false);
-        assert!(settings.set_from_page("teamMode", Value::from(true)).is_ok());
-        assert_eq!(settings.page()["teamMode"], true);
+        assert_eq!(page["teamMode"], true);
+        assert!(settings.set_from_page("teamMode", Value::from(false)).is_ok());
+        assert_eq!(settings.page()["teamMode"], false);
         assert!(settings.set_from_page("poolAdded", serde_json::json!([122, 86])).is_err());
         assert!(settings.set_from_page("lockfilePath", Value::from("C:\\x")).is_err());
         assert!(settings.set_from_page("trayHintShown", Value::from(false)).is_err());

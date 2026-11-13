@@ -106,14 +106,20 @@ Kopien melden sie beim nächsten Start.
 - **Flex-Picks.** Ist ein Vorschlag auf mindestens zwei Lanes stark, die in eurem Team noch offen
   sind, trägt er den Chip „Flex: Top oder Mid“. Der Gegner sieht dann den Champion, aber nicht seine
   Lane. Zählt nicht in die Prozentzahl.
-- **Team-Modus** (Einstellungen, standardmäßig aus) für Flex mit festem Team: Die Kachel „Team-Plan“
-  plant die offenen Plätze gemeinsam — die beste Kombination ohne doppelte Champions, mit der
-  Synergie zwischen den neuen Picks — und schlägt eine Reihenfolge vor: zuerst der Pick mit den
-  wenigsten offenen Countern (Flex-Picks zählen einen weniger), zuletzt der am leichtesten zu
-  kontern ist. Hat niemand offene Counter, steht keine Reihenfolge da.
-- **Team-Banns** (im Team-Modus): eine Kachel mit einem Set für das ganze Team statt fünfmal derselben
-  Liste — die stärksten Banns aller Sitze, höchstens zwei je Lane; was Teammates schon hovern, ist
-  gesetzt, und dein eigener ist markiert. In den Bann-Vorschlägen steht außerdem, wenn ein Champion
+- **Team-Modus: DirkDraft erkennt deine Party.** Spielst du im Duo oder mit mehreren in Flex, plant
+  die Kachel „Team-Plan“ eure offenen Plätze gemeinsam — die beste Kombination ohne doppelte
+  Champions, mit der Synergie zwischen euren Picks — und schlägt eine Reihenfolge vor: zuerst der
+  Pick mit den wenigsten offenen Countern (Flex-Picks zählen einen weniger), zuletzt der am
+  leichtesten zu kontern ist. Hat niemand offene Counter, steht keine Reihenfolge da. Der Platz
+  deines Partners heißt „dein Duo“, bei mehreren „Party“; die Kachel sagt „geplant für euch 3“. Die
+  anderen Teammates bleiben, wie sie sind: Was sie hovern, gilt als vergeben. Spielst du allein,
+  ändert sich nichts. Der Modus ist an und lässt sich in den Einstellungen abschalten. Wer zur
+  Party gehört, liest DirkDraft aus der Lobby, bevor Namen und Kennungen entfernt werden; in der
+  App selbst steht nur „in der Party: ja“ am Platz, kein Name.
+- **Team-Banns** (im Team-Modus): eine Kachel mit einem Set für eure Party statt derselben Liste für
+  jeden — die stärksten Banns eurer Plätze, höchstens zwei je Lane, so viele, wie ihr Plätze habt.
+  Was ihr schon hovert, ist gesetzt, und dein eigener ist markiert; was ein anderer Teammate hovert,
+  wird nicht noch einmal vorgeschlagen. In den Bann-Vorschlägen steht außerdem, wenn ein Champion
   euren Plan bedroht: „bedroht euren Teamfight-Plan“ (Disengage) oder „bedroht euren Poke-Plan“
   (hartes Engage). Zählt nicht in den Bann-Wert.
 - **Plan vor dem Draft.** In der Comp-Kachel lässt sich ein Plan wählen — Teamfight, Pick, Poke,

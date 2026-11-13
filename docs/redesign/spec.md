@@ -114,6 +114,11 @@ CC ≥ 6 → Tenacity, nur ab drei aufgedeckten Gegnern, nie umsortierend.
   tagLine, puuid, obfuscatedPuuid, summonerId, obfuscatedSummonerId, playerAlias, internalName,
   nameVisibilityType. `LiveGameScrubber` ersetzt summonerName, riotId(GameName/TagLine),
   KillerName, VictimName, Assisters, Acer, Recipient durch „Spieler N“ (auch nackte Strings).
+  Seit 2.1 (13.11.2026) liest die Shell vor dem Entfernen eines aus: Sie fragt je Draft einmal die
+  Lobby ab (`/lol-lobby/v2/lobby`), vergleicht deren Mitglieder mit dem eigenen Team und lässt an
+  den Plätzen der eigenen Party ein nacktes `inParty: true` stehen (`lcu/scrub.rs`, `Party`). Die
+  Lobby-Liste bleibt im Speicher der Shell, bis der Draft endet; die Seite, die Diagnose und die
+  Aufzeichnungen bekommen nur das Kennzeichen — keinen Namen, keine Kennung.
 - **Aufzeichnen/Abspielen:** JSONL `{offsetMs, session}` oder `{offsetMs, phase}`, gescrubbt.
   2.0: Replay auch im Browser (ersetzt `--demo`/`--screenshot`).
 
