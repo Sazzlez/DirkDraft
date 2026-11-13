@@ -29,6 +29,7 @@ import {
   type GapLine,
   type PickNote,
   type TeamBansView,
+  type PlanChoiceView,
   type TeamPlanView,
   type DraftChanceView,
   type HoverView,
@@ -65,6 +66,15 @@ const allyLabel = (s: GoldenFrame['state'], cellId: number): string => {
   if (cellId === s.localCellId) return 'Du';
   const slot = s.allies.find((a) => a.cellId === cellId);
   return slot?.inParty && partySize(s) === 2 ? 'dein Duo' : `Teammate ${(slot?.index ?? 0) + 1}`;
+};
+
+/** What each plan is about, short enough for a button (the long form: compAnalyzer PLAN_WANTS). */
+const PLAN_SHORT: Record<Plan, string> = {
+  teamfight: 'Engage und der große Kampf um Objectives',
+  pick: 'einzelne Gegner abfangen',
+  poke: 'Schaden aus der Distanz, Türme belagern',
+  protect: 'den eigenen Carry schützen',
+  split: 'Druck über eine Seitenlane',
 };
 
 /** How the recommender's synergy reasons start, before the partner's champion (recommender.ts). */
@@ -424,6 +434,19 @@ export class GoldenAdapter {
     };
   }
 
+  /**
+   * D4: the plan chooser. Only for a fixed five: with teammates who queued on their own nobody can
+   * make the team follow a plan, and the plan the picks show stands in the comp tile anyway.
+   */
+  planChoice(frame: GoldenFrame): PlanChoiceView | null {
+    const s = frame.state;
+    if (!s.isActive || !s.usesLanes || s.allies.length < 5 || partySize(s) < s.allies.length) return null;
+    return {
+      options: (Object.keys(PLAN_NAMES) as Plan[]).map((plan) => ({ plan, label: PLAN_NAMES[plan], wants: PLAN_SHORT[plan], active: plan === frame.chosenPlan })),
+      chosen: frame.chosenPlan ? PLAN_NAMES[frame.chosenPlan] : null,
+    };
+  }
+
   /** D1: the team plan as a tile; null outside team mode. */
   teamPlan(frame: GoldenFrame): TeamPlanView | null {
     const plan = frame.teamPlan;
@@ -569,10 +592,6 @@ export class GoldenAdapter {
       enemyDamage: damage(e),
       enemyGap: gapsOf(e.findings).length > 0 ? { lead: 'Dem Gegnerteam fehlt', items: gapItems(gapsOf(e.findings)), tone: 'good' } : null,
       plans: this.plans(frame.chosenPlan ?? a.plan ?? null, e.plan ?? null, !!frame.chosenPlan),
-      planChoice:
-        frame.state.isActive && frame.state.usesLanes
-          ? (Object.keys(PLAN_NAMES) as Plan[]).map((plan) => ({ plan, label: PLAN_NAMES[plan], active: plan === frame.chosenPlan }))
-          : null,
       timing: a.findings.some((f) => f.issue === 'mixedTiming')
         ? {
             text: `Gemischtes Timing: ${a.earlyScalingCount ?? 0}× Early Game, ${a.lateScalingCount}× Late Game`,

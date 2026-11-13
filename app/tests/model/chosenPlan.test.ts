@@ -15,6 +15,8 @@ const adapter = new GoldenAdapter(snapshot.champions);
 
 /** Mid on the clock, nobody shown: a blind mid pick. */
 const midBlind = () => new SessionBuilder().queue(420).localPlayer(2).onClock(2, 'pick').build();
+/** The same as a fixed five: everyone queued with the local player. */
+const fiveBlind = () => new SessionBuilder().queue(440).localPlayer(2).party(0, 1, 3, 4).onClock(2, 'pick').build();
 
 describe('chosen plan', () => {
   it('gives the picks that bring it a small pro, and nothing without a choice', () => {
@@ -37,15 +39,30 @@ describe('chosen plan', () => {
 
   it('names the chosen plan in the comp tile and lets the second click clear it', () => {
     const engine = new DraftEngine(snapshot);
-    engine.update(midBlind());
+    engine.update(fiveBlind());
     engine.choosePlan('teamfight');
-    const view = adapter.comp(engine.update(midBlind()).frame as unknown as GoldenFrame);
+    const frame = engine.update(fiveBlind()).frame as unknown as GoldenFrame;
 
-    expect(view.plans!.text).toBe('Euer Plan: Teamfight (gewählt) · Ihr Plan: noch offen');
-    expect(view.planChoice!.filter((o) => o.active).map((o) => o.plan)).toEqual(['teamfight']);
+    expect(adapter.comp(frame).plans!.text).toBe('Euer Plan: Teamfight (gewählt) · Ihr Plan: noch offen');
+    const choice = adapter.planChoice(frame)!;
+    expect(choice.chosen).toBe('Teamfight');
+    expect(choice.options.filter((o) => o.active).map((o) => o.plan)).toEqual(['teamfight']);
+    expect(choice.options.map((o) => o.label)).toEqual(['Teamfight', 'Pick', 'Poke', 'Protect', 'Splitpush']);
+    expect(choice.options.every((o) => o.wants.length > 0)).toBe(true);
 
     engine.choosePlan(null);
-    expect(adapter.comp(engine.update(midBlind()).frame as unknown as GoldenFrame).planChoice!.some((o) => o.active)).toBe(false);
+    const cleared = adapter.planChoice(engine.update(fiveBlind()).frame as unknown as GoldenFrame)!;
+    expect(cleared.chosen).toBeNull();
+    expect(cleared.options.some((o) => o.active)).toBe(false);
+  });
+
+  it('offers the choice to a fixed five only: nobody makes strangers follow a plan', () => {
+    const choice = (party: number[]) =>
+      adapter.planChoice(new DraftEngine(snapshot).update(new SessionBuilder().queue(420).localPlayer(2).party(...party).onClock(2, 'pick').build()).frame as unknown as GoldenFrame);
+    expect(choice([])).toBeNull();
+    expect(choice([0])).toBeNull();
+    expect(choice([0, 1, 3])).toBeNull();
+    expect(choice([0, 1, 3, 4])).not.toBeNull();
   });
 
   it('warns in the bans what threatens the chosen plan', () => {

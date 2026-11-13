@@ -320,6 +320,10 @@ export class LiveSession {
       main = { kind: 'none' };
     }
 
+    // A fixed five chooses its plan at the top of the side column, where nobody misses it.
+    const plan = this.adapter.planChoice(frame);
+    if (plan && side.length > 0) side.unshift({ kind: 'plan', plan });
+
     return { ...base, board, main, side, build, emptyText };
   }
 

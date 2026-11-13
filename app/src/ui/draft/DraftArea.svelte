@@ -9,6 +9,7 @@
   import CompTile from './CompTile.svelte';
   import OpenRolesTile from './OpenRolesTile.svelte';
   import VerdictTile from './VerdictTile.svelte';
+  import PlanTile from './PlanTile.svelte';
   import TeamPlanTile from './TeamPlanTile.svelte';
   import TeamBansTile from './TeamBansTile.svelte';
 
@@ -40,7 +41,9 @@
   {#if view.side.length > 0}
     <div class="side" class:single={view.side.length === 1}>
       {#each view.side as tile, i (i)}
-        {#if tile.kind === 'team'}
+        {#if tile.kind === 'plan'}
+          <div class="wide"><PlanTile plan={tile.plan} /></div>
+        {:else if tile.kind === 'team'}
           <div class="wide"><TeamPlanTile team={tile.team} /></div>
         {:else if tile.kind === 'teamBans'}
           <div class="wide"><TeamBansTile bans={tile.bans} /></div>

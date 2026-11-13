@@ -208,8 +208,6 @@ export interface CompView {
   enemyGap: GapLine | null;
   /** "Euer Plan: Teamfight · Ihr Plan: Poke" and what each side wants (B3); null while neither is clear. */
   plans: { text: string; detail: string } | null;
-  /** D4: the plan for this draft, chosen by hand; null outside champ select. A second click clears it. */
-  planChoice: { plan: Plan; label: string; active: boolean }[] | null;
   /** "Gemischtes Timing: 1× Early Game, 2× Late Game" — a hint, the traits are coarse. */
   timing: { text: string; hint: string } | null;
 }
@@ -379,6 +377,22 @@ export type MainTile =
   | { kind: 'lobby'; title: string; lines: { label: string; value: string; tone: Tone }[] }
   | { kind: 'none' };
 
+/**
+ * D4: the plan for this draft, chosen by hand — offered to a fixed five only, where the whole team
+ * can follow it. A second click on the chosen plan clears it.
+ */
+export interface PlanChoiceView {
+  options: {
+    plan: Plan;
+    label: string;
+    /** "Engage und der große Kampf um Objectives" */
+    wants: string;
+    active: boolean;
+  }[];
+  /** The chosen plan's name; null while none is chosen. */
+  chosen: string | null;
+}
+
 /** D1: the open seats of the own team planned together (team mode). */
 export interface TeamPlanView {
   rows: {
@@ -419,6 +433,7 @@ export interface TeamBansView {
 
 export type SideTile =
   | { kind: 'team'; team: TeamPlanView }
+  | { kind: 'plan'; plan: PlanChoiceView }
   | { kind: 'teamBans'; bans: TeamBansView }
   | { kind: 'chance'; chance: DraftChanceView }
   | { kind: 'comp'; comp: CompView }

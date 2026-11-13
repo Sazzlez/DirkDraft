@@ -122,12 +122,14 @@ Kopien melden sie beim nächsten Start.
   wird nicht noch einmal vorgeschlagen. In den Bann-Vorschlägen steht außerdem, wenn ein Champion
   euren Plan bedroht: „bedroht euren Teamfight-Plan“ (Disengage) oder „bedroht euren Poke-Plan“
   (hartes Engage). Zählt nicht in den Bann-Wert.
-- **Plan vor dem Draft.** In der Comp-Kachel lässt sich ein Plan wählen — Teamfight, Pick, Poke,
-  Protect oder Splitpush. Picks, die ihn bringen, tragen „passt zum gewählten Plan“ und bekommen ein
-  kleines Plus in der Teamcomp, auch schon vor dem ersten Pick. Ohne Wahl bleibt alles wie bisher:
-  der erkannte Plan steht nur als Hinweis da. Ein zweiter Klick hebt die Wahl auf; mit dem Draft ist
-  sie vorbei, gespeichert wird nichts. Solange kein Plan gewählt ist, steht die Auswahl in einem
-  blauen Kasten, damit sie nicht untergeht; danach tritt sie zurück.
+- **Plan vor dem Draft, für den festen Fünfer.** Seid ihr zu fünft in der Party, steht oben rechts
+  die Kachel „Euer Plan“ mit der Frage „Was wollt ihr spielen?“ und fünf Knöpfen — Teamfight, Pick,
+  Poke, Protect oder Splitpush, jeder mit einer Zeile, was er meint. Picks, die den Plan bringen,
+  tragen „passt zum gewählten Plan“ und bekommen ein kleines Plus in der Teamcomp, auch schon vor dem
+  ersten Pick. Ein Klick auf den gewählten Plan hebt die Wahl auf; mit dem Draft ist sie vorbei,
+  gespeichert wird nichts. Allein, im Duo und zu dritt oder viert gibt es die Auswahl nicht: Mit
+  Randoms lässt sich kein Plan durchziehen. Der erkannte Plan steht dort weiter als Hinweis im
+  Comp-Vergleich.
 - Die Chips sprechen League: „Frontline“ statt „steht vorne“, „Peel“ statt „schützt deine Carrys“,
   „Disengage“ statt „hält ihr Engage auf“. Der Hinweis darunter erklärt weiter, was gemeint ist.
 - Das Draft-Urteil sagt „Gegner skalieren besser“ statt „Sie skalieren besser“, ebenso bei Engage
