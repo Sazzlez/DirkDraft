@@ -2,6 +2,9 @@
 
 import { describe, expect, it } from 'vitest';
 import type { GameModel } from '../../src/core/game';
+import { Lane } from '../../src/core/model/lane';
+import { LANE_PHASE_SECONDS, type Strength, type TeamStand } from '../../src/core/strength';
+import type { VerdictLine } from '../../src/core/view';
 import { SITUATION, SLOT, type RatedSuggestion } from '../../src/core/situational';
 import { DamageType } from '../../src/core/model/metaLookup';
 import { gameView } from '../../src/data/gameView';
@@ -82,5 +85,60 @@ describe('the alternative in the buy box', () => {
     expect(view(model(), [{ ...mercs, instead: null }]).buyAlternative).toBeNull();
     expect(view(model(), null).buyAlternative).toBeNull();
     expect(view(model({ nextBuy: null })).buyAlternative).toBeNull();
+  });
+});
+
+describe('after the lane phase', () => {
+  const scale: Strength = {
+    lane: Lane.Support,
+    mine: { championIds: [201], levels: [5], worth: 1200 },
+    theirs: { championIds: [1], levels: [5], worth: 900 },
+    levelDiff: 0,
+    worthDiff: 300,
+    chance: 0.55,
+    value: 0.4,
+  };
+  const stand: TeamStand = {
+    mine: { players: 5, level: 62, worth: 41200 },
+    theirs: { players: 5, level: 58, worth: 38900 },
+    levelDiff: 4,
+    worthDiff: 2300,
+    enemies: [1, 2, 3, 4, 5].map((championId) => ({ championId, level: 10 + championId, worth: championId === 3 ? 12000 : 6000 })),
+    leaderId: 3,
+  };
+  const verdict: VerdictLine[] = [
+    { icon: 'scaling', tone: 'warn', title: 'Gegner skalieren besser', detail: 'Früh Druck machen, Objectives nehmen.' },
+    { icon: 'damage', tone: 'info', title: 'Viel AP beim Gegner', detail: 'MR zuerst lohnt sich.' },
+  ];
+  const at = (gameTime: number, strength: Strength | null = scale, team: TeamStand | null = stand) =>
+    gameView(model({ gameTime }), () => null, 'Braum', null, null, strength, [], { team, verdict });
+
+  it('shows the lane scale during the lane phase and the team stand after it', () => {
+    const lane = at(LANE_PHASE_SECONDS - 1);
+    expect(lane.strength).not.toBeNull();
+    expect(lane.team).toBeNull();
+    const later = at(LANE_PHASE_SECONDS);
+    expect(later.strength).toBeNull();
+    expect(later.team!.rows.map((r) => [r.label, r.mine, r.theirs, r.diff])).toEqual([
+      ['Level', '62', '58', '+4'],
+      ['Items', '41.200', '38.900', '+2.300'],
+    ]);
+    // Without a lane opponent the team stand stands in from the start; without either, nothing.
+    expect(at(300, null).team).not.toBeNull();
+    expect(at(300, null, null)).toMatchObject({ strength: null, team: null });
+  });
+
+  it('gives every enemy his level and item worth, and marks the one with the most items once the lanes are over', () => {
+    const lane = at(600).enemies;
+    expect(lane.map((e) => e.stand)).toEqual([1, 2, 3, 4, 5].map((id) => ({ level: 10 + id, worth: id === 3 ? 12000 : 6000 })));
+    expect(lane.some((e) => e.lead)).toBe(false);
+    expect(at(1500).enemies.map((e) => e.lead)).toEqual([false, false, true, false, false]);
+    // No team stand, no numbers and no mark.
+    expect(at(1500, null, null).enemies.every((e) => e.stand === null && !e.lead)).toBe(true);
+  });
+
+  it('keeps the draft\'s verdict through the game, without the damage line the hint already says', () => {
+    expect(at(600).verdict.map((line) => line.title)).toEqual(['Gegner skalieren besser']);
+    expect(view(model()).verdict).toEqual([]);
   });
 });

@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest';
 import type { ItemInfo, LiveGameData, LivePlayer } from '../../src/core/game';
 import { Lane } from '../../src/core/model/lane';
 import { DamageType } from '../../src/core/model/metaLookup';
-import { STRENGTH_STEP, STRENGTH_WEIGHTS, strengthOf } from '../../src/core/strength';
-import { strengthLabel, strengthView } from '../../src/data/gameView';
+import { STRENGTH_STEP, STRENGTH_WEIGHTS, strengthOf, teamStandOf } from '../../src/core/strength';
+import { strengthLabel, strengthView, teamStandView } from '../../src/data/gameView';
 import { MetaBuilder } from './helpers';
 
 const ITEMS = new Map<number, ItemInfo>([
@@ -197,5 +197,47 @@ describe('as the tile shows it', () => {
     expect(view.rows[0]).toEqual({ label: 'Level', mine: '8 + 7', theirs: '8 + 7', diff: '±0', tone: 'even' });
     expect(view.rows[1]).toEqual({ label: 'Items', mine: '350', theirs: '350', diff: '±0', tone: 'even' });
     expect(view.label).toBe('Ausgeglichen');
+  });
+});
+
+describe('team against team', () => {
+  // Darius 9 with 1.750 of items and Ahri 9 with 3.000 against Jax 8 with 800 and Ahri 3 with nothing.
+  const game = top({ level: 9, items: [3133, 1036, 1001, 2003, 3340] }, { level: 8, items: [1055, 1036] });
+
+  it('sums levels and item worth of both sides, as the scoreboard shows them', () => {
+    const stand = teamStandOf(game, meta, ITEMS)!;
+    expect(stand.mine).toEqual({ players: 2, level: 18, worth: 4750 });
+    expect(stand.theirs).toEqual({ players: 2, level: 11, worth: 800 });
+    expect(stand.levelDiff).toBe(7);
+    expect(stand.worthDiff).toBe(3950);
+    // The enemies in the game's own order, and the one with the most item worth.
+    expect(stand.enemies).toEqual([
+      { championId: 24, level: 8, worth: 800 },
+      { championId: 103, level: 3, worth: 0 },
+    ]);
+    expect(stand.leaderId).toBe(24);
+  });
+
+  it('names no leader while no enemy has bought anything that counts', () => {
+    expect(teamStandOf(top({ level: 1, items: [] }, { level: 1, items: [2003, 3340] }), meta, ITEMS)!.leaderId).toBe(0);
+  });
+
+  it('has nothing to say without the own row or without enemies', () => {
+    const alone: LiveGameData = { ...game, allPlayers: game.allPlayers!.filter((p) => p.team === 'ORDER') };
+    expect(teamStandOf(alone, meta, ITEMS)).toBeNull();
+    const stranger: LiveGameData = { ...game, activePlayer: { riotId: 'Jemand#X' } };
+    expect(teamStandOf(stranger, meta, ITEMS)).toBeNull();
+  });
+
+  it('shows numbers and each side\'s part, and no verdict', () => {
+    const view = teamStandView(teamStandOf(game, meta, ITEMS)!);
+    expect(view.rows).toEqual([
+      { label: 'Level', mine: '18', theirs: '11', diff: '+7', tone: 'up', share: 18 / 29 },
+      { label: 'Items', mine: '4.750', theirs: '800', diff: '+3.950', tone: 'up', share: 4750 / 5550 },
+    ]);
+    expect(JSON.stringify(view)).not.toMatch(/stärker|schwächer/);
+    // Nothing bought on either side: the bar stands in the middle.
+    const none = { players: 5, level: 5, worth: 0 };
+    expect(teamStandView({ mine: none, theirs: none, levelDiff: 0, worthDiff: 0, enemies: [], leaderId: 0 }).rows[1]).toMatchObject({ diff: '±0', tone: 'even', share: 0.5 });
   });
 });

@@ -286,3 +286,39 @@ describe('LiveSession', () => {
     expect(view.game?.situational).toBeNull();
   });
 });
+
+describe('the game after a draft', () => {
+  it("keeps the draft's verdict and shows the team stand once the lanes are over", () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    for (const record of sessions('state-nachlock')) live.onSession(record.session ?? null);
+    const said = live.view().side.find((tile) => tile.kind === 'verdict');
+    const lines = said?.kind === 'verdict' ? said.lines.filter((line) => line.icon !== 'damage') : [];
+    expect(lines.length).toBeGreaterThan(0);
+
+    // The session ends with the loading screen; the game answers with its own players.
+    live.onSession(null);
+    live.onPhase('InProgress');
+    const player = (riotId: string, champion: string, team: string, level: number) => ({ riotId, rawChampionName: `game_character_displayname_${champion}`, team, level, items: [] });
+    const game = (gameTime: number) => ({
+      activePlayer: { riotId: 'Ich#1', level: 9, currentGold: 500, abilities: {} },
+      allPlayers: [player('Ich#1', 'Darius', 'ORDER', 9), player('Fremd#1', 'Jax', 'CHAOS', 8), player('Fremd#2', 'Syndra', 'CHAOS', 7)],
+      gameData: { gameTime, gameMode: 'CLASSIC' },
+    });
+    live.onGame(game(15 * 60));
+    const view = live.view();
+    expect(view.moment).toBe('game');
+    expect(view.game!.verdict).toEqual(lines);
+    expect(view.game!.strength).toBeNull();
+    expect(view.game!.team!.rows[0]).toMatchObject({ label: 'Level', mine: '9', theirs: '15', diff: '−6' });
+    expect(JSON.stringify(view.game)).not.toContain('Fremd');
+
+    // Back in the lobby the draft is over for good: a game started without one has no verdict.
+    live.onPhase('Lobby');
+    live.onPhase('InProgress');
+    live.onGame(game(15 * 60));
+    expect(live.view().game!.verdict).toEqual([]);
+  });
+});

@@ -6,6 +6,8 @@
   import SkillGrid from '../build/SkillGrid.svelte';
   import BuyStrip from './BuyStrip.svelte';
   import StrengthTile from './StrengthTile.svelte';
+  import TeamTile from './TeamTile.svelte';
+  import VerdictTile from '../draft/VerdictTile.svelte';
 
   let { game, build }: { game: GameView; build: BuildView | null } = $props();
 </script>
@@ -88,9 +90,20 @@
 
   </div>
   <div class="col right">
+  <!-- The lane scale during the lane phase; after it (and where there is none) both teams' numbers. -->
   {#if game.strength}
   <div class="strength">
     <StrengthTile strength={game.strength} />
+  </div>
+  {:else if game.team}
+  <div class="strength">
+    <TeamTile team={game.team} />
+  </div>
+  {/if}
+  <!-- What the draft said about the two line-ups: the same lines as in champ select, kept through the game. -->
+  {#if game.verdict.length > 0}
+  <div class="verdict">
+    <VerdictTile lines={game.verdict} />
   </div>
   {/if}
   <!-- Only with something to say: an empty tile with just its footnote read like a fault (live test 07.11.). -->
@@ -113,7 +126,10 @@
       {#each game.enemies as enemy (enemy.champion.id)}
         <div class="er">
           <Icon kind="champion" champion={enemy.champion} size={28} />
-          <span class="nm">{enemy.champion.name}</span>
+          <span class="nm">
+            {enemy.champion.name}{#if enemy.lead}<span class="lead">meiste Items</span>{/if}
+            {#if enemy.stand}<span class="st num">Stufe {enemy.stand.level} · {count(enemy.stand.worth)} Gold</span>{/if}
+          </span>
           <span class="its">{#each enemy.items as item, i (i)}<Icon kind="item" id={item.id} size={22} title={item.name} />{/each}</span>
           <span class="dt" class:magic={enemy.damage === 'magisch'}>{enemy.damage}</span>
         </div>
@@ -182,6 +198,7 @@
   }
 
   .strength { order: 0; }
+  .verdict { order: 0; }
   .enemies { order: 1; }
   .hints { order: 2; }
 
@@ -403,6 +420,25 @@
     font-weight: 600;
   }
 
+  /* Level and item worth under the name; the enemy with the most items carries a quiet tag. */
+  .st {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 400;
+    color: var(--fg2);
+  }
+
+  .lead {
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--red-text);
+    background: var(--red-wash);
+    vertical-align: 1px;
+  }
+
   .its {
     display: flex;
     gap: 3px;
@@ -453,6 +489,7 @@
     }
 
     .strength { order: 0; }
+    .verdict { order: 1; }
     .skill { order: 2; }
     .hints { order: 3; }
     .path { order: 4; }

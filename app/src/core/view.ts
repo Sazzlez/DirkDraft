@@ -297,7 +297,11 @@ export interface GameView {
   nextSkill: { key: 'Q' | 'W' | 'E' | 'R'; level: number; now: boolean } | null;
   /** Points spent so far: the skill grid marks that many levels as taken. */
   skillPoints: number;
-  enemies: { champion: ChampionRef; items: ItemRef[]; damage: 'physisch' | 'magisch' | 'gemischt' }[];
+  /**
+   * `stand`: level and item worth as the scoreboard shows them, where the team stand is reckoned.
+   * `lead`: the enemy with the most item worth, marked once the lane phase is over.
+   */
+  enemies: { champion: ChampionRef; items: ItemRef[]; damage: 'physisch' | 'magisch' | 'gemischt'; stand: { level: number; worth: number } | null; lead: boolean }[];
   hints: { title: string; detail: string; tone: Tone }[];
   draftLine: string | null;
   sample: string | null;
@@ -306,8 +310,21 @@ export interface GameView {
    * an empty list means nothing beats the base build clearly here.
    */
   situational: SituationalView[] | null;
-  /** Du gegen den Lane-Gegner (docs/lane-vergleich.md); null without a known opponent. */
+  /**
+   * Du gegen den Lane-Gegner (docs/lane-vergleich.md), during the lane phase; null without a known
+   * opponent and once the lane phase is over.
+   */
   strength: StrengthView | null;
+  /** Team gegen Team, in the lane scale's place once the lane phase is over or where there is no scale. */
+  team: TeamStandView | null;
+  /** What the draft said about the two line-ups, kept through the game; empty without a draft. */
+  verdict: VerdictLine[];
+}
+
+/** Both teams as the scoreboard shows them: numbers only, no verdict (core/strength teamStandOf). */
+export interface TeamStandView {
+  /** "Level 62 : 58 +4", "Items 41.200 : 38.900 +2.300"; `share`: the own side's part of the two, 0..1, for the bar. */
+  rows: { label: string; mine: string; theirs: string; diff: string; tone: 'up' | 'down' | 'even'; share: number }[];
 }
 
 /** The strength scale: up = stronger than the lane opponent, down = weaker. Describes, never advises. */

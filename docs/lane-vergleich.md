@@ -96,6 +96,29 @@ einen Untertitel und den Hinweis auf Leben, Mana und Jungler zeigt die Kachel ni
 Fähigkeiten, Welle und Jungler. Die Skala zeigt, wer stärker ist, wenn beide voll da sind — nicht
 den Moment. Den sieht man selbst auf dem Bildschirm.
 
+## Nach der Lane-Phase: Team gegen Team (15.11.2026)
+
+Anlass: ein aufgezeichnetes Spiel des Nutzers. Als Braum-Support stand die Skala in Minute 35 auf
+„Deutlich stärker“ gegen die gegnerische Botlane — aus den Items seines ADC, lange nachdem die Lanes
+aufgelöst waren. Geprüft ist die Skala nur an Duellen zwischen 10:00 und 11:00 (Messung 27).
+
+- **Ab 14:00** (`LANE_PHASE_SECONDS` in `core/strength.ts`) zeigt die Kachel statt der Skala „Team
+  gegen Team“: Level und Itemwert beider Teams, summiert über alle fünf, die Differenz und ein
+  Balken mit beiden Anteilen. Wo es keinen Lane-Gegner gibt, steht sie von Anfang an. Die Grenze ist
+  eine Setzung (die Turmplatten fallen), keine Messung.
+- **Kein Urteil.** Die Gewichte der Skala stammen aus Duellen zwischen Lane-Gegnern; was ein Level
+  oder 1.000 Gold einem Team wert sind, ist nicht gemessen. Deshalb nur Zahlen, kein „stärker“. Ein
+  Urteil gäbe es erst nach einer eigenen Prüfung (Teamkämpfe oder Sieg nach Stand zu einem
+  Zeitpunkt).
+- **Gegnerliste:** unter jedem Champion Stufe und Itemwert; nach der Lane-Phase trägt der Gegner mit
+  dem meisten Itemwert das Etikett „meiste Items“. Die Reihenfolge bleibt die des Scoreboards.
+- **Draft-Urteil im Spiel:** Die Sätze aus dem Ladebildschirm („Ihr habt mehr Engage“, „Gegner
+  skalieren besser“) bleiben in der Spielansicht stehen. Sie stammen aus dem Draft, nicht aus dem
+  Spielstand, und ändern sich im Spiel nicht — keine Meldung, kein Auslöser. Die Zeile zur
+  Schadensart fehlt dort, weil der Hinweis „Magieresistenz lohnt sich“ sie mit Anteil und Item
+  genauer sagt.
+- Alles steht im Scoreboard des Spiels: keine Kills, kein Gold im Beutel, keine Timer.
+
 ## Daten: was der Sammler zusätzlich zählt (Phase 1d, umgesetzt 08.11.2026)
 
 Die Zeitleiste jedes Spiels liest der Sammler schon (Team-Gold je Minute, Käufe für die Builds).

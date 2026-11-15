@@ -159,3 +159,50 @@ export function strengthOf(
     value: Math.max(-STRENGTH_STEPS, Math.min(STRENGTH_STEPS, logOdds / STRENGTH_STEP)),
   };
 }
+
+// ---- after the lane phase: team against team -----------------------------------------------------
+
+/**
+ * When the tile changes from "you against your lane opponent" to "team against team". The lane
+ * scale is checked on duels between 10:00 and 11:00 only (Messung 27); at 14:00 the turret plating
+ * falls and the lanes break up — a support stood "deutlich stärker" against the enemy bot lane at
+ * minute 35 (15.11.2026), from his ADC's items. A convention, not a measured boundary.
+ */
+export const LANE_PHASE_SECONDS = 14 * 60;
+
+export interface TeamStand {
+  /** Levels and item worth of each side, summed over its players. */
+  mine: { players: number; level: number; worth: number };
+  theirs: { players: number; level: number; worth: number };
+  levelDiff: number;
+  worthDiff: number;
+  /** Every enemy as the scoreboard shows him, in the game's own order. */
+  enemies: { championId: number; level: number; worth: number }[];
+  /** The enemy with the most item worth; 0 while nobody has bought anything that counts. */
+  leaderId: number;
+}
+
+/**
+ * Both teams as the scoreboard shows them: levels and item worth, summed. It describes and carries
+ * no verdict — the lane scale's weights are measured on duels of lane opponents, and nothing says
+ * yet what a level or 1.000 gold are worth to a team. Null without the own row or without enemies.
+ */
+export function teamStandOf(data: LiveGameData, meta: MetaLookup, items: ReadonlyMap<number, ItemInfo>): TeamStand | null {
+  const me = ownRow(data);
+  if (!me || !me.team) return null;
+  const players = data.allPlayers ?? [];
+  const allies = players.filter((p) => p.team === me.team);
+  const enemies = players.filter((p) => p.team && p.team !== me.team);
+  if (enemies.length === 0) return null;
+  const levelOf = (p: LivePlayer): number => Math.max(1, (p === me ? data.activePlayer?.level : undefined) ?? p.level ?? 1);
+  const side = (team: readonly LivePlayer[]) => ({
+    players: team.length,
+    level: team.reduce((sum, p) => sum + levelOf(p), 0),
+    worth: team.reduce((sum, p) => sum + itemWorth(owned(p), items), 0),
+  });
+  const mine = side(allies);
+  const theirs = side(enemies);
+  const rows = enemies.map((p) => ({ championId: championIdOf(p, meta), level: levelOf(p), worth: itemWorth(owned(p), items) }));
+  const leader = rows.reduce<(typeof rows)[number] | null>((best, row) => (row.worth > (best?.worth ?? 0) ? row : best), null);
+  return { mine, theirs, levelDiff: mine.level - theirs.level, worthDiff: mine.worth - theirs.worth, enemies: rows, leaderId: leader?.championId ?? 0 };
+}

@@ -3,8 +3,8 @@
 import { DAMAGE_HINT_SHARE, type GameModel } from '../core/game';
 import { SITUATION_TEXT, SLOT, type Move, type RatedSuggestion, type SituationalSuggestion } from '../core/situational';
 import { DamageType } from '../core/model/metaLookup';
-import type { Strength } from '../core/strength';
-import type { ChampionRef, GameView, ItemRef, StrengthView, Tone } from '../core/view';
+import { LANE_PHASE_SECONDS, type Strength, type TeamStand } from '../core/strength';
+import type { ChampionRef, GameView, ItemRef, StrengthView, TeamStandView, Tone, VerdictLine } from '../core/view';
 import { itemName } from './assets';
 
 const item = (id: number): ItemRef => ({ id, name: itemName(id) });
@@ -60,6 +60,26 @@ export function strengthView(strength: Strength, champion: (id: number) => Champ
   };
 }
 
+/** Team gegen Team as the tile shows it: the two sums of each row, their difference and the own side's part. */
+export function teamStandView(stand: TeamStand): TeamStandView {
+  const tone = (diff: number): 'up' | 'down' | 'even' => (diff > 0 ? 'up' : diff < 0 ? 'down' : 'even');
+  const signed = (diff: number): string => (diff === 0 ? '±0' : `${diff > 0 ? '+' : '−'}${Math.abs(diff).toLocaleString('de-DE')}`);
+  const share = (mine: number, theirs: number): number => (mine + theirs > 0 ? mine / (mine + theirs) : 0.5);
+  return {
+    rows: [
+      { label: 'Level', mine: String(stand.mine.level), theirs: String(stand.theirs.level), diff: signed(stand.levelDiff), tone: tone(stand.levelDiff), share: share(stand.mine.level, stand.theirs.level) },
+      {
+        label: 'Items',
+        mine: stand.mine.worth.toLocaleString('de-DE'),
+        theirs: stand.theirs.worth.toLocaleString('de-DE'),
+        diff: signed(stand.worthDiff),
+        tone: tone(stand.worthDiff),
+        share: share(stand.mine.worth, stand.theirs.worth),
+      },
+    ],
+  };
+}
+
 /**
  * `situational`: suggestions from core/situational, or null when there is no situational data —
  * the tile is then left out rather than saying "nothing better" on no evidence.
@@ -73,6 +93,11 @@ export function gameView(
   strength: Strength | null = null,
   /** The plan's own late items brought forward for this line-up (core/situational lateOrder). */
   moves: readonly Move[] = [],
+  /**
+   * `team`: both teams' levels and items (core/strength teamStandOf). `verdict`: what the draft said
+   * about the two line-ups.
+   */
+  extra: { team?: TeamStand | null; verdict?: readonly VerdictLine[] } = {},
 ): GameView {
   const me = champion(model.championId) ?? { id: model.championId, key: '', name: `#${model.championId}` };
 
@@ -119,6 +144,11 @@ export function gameView(
     };
   });
 
+  // The lane scale holds for the lane phase; after it, and where there is no scale, the team stand.
+  const lanePhase = model.gameTime < LANE_PHASE_SECONDS;
+  const scale = strength && lanePhase ? strengthView(strength, champion) : null;
+  const team = extra.team ?? null;
+
   return {
     clock: clock(model.gameTime),
     level: model.level,
@@ -141,7 +171,10 @@ export function gameView(
     path,
     nextSkill: model.nextSkill ? { key: model.nextSkill.key, level: model.nextSkill.level, now: model.nextSkill.now } : null,
     skillPoints: model.skillPoints,
-    enemies: model.enemies.map((e) => ({
+    enemies: model.enemies.map((e, index) => ({
+      // Same players in the same order as the team stand reads them.
+      stand: team?.enemies[index]?.championId === e.championId ? { level: team.enemies[index]!.level, worth: team.enemies[index]!.worth } : null,
+      lead: !lanePhase && !!team && team.leaderId !== 0 && team.leaderId === e.championId,
       champion: champion(e.championId) ?? { id: e.championId, key: '', name: `#${e.championId}` },
       items: e.items.map(item),
       damage: DAMAGE[e.damage] ?? 'gemischt',
@@ -149,7 +182,10 @@ export function gameView(
     hints,
     draftLine,
     sample: null,
-    strength: strength ? strengthView(strength, champion) : null,
+    strength: scale,
+    team: !scale && team ? teamStandView(team) : null,
+    // The damage line is the hint above, with the share and the build's own item.
+    verdict: (extra.verdict ?? []).filter((line) => line.icon !== 'damage'),
     situational: situational
       ? [...moved, ...situational.map((s) => {
           // The base choice it is an alternative to: the planned boots, or the next core or late item
