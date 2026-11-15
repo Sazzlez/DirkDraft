@@ -5,6 +5,7 @@ import { Lane } from '../../src/core/model/lane';
 import { MetaLookup } from '../../src/core/model/metaLookup';
 import { termHint } from '../../src/core/model/recommender';
 import { clearance, LEAD_SIGMA, riotPlan, slotWeights, type BuildCount, type ChampionBuildStats, type RiotBuildFile } from '../../src/core/riotBuilds';
+import { buildFromRiot } from '../../src/data/builds';
 import { MetaBuilder } from './helpers';
 
 function ownMeta(): MetaLookup {
@@ -298,6 +299,16 @@ describe('builds from own data', () => {
     // A tie goes to the earlier place.
     const tie = riotPlan(file([stats(222, Lane.Adc, 500, { core, bootsAfter: [count([], 50, 25, '2'), count([], 50, 25, '1')] })]), 222, Lane.Adc)!;
     expect(tie.bootsAfterItems).toBe(1);
+  });
+
+  it('shows the core with its games only: who finishes three items wins more often anyway (Messung 32)', () => {
+    // 608 finished cores won 65 %, all 10.758 games of the row 51,6 % (Braum, 15.11.2026).
+    const row = stats(201, Lane.Support, 10758, { core: [count([3190, 3109, 3075], 608, 396)], starters: [count([3865], 10038, 5160)] });
+    const view = buildFromRiot(riotPlan(file([row]), 201, Lane.Support)!, { id: 201, key: 'Braum', name: 'Braum' }, null);
+    expect(view.core!.stats).toBe('608 Spiele');
+    expect(view.core!.stats).not.toContain('%');
+    // The start is counted in nearly every game: its rate is the row's, and stays.
+    expect(view.start!.stats).toBe('51 % · 10.038 Spiele');
   });
 
   it('has no plan for a champion without any games', () => {

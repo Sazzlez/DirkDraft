@@ -231,7 +231,7 @@ export interface ItemRef {
 
 export interface ItemOption {
   items: ItemRef[];
-  /** "52 % · 1.240 Spiele" or "dünne Datenlage · 31 Spiele". */
+  /** "52 % · 1.240 Spiele" or "dünne Datenlage · 31 Spiele"; the core of our own data: "608 Spiele" (data/builds.ts). */
   stats: string;
 }
 

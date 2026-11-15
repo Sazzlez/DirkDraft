@@ -1596,6 +1596,44 @@ bewegt: rund ein Zehntel Punkt, meist nicht zu unterscheiden.
 `BAN_LANE_FOCUS` und `BAN_ALLY_SHARE` gelten damit nur noch für OP.GG-Dateien; ohne bekannte eigene
 Lane (Custom ohne Positionen) rechnet auch mit eigenen Daten die alte Summe.
 
+## 32. Die Winrate am Kern: wer drei Items fertig hat, gewinnt ohnehin öfter (15.11.2026)
+
+**Anlass.** In der Prüfung aus Spielersicht standen im Build-Modell am Kern 65 %, 62 %, 60 % und
+57 % (Braum, Leona, Rakan, Morgana), bei Runen und Start derselben Champions 50 bis 52 %.
+
+**Gezählt** auf `builds.json` vom 15.11. (220.314 Spiele, 369 Champion-Lanes ab 300 Spielen): die
+Spiele, in denen ein Slot gezählt ist, gegen alle Spiele derselben Zeilen.
+
+| Slot | in so vielen Spielen gezählt | Winrate dieser Spiele | Abstand zu allen Spielen (50,1 %) |
+|---|---:|---:|---:|
+| Zauber, Start, Skill-Priorität | 99–100 % | 50,1 % | ±0,0 |
+| Support-Item | 99 % | 50,3 % | +0,2 |
+| Schuhe | 96 % | 50,5 % | +0,4 |
+| Runen | 70 % | 49,8 % | −0,3 |
+| **Kern** | 37 % | 55,1 % | **+5,1** |
+| Item 4 | 27 % | 57,5 % | +7,5 |
+| Item 5 | 9 % | 58,2 % | +8,1 |
+| Skill-Reihenfolge | 54 % | 56,5 % | +6,5 |
+
+Der meistgespielte Kern steht in 91 % der Zeilen über der Winrate seiner Zeile (Median +4,9 Punkte,
+jede zehnte Zeile +9,7 oder mehr); das meistgespielte vierte Item in 94 % (Median +7,4). Beim Start
+sind es 60 % der Zeilen, Median +0,1. Braum Support: alle Spiele 51,6 %, Start 51,4 %, Schuhe 52,2 %,
+Kern 65,1 % aus 608 Spielen.
+
+**Folgen.**
+
+- Die Winrate eines Kerns, eines späten Items oder einer Skill-Reihenfolge ist keine Aussage über
+  den Build, sondern zum größeren Teil über die Spiele, in denen man so weit kommt. Sie darf nicht
+  neben einer Winrate aus allen Spielen stehen (Runen, Start, Support-Item).
+- **Auf dem Bildschirm stand sie nie.** Die App zeigt eine Winrate nur an den Runen und im Tooltip
+  des Support-Items, beide ohne diesen Effekt. Die Zahlen aus dem Anlass standen nur im
+  Ansichtsmodell (`BuildView.core.stats`), das keine Komponente ausgibt. Damit das so bleibt, trägt
+  der Kern dort seit dem 15.11. nur noch die Zahl der Spiele („608 Spiele“, `data/builds.ts`).
+- **Die Auswahl im Plan ist nicht betroffen.** Sie vergleicht Optionen innerhalb eines Slots, also
+  unter derselben Bedingung, und für Schuhe, Kern und Items 4–6 zusätzlich im selben Spielstand
+  (Messung 16, Regel 3). Offen bleibt der dort genannte Einfluss des Zeitpunkts (billige Kerne sind
+  früher fertig).
+
 ## Was offen bleibt (2.0)
 
 - **Seit 2.1 erledigt** (Messung 13 und 21): Die drei geschätzten Gewichte (übrige Gegner 0,35,

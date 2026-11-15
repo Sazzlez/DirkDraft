@@ -1,6 +1,6 @@
 // A plan from DirkDraft's own build counts (core/riotBuilds) as the matchup, ARAM and game tiles show it.
 
-import { sampleText } from '../core/format';
+import { count, sampleText } from '../core/format';
 import { laneKey } from '../core/model/lane';
 import { SHARD_NAMES, type PlanOption, type RiotBuildPlan } from '../core/riotBuilds';
 import { extendSkills } from '../core/skillplan';
@@ -14,6 +14,15 @@ const viewLane = (lane: RiotBuildPlan['lane']): Lane | null => {
 
 const option = (o: PlanOption | undefined): ItemOption | null =>
   o ? { items: o.ids.map((id) => ({ id, name: itemName(id) })), stats: sampleText(o.winRate, o.games) } : null;
+
+/**
+ * The core carries its games only, never a win rate. A core is counted in the 37 % of games in which
+ * three items were finished, and those are won 5,1 points more often than all games of the same
+ * champion and lane (Braum: 65 % against 51,6 %) — beside the runes' rate it would read as "this
+ * build wins 65 %" (docs/modellpruefung.md, Messung 32).
+ */
+const coreOption = (o: PlanOption | undefined): ItemOption | null =>
+  o ? { items: o.ids.map((id) => ({ id, name: itemName(id) })), stats: `${count(o.games)} Spiele` } : null;
 
 /** The ARAM build (aram.json), for ARAM and — as its stand-in — Mayhem. */
 export function aramBuild(plan: RiotBuildPlan, champion: ChampionRef, mayhem: boolean): BuildView {
@@ -53,7 +62,7 @@ export function buildFromRiot(plan: RiotBuildPlan, champion: ChampionRef, oppone
     spells: plan.spells?.ids ?? [],
     start: option(plan.starters[0]),
     boots: option(plan.boots[0]),
-    core: option(plan.core[0]),
+    core: coreOption(plan.core[0]),
     support: option(plan.supportOptions[0] ?? plan.supportChoice ?? undefined),
     skills: extendSkills(plan.skillOrder.split('')).map((s) => ({ level: s.level, key: s.ability, derived: s.isDerived })),
     skillPriority: plan.skillMax.split('').join(' > '),
