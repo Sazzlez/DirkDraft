@@ -62,3 +62,4 @@ in `build/golden-rebase.txt` — die Grundlage für die Begründung.
 | `teamPlan` (neues Feld) | Team-Modus (D1), standardmäßig aus; in den Referenzen immer null. Kein Wert ändert sich. |
 | Chip „bedroht euren Teamfight-/Poke-Plan“ in den Banns (neutral); neue Felder `banLane`, `teamBans` | Disengage gegen einen Teamfight-Plan, hartes Engage gegen einen Poke-Plan der eigenen Seite. Nur Text: 36 Bann-Begründungslisten in last-pick-support, live-draft und live-tournament-draft (dort Poke-Plan); kein Bann-Wert ändert sich. `teamBans` ist ohne Team-Modus null. |
 | `chosenPlan` (neues Feld) | Plan vor dem Draft (D4), nur auf Klick; in den Referenzen immer null. Kein Wert ändert sich. |
+| `hover.gapWith`, `hover.compBehind` (neue Felder, 15.11.2026) | Was dem Team mit dem gehoverten Champion weiter fehlt, und wie weit sein Comp-Term hinter dem besten der Liste liegt. Nur Anzeige an der Hover-Zeile („Frontline bleibt offen · −1,2 Punkte“), kein Score ändert sich. |

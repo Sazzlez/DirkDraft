@@ -84,11 +84,6 @@ export interface SlotView {
   warning: string | null;
 }
 
-export interface PhaseStep {
-  label: string;
-  state: 'done' | 'now' | 'next';
-}
-
 export interface BoardView {
   allies: SlotView[];
   enemies: SlotView[];
@@ -99,7 +94,6 @@ export interface BoardView {
   /** "Du pickst", "Teammate 3 pickt", "Gegner bannen", "Finalisierung". */
   turnText: string;
   myTurn: boolean;
-  steps: PhaseStep[];
   /** "Ranked Solo/Duo", "ARAM Mayhem*" … */
   mode: string;
   modeNote: string | null;
@@ -152,6 +146,7 @@ export interface PickTileView {
   hover: HoverView | null;
   /** One line above the list about the pick position (B1). */
   note: PickNote | null;
+  /** Bans: what the ban value means. Picks have none. */
   footnote: string | null;
 }
 
@@ -161,10 +156,12 @@ export type PickNote = { kind: 'gap'; line: GapLine };
 export interface HoverView {
   champion: ChampionRef;
   value: string | null;
-  /** "Platz 9 von 58 · knapp dahinter" */
+  /** "geht · 1,5 Punkte hinter Garen": the distance to the list's best pick, in three steps. */
   place: string;
   tone: Tone;
+  /** "Frontline bleibt offen · −1,2 Punkte": a gap of the team the hovered pick does not close. */
   note: string | null;
+  noteHint: string | null;
 }
 
 export interface OpenRolesView {
@@ -184,13 +181,6 @@ export interface DraftChanceView {
   withPick?: { name: string; text: string };
 }
 
-export interface CompRow {
-  label: string;
-  ally: number;
-  enemy: number;
-  max: number;
-}
-
 /** "Eurem Team fehlt noch: Frontline, AP-Schaden und Engage", with the names kept apart (no break inside one). */
 export interface GapLine {
   /** "Eurem Team fehlt noch", "Dem Gegnerteam fehlt", "Eurem Team fehlt nichts". */
@@ -203,7 +193,6 @@ export interface GapLine {
 export interface CompView {
   /** The own team's gaps for the seat about to pick. */
   gap: GapLine | null;
-  rows: CompRow[];
   allyDamage: { physical: number; magic: number } | null;
   enemyDamage: { physical: number; magic: number } | null;
   /** The enemy's gaps; null while they lack nothing the rules see. */

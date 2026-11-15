@@ -39,7 +39,6 @@ import {
   type MatchupView,
   type Moment,
   type OpenRolesView,
-  type PhaseStep,
   type PickTileView,
   type RecommendationView,
   type SlotView,
@@ -152,7 +151,17 @@ export interface GoldenFrame {
   };
   picks: GoldenSet | null;
   bans: GoldenSet | null;
-  hover: { championId: number; rank: number; candidates: number; lane: string; leader: GoldenItem | null; item: GoldenItem; decimals: number } | null;
+  hover: {
+    championId: number;
+    rank: number;
+    candidates: number;
+    lane: string;
+    leader: GoldenItem | null;
+    item: GoldenItem;
+    decimals: number;
+    gapWith?: { issue: string; text: string; severity: number }[];
+    compBehind?: number;
+  } | null;
   comp: { allies: GoldenProfile; enemies: GoldenProfile };
   balance: {
     allyWinRate: number;
@@ -326,8 +335,6 @@ export class GoldenAdapter {
         .map((intent) => ({ champion: this.champion(intent.championId)!, by: label(intent.cellId) })),
       turnText,
       myTurn: !planning && !!turn?.isLocalPlayer,
-      // ARAM has no bans and no pick order to walk through — only the timer.
-      steps: s.usesLanes ? steps(frame) : [],
       // Every queue by its name; an unknown one says nothing rather than "Ranked Solo/Duo".
       mode: queueDisplay(s.queue as QueueKind),
       modeNote: MODE_NOTES[s.queue as QueueKind] ?? null,
@@ -394,9 +401,8 @@ export class GoldenAdapter {
       items: rows(set).map((row) => (row.champion.id === safest ? { ...row, badge: 'sicherer Blind Pick' } : row)),
       hover: isBan ? null : this.hover(frame),
       note: hint ? this.pickNote(hint, frame) : null,
-      footnote: isBan
-        ? 'Bann-Wert: so viel Winrate nimmt der Bann dem Gegner, mal der Chance, dass er den Champion überhaupt pickt.'
-        : 'Balken: Beitrag jedes Kriteriums in Prozentpunkten über 50 %. Rot zieht ab.',
+      // Picks: what the bars mean stands in the bar's tooltip (ContributionBar).
+      footnote: isBan ? 'Bann-Wert: so viel Winrate nimmt der Bann dem Gegner, mal der Chance, dass er den Champion überhaupt pickt.' : null,
     };
   }
 
@@ -525,13 +531,38 @@ export class GoldenAdapter {
     const champion = this.champion(h.championId)!;
     const leader = h.leader ?? h.item;
     const s = standing(leader.score, leader.uncertainty, h.item.score, h.item.uncertainty);
-    const verdict = h.rank === 1 ? 'bester Pick' : s === 'tied' ? 'gleichauf mit Platz 1' : s === 'ahead' ? 'knapp dahinter' : 'deutlich dahinter';
+    // The distance to the list's best pick in points, in three steps — not the rank: place 28 of 59
+    // read like a bad pick and stood two points behind place 1 (the user's Xerath, 14.11.2026).
+    const best = this.champion(leader.championId)?.name ?? 'Platz 1';
+    const behind = `${((leader.score - h.item.score) * 100).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} Punkte hinter ${best}`;
+    const place =
+      h.rank <= 0
+        ? 'nicht in der Liste für diese Lane'
+        : h.rank === 1
+          ? 'bester Pick der Liste'
+          : s === 'tied'
+            ? `passt · gleichauf mit ${best}`
+            : s === 'ahead'
+              ? `geht · ${behind}`
+              : `klar schlechter · ${behind}`;
+    // What the team lacked before the pick and still lacks with it: said at the hover, with what the
+    // pick gives away on the comp against the list's best there.
+    const before = frame.gap && frame.gap.cellId === frame.state.localCellId ? gapsOf(frame.gap.findings) : [];
+    const left = gapsOf(h.gapWith ?? []).filter((f) => before.some((b) => b.issue === f.issue));
+    const names = gapItems(left);
+    const lost = (h.compBehind ?? 0) * 25;
+    const cost = lost >= 0.05 ? points(-lost) : null;
     return {
       champion,
       value: h.item.uncertainty > 0 ? percent(h.item.score, h.decimals) : null,
-      place: h.rank > 0 ? `Platz ${h.rank} von ${h.candidates} · ${verdict}` : 'nicht in der Liste für diese Lane',
-      tone: h.rank === 1 || s === 'tied' ? 'good' : 'neutral',
-      note: null,
+      place,
+      tone: h.rank <= 0 ? 'neutral' : h.rank === 1 || s === 'tied' ? 'good' : s === 'ahead' ? 'neutral' : 'warn',
+      note: names.length > 0 ? `${joinGerman(names)} ${names.length === 1 ? 'bleibt' : 'bleiben'} offen${cost ? ` · ${cost} Punkte` : ''}` : null,
+      noteHint:
+        names.length > 0
+          ? `Mit ${champion.name} fehlt eurem Team weiter ${joinGerman(names)}.` +
+            (cost ? ` Beim Team-Bedarf liegt der Pick ${points(lost).replace('+', '')} Punkte hinter dem besten dieser Liste.` : '')
+          : null,
     };
   }
 
@@ -583,13 +614,6 @@ export class GoldenAdapter {
     const damage = (p: GoldenProfile) => (p.count === 0 ? null : { physical: p.physicalShare, magic: p.magicShare });
     return {
       gap: this.gapLine(frame),
-      rows: [
-        { label: 'Engage', ally: a.maxEngage, enemy: e.maxEngage, max: 3 },
-        { label: 'Frontline', ally: a.frontlineCount, enemy: e.frontlineCount, max: 5 },
-        { label: 'Peel', ally: a.maxPeel, enemy: e.maxPeel, max: 3 },
-        { label: 'Spätes Spiel', ally: a.lateScalingCount, enemy: e.lateScalingCount, max: 5 },
-        { label: 'Waveclear', ally: a.strongWaveclearCount ?? 0, enemy: e.strongWaveclearCount ?? 0, max: 5 },
-      ],
       allyDamage: damage(a),
       enemyDamage: damage(e),
       enemyGap: gapsOf(e.findings).length > 0 ? { lead: 'Dem Gegnerteam fehlt', items: gapItems(gapsOf(e.findings)), tone: 'good' } : null,
@@ -650,22 +674,6 @@ export class GoldenAdapter {
       note: 'Die ARAM-Winrate kommt auf ganze Prozent gerundet; die Rundung steckt im Fehlerbalken.',
     };
   }
-}
-
-/**
- * The phase timeline of a stored frame, which has no action groups to read: the ranked order (one
- * round of bans, then the picks). A live session reads the real order instead (core/steps.ts).
- */
-function steps(frame: GoldenFrame): PhaseStep[] {
-  const s = frame.state;
-  const locks = [...s.allies, ...s.enemies].filter((slot) => slot.lockedChampionId).length;
-  const labels = ['Banns', 'Picks', 'Finalisierung'];
-  let now: number;
-  if (s.phase === 'planning') now = -1;
-  else if (s.phase === 'finalization') now = 2;
-  else if (locks === 0 && s.turn?.action !== 'pick') now = 0;
-  else now = 1;
-  return labels.map((label, i) => ({ label, state: i < now ? 'done' : i === now ? 'now' : 'next' }));
 }
 
 /**

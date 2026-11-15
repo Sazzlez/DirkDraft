@@ -16,7 +16,6 @@ import { gameView, strengthView } from './gameView';
 import { SITUATION, SLOT, applySwaps, type RatedSuggestion, type Swap } from '../core/situational';
 import { assets } from './assets';
 import { GoldenAdapter, buildFromPlan, type GoldenFrame, type GoldenPlan } from './golden';
-import { draftSteps } from '../core/steps';
 import { LiveSession } from '../live/session';
 
 export interface Scene {
@@ -33,6 +32,7 @@ export const SCENES: Scene[] = [
   { id: 'picking', title: 'Dein Pick', moment: 'picking' },
   { id: 'blind', title: 'Blind Pick mit offenen Countern', moment: 'picking' },
   { id: 'lastpick', title: 'Letzter Pick', moment: 'picking' },
+  { id: 'hovergap', title: 'Hover lässt Lücke offen', moment: 'picking' },
   { id: 'teammate', title: 'Teammate am Zug', moment: 'teammate' },
   { id: 'mate', title: 'Teammate gelockt', moment: 'teammate' },
   { id: 'team', title: 'Team-Modus · 5er', moment: 'picking' },
@@ -65,7 +65,7 @@ interface Sources {
 
 let sources: Promise<Sources> | null = null;
 
-/** The recorded session behind a played frame: the step line reads the draft's real order from it. */
+/** The recorded session behind a played frame, for the scenes that run it through a live session. */
 const sessionOf = new WeakMap<object, unknown>();
 
 async function json<T>(path: string): Promise<T> {
@@ -125,6 +125,10 @@ function load(): Promise<Sources> {
     const last = await json<{ input: { hover: number }; frame: DraftFrame }>('/tests/golden/drafts/last-pick-top.json');
     const lastState = stateFromFrame(last.frame.state);
     drafts.set('last-pick-top', { frame: engine.evaluate(lastState, engine.resolveTarget(lastState), last.input.hover) });
+    // The same draft with Lulu in Nautilus' place — a team without a tank — and Fiora hovered: the
+    // hover row names the gap the pick leaves open.
+    const noTank = stateFromFrame({ ...last.frame.state, allies: last.frame.state.allies.map((slot) => (slot.lockedChampionId === 111 ? { ...slot, lockedChampionId: 117 } : slot)) });
+    drafts.set('hover-gap', { frame: engine.evaluate(noTank, engine.resolveTarget(noTank), 114) });
     const plans = await json<{ matchupGuide: GoldenPlan; laneBuild: GoldenPlan }>('/tests/golden/builds/plans.json');
     return { adapter: new GoldenAdapter(snapshot.champions), plans, recordings, drafts, meta: new MetaLookup(snapshot) };
   })();
@@ -210,6 +214,10 @@ export async function sceneView(id: string): Promise<ViewModel> {
     }
     case 'lastpick': {
       const frame = s.drafts.get('last-pick-top')!.frame;
+      return draftScene(a, frame, 'picking', s.plans, 'Picks für dich');
+    }
+    case 'hovergap': {
+      const frame = s.drafts.get('hover-gap')!.frame;
       return draftScene(a, frame, 'picking', s.plans, 'Picks für dich');
     }
     case 'teammate': {
@@ -315,7 +323,6 @@ function draftScene(
   title: string,
 ): ViewModel {
   const board = a.board(frame);
-  if (sessionOf.has(frame) && board.usesLanes) board.steps = draftSteps(sessionOf.get(frame));
   const me = board.allies.find((slot) => slot.isMe)!;
   const myChampion = me.champion;
   const side: ViewModel['side'] = [];

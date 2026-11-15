@@ -130,7 +130,19 @@ export interface DraftFrame {
   predictions: { enemies: FramePrediction[]; allies: FramePrediction[] };
   picks: FrameSet | null;
   bans: FrameSet | null;
-  hover: { championId: number; rank: number; candidates: number; lane: LaneName; leader: FrameItem | null; item: FrameItem; decimals: number } | null;
+  hover: {
+    championId: number;
+    rank: number;
+    candidates: number;
+    lane: LaneName;
+    leader: FrameItem | null;
+    item: FrameItem;
+    decimals: number;
+    /** 2.2: what the own team still lacks with the hovered champion in the seat — `gap` is the team without it. */
+    gapWith?: FrameProfile['findings'];
+    /** 2.2: how far the hover's comp term stands behind the list's best, in log-odds; 0 for the best. */
+    compBehind?: number;
+  } | null;
   comp: { allies: FrameProfile; enemies: FrameProfile };
   balance: {
     allyWinRate: number;
@@ -355,6 +367,14 @@ export class DraftEngine {
     if (state.isActive && hover !== 0 && mine && usesLanes(state.queue)) {
       const evaluation = recommender.evaluate(state, { slot: mine, action: 'pick', isFollowingTurn: false }, hover, enemyPredictions, allyPredictions, this.selectable);
       if (evaluation) {
+        const compOf = (item: Recommendation): number => item.breakdown.find((term) => term.kind === 'composition')?.logOdds ?? 0;
+        const bestComp = evaluation.ranking.reduce((best, item) => Math.max(best, compOf(item)), compOf(evaluation.item));
+        const others = allyPredictions.predictions.filter((p) => p.championId !== 0 && p.cellId !== mine.cellId).map((p) => ({ championId: p.championId, lane: p.lane }));
+        const withHover = gapOf(
+          mine.cellId,
+          comp.analyze([...state.allies.filter((slot) => slot !== mine).map(effectiveChampionId), hover]),
+          open?.odds([...others, { championId: hover, lane: evaluation.lane }]) ?? null,
+        );
         hoverResult = {
           championId: hover,
           rank: evaluation.rank,
@@ -363,6 +383,8 @@ export class DraftEngine {
           leader: evaluation.ranking.length > 0 ? frameItem(evaluation.ranking[0]!) : null,
           item: frameItem(evaluation.item),
           decimals: decimalsOf(evaluation.ranking.slice(0, LIST_LIMIT)),
+          gapWith: withHover.findings,
+          compBehind: Math.max(0, bestComp - compOf(evaluation.item)),
         };
       }
     }

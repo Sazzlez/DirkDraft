@@ -115,3 +115,33 @@ describe('comp gap', () => {
     expect(adapter.comp(frame).gap).toBeNull();
   });
 });
+
+describe('the hover row', () => {
+  const hovering = (champion: number) =>
+    frameOf(new SessionBuilder().queue(420).localPlayer(0).locked(1, LeeSin).locked(2, Ahri).locked(3, Jinx).hovering(0, champion).onClock(0, 'pick').build());
+
+  it('says how far the hover stands behind the best pick, in points and three steps — never a rank', () => {
+    for (const champion of [Malphite, Zed, Leona]) {
+      const hover = adapter.hover(hovering(champion))!;
+      expect(hover.place).toMatch(/^(bester Pick der Liste|passt · gleichauf mit .+|(geht|klar schlechter) · \d+,\d Punkte hinter .+|nicht in der Liste für diese Lane)$/);
+      expect(hover.place).not.toMatch(/Platz \d/);
+    }
+  });
+
+  it('names the gap the hovered pick leaves open, and is silent about one it closes', () => {
+    // Lee Sin, Ahri and Jinx have no tank. Malphite is one; Zed is not.
+    const tank = hovering(Malphite);
+    expect(tank.gap!.findings.map((f) => f.issue)).toContain('noFrontline');
+    expect(tank.hover!.gapWith!.map((f) => f.issue)).not.toContain('noFrontline');
+    expect(adapter.hover(tank)!.note ?? '').not.toContain('Frontline');
+
+    const assassin = hovering(Zed);
+    expect(assassin.hover!.gapWith!.map((f) => f.issue)).toContain('noFrontline');
+    const hover = adapter.hover(assassin)!;
+    expect(hover.note).toMatch(/Frontline.* (bleibt|bleiben) offen/);
+    expect(hover.noteHint).toMatch(/^Mit Zed fehlt eurem Team weiter .*Frontline/);
+    // What the pick gives away on the comp against the list's best there, never negative.
+    expect(assassin.hover!.compBehind).toBeGreaterThanOrEqual(0);
+    expect(tank.hover!.compBehind).toBeLessThanOrEqual(assassin.hover!.compBehind!);
+  });
+});

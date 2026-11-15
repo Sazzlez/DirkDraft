@@ -17,21 +17,6 @@
     </p>
   {/if}
 
-  <div class="grid">
-    <span class="h"></span>
-    <span class="h">Ihr</span>
-    <span class="h">Gegner</span>
-    {#each comp.rows as row (row.label)}
-      <span>{row.label}</span>
-      <span class="dots ally" aria-label="{row.ally} von {row.max}">
-        {#each Array(row.max) as _, i (i)}<i class:f={i < row.ally}></i>{/each}
-      </span>
-      <span class="dots enemy" aria-label="{row.enemy} von {row.max}">
-        {#each Array(row.max) as _, i (i)}<i class:f={i < row.enemy}></i>{/each}
-      </span>
-    {/each}
-  </div>
-
   <div class="dmg">
     {#each [{ label: 'Ihr', d: comp.allyDamage }, { label: 'Gegner', d: comp.enemyDamage }] as side (side.label)}
       <span>{side.label}</span>
@@ -54,46 +39,6 @@
 </Tile>
 
 <style>
-  .grid {
-    display: grid;
-    grid-template-columns: max-content auto auto;
-    justify-content: space-between;
-    /* Two side tiles share the wide side column (about 180 px inside each): label and two rows of
-       five dots have to fit there without running over the tile's edge. */
-    gap: 8px 8px;
-    align-items: center;
-    font-size: 12px;
-  }
-
-  .grid > span:nth-child(3n + 1) {
-    white-space: nowrap;
-  }
-
-  .h {
-    font: var(--t-caption);
-    color: var(--fg3);
-  }
-
-  .dots {
-    display: flex;
-    gap: 2px;
-  }
-
-  .dots i {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--track);
-  }
-
-  .ally i.f {
-    background: var(--blue);
-  }
-
-  .enemy i.f {
-    background: var(--red);
-  }
-
   .dmg {
     display: grid;
     grid-template-columns: 48px minmax(0, 1fr);
@@ -141,7 +86,7 @@
     color: var(--fg3);
   }
 
-  /* The line the next pick answers: above the dots, larger than the enemy's line below. */
+  /* The line the next pick answers: on top, larger than the enemy's line below. */
   .gap {
     margin: 0 0 12px;
     padding-bottom: 10px;

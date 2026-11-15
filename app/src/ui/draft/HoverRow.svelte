@@ -10,7 +10,8 @@
   <span class="text">
     <span class="kicker">Dein Hover</span>
     <span class="name">{hover.champion.name}</span>
-    <span class="place">{hover.place}</span>
+    <span class="place tone-{hover.tone}">{hover.place}</span>
+    {#if hover.note}<span class="gap" title={hover.noteHint ?? undefined}>{hover.note}</span>{/if}
   </span>
   <b class="num">{hover.value ?? 'keine Daten'}</b>
 </div>
@@ -52,6 +53,21 @@
   .place {
     font-size: 12px;
     color: var(--fg2);
+  }
+
+  .place.tone-good {
+    color: var(--green-text);
+  }
+
+  .place.tone-warn {
+    color: var(--orange-text);
+  }
+
+  /* A gap of the team the hovered pick leaves open. */
+  .gap {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--orange-text);
   }
 
   b {

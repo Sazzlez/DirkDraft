@@ -16,7 +16,7 @@
   const negative = $derived(parts.filter((p) => p.value < 0).reduce((sum, p) => sum + Math.abs(p.value), 0));
 </script>
 
-<span class="bar" aria-hidden="true">
+<span class="bar" title="Beitrag jedes Kriteriums in Prozentpunkten über 50 %: Lane, Matchup, Synergie, Team-Bedarf. Rot zieht ab.">
   {#each positive as part, i (i)}
     <i class={part.kind} style:width="{Math.min(100, (part.value / SCALE) * 100)}%"></i>
   {/each}

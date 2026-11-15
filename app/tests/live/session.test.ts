@@ -102,7 +102,7 @@ describe('LiveSession', () => {
     expect(live.view().moment).toBe('game');
   });
 
-  it('reads the step line from the draft order: blind pick has no ban steps', () => {
+  it('the loading screen looks back on a finished draft, and says what it is', () => {
     const live = new LiveSession();
     live.setData(data);
     live.onStatus(connected);
@@ -110,14 +110,9 @@ describe('LiveSession', () => {
     const last = sessions('live-tournament-draft').filter((r) => r.session).at(-1)!.session!;
     const pick = { id: 1, actorCellId: 0, championId: 0, type: 'pick', completed: false, isAllyAction: true, isInProgress: true };
     live.onSession({ ...last, timer: { phase: 'BAN_PICK' }, actions: [[pick]] });
-    expect(live.view().board?.steps.map((s) => s.label)).toEqual(['Picks', 'Finalisierung']);
-    const ban = { ...pick, id: 2, type: 'ban' };
-    live.onSession({ ...last, timer: { phase: 'BAN_PICK' }, actions: [[ban], [pick]] });
-    expect(live.view().board?.steps.map((s) => `${s.label}:${s.state}`)).toEqual(['Banns:now', 'Picks:next', 'Finalisierung:next']);
-    // The loading screen looks back on a finished draft, and says what it is.
+    expect(live.view().board?.turnText).not.toBe('Ladebildschirm');
     live.onSession(null);
     live.onPhase('GameStart');
-    expect(live.view().board?.steps.every((s) => s.state === 'done')).toBe(true);
     expect(live.view().board?.turnText).toBe('Ladebildschirm');
   });
 

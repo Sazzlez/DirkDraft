@@ -19,15 +19,6 @@
 </script>
 
 <Tile title={tile.title} main>
-  {#if !isBan}
-    <div class="legend">
-      <span><i class="lane"></i>Lane</span>
-      <span><i class="matchup"></i>Matchup</span>
-      <span><i class="synergy"></i>Synergie</span>
-      <span><i class="comp"></i>Team-Bedarf</span>
-    </div>
-  {/if}
-
   {#if tile.note?.kind === 'gap'}
     <p class="note gap tone-{tile.note.line.tone}"><GapSentence line={tile.note.line} /></p>
   {/if}
@@ -67,34 +58,11 @@
   </div>
 
   {#if tile.footnote}
-    <p class="foot" class:bars={!isBan}>{tile.footnote}</p>
+    <p class="foot">{tile.footnote}</p>
   {/if}
 </Tile>
 
 <style>
-  .legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 14px;
-    margin: -4px 0 12px;
-    font: var(--t-caption);
-    color: var(--fg2);
-  }
-
-  .legend i {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-right: 6px;
-    vertical-align: 0;
-  }
-
-  .lane { background: var(--series-lane); }
-  .matchup { background: var(--series-matchup); }
-  .synergy { background: var(--series-synergy); }
-  .comp { background: var(--series-need); }
-
   /* The pick position (B1): one line above the list, before the hover. */
   .note {
     margin: 0 0 12px;
@@ -143,12 +111,5 @@
     font: var(--t-caption);
     font-weight: 400;
     color: var(--fg3);
-  }
-
-  @container main (max-width: 469px) {
-    .legend,
-    .foot.bars {
-      display: none;
-    }
   }
 </style>

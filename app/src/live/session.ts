@@ -24,7 +24,7 @@ import { draftStateFrom } from '../core/model/draftState';
 import { patchesBetween, patchLine } from '../core/model/patchVersion';
 import type { Plan } from '../core/model/compAnalyzer';
 import { TankShred } from '../core/model/tankShred';
-import { draftSteps, simultaneousTurn } from '../core/steps';
+import { simultaneousTurn } from '../core/turn';
 
 export interface ClientStatus {
   leagueFound: boolean;
@@ -68,8 +68,6 @@ export class LiveSession {
   private frame: GoldenFrame | null = null;
   /** The last frame of a running draft: the loading screen still shows the matchup. */
   private lastActive: GoldenFrame | null = null;
-  /** The session behind lastActive: the step line reads the draft's order from it. */
-  private lastSession: Record<string, unknown> | null = null;
   /** The patch the client runs ("16.23.1"), for the data's lag; null until the client said. */
   private clientPatch: string | null = null;
   /** This app's version and a newer one on GitHub, for the lobby (live/update). */
@@ -142,10 +140,7 @@ export class LiveSession {
       this.swaps.reset();
     }
     // Back in the lobby or the queue: the last draft is over for good.
-    if (phase === 'Lobby' || phase === 'Matchmaking' || phase === 'None') {
-      this.lastActive = null;
-      this.lastSession = null;
-    }
+    if (phase === 'Lobby' || phase === 'Matchmaking' || phase === 'None') this.lastActive = null;
     this.phase = phase;
   }
 
@@ -159,7 +154,6 @@ export class LiveSession {
     this.frame = frame as unknown as GoldenFrame;
     if (parsed && frame.state.isActive) {
       this.lastActive = this.frame;
-      this.lastSession = parsed;
       this.rememberPick();
     }
   }
@@ -240,8 +234,6 @@ export class LiveSession {
     }
 
     const board = this.adapter.board(frame);
-    // The draft's own order (tournament, ranked/draft, blind); after the session, every step is done.
-    board.steps = frame.state.usesLanes ? draftSteps(active ? this.session : this.lastSession, !active) : [];
     if (active && frame.state.phase !== 'planning') board.turnText = simultaneousTurn(this.session) ?? board.turnText;
     // Seats can be chosen only while the draft runs; the loading screen is a look back.
     if (!active) {

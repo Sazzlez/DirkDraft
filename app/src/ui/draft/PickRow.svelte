@@ -53,7 +53,6 @@
           {/each}
         </p>
       {/if}
-      <p class="err num">Streubereich ±{item.errorPoints.toLocaleString('de-DE', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} Punkte{ban ? '' : ' — darunter bedeuten Unterschiede nichts.'}</p>
     </div>
   {/if}
 </div>
