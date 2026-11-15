@@ -79,16 +79,27 @@ export const hasIssue = (p: CompProfile, issue: CompIssue): boolean => p.finding
 export const severityOf = (p: CompProfile, issue: CompIssue): number =>
   p.findings.find((f) => f.issue === issue)?.severity ?? 0;
 
-const DAMAGE_IMBALANCE = 0.2;
+export const DAMAGE_IMBALANCE = 0.2;
 const FRONTLINE_DEFENSE = 6;
 const HARD_ENGAGE = 2;
-const STRONG_WAVECLEAR = 2;
+export const STRONG_WAVECLEAR = 2;
 /** A plan needs this much weight in total and this much lead over the next one. */
 const PLAN_MINIMUM = 3;
 const PLAN_LEAD = 1;
 const MINIMUM_ENEMIES_TO_JUDGE = 2;
 const MINIMUM_FOR_DAMAGE_RULES = 3;
 const MINIMUM_FOR_ROLE_RULES = 3;
+
+/**
+ * What the recommender knows on our own data beyond the two profiles (15.11.2026): the names for
+ * the peel chip, and whether AP or AD is missing once the open seats are filled with what their
+ * lanes usually bring (openSeats.ts) — before the pick and with it.
+ */
+export interface OwnContext {
+  peel: { engager: string | null; carry: string | null };
+  lacksMagic: readonly [before: boolean, after: boolean];
+  lacksPhysical: readonly [before: boolean, after: boolean];
+}
 
 export class CompAnalyzer {
   constructor(
@@ -98,6 +109,18 @@ export class CompAnalyzer {
     /** D4: the plan the team chose for this draft; null leaves it to the detection (B3). */
     private readonly chosenPlan: Plan | null = null,
   ) {}
+
+  /**
+   * Who can stand in front. On our own data the Tank tag alone (15.11.2026): the 1.5 rule also takes
+   * a defence rating of 6 and up, which reads Xayah, Morgana, Zoe and Karma as frontline — in a
+   * recorded draft of the user's, Morgana closed "kein Frontline". With the tag alone the finding
+   * tells the sides apart in twice as many games and stands clearer (docs/modellpruefung.md,
+   * Messung 29). OP.GG files keep the 1.5 rule, which the golden tests hold.
+   */
+  isFrontline(champion: ChampionEntry): boolean {
+    if (!hasStaticData(champion)) return false;
+    return isTagged(champion, 'Tank') || (!this.meta.isOwnData && champion.defense >= FRONTLINE_DEFENSE);
+  }
 
   analyze(championIds: readonly number[]): CompProfile {
     const ids = [...new Set(championIds.filter((id) => id !== 0))];
@@ -155,7 +178,7 @@ export class CompAnalyzer {
 
       if (champion && hasStaticData(champion)) {
         staticKnown++;
-        if (isTagged(champion, 'Tank') || champion.defense >= FRONTLINE_DEFENSE) frontline++;
+        if (this.isFrontline(champion)) frontline++;
         if (isRanged(champion)) ranged++;
       }
 
@@ -197,14 +220,29 @@ export class CompAnalyzer {
   /** How much the candidate covers the gaps, -1..+1; null where no rule could fire either way. */
   /** `lane`: the seat's lane, for what the candidate builds there (B4); Unknown reads any lane. */
   /**
-   * `measured` (own data, since 13.11.2026): the findings with a measured cost — missing AP or AD,
-   * no frontline, no engage, little waveclear, and "even more AD/AP", which is the same gap from the
-   * other side — are counted by the draft model with their measured weight (draftModel compValue),
-   * so here they only give their reason and add nothing. Timing and tank shred showed no effect in
-   * 145.741 games (docs/modellpruefung.md, Messung 13): they become hints without a weight. What is
-   * left in the score are the rules too rare or too specific to measure yet.
+   * `measured` (own data, since 13.11.2026): what has a measured weight — missing AP or AD, no engage,
+   * little waveclear, "even more AD/AP" (the same gap from the other side) and, since 15.11.2026,
+   * assassins against a line-up without a frontline or with two frontliners and tank shred — is
+   * counted by the draft model (draftModel lineUpEdge), so here it only gives its reason and adds
+   * nothing. Timing and peel against hard engage showed no effect (docs/modellpruefung.md, Messung 13
+   * and 29): they are hints without a weight. What is left in the score are the rules too rare or
+   * too specific to measure yet.
    */
-  fit(candidateId: number, profile: CompProfile, enemies: CompProfile, reasons: Reason[], lane: Lane = Lane.Unknown, measured = false): number | null {
+  /**
+   * `own` (own data, 15.11.2026): the names for the chip against their engage — "Peel für Xayah gegen
+   * Malphite" instead of "Disengage" (user's wish: the reason with the champions it is about) — and
+   * the damage mix with the open seats filled, so that "noch mehr AP-Schaden" is said only where AD
+   * would still be missing after the picks to come.
+   */
+  fit(
+    candidateId: number,
+    profile: CompProfile,
+    enemies: CompProfile,
+    reasons: Reason[],
+    lane: Lane = Lane.Unknown,
+    measured = false,
+    own: OwnContext | null = null,
+  ): number | null {
     const champion = this.meta.champion(candidateId);
     // Nothing to judge yet — unless the team chose a plan before the draft (D4).
     if (!champion || (profile.count === 0 && enemies.count < MINIMUM_ENEMIES_TO_JUDGE && !this.chosenPlan)) return null;
@@ -216,7 +254,7 @@ export class CompAnalyzer {
     const isPhysicalish = champion.damage === DamageType.Physical || champion.damage === DamageType.Mixed;
     let score = 0;
 
-    if (hasIssue(profile, 'noMagicDamage') && isMagicish) {
+    if (own ? own.lacksMagic[0] && !own.lacksMagic[1] : hasIssue(profile, 'noMagicDamage') && isMagicish) {
       if (!measured) score += 0.5 * severityOf(profile, 'noMagicDamage');
       reasons.push(
         pro(
@@ -226,7 +264,7 @@ export class CompAnalyzer {
       );
     }
 
-    if (hasIssue(profile, 'noPhysicalDamage') && isPhysicalish) {
+    if (own ? own.lacksPhysical[0] && !own.lacksPhysical[1] : hasIssue(profile, 'noPhysicalDamage') && isPhysicalish) {
       if (!measured) score += 0.5 * severityOf(profile, 'noPhysicalDamage');
       reasons.push(
         pro(
@@ -237,7 +275,7 @@ export class CompAnalyzer {
     }
 
     if (hasStaticData(champion)) {
-      if (hasIssue(profile, 'noFrontline') && (isTagged(champion, 'Tank') || champion.defense >= FRONTLINE_DEFENSE)) {
+      if (hasIssue(profile, 'noFrontline') && this.isFrontline(champion)) {
         if (!measured) score += 0.4;
         reasons.push(
           pro(
@@ -314,7 +352,7 @@ export class CompAnalyzer {
       }
     }
 
-    if (profile.physicalShare >= 0.75 && champion.damage === DamageType.Physical) {
+    if (own ? own.lacksMagic[1] && champion.damage === DamageType.Physical : profile.physicalShare >= 0.75 && champion.damage === DamageType.Physical) {
       if (!measured) score -= 0.2;
       reasons.push(
         contra(
@@ -324,7 +362,7 @@ export class CompAnalyzer {
       );
     }
 
-    if (profile.magicShare >= 0.75 && champion.damage === DamageType.Magic) {
+    if (own ? own.lacksPhysical[1] && champion.damage === DamageType.Magic : profile.magicShare >= 0.75 && champion.damage === DamageType.Magic) {
       if (!measured) score -= 0.2;
       reasons.push(
         contra(
@@ -360,7 +398,7 @@ export class CompAnalyzer {
     // What the pick does about THEIR line-up; shares the term's cap.
     if (hasStaticData(champion)) {
       if (hasIssue(enemies, 'noFrontline') && isTagged(champion, 'Assassin')) {
-        score += 0.3;
+        if (!measured) score += 0.3;
         reasons.push(
           pro(
             'ihre Backline steht frei',
@@ -370,7 +408,7 @@ export class CompAnalyzer {
       }
 
       if (enemies.frontlineCount >= 2 && isTagged(champion, 'Assassin')) {
-        score -= 0.2;
+        if (!measured) score -= 0.2;
         reasons.push(
           contra(
             'kommt schwer an ihre Carrys',
@@ -387,7 +425,7 @@ export class CompAnalyzer {
           'Items, die durch Rüstung oder Magieresistenz gehen oder nach Leben Schaden machen (etwa Black Cleaver, Lord ' +
           'Dominik’s, Void Staff, Liandry’s) — gezählt in unseren eigenen Builds.';
         if (measured) {
-          reasons.push(neutral('Tank-Shred', `${hint} Zählt nicht in die Prozentzahl: In unseren Spielen bringt ein solcher Champ gegen zwei Frontliner keinen messbaren Vorteil (+0,1 ± 0,2 Punkte).`));
+          reasons.push(pro('Tank-Shred', `${hint} In unseren Spielen bringt das gegen zwei Frontliner +0,4 ± 0,3 Punkte.`));
         } else {
           score += 0.25;
           reasons.push(pro('Tank-Shred', hint));
@@ -407,12 +445,22 @@ export class CompAnalyzer {
 
     if (trait.isKnown) {
       if (enemies.maxEngage >= HARD_ENGAGE && hasPeel(trait)) {
-        score += 0.3;
+        // Own data: a hint without a weight. Peel against hard engage shows nothing in the games
+        // (docs/modellpruefung.md, Messung 29), and the rule fired at nearly every support.
+        if (!measured) score += 0.3;
+        const engager = own?.peel.engager;
+        const carry = own?.peel.carry ?? null;
         reasons.push(
-          pro(
-            'Disengage',
-            'Der Gegner hat einen Champ, der einen Teamfight von sich aus starten kann. Dieser Pick kann die Getroffenen wieder herausholen (Disengage) — sonst entscheidet ihr Anspiel den Kampf.',
-          ),
+          measured && engager
+            ? neutral(
+                carry ? `Peel für ${carry} gegen ${engager}` : `Peel gegen ${engager}`,
+                `${engager} kann einen Teamfight von sich aus starten (Hard Engage). Dieser Pick kann ${carry ?? 'die Getroffenen'} wieder herausholen (Peel, Disengage). ` +
+                  'Zählt nicht in die Prozentzahl: In unseren Spielen gewinnt ein Team mit Peel gegen Hard Engage nicht messbar öfter (+0,2 ± 0,3 Punkte je Peel-Champion).',
+              )
+            : pro(
+                'Disengage',
+                'Der Gegner hat einen Champ, der einen Teamfight von sich aus starten kann. Dieser Pick kann die Getroffenen wieder herausholen (Disengage) — sonst entscheidet ihr Anspiel den Kampf.',
+              ),
         );
       }
 

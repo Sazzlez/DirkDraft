@@ -31,6 +31,7 @@ import type { DraftSlot } from '../../src/core/model/draftState';
 import { ALL_LANES, Lane } from '../../src/core/model/lane';
 import { LanePredictor, LOW_CONFIDENCE } from '../../src/core/model/lanePredictor';
 import { MetaLookup, type MetaSnapshot } from '../../src/core/model/metaLookup';
+import { OpenSeats } from '../../src/core/model/openSeats';
 import { logit } from '../../src/core/model/scoreModel';
 import { TankShred } from '../../src/core/model/tankShred';
 import { TraitTable } from '../../src/core/model/traits';
@@ -77,7 +78,10 @@ function checkOnModel(report: string[], games: readonly Game[], base: MetaSnapsh
   const trainIndex = games.map((_, i) => i).filter((i) => !isHeldOut(i));
   const testIndex = games.map((_, i) => i).filter((i) => isHeldOut(i));
   const meta = new MetaLookup(tally(trainIndex.map((i) => games[i]!), base).snapshot);
-  const analyzer = new CompAnalyzer(new MetaLookup(base), TraitTable.bundled(), TankShred.fromBuilds(builds));
+  const baseMeta = new MetaLookup(base);
+  const shred = TankShred.fromBuilds(builds);
+  const analyzer = new CompAnalyzer(baseMeta, TraitTable.bundled(), shred);
+  const lineUps = new OpenSeats(analyzer, baseMeta, TraitTable.bundled(), shred);
 
   const bands = [0.1, 0.25, 0.5, 0.75, 1.0001];
   const labels = ['oberstes Zehntel', 'bis zum obersten Viertel', 'obere Hälfte darunter', 'untere Hälfte, oberes Viertel', 'unterstes Viertel'];
@@ -92,12 +96,11 @@ function checkOnModel(report: string[], games: readonly Game[], base: MetaSnapsh
       const mine = game[side];
       const theirs = side === 'blue' ? game.red : game.blue;
       const won = side === 'blue' ? game.blueWins === 1 : game.blueWins === 0;
-      const enemyProfile = analyzer.analyze(theirs.map((s) => s.championId));
       mine.forEach((seat, index) => {
         if (seat.lane === Lane.Unknown || !meta.laneStat(seat.championId, seat.lane)) return;
         const valueOf = (championId: number): number => {
           const team: DraftSeat[] = mine.map((s, k) => (k === index ? { championId, lane: seat.lane } : s));
-          return draftParts(meta, team, theirs, { allies: analyzer.analyze(team.map((s) => s.championId)), enemies: enemyProfile }).total;
+          return draftParts(meta, team, theirs, lineUps).total;
         };
         const actual = valueOf(seat.championId);
         let better = 0;

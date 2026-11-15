@@ -16,6 +16,7 @@ import {
 } from '../core/format';
 import { momentOf, type DraftFacts } from '../core/moment';
 import { PLAN_NAMES, PLAN_WANTS, type Plan } from '../core/model/compAnalyzer';
+import { isComboReason } from '../core/model/kits';
 import { queueDisplay, type QueueKind } from '../core/model/queue';
 import { extendSkills } from '../core/skillplan';
 import {
@@ -351,7 +352,7 @@ export class GoldenAdapter {
     const verdict = isBan
       ? banVerdict(item.score)
       : pickVerdict(item.uncertainty > 0, rank, standing(leader.score, leader.uncertainty, item.score, item.uncertainty));
-    const reasons = item.reasons.map((r) => ({ text: r.text, tone: toneOf(r.tone) }));
+    const reasons = item.reasons.map((r) => ({ text: r.text, tone: toneOf(r.tone), hint: r.hint }));
     const main = { text: mainReason(item, isBan ? null : lane) };
     return {
       champion,
@@ -362,6 +363,7 @@ export class GoldenAdapter {
       tone: verdict.tone,
       reason: main?.text ?? (isBan ? '' : verdict.text),
       reasons,
+      combo: isBan ? null : (item.reasons.find((r) => isComboReason(r.text))?.text ?? null),
       terms: item.breakdown.map(term),
       tied,
       unavailable: false,

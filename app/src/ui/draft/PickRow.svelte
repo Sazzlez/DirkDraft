@@ -15,7 +15,7 @@
   <button class="line" onclick={() => (open = !open)} aria-expanded={open}>
     <Icon kind="champion" champion={item.champion} size={34} grey={item.unavailable} />
     <span class="text">
-      <span class="name">{item.champion.name}{#if item.badge}<span class="badge">{item.badge}</span>{/if}</span>
+      <span class="name">{item.champion.name}{#if item.badge}<span class="badge">{item.badge}</span>{/if}{#if item.combo}<span class="badge combo">{item.combo}</span>{/if}</span>
       <span class="reason">{item.reason}</span>
     </span>
     <span class="bar"><ContributionBar terms={item.terms} /></span>
@@ -49,7 +49,7 @@
       {#if item.reasons.length > 1}
         <p class="reasons">
           {#each item.reasons as reason (reason.text)}
-            <span class="tone-{reason.tone === 'bad' ? 'bad' : 'neutral'}">{reason.text}</span>
+            <span class="tone-{reason.tone === 'bad' ? 'bad' : 'neutral'}" title={reason.hint ?? undefined}>{reason.text}</span>
           {/each}
         </p>
       {/if}
@@ -130,6 +130,12 @@
     letter-spacing: 0;
     vertical-align: 2px;
     white-space: nowrap;
+  }
+
+  /* A hint that does not count: blue like the other notes, not the green of a pick that is better. */
+  .badge.combo {
+    background: var(--blue-wash);
+    color: var(--blue-text);
   }
 
   .reason {

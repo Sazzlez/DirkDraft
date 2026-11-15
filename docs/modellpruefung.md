@@ -1286,6 +1286,202 @@ Sammlers, nie das Gold in der Tasche.
 - Neu messen, sobald 40.000 Duelle mit −2 gezählt sind (`npm run measure:duels` nimmt sie dann von
   selbst).
 
+## 28. Fähigkeiten-Combos im Team (15.11.2026)
+
+Werkzeug: `npm run measure:combos -- <games.json.gz> <meta.json> --before <frühere games.json.gz>`
+(`app/tools/measure/combos.ts`), Bericht in `build/measure-combos.md`. Die Frage des Nutzers: Gewinnt
+ein Team öfter, dessen Fähigkeiten zusammenpassen — Amumu und Malphite mit Oriannas Ult, Knock-ups
+für Yasuo, ein Enchanter hinter einem Hypercarry?
+
+Die Listen sind Einschätzung, nur eindeutige Fälle (Entwurf `build/wombo-entwurf.md`), vom Nutzer am
+15.11.2026 festgelegt. Auf den 145.741 Spielen bis zum 13.11. war mit engeren Listen vorab geschaut
+worden (AoE-Engage + AoE-Schaden +0,88 ± 0,62 Punkte); geprüft wird deshalb auf den **62.227 Spielen,
+die der Sammler seither gezählt hat** und die keine Liste je gesehen haben. Gemessen ist der Sieg über
+die Lane-Stärke der zehn Champions hinaus, die Lane-Stärke aus den jeweils anderen vier Fünfteln.
+
+| Merkmal | Teams | neue Spiele | alle 207.968 |
+|---|---:|---|---|
+| Wombo: AoE-Engage + AoE-Schaden (zwei Champions), neben der Zahl beider Kits | 46,7 % | +0,80 ± 0,89 Pkt | +0,82 ± 0,49 Pkt |
+| zwei oder mehr AoE-Engage | 22,0 % | +1,17 ± 1,24 | +0,54 ± 0,68 |
+| Yasuo: je Knock-up im Team | 5,5 % | +0,54 ± 0,76 | +0,32 ± 0,41 |
+| Enchanter + Hypercarry | 16,5 % | +0,10 ± 1,15 | −0,08 ± 0,63 |
+
+Die erste Zeile überzeichnet, was ein Pick bringt: Sie steht neben den Kontrollen, und die Zahl der
+AoE-Engage-Champions zählt dort für sich negativ (−0,44 ± 0,41 je Champion). Einfach gezählt — ein
+Team mit Wombo gegen das Team, das es ohne den Pick wäre:
+
+| Team mit Wombo gegen … | neue Spiele | alle 207.968 |
+|---|---|---|
+| alle anderen Teams | +0,11 ± 0,55 Pkt | +0,39 ± 0,30 Pkt |
+| Teams nur mit AoE-Engage (der Pick bringt den Schaden) | +0,60 ± 0,77 | +0,50 ± 0,42 |
+| Teams nur mit AoE-Schaden (der Pick bringt den Engage) | −0,23 ± 0,68 | +0,27 ± 0,37 |
+
+- **Die Prüfung ist nicht bestanden.** Auf den neuen Spielen ist kein Merkmal von null zu trennen;
+  der Wombo liegt einfach gezählt bei +0,1 ± 0,6 Punkten. Über alle Spiele bleibt ein Drittel- bis
+  ein halber Punkt, kleiner als der Fehlerbalken jeder Zeile der Pick-Liste.
+- Fast jedes zweite Team hat nach diesen Listen einen Wombo. Engere Listen träfen seltener und wären
+  noch schlechter messbar; einzelne Combos sind es gar nicht (Amumu + Malphite + Orianna: 9 Teams in
+  145.741 Spielen).
+- **Kein Merkmal bekommt ein Gewicht.** Die Combos taugen als Hinweis am Vorschlag („Wombo mit
+  Amumu“, „Knock-up für Yasuo“), der sagt, wie die Comp gedacht ist, und nicht in die Prozentzahl
+  zählt.
+- **Als Hinweis gebaut (15.11.2026, Nutzerwunsch):** `app/src/core/model/kits.ts` hängt die Combos
+  als neutrale Gründe an den Pick — „Wombo mit Amumu“, „Engage für Miss Fortune“, „Knock-up für
+  Yasuo“, „Knock-up von Malphite“, „Enchanter für Kog'Maw“, „Hypercarry mit Lulu“, höchstens zwei —
+  und die Zeile zeigt den ersten als blaues Tag neben dem Namen. Der Tooltip nennt die Fähigkeit und
+  sagt, dass der Hinweis nicht zählt. „Disengage“ heißt auf eigenen Daten „Peel für Xayah gegen
+  Malphite“; sein Gewicht (+1,2 Punkte, ungemessen unter dem Comp-Deckel) fiel am selben Tag weg
+  (Messung 29). Nur für eigene Daten, die Golden-Referenz ist unberührt.
+- **Die App zeigt engere Listen als die gemessenen** (Nutzer, 15.11.2026: „Listen enger fassen“).
+  Mit den gemessenen trug in den aufgezeichneten Drafts des Nutzers fast jeder Engage-Champion
+  „Engage für …“, sobald ein Magier oder Miss Fortune im Team stand. Die engen Listen
+  (`kits.ts`, `COMBOS`) nennen nur die Kits, um die eine Comp gebaut wird: 18 AoE-Engages mit einer
+  Ult, die mehrere Gegner festhält, 14 AoE-Schaden-Ults, 16 verlässliche Knock-ups, 8 Enchanter,
+  9 Hypercarrys. Die gemessenen bleiben als `WIDE` im Messwerkzeug, damit die Zahlen oben
+  nachzählbar bleiben.
+- **Auch die engen Listen zeigen nichts** (`npm run measure:combos -- … --lists shown`, Bericht
+  `build/measure-combos-shown.md`; gewählt nach der Messung der breiten, also keine eigene Prüfung):
+
+  | Merkmal, enge Listen | Teams | neue Spiele | alle 207.968 |
+  |---|---:|---|---|
+  | Wombo, einfach gezählt gegen alle anderen Teams | 13,4 % | −0,13 ± 0,81 Pkt | +0,24 ± 0,45 Pkt |
+  | Yasuo: je Knock-up im Team | 3,1 % | +0,63 ± 1,37 | +0,63 ± 0,74 |
+  | Enchanter + Hypercarry | 7,2 % | +0,89 ± 1,46 | +0,77 ± 0,80 |
+
+  Der Wombo steht jetzt in jedem siebten statt in jedem zweiten Team, und selbst die klassischen
+  Combos gewinnen in Platin nicht messbar öfter. Enchanter mit Hypercarry liegt über alle Spiele bei
+  1,9 Standardfehlern — ein Hinweis, mehr nicht; mit dem nächsten Patch nachmessen.
+
+## 29. Der Comp-Term: offene Plätze, Frontline, Regeln gegen die Comp des Gegners (15.11.2026)
+
+Anlass: die aufgezeichneten Drafts des Nutzers (sechs Ranked-Drafts vom 14.11., er spielt Support).
+Über seine rund 58 Support-Kandidaten streute die Liste durch die Lane-Stärke um 1,64 Punkte und
+durch den Comp-Term um 1,76 — Matchup 0,16, Enemy-Team 0,28, Synergie 0,29. Der Comp-Term entschied
+die Reihenfolge also mit, und er hatte drei Schwächen. Daten: 207.968 Spiele (Sammler-Lauf
+43687134187, Stand 15.11.2026, 14:34 UTC), 166.374 zum Anpassen, 41.594 zurückgehalten; Berichte
+`build/combos/model-before.md` (vorher) und `build/combos/model-final.md` (nachher).
+
+### Offene Plätze
+
+Bis hierher zählte ein Befund auf den gezeigten Champions mit dem Anteil des Teams, der feststeht
+(Messung 21). Mit Viktor und Malzahar im Team bekam Thresh so −4,4 Punkte für „noch mehr AP-Schaden“,
+bei offenem ADC- und Jungle-Platz; Poppy stieg von Rang 28 auf 1, Sion auf 2. Geprüft an 103.984
+echten Teams, denen Plätze verdeckt wurden:
+
+| Befund, offene Plätze | alte Regel feuert in | davon am Ende wirklich | neue Erwartung | eingetreten |
+|---|---:|---:|---:|---:|
+| AD-Schaden fehlt, Bot und Jungle offen | 18,5 % | 1,9 % | 0,9 % | 0,7 % |
+| AD-Schaden fehlt, Bot offen | 5,6 % | 5,5 % | 3,6 % | 2,9 % |
+| AP-Schaden fehlt, Top und Support offen | 7,6 % | 20,9 % | 8,9 % | 9,3 % |
+| kein Engage, Bot und Jungle offen | 3,3 % | 11,6 % | 11,8 % | 11,6 % |
+| kein Frontline, Top und Support offen | 64,2 % | 31,0 % | 32,1 % | 31,0 % |
+| wenig Waveclear, Support offen | 21,9 % | 71,1 % | 72,5 % | 71,1 % |
+
+(„Neue Erwartung“ und „eingetreten“ über die Teams, in denen die neue Rechnung nicht null sagt.)
+
+Die neue Rechnung (`app/src/core/model/openSeats.ts`): Ein Befund zählt mit der Wahrscheinlichkeit,
+dass er am Ende steht — die Picks, die noch kommen, als das genommen, was auf diesen Lanes gepickt
+wird (nach Pickrate).
+
+- Kein Frontline, kein Engage, wenig Waveclear: Niemand Gezeigtes bringt es, und keiner der offenen
+  Plätze — das Produkt über die offenen Lanes aus (1 − Anteil der Picks der Lane, die es bringen).
+  Ein durchschnittlicher Pick ist auf Top zu 52 % ein Tank, im Jungle zu 32 %, auf Support zu 34 %,
+  auf Mid zu 3 %, auf Bot nie.
+- AP oder AD fehlt: gezählt über jede Kombination aus einem Pick je offener Lane. Mitspieler füllen
+  eine solche Lücke öfter, als die Pickraten sagen (72 % der gerechneten Quote bei einem offenen
+  Platz, 56 % bei zweien, 47 % bei dreien); die Quote wird deshalb durch 1 + 0,4 je offenem Platz
+  geteilt. Dieser eine Faktor ist an denselben Teams angepasst, an denen die Tabelle oben zählt.
+- Ein vollständiges Team liest sich genau wie bisher: Die gemessenen Gewichte gelten unverändert.
+
+Dasselbe gilt für die Draft-Chance (beide Seiten) und für die Lücke über der Liste: „AD-Schaden
+fehlt“ steht dort nur noch, wenn es nach den offenen Plätzen wahrscheinlich dabei bleibt.
+
+### Frontline
+
+Die Regel aus 1.5 zählte als Frontline, wer das Tank-Tag trägt oder eine Defense-Wertung ab 6 — also
+auch Xayah, Morgana, Zoe, Karma, Vladimir, Swain. In einem Draft des Nutzers schloss sein
+Morgana-Pick so die Lücke „kein Frontline“. Auf eigenen Daten zählt jetzt nur das Tank-Tag
+(`CompAnalyzer.isFrontline`); OP.GG-Dateien behalten die alte Regel, die Golden-Referenz ist
+unberührt.
+
+| „Kein Frontline“, allein neben der Lane-Stärke | Spiele mit Unterschied | im Sieg |
+|---|---:|---|
+| Tank-Tag oder Defense ≥ 6 (alt) | 17,0 % | −0,64 ± 0,53 Pkt (2,4 σ) |
+| nur Tank-Tag (neu) | 32,3 % | −0,64 ± 0,38 Pkt (3,2 σ) |
+| nur Tank als erstes Tag | 51,0 % | −0,46 ± 0,30 Pkt (3,0 σ) |
+
+Zusammen angepasst trägt das Tank-Tag den Befund (−0,57 ± 0,50 gegen −0,14 ± 0,68 für die alte Regel).
+
+### Regeln gegen die Comp des Gegners
+
+Vier Regeln liefen ungemessen unter dem Comp-Deckel oder als Hinweis. Mit der neuen
+Frontline-Definition im gemeinsamen Fit (`tools/measure/comp.ts`, jede neben ihrer einfachen Zahl
+als Kontrolle; B, 95 %):
+
+| Merkmal | Gewicht (log-odds) | in Punkten |
+|---|---|---|
+| kein Frontline | +0,013 ± 0,036 | nichts |
+| Assassinen gegen ein Team ohne Frontline, je Assassine | +0,029 ± 0,020 (B schlank +0,026 ± 0,011) | +0,65 |
+| Assassinen gegen 2+ Frontliner, je Assassine | −0,012 ± 0,011 (B schlank −0,010 ± 0,008) | −0,25 |
+| Tank-Shred gegen 2+ Frontliner, je Champion | +0,020 ± 0,012 (B schlank +0,017 ± 0,011) | +0,43 |
+| Peel-Champions gegen Hard Engage, je Champion | +0,006 ± 0,013 | nichts |
+| Assassinen, je einer (Kontrolle) | −0,000 ± 0,014 | nichts |
+
+- **Kein Frontline kostet nicht für sich**, sondern dort, wo der Gegner jemanden hat, der auf die
+  Backline geht: je gegnerischem Assassinen 0,65 Punkte. Mit der alten Frontline-Regel war das nicht
+  zu sehen (145.741 Spiele: +0,27 ± 0,40 Punkte).
+- **Tank-Shred** stand in Messung 13 bei +0,1 ± 0,2 Punkten; mit der sauberen Frontline zeigt er sich.
+- **Peel gegen Hard Engage** („Disengage“) zeigt nichts. Die Regel gab +1,2 Punkte und feuerte bei
+  fast jedem Support.
+
+### Was sich in der App ändert (eigene Daten)
+
+| | bis hierher | jetzt |
+|---|---|---|
+| Befund bei offenen Plätzen | Anteil des Teams, der feststeht | Wahrscheinlichkeit, dass er am Ende steht |
+| Frontline | Tank-Tag oder Defense ≥ 6 | Tank-Tag |
+| kein Frontline | −0,035 | kein eigenes Gewicht |
+| Assassine gegen Team ohne Frontline | Regel, +0,048 | gemessen, +0,026 je Assassine, beide Seiten |
+| Assassine gegen 2+ Frontliner | Regel, −0,032 | gemessen, −0,010 je Assassine |
+| Tank-Shred gegen 2+ Frontliner | Hinweis | gemessen, +0,017 je Champion |
+| „Disengage“ | Regel, +0,048 | Hinweis ohne Gewicht („Peel für Xayah gegen Malphite“) |
+| AP fehlt / AD fehlt / kein Engage / wenig Waveclear | −0,26 / −0,295 / −0,22 / −0,05 | −0,25 / −0,30 / −0,175 / −0,04 (B schlank, neu angepasst) |
+
+Auch die Terme gegen die Comp des Gegners rechnen mit offenen Plätzen: erwartete Assassinen und
+Tank-Shredder aus den offenen Lanes, die Wahrscheinlichkeit für zwei Frontliner.
+
+**Abnahme** auf den 41.594 zurückgehaltenen Spielen, feste Gewichte, nichts angepasst:
+
+| | vorher | nachher |
+|---|---|---|
+| App, Log-Loss | 0,6870 | 0,6868 |
+| B → App | −0,0001 ± 0,0002 | −0,0001 ± 0,0002 |
+| Draft-Chance wie in 2.0, kalibriert → App | +0,0005 ± 0,0004 (2,7 σ) | +0,0007 ± 0,0004 (3,7 σ) |
+| Kalibrierung, Steigung | 1,03 ± 0,09 | 1,05 ± 0,09 |
+
+Für vollständige Drafts ist der Gewinn klein, wie zu erwarten: Diese Terme bewegen wenig. Der
+Nutzen liegt in der Pick-Liste während des Drafts — dort hat der Comp-Term die Reihenfolge bestimmt.
+In den Drafts des Nutzers streut er jetzt um ±0,8 Punkte statt zwischen −3,7 und +1,9; im Flex-Draft
+mit Viktor und Malzahar stehen Thresh, Braum und Leona vorn statt Poppy und Sion.
+
+Ein Engine-Lauf je Client-Ereignis dauert im Mittel 27 ms statt 14 ms (Median 19 statt 15); die
+Tabellen für die offenen Plätze werden einmal je Datenstand gefüllt (`DraftEngine.openSeats`).
+
+### Was dabei auffiel und nicht geändert ist
+
+- **Gegner Jungle ↔ Laner** steht mit 207.968 Spielen bei +0,30 ± 0,13 (am 13.11. +0,17 ± 0,18, ohne
+  Gewicht). Das Gewicht in der App ist weiter null; die übrigen Paar-Gewichte liegen im Fehlerbalken
+  der App-Werte (Botlane-Duo 0,52 ± 0,21, Botlane-Kreuz 0,47 ± 0,21, übrige 0,26 ± 0,11).
+- **Mage-Support ohne Tank bei den anderen vier** (vorläufig, an allen Spielen gesehen, also ohne
+  saubere Prüfung): −1,29 ± 0,58 Punkte unter der Lane-Stärke (bis 13.11. −1,55 ± 0,69, seither
+  −0,71 ± 1,04); Tank-Support im selben Fall +0,29 ± 0,46, Enchanter +0,12 ± 0,49. Mit den nächsten
+  Spielen nachmessen, bevor es ein Merkmal wird.
+- Die Regeln, die weiter ungemessen unter dem Comp-Deckel laufen: kein Peel, nur Melee, wenig CC,
+  Early gegen Scaling, der gewählte Plan.
+- Die Kandidaten „Assassinen gegen ein Team ohne Frontline“ und die Mess-Listen dieser Runde habe ich
+  zuerst an allen Spielen gesehen; die zurückgehaltenen Spiele sind dafür keine unberührte Prüfung.
+  Mit dem nächsten Patch nachmessen.
+
 ## Was offen bleibt (2.0)
 
 - **Seit 2.1 erledigt** (Messung 13 und 21): Die drei geschätzten Gewichte (übrige Gegner 0,35,

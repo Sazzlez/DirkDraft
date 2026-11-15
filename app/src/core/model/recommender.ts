@@ -8,12 +8,14 @@
 // line-up findings it closes or causes. OP.GG files, and with them the golden tests, are untouched.
 
 import { CompAnalyzer, EMPTY_PROFILE, type CompProfile, type Plan } from './compAnalyzer';
-import { BOT_DUO_WEIGHT, compValue, isBotDuo, STRENGTH_WEIGHT, VERSUS_WEIGHT, versusKind, type DraftSeat } from './draftModel';
+import { BOT_DUO_WEIGHT, isBotDuo, lineUpEdge, STRENGTH_WEIGHT, VERSUS_WEIGHT, versusKind, type DraftSeat } from './draftModel';
 import { effectiveChampionId, isLocked, type DraftState, type TurnAction } from './draftState';
+import { KitTable } from './kits';
 import { ALL_LANES, Lane, laneDisplay } from './lane';
 import type { LanePrediction, LanePredictionResult } from './lanePredictor';
 import type { LaneView, MatchupView, MetaLookup, SynergyView } from './metaLookup';
 import { netN0, netPercent } from './netFormat';
+import { OpenSeats, type FindingOdds, type LineUpOutlook } from './openSeats';
 import { contra, neutral, pro, type Reason } from './reason';
 import { ErrorBudget, logitVariance } from './scoreError';
 import {
@@ -197,6 +199,11 @@ interface Seat {
   openLanes: readonly Lane[];
   allyComp: CompProfile;
   enemyComp: CompProfile;
+  /**
+   * Own data: who the peel chip names — the enemy's hard engage and the own ADC, where shown — and
+   * both line-ups as they will be at the end, the open seats taken as average picks of their lanes.
+   */
+  own: { peel: { engager: string | null; carry: string | null }; team: LineUpOutlook; enemy: LineUpOutlook } | null;
 }
 
 interface BanLane {
@@ -219,6 +226,10 @@ const winRateDelta = (view: { winRate: number }): number => view.winRate - 0.5;
 
 export class Recommender {
   private readonly comp: CompAnalyzer;
+  /** Own data: the ability combos a pick closes, as hints (kits.ts). */
+  private readonly kits: KitTable | null;
+  /** Own data: what the picks to come are likely to bring (openSeats.ts). */
+  private readonly open: OpenSeats | null;
 
   constructor(
     private readonly meta: MetaLookup,
@@ -226,8 +237,15 @@ export class Recommender {
     shred: TankShred = TankShred.none,
     /** D4: the plan the team chose for this draft. */
     private readonly chosenPlan: Plan | null = null,
+    /**
+     * Own data: the open-seat tables, kept by whoever builds a recommender per event (the engine) —
+     * they depend on the data alone and cost a quarter of a second to fill. Left out, built here.
+     */
+    open: OpenSeats | null | undefined = undefined,
   ) {
     this.comp = new CompAnalyzer(meta, traits, shred, chosenPlan);
+    this.kits = meta.isOwnData ? new KitTable(meta.champions) : null;
+    this.open = open !== undefined ? open : meta.isOwnData ? new OpenSeats(this.comp, meta, traits, shred) : null;
   }
 
   recommend(
@@ -305,6 +323,13 @@ export class Recommender {
       openLanes: ALL_LANES.filter((l) => openLanes.has(l)),
       allyComp: this.comp.analyze(allyChampions),
       enemyComp: this.comp.analyze(enemyChampions),
+      own: this.open
+        ? {
+            peel: this.peelNames(lane, allySeats, enemyChampions),
+            team: this.open.outlook(allySeats),
+            enemy: this.open.outlook(enemyLanes.predictions.filter((p) => p.championId !== 0).map((p) => ({ championId: p.championId, lane: p.lane }))),
+          }
+        : null,
     };
   }
 
@@ -341,7 +366,18 @@ export class Recommender {
         : this.laneLogOdds(candidate, lane, reasons, budget);
 
     const own = this.meta.isOwnData;
-    const compFit = this.comp.fit(candidate, seat.allyComp, seat.enemyComp, reasons, lane, own);
+    // Own data: the team with the candidate, the seats still open taken as average picks of their lanes.
+    const after = seat.own && this.open ? this.open.outlook([...seat.allySeats, { championId: candidate, lane }]) : null;
+    const lacks = (odds: FindingOdds, issue: 'noMagicDamage' | 'noPhysicalDamage'): boolean => (odds[issue] ?? 0) >= 0.5;
+    const context =
+      seat.own && after
+        ? {
+            peel: seat.own.peel,
+            lacksMagic: [lacks(seat.own.team.odds, 'noMagicDamage'), lacks(after.odds, 'noMagicDamage')] as const,
+            lacksPhysical: [lacks(seat.own.team.odds, 'noPhysicalDamage'), lacks(after.odds, 'noPhysicalDamage')] as const,
+          }
+        : null;
+    const compFit = this.comp.fit(candidate, seat.allyComp, seat.enemyComp, reasons, lane, own, context);
 
     const counters = openLaneBlocked ? this.addCounterRisk(candidate, lane, openLaneBlocked, reasons) : undefined;
     const flexLanes = this.flexLanes(candidate, seat.openLanes, reasons);
@@ -352,7 +388,7 @@ export class Recommender {
           { kind: 'laneMatchup', logOdds: this.laneMatchupLogOdds(candidate, lane, enemyLanes, reasons, budget) },
           { kind: 'enemyTeam', logOdds: this.versusLogOdds(candidate, lane, enemyLanes, reasons, budget) },
           { kind: 'synergy', logOdds: this.botDuoLogOdds(candidate, lane, seat.allySeats, reasons, budget) },
-          { kind: 'composition', logOdds: this.measuredComp(candidate, seat, compFit) },
+          { kind: 'composition', logOdds: this.measuredComp(seat, after, compFit) },
         ]
       : [
           { kind: 'laneStrength', logOdds: baseTerm },
@@ -365,6 +401,9 @@ export class Recommender {
     let total = 0;
     for (const term of terms) total += term.logOdds ?? 0;
 
+    // Last, so they never displace a reason that counts: the combos with the teammates shown.
+    if (this.kits) reasons.push(...this.kits.reasons(candidate, seat.allies));
+
     return {
       championId: candidate,
       name: this.meta.championName(candidate),
@@ -375,6 +414,21 @@ export class Recommender {
       ...(counters !== undefined ? { openCounters: counters } : {}),
       ...(flexLanes ? { flexLanes } : {}),
     };
+  }
+
+  /** The enemy with the hardest engage and the own ADC (unless the seat is the ADC's), by name. */
+  private peelNames(lane: Lane, allySeats: readonly DraftSeat[], enemyChampions: readonly number[]): { engager: string | null; carry: string | null } {
+    let engager = 0;
+    let hardest = 0;
+    for (const id of enemyChampions) {
+      const trait = this.traits.for(this.meta.champion(id)?.key);
+      if (hasHardEngage(trait) && trait.engage > hardest) {
+        hardest = trait.engage;
+        engager = id;
+      }
+    }
+    const carry = lane === Lane.Adc ? undefined : allySeats.find((ally) => ally.lane === Lane.Adc);
+    return { engager: engager ? this.meta.championName(engager) : null, carry: carry ? this.meta.championName(carry.championId) : null };
   }
 
   /**
@@ -763,10 +817,8 @@ export class Recommender {
    * costs and one that keeps it open loses a little more of it. On top, under the old cap, the
    * rules the games are too few to measure (`unmeasured`, from CompAnalyzer.fit).
    */
-  private measuredComp(candidate: number, seat: Seat, unmeasured: number | null): number | null {
-    const before = seat.allyComp;
-    const after = this.comp.analyze([...seat.allies, candidate]);
-    const measured = compValue(after) - compValue(before);
+  private measuredComp(seat: Seat, after: LineUpOutlook | null, unmeasured: number | null): number | null {
+    const measured = seat.own && after ? lineUpEdge(after, seat.own.enemy) - lineUpEdge(seat.own.team, seat.own.enemy) : 0;
     if (unmeasured === null && measured === 0) return null;
     return measured + COMP_SCALE * (unmeasured ?? 0);
   }

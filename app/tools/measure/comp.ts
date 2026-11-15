@@ -13,7 +13,7 @@ import { Lane } from '../../src/core/model/lane';
 import { isTagged, MetaLookup, type MetaSnapshot } from '../../src/core/model/metaLookup';
 import { logit } from '../../src/core/model/scoreModel';
 import { TankShred } from '../../src/core/model/tankShred';
-import { TraitTable } from '../../src/core/model/traits';
+import { hasPeel, TraitTable } from '../../src/core/model/traits';
 import type { RiotBuildFile } from '../../src/core/riotBuilds';
 import { gamesOf, isHeldOut, readGamesFile, type Seat } from './games';
 import { fitLogistic, logLoss, predict, type LogisticFit } from './logistic';
@@ -25,6 +25,10 @@ export interface Side {
   poke: number;
   /** Champions that build against tanks on their lane, assassins left out (B4). */
   shredders: number;
+  /** Champions with the Assassin tag. */
+  assassins: number;
+  /** Champions with strong peel (trait 2). */
+  peelers: number;
 }
 
 export interface Feature {
@@ -53,6 +57,12 @@ export const FEATURES: readonly Feature[] = [
   { key: 'early', label: 'Early-Game-Champions (je einer)', isNew: true, of: (s) => s.profile.earlyScalingCount },
   { key: 'late', label: 'Late-Game-Champions (je einer)', isNew: true, of: (s) => s.profile.lateScalingCount },
   { key: 'mixedTiming', label: 'gemischtes Timing', isNew: true, of: flag('mixedTiming') },
+  // The rules against their line-up that ran unmeasured under the comp cap (15.11.2026), each beside its plain count.
+  { key: 'assassins', label: 'Assassinen (je einer)', isNew: true, of: (s) => s.assassins },
+  { key: 'backline', label: 'Assassinen gegen ein Team ohne Frontline (je Assassine)', isNew: true, of: (s, o) => (hasIssue(o.profile, 'noFrontline') ? s.assassins : 0) },
+  { key: 'assassinWall', label: 'Assassinen gegen 2+ Frontliner (je Assassine)', isNew: true, of: (s, o) => (o.profile.frontlineCount >= 2 ? s.assassins : 0) },
+  { key: 'peelers', label: 'Peel-Champions (je einer)', isNew: true, of: (s) => s.peelers },
+  { key: 'peelVsEngage', label: 'Peel-Champions gegen Hard Engage (je Champion)', isNew: true, of: (s, o) => (o.profile.maxEngage >= 2 ? s.peelers : 0) },
 ];
 
 /** Games a feature must tell the sides apart in; rarer ones run away in the fit (separation). */
@@ -81,12 +91,16 @@ function args(list: readonly string[]): { files: string[]; options: Record<strin
 export function sideOf(meta: MetaLookup, traits: TraitTable, shred: TankShred, analyzer: CompAnalyzer, seats: readonly Seat[]): Side {
   let poke = 0;
   let shredders = 0;
+  let assassins = 0;
+  let peelers = 0;
   for (const s of seats) {
     const champion = meta.champion(s.championId);
     poke += traits.for(champion?.key).poke;
+    if (champion && isTagged(champion, 'Assassin')) assassins++;
+    if (hasPeel(traits.for(champion?.key))) peelers++;
     if (champion && !isTagged(champion, 'Assassin') && shred.has(s.championId, s.lane)) shredders++;
   }
-  return { profile: analyzer.analyze(seats.map((s) => s.championId)), poke, shredders };
+  return { profile: analyzer.analyze(seats.map((s) => s.championId)), poke, shredders, assassins, peelers };
 }
 
 export async function main(argv: string[]): Promise<number> {

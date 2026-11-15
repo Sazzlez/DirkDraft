@@ -6,6 +6,7 @@
 import { estimateBalance, laneMatchups, rankAram, type AramStat } from './model/advisors';
 import { CompAnalyzer, traitCoverage, type CompProfile, type Plan } from './model/compAnalyzer';
 import { draftParts } from './model/draftModel';
+import { OpenSeats, type FindingOdds } from './model/openSeats';
 import { sigmoid } from './model/scoreModel';
 import {
   draftStateFrom,
@@ -219,6 +220,8 @@ export class DraftEngine {
   private readonly shred: TankShred;
 
   private readonly turns = new TurnTracker();
+  /** Own data: what the picks to come are likely to bring — counted once, it depends on the data alone. */
+  private openSeats: OpenSeats | null | undefined;
   private wasActive = false;
   private lastProgress = 0;
   private lastLocal = -1;
@@ -332,7 +335,10 @@ export class DraftEngine {
     const partySeats = this.teamMode ? partyCells(state) : null;
     const party = partySeats && partySeats.size >= 2 ? partySeats : null;
     const comp = new CompAnalyzer(meta, this.traits, this.shred);
-    const recommender = new Recommender(meta, this.traits, this.shred, this.chosenPlan);
+    // Own data: what both line-ups will lack at the end, open seats taken as average picks.
+    if (this.openSeats === undefined) this.openSeats = meta.isOwnData ? new OpenSeats(new CompAnalyzer(meta, this.traits, this.shred), meta, this.traits, this.shred) : null;
+    const open = this.openSeats;
+    const recommender = new Recommender(meta, this.traits, this.shred, this.chosenPlan, open);
 
     let picks: FrameSet | null = null;
     let bans: FrameSet | null = null;
@@ -377,7 +383,7 @@ export class DraftEngine {
     }
 
     const profiles = { allies: comp.analyze(state.allies.map(effectiveChampionId)), enemies: comp.analyze(state.enemies.map(effectiveChampionId)) };
-    const balance = estimateBalance(meta, state, allyPredictions, enemyPredictions, profiles);
+    const balance = estimateBalance(meta, state, allyPredictions, enemyPredictions, open);
 
     const advised = target ? state.allies.find((slot) => slot.cellId === target.slot.cellId) : undefined;
     // "Your draft: 52 % → with Nami 54 %": the same model with the list's first pick on the empty seat.
@@ -386,10 +392,7 @@ export class DraftEngine {
     const pickLane = picks ? laneFromKey(picks.lane) : Lane.Unknown;
     if (balance.parts && first && advised && effectiveChampionId(advised) === 0 && pickLane !== Lane.Unknown) {
       const seats = (predictions: LanePredictionResult) => predictions.predictions.filter((p) => p.championId !== 0).map((p) => ({ championId: p.championId, lane: p.lane }));
-      const withPick = draftParts(meta, [...seats(allyPredictions), { championId: first.championId, lane: pickLane }], seats(enemyPredictions), {
-        allies: comp.analyze([...state.allies.map(effectiveChampionId), first.championId]),
-        enemies: profiles.enemies,
-      });
+      const withPick = draftParts(meta, [...seats(allyPredictions), { championId: first.championId, lane: pickLane }], seats(enemyPredictions), open);
       withTop = { championId: first.championId, allyWinRate: sigmoid(withPick.total) };
     }
     const pickHint =
@@ -398,7 +401,12 @@ export class DraftEngine {
         : null;
     const gap =
       state.isActive && usesLanes(state.queue) && advised && !isLocked(advised)
-        ? gapOf(advised.cellId, comp.analyze(state.allies.filter((slot) => slot !== advised).map(effectiveChampionId)))
+        ? gapOf(
+            advised.cellId,
+            comp.analyze(state.allies.filter((slot) => slot !== advised).map(effectiveChampionId)),
+            // Own data: AP or AD is no gap while the open seats will bring it (openSeats.ts).
+            open?.odds(allyPredictions.predictions.filter((p) => p.championId !== 0 && p.cellId !== advised.cellId).map((p) => ({ championId: p.championId, lane: p.lane }))) ?? null,
+          )
         : null;
 
     return {
@@ -558,10 +566,12 @@ const frameTeamPlan = (plan: TeamPlan | null): DraftFrame['teamPlan'] =>
     last: plan.last,
   };
 
-const gapOf = (cellId: number, p: CompProfile): NonNullable<DraftFrame['gap']> => ({
+const gapOf = (cellId: number, p: CompProfile, odds: FindingOdds | null = null): NonNullable<DraftFrame['gap']> => ({
   cellId,
   count: p.count,
-  findings: p.findings.map((f) => ({ issue: f.issue, text: f.text, severity: f.severity })),
+  findings: p.findings
+    .filter((f) => !odds || (f.issue !== 'noMagicDamage' && f.issue !== 'noPhysicalDamage') || (odds[f.issue] ?? 0) >= 0.5)
+    .map((f) => ({ issue: f.issue, text: f.text, severity: f.severity })),
 });
 
 const frameProfile = (p: CompProfile): FrameProfile => ({

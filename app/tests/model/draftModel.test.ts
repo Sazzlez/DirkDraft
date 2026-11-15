@@ -9,9 +9,11 @@ import {
   BOT_DUO_WEIGHT,
   botDuoEdge,
   COMP_WEIGHT,
-  compValue,
+  AGAINST_WEIGHT,
+  compCost,
   draftParts,
   duelEdge,
+  lineUpEdge,
   VERSUS_WEIGHT,
   versusEdge,
   versusKind,
@@ -21,6 +23,7 @@ import { draftStateFrom } from '../../src/core/model/draftState';
 import { Lane } from '../../src/core/model/lane';
 import { LanePredictionResult, LanePredictor } from '../../src/core/model/lanePredictor';
 import { DamageType, MetaLookup } from '../../src/core/model/metaLookup';
+import { OpenSeats } from '../../src/core/model/openSeats';
 import { Recommender } from '../../src/core/model/recommender';
 import { logit, sigmoid } from '../../src/core/model/scoreModel';
 import { MATCHUP_PRIOR, OWN_MATCHUP_PRIOR, shrink, SYNERGY_PRIOR } from '../../src/core/model/shrinkage';
@@ -161,24 +164,32 @@ describe('the parts of the draft', () => {
     expect(draftParts(meta, [], enemies).comparable).toBe(false);
   });
 
-  it('values a line-up by its measured findings, by the share of the team that is fixed', () => {
-    const lacking = (count: number, ...issues: CompProfile['findings'][number]['issue'][]): CompProfile => ({
-      ...EMPTY_PROFILE,
-      count,
-      findings: issues.map((issue) => ({ issue, text: '', severity: 1 })),
-    });
-    expect(compValue(EMPTY_PROFILE)).toBe(0);
-    expect(compValue(lacking(5, 'noMagicDamage'))).toBeCloseTo(-COMP_WEIGHT.noMagicDamage!, 12);
-    expect(compValue(lacking(5, 'noMagicDamage', 'noEngage'))).toBeCloseTo(-(COMP_WEIGHT.noMagicDamage! + COMP_WEIGHT.noEngage!), 12);
-    // Four of five fixed: the last pick can still close it.
-    expect(compValue(lacking(4, 'noMagicDamage'))).toBeCloseTo(-0.8 * COMP_WEIGHT.noMagicDamage!, 12);
-    // Findings without a measured effect cost nothing.
-    expect(compValue(lacking(5, 'mixedTiming', 'noPeel', 'allMelee'))).toBe(0);
+  it('values a line-up by its measured findings, each by how likely it stands at the end', () => {
+    expect(compCost({})).toBe(0);
+    expect(compCost({ noMagicDamage: 1 })).toBeCloseTo(-COMP_WEIGHT.noMagicDamage!, 12);
+    expect(compCost({ noMagicDamage: 1, noEngage: 1 })).toBeCloseTo(-(COMP_WEIGHT.noMagicDamage! + COMP_WEIGHT.noEngage!), 12);
+    // Seats still open: the picks to come close it three times in four.
+    expect(compCost({ noEngage: 0.25 })).toBeCloseTo(-0.25 * COMP_WEIGHT.noEngage!, 12);
+    // Never more than measured, and findings without a measured effect cost nothing.
+    expect(compCost({ noEngage: 3 })).toBeCloseTo(-COMP_WEIGHT.noEngage!, 12);
+    expect(compCost({ mixedTiming: 1, noPeel: 1, allMelee: 1 })).toBe(0);
     const meta = own();
-    expect(draftParts(meta, allies, enemies, { allies: lacking(5, 'noMagicDamage'), enemies: lacking(5, 'noEngage') }).comp).toBeCloseTo(
-      COMP_WEIGHT.noEngage! - COMP_WEIGHT.noMagicDamage!,
-      12,
-    );
+    const plain = { assassins: 0, shredders: 0, wall: 0 };
+    const lineUps = { outlook: (seats: readonly DraftSeat[]) => ({ ...plain, odds: seats === allies ? { noMagicDamage: 1 } : { noEngage: 1 } }) };
+    expect(draftParts(meta, allies, enemies, lineUps).comp).toBeCloseTo(COMP_WEIGHT.noEngage! - COMP_WEIGHT.noMagicDamage!, 12);
+  });
+
+  it('counts what a champion brings against the other line-up, both ways round', () => {
+    const plain = { odds: {}, assassins: 0, shredders: 0, wall: 0 };
+    // Two assassins against a team without a frontline; nothing the other way.
+    expect(lineUpEdge({ ...plain, assassins: 2 }, { ...plain, odds: { noFrontline: 1 } })).toBeCloseTo(2 * AGAINST_WEIGHT.backline, 12);
+    expect(lineUpEdge({ ...plain, odds: { noFrontline: 1 } }, { ...plain, assassins: 2 })).toBeCloseTo(-2 * AGAINST_WEIGHT.backline, 12);
+    // A frontline that is half likely to be missing at the end counts half.
+    expect(lineUpEdge({ ...plain, assassins: 1 }, { ...plain, odds: { noFrontline: 0.5 } })).toBeCloseTo(0.5 * AGAINST_WEIGHT.backline, 12);
+    // Against two frontliners an assassin loses a little and a tank shredder gains.
+    expect(lineUpEdge({ ...plain, assassins: 1, shredders: 2 }, { ...plain, wall: 1 })).toBeCloseTo(AGAINST_WEIGHT.wall + 2 * AGAINST_WEIGHT.shred, 12);
+    // No frontline costs nothing by itself: only where the other side has someone to go for the back line.
+    expect(lineUpEdge({ ...plain, odds: { noFrontline: 1 } }, plain)).toBe(0);
   });
 });
 
@@ -293,8 +304,11 @@ describe('the line-up on our own data', () => {
     const analyzer = new CompAnalyzer(own, TraitTable.empty);
     const team = analyzer.analyze(AD);
     expect(team.findings.map((f) => f.issue)).toContain('noMagicDamage');
-    const closes = compValue(analyzer.analyze([...AD, Mage])) - compValue(team);
-    const keeps = compValue(analyzer.analyze([...AD, Fighter])) - compValue(team);
+    // Without damage amounts in the file the mix cannot be filled up: the finding counts by the share that is fixed.
+    const open = new OpenSeats(analyzer, own, TraitTable.empty);
+    const cost = (ids: number[]) => compCost(open.odds(ids.map((championId) => ({ championId, lane: Lane.Unknown }))));
+    const closes = cost([...AD, Mage]) - cost(AD);
+    const keeps = cost([...AD, Fighter]) - cost(AD);
     expect(closes).toBeCloseTo(0.8 * COMP_WEIGHT.noMagicDamage!, 12);
     expect(keeps).toBeCloseTo(-0.2 * COMP_WEIGHT.noMagicDamage!, 12);
     // Last pick: the difference between closing and keeping is exactly the measured cost.

@@ -130,7 +130,9 @@ export interface RecommendationView {
   tone: Tone;
   /** The one reason shown in the row. */
   reason: string;
-  reasons: { text: string; tone: Tone }[];
+  reasons: { text: string; tone: Tone; hint?: string | null }[];
+  /** The ability combo the pick closes with a teammate ("Wombo mit Amumu"): a hint, shown as a tag beside the name. */
+  combo?: string | null;
   terms: TermView[];
   tied: boolean;
   /** Not choosable by the viewer (shown greyed). */

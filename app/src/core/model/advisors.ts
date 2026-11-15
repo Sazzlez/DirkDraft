@@ -1,8 +1,7 @@
 // Ports of the small 1.5 advisors: DraftBalance (draft chance), LaneMatchups (the duel rows),
 // AramAdvisor (bench ranking), AugmentAdvisor (Mayhem augments) and BuildChoice (Wilson bound).
 
-import type { CompProfile } from './compAnalyzer';
-import { draftParts, type DraftParts, type DraftSeat } from './draftModel';
+import { draftParts, type DraftParts, type DraftSeat, type LineUps } from './draftModel';
 import type { DraftState } from './draftState';
 import { ALL_LANES, Lane } from './lane';
 import type { LanePredictionResult } from './lanePredictor';
@@ -42,7 +41,7 @@ export function estimateBalance(
   state: DraftState,
   allyLanes: LanePredictionResult,
   enemyLanes: LanePredictionResult,
-  comp: { allies: CompProfile; enemies: CompProfile } | null = null,
+  comp: LineUps | null = null,
 ): DraftBalance {
   if (!state.isActive || meta.isEmpty) return UNKNOWN_BALANCE;
 

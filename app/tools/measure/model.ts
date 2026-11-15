@@ -17,6 +17,7 @@ import { CompAnalyzer } from '../../src/core/model/compAnalyzer';
 import { draftParts } from '../../src/core/model/draftModel';
 import { ALL_LANES, Lane } from '../../src/core/model/lane';
 import { MetaLookup, type MetaSnapshot } from '../../src/core/model/metaLookup';
+import { OpenSeats } from '../../src/core/model/openSeats';
 import { logit, sigmoid } from '../../src/core/model/scoreModel';
 import { TankShred } from '../../src/core/model/tankShred';
 import { TraitTable } from '../../src/core/model/traits';
@@ -440,8 +441,8 @@ export async function main(argv: string[]): Promise<number> {
 
   // The app's own draft chance (core/model/draftModel.ts): fixed weights, nothing fitted here. The
   // check that what ships predicts as well as the fit it was taken from, and is calibrated.
-  const profilesOf = (game: Game) => ({ allies: analyzer.analyze(game.blue.map((s) => s.championId)), enemies: analyzer.analyze(game.red.map((s) => s.championId)) });
-  const appTest = testIndex.map((i) => draftParts(full.meta, games[i]!.blue, games[i]!.red, profilesOf(games[i]!)).total);
+  const lineUps = new OpenSeats(analyzer, baseMeta, traits, shred);
+  const appTest = testIndex.map((i) => draftParts(full.meta, games[i]!.blue, games[i]!.red, lineUps).total);
   const appCal = fitLogistic(appTest.map((v) => [v]), yTest);
 
   const evaluate = (predictRow: (k: number) => number) => {
