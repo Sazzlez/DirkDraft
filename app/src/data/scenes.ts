@@ -29,6 +29,7 @@ export const SCENES: Scene[] = [
   { id: 'planning', title: 'Planung und Hover', moment: 'planning' },
   { id: 'banning', title: 'Bannen', moment: 'banning' },
   { id: 'teambans', title: 'Bannen im Team', moment: 'banning' },
+  { id: 'banintent', title: 'Bannen mit gehovertem Pick', moment: 'banning' },
   { id: 'picking', title: 'Dein Pick', moment: 'picking' },
   { id: 'blind', title: 'Blind Pick mit offenen Countern', moment: 'picking' },
   { id: 'lastpick', title: 'Letzter Pick', moment: 'picking' },
@@ -129,6 +130,11 @@ function load(): Promise<Sources> {
     // hover row names the gap the pick leaves open.
     const noTank = stateFromFrame({ ...last.frame.state, allies: last.frame.state.allies.map((slot) => (slot.lockedChampionId === 111 ? { ...slot, lockedChampionId: 117 } : slot)) });
     drafts.set('hover-gap', { frame: engine.evaluate(noTank, engine.resolveTarget(noTank), 114) });
+    // Ranked bans with the own pick shown as well (Braum on support): what beats it comes first.
+    const ranked = lastActive(recordings.get('live-ranked')!, (f) => f.state.turn?.action === 'ban' && (f.state.allyBanIntents?.length ?? 0) > 1).state as unknown as DraftFrame['state'];
+    const intent = stateFromFrame({ ...ranked, allies: ranked.allies.map((slot) => (slot.cellId === ranked.localCellId ? { ...slot, hoverChampionId: 201 } : slot)) });
+    const mine = intent.allies.find((slot) => slot.cellId === intent.localCellId)!;
+    drafts.set('ban-intent', { frame: engine.evaluate(intent, { slot: mine, action: 'ban', isFollowingTurn: false }, 0) });
     const plans = await json<{ matchupGuide: GoldenPlan; laneBuild: GoldenPlan }>('/tests/golden/builds/plans.json');
     return { adapter: new GoldenAdapter(snapshot.champions), plans, recordings, drafts, meta: new MetaLookup(snapshot) };
   })();
@@ -202,6 +208,10 @@ export async function sceneView(id: string): Promise<ViewModel> {
     // Ranked: the whole team bans at once; the teammates' hovers stand faded in the ban row.
     case 'teambans': {
       const frame = lastActive(s.recordings.get('live-ranked')!, (f) => f.state.turn?.action === 'ban' && (f.state.allyBanIntents?.length ?? 0) > 1);
+      return draftScene(a, frame, 'banning', s.plans, 'Banns für dich');
+    }
+    case 'banintent': {
+      const frame = s.drafts.get('ban-intent')!.frame;
       return draftScene(a, frame, 'banning', s.plans, 'Banns für dich');
     }
     case 'picking': {

@@ -50,6 +50,23 @@ export function countLeadingTies(items: readonly { score: number; uncertainty: n
   return tied >= 2 ? tied : 0;
 }
 
+/**
+ * Bans on own data: the score is points and its error log-odds (× 25 = points). Rows within one
+ * sigma of the first; 0 when the first stands alone or the list carries no error (OP.GG files).
+ */
+export function countLeadingBanTies(items: readonly { score: number; uncertainty: number }[]): number {
+  const leader = items[0];
+  if (!leader || !(leader.uncertainty > 0)) return 0;
+  let tied = 1;
+  while (tied < items.length) {
+    const next = items[tied]!;
+    const spread = asPoints(Math.sqrt(leader.uncertainty ** 2 + next.uncertainty ** 2));
+    if ((leader.score - next.score) / spread >= TIE_SIGMA) break;
+    tied++;
+  }
+  return tied >= 2 ? tied : 0;
+}
+
 export class ErrorBudget {
   private variance = 0;
 

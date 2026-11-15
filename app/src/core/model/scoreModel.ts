@@ -32,10 +32,11 @@ export const LANE_DRIFT_PER_PATCH = 3.7e-4;
 /**
  * For bans: share of a champion's lane strength counted AGAIN when that lane is the seat's own.
  * Deliberate double counting — a champion you personally have to face is worth more of a ban.
+ * OP.GG files only: on our own data a ban is an expectation (recommender.ts scoreBansOwn).
  */
 export const BAN_LANE_FOCUS = 0.5;
 
-/** For bans: damping on the candidate's matchups against our locked picks (as SYNERGY_DAMPING). */
+/** For bans: damping on the candidate's matchups against our locked picks (as SYNERGY_DAMPING). OP.GG files only. */
 export const BAN_ALLY_SHARE = 0.5;
 
 /**

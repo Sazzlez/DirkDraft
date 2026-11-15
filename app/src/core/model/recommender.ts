@@ -114,7 +114,7 @@ export interface Recommendation {
   score: number;
   reasons: Reason[];
   breakdown: ScoreTerm[];
-  /** Standard error of the score in log-odds; 0 for bans. */
+  /** Standard error of the score in log-odds; for bans 0, on own data the error of the denied points (÷ 25). */
   uncertainty: number;
   /** Champions still free that counter this pick on its lane, while the lane opponent is open (2.1). */
   openCounters?: number;
@@ -131,6 +131,8 @@ export interface RecommendationSet {
   items: Recommendation[];
   allyComp: CompProfile;
   enemyComp: CompProfile;
+  /** Bans on own data: the score is an expected change of the chance in points, with an error (scoreBansOwn). */
+  expected?: boolean;
 }
 
 export const EMPTY_SET: RecommendationSet = Object.freeze({
@@ -212,6 +214,9 @@ interface BanLane {
   gate: number;
 }
 
+/** An own champion shown in the draft, locked or as a pick intent; `mine`: the advised seat's own. */
+type ShownSeat = DraftSeat & { mine: boolean };
+
 const ordinal = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** D2: a flex lane needs this shrunk win rate and this share of the champion's games. */
@@ -258,11 +263,16 @@ export class Recommender {
   ): RecommendationSet {
     if (!state.isActive || this.meta.isEmpty) return EMPTY_SET;
     const seat = this.prepare(state, target, enemyLanes, allyLanes);
+    const plan = this.chosenPlan ?? seat.allyComp.plan;
+    // Own data, and the seat's lane known: the ban's worth as an expectation (scoreBansOwn).
+    const expected = target.action === 'ban' && this.meta.isOwnData && seat.lane !== Lane.Unknown;
     const items =
       target.action === 'ban'
-        ? this.scoreBans(state, seat.lane, seat.allies, new Set([...seat.hoveredByOthers, ...seat.bannedByOthers]), enemyLanes, limit, this.chosenPlan ?? seat.allyComp.plan)
+        ? expected
+          ? this.scoreBansOwn(state, target, seat, enemyLanes, limit, plan)
+          : this.scoreBans(state, seat.lane, seat.allies, new Set([...seat.hoveredByOthers, ...seat.bannedByOthers]), enemyLanes, limit, plan)
         : top(this.scorePicks(state, seat, enemyLanes, selectable), limit);
-    return { cellId: target.slot.cellId, lane: seat.lane, action: target.action, items, allyComp: seat.allyComp, enemyComp: seat.enemyComp };
+    return { cellId: target.slot.cellId, lane: seat.lane, action: target.action, items, allyComp: seat.allyComp, enemyComp: seat.enemyComp, ...(expected ? { expected } : {}) };
   }
 
   /** Scores one champion — usually the hover — by the same rules, with its place in the list. */
@@ -494,6 +504,154 @@ export class Recommender {
       });
     }
     return top(results, limit);
+  }
+
+  /**
+   * Own data: a ban's worth as the change in the draft's chance it stands for — how often the enemy
+   * would take the champion, times what he brings them by the measured draft model (draftModel.ts):
+   * his strength on his lane, his duel against the champion the own team shows there, and his pairs
+   * with the own champions shown on other lanes.
+   *
+   * A ban takes the champion from both teams. Where the own team's seat on his lane has shown
+   * nothing yet, that seat would pick him as often as the enemy's: his strength cancels, and only
+   * what he does against the champions shown is left. The advised seat's own lane counts in full —
+   * what to pick there is the player's call. Nothing here is fitted: the rates are the file's, the
+   * weights the draft model's (docs/modellpruefung.md, Messung 31).
+   */
+  private scoreBansOwn(state: DraftState, target: RecommendationTarget, seat: Seat, enemyLanes: LanePredictionResult, limit: number, plan: Plan | null): Recommendation[] {
+    const blocked = new Set([...seat.hoveredByOthers, ...seat.bannedByOthers]);
+    const takenByEnemy = enemyLanesTaken(state, enemyLanes);
+    // The own champions shown so far, locked or as a pick intent; the advised seat's own among them.
+    const shown: ShownSeat[] = seat.allySeats.filter((ally) => ally.lane !== Lane.Unknown).map((ally) => ({ ...ally, mine: false }));
+    const own = effectiveChampionId(target.slot);
+    if (own !== 0) shown.push({ championId: own, lane: seat.lane, mine: true });
+    const declared = new Set<Lane>([seat.lane, ...shown.map((ally) => ally.lane)]);
+
+    const results: Recommendation[] = [];
+    for (const candidate of this.candidates(Lane.Unknown)) {
+      if (state.unavailable.has(candidate) || blocked.has(candidate)) continue;
+      const banLane = this.banLane(candidate, takenByEnemy);
+      if (!banLane || !(banLane.stat.play > 0)) continue;
+      const { lane, stat } = banLane;
+      const room = 1 - (takenByEnemy.get(lane) ?? 0);
+      // So often a team takes him on this lane while he is free. Of the ten bans five are the
+      // enemy's and unseen: the root is how often none of those is on him anyway.
+      const free = Math.max(0.05, 1 - stat.banRate);
+      const perTeam = clamp((Math.sqrt(free) * stat.pickRate) / 2 / free, 0, 1);
+      const chance = perTeam * room;
+      if (chance <= 0) continue;
+      // The own seat on his lane, while it has shown nothing: as likely to take him as theirs.
+      const ours = declared.has(lane) ? 0 : perTeam;
+      const share = 1 - ours / chance;
+
+      const reasons: Reason[] = [];
+      const budget = new ErrorBudget();
+      const strength = STRENGTH_WEIGHT * logit(stat.winRate);
+      budget.add(share * share * (logitVariance(stat.winRate, stat.play, this.meta.lanePrior, this.meta.laneTarget) + this.laneDrift()));
+      const facing = shown.find((ally) => ally.lane === lane && ally.championId !== candidate);
+      const duel = facing ? this.banDuel(candidate, lane, facing, reasons, budget) : null;
+      const pairs = this.banPairs(candidate, lane, shown, reasons, budget);
+
+      const where = laneDisplay(lane);
+      if (ours > 0) {
+        reasons.push(
+          neutral(
+            'könnte auch euer Team picken',
+            `Auf ${where} hat bei euch noch niemand einen Champion gezeigt. Ein Bann nimmt ihn beiden Teams, ` +
+              'und euer Teammate nähme ihn so oft wie der Gegner — seine Stärke zählt deshalb nicht in den Bann-Wert, nur was er gegen eure gezeigten Champions macht.',
+          ),
+        );
+      } else if (strength > 0) {
+        reasons.push(
+          pro(
+            `${netPercent(stat.winRate, 1)} WR auf ${where}`,
+            `Aus ${netN0(stat.play)} Games im aktuellen Patch; 50 % wäre Durchschnitt. ` +
+              (lane === seat.lane
+                ? 'Deine Lane: ob du ihn selbst spielst, entscheidest du — der Bann trifft dann nur den Gegner.'
+                : `Auf ${where} hat euer Team schon einen Champion gezeigt — der Bann trifft nur den Gegner.`),
+          ),
+        );
+      }
+      reasons.push(
+        neutral(
+          `beim Gegner in ${netPercent(chance, 0)} der Games`,
+          `So oft stünde er beim Gegner auf ${where}, wenn du etwas anderes bannst: aus ${netPercent(stat.pickRate, 1)} Pickrate und ${netPercent(stat.banRate, 1)} Bannrate.` +
+            (room < 1 ? ` ${where} ist beim Gegner wahrscheinlich schon besetzt.` : ''),
+        ),
+      );
+      this.addPlanThreat(candidate, plan, reasons);
+
+      const terms: ScoreTerm[] = [
+        { kind: 'banStrength', logOdds: share * strength },
+        { kind: 'banLaneThreat', logOdds: duel },
+        { kind: 'banTeamThreat', logOdds: pairs },
+        { kind: 'banPopularity', logOdds: chance },
+      ];
+      const threat = share * strength + (duel ?? 0) + (pairs ?? 0);
+      const score = chance * (sigmoid(threat) - 0.5) * 100;
+      // Only what takes something from the enemy is a ban; the rest would fill the list with zeros.
+      if (!(score > 0)) continue;
+      results.push({
+        championId: candidate,
+        name: this.meta.championName(candidate),
+        score,
+        reasons: dedupe(reasons),
+        breakdown: terms,
+        uncertainty: chance * budget.standardError,
+        banLane: lane,
+      });
+    }
+    return top(results, limit);
+  }
+
+  /** Own data, bans: the candidate's duel against the own champion shown on his lane, beyond both strengths. */
+  private banDuel(candidate: number, lane: Lane, facing: ShownSeat, reasons: Reason[], budget: ErrorBudget): number | null {
+    const view = this.meta.matchup(candidate, facing.championId, lane);
+    if (!view) return null;
+    const baseline = this.meta.matchupBaseline(candidate, facing.championId, lane);
+    const edge = logit(view.winRate) - baseline;
+    budget.add(logitVariance(view.winRate, view.play, this.meta.matchupPrior(lane), sigmoid(baseline)));
+    if (edge > 0.04) {
+      const name = this.meta.championName(facing.championId);
+      reasons.push(
+        pro(
+          `schlägt ${facing.mine ? 'deinen' : 'euren'} ${name}`,
+          `Auf ${laneDisplay(lane)} gewinnt er gegen ${name} ${netPercent(finiteOr(view.measured, view.winRate), 1)} aus ${netN0(view.play)} Games — ` +
+            `aus der Stärke beider allein wären ${netPercent(sigmoid(baseline), 1)} zu erwarten. Gezählt wird der Unterschied, geglättet.`,
+        ),
+      );
+    }
+    return edge;
+  }
+
+  /** Own data, bans: the candidate against the own champions shown on other lanes, each pair by its measured weight. */
+  private banPairs(candidate: number, lane: Lane, shown: readonly ShownSeat[], reasons: Reason[], budget: ErrorBudget): number | null {
+    let total = 0;
+    let counted = 0;
+    let best: { edge: number; seat: ShownSeat; play: number; measured: number; expected: number } | null = null;
+    for (const ally of shown) {
+      if (ally.lane === lane || ally.championId === candidate) continue;
+      const weight = VERSUS_WEIGHT[versusKind(lane, ally.lane)];
+      const view = weight > 0 ? this.meta.versus(candidate, lane, ally.championId, ally.lane) : null;
+      if (!view) continue;
+      const edge = weight * (logit(view.winRate) - logit(view.expected));
+      counted++;
+      total += edge;
+      budget.add(weight * weight * logitVariance(view.winRate, view.play, SYNERGY_PRIOR, view.expected));
+      if (!best || edge > best.edge) best = { edge, seat: ally, play: view.play, measured: view.measured, expected: view.expected };
+    }
+    if (counted === 0) return null;
+    if (best && best.edge > 0.02) {
+      const name = this.meta.championName(best.seat.championId);
+      reasons.push(
+        pro(
+          `gut gegen ${best.seat.mine ? 'deinen' : 'euren'} ${name}`,
+          `Auf ${laneDisplay(lane)} gegen ${name} auf ${laneDisplay(best.seat.lane)}: ${netPercent(finiteOr(best.measured, 0.5), 1)} Winrate aus ${netN0(best.play)} Games — ` +
+            `aus der Stärke beider allein wären ${netPercent(best.expected, 1)} zu erwarten. Gezählt wird der Unterschied, geglättet und mit dem Gewicht solcher Paare in unseren Spielen.`,
+        ),
+      );
+    }
+    return total;
   }
 
   /**

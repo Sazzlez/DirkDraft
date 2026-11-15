@@ -1537,6 +1537,65 @@ Grüße vor Blutdürster.
   Kaufanteilen des späten Slots ab (Kai'Sa Bot: Lord Dominiks Grüße vor Zhonyas, obwohl Zhonyas gegen
   viel physischen Schaden 50 % der späten Käufe stellt und sonst 49 %).
 
+## 31. Der Bann-Wert als Erwartung (15.11.2026, Prüfung aus Spielersicht)
+
+**Anlass.** In sieben aufgezeichneten Ranked-Drafts (Support) stand vor dem ersten Pick fast immer
+dieselbe Bann-Liste: Garen +2,5, Fizz +2,2, Briar +2,1, Leona +2,0, Nami +1,9. Leona stand jedes
+Mal darauf und war in zwei der Drafts später die oberste Pick-Empfehlung für den Platz.
+
+**Was die alte Rechnung tat** (1.5, gilt für OP.GG-Dateien weiter): Winrate auf der Haupt-Lane, die
+eigene Lane zur Hälfte noch einmal (`BAN_LANE_FOCUS`), Duelle gegen gezeigte Teammates zur Hälfte
+(`BAN_ALLY_SHARE`), mal einem „Tor“ aus Pickrate × 8 + Bannrate × 4, gedeckelt bei 1. Zwei Fehler:
+
+- Das Tor ist keine Chance. Ab 12,5 % Pickrate steht es bei 1; die Fußzeile nannte den Wert trotzdem
+  „mal der Chance, dass er den Champion überhaupt pickt“. Garen steht in 9,9 % der Spiele auf Top,
+  also in etwa 5 % beim Gegner — der Wert stand rund zwanzigmal zu hoch.
+- Ein Bann nimmt den Champion beiden Teams. Hat der eigene Toplaner noch nichts gezeigt, nimmt er
+  Garen so oft wie der gegnerische: was der Bann dem Gegner nimmt, nimmt er dem eigenen Team genauso.
+
+**Die neue Rechnung** (eigene Daten, `recommender.ts scoreBansOwn`). Nichts daran ist angepasst; sie
+setzt zusammen, was schon gemessen ist:
+
+    Bann-Wert = Chance × (Stärke × Anteil + Duell + Paare)
+
+- **Chance:** wie oft der Champion beim Gegner auf seiner Lane stünde, wenn dieser Bann woanders
+  hingeht: Pickrate der Lane / 2 (je Team) / (1 − Bannrate) (solange er frei ist) × √(1 − Bannrate)
+  (keiner der fünf unsichtbaren Gegner-Banns trifft ihn ohnehin). Ist die Lane beim Gegner schon
+  besetzt, entsprechend weniger.
+- **Stärke, Duell, Paare:** wie im Draft-Modell (Messung 21): Lane-Winrate, das Duell gegen den
+  Champion, den das eigene Team auf dieser Lane zeigt, und die Paare mit den eigenen Champions auf
+  anderen Lanes (Botlane-Kreuz 0,55, sonst 0,2, Jungle 0).
+- **Anteil:** 1, wenn der eigene Platz auf dieser Lane einen Champion gezeigt hat (Lock oder
+  Pick-Absicht) oder es der eigene Platz ist; sonst 0 — das Team nimmt ihn so oft wie der Gegner.
+  Die Pick-Absicht des eigenen Platzes zählt als gezeigter Champion: was ihn schlägt, rückt vor.
+- Der Fehler kommt aus den Stichproben von Winrate, Duell und Paaren; Banns innerhalb eines
+  Standardfehlers stehen als „Vorne gleichauf“.
+
+**Was das an den sieben Drafts ändert** (Stand `origin/data` vom 15.11., 220.314 Spiele):
+
+| | alt | neu |
+|---|---|---|
+| ohne Hover im Team | Garen +2,51, Fizz +2,15, Briar +2,12, Leona +1,95 | Thresh +0,08 ± 0,02, Nami +0,07, Leona +0,07, Milio +0,06 — vier gleichauf |
+| Jungler zeigt Jarvan IV | Garen +2,43, Fizz +2,28, Shyvana +1,97 | Master Yi +0,13 ± 0,04 („schlägt euren Jarvan IV“), Viego +0,10, Thresh +0,08 |
+| Jungler zeigt Xin Zhao | Garen +2,75, Lillia +2,24, Shyvana +2,13 | Lillia +0,11 ± 0,02, Shyvana +0,09, Wukong +0,09, Thresh +0,08 |
+
+Die Liste folgt jetzt dem, was das Team zeigt, und sie sagt, wie wenig ein Bann vor dem ersten Pick
+bewegt: rund ein Zehntel Punkt, meist nicht zu unterscheiden.
+
+**Annahmen, nicht gemessen:**
+
+- Ein Teammate ohne gezeigten Champion nimmt einen Champion so oft wie der Gegner auf derselben Lane.
+  One-Tricks und Vorlieben kennt die App nicht.
+- Für den eigenen Platz entscheidet der Spieler. Steht ein Bann unter den ersten drei Picks der
+  eigenen Liste, ist er markiert („oben in deiner Pick-Liste“); der Wert ändert sich dadurch nicht.
+- Der Champion zählt nur auf der Lane, auf der ihn der Gegner am ehesten spielt (wie bisher).
+- Die Bannrate verteilt sich gleich auf beide Teams; wer zuerst pickt, zählt nicht.
+- **Nicht prüfbar:** ob ein Bann nach dieser Liste öfter gewinnt. Die Spieldaten kennen keine Banns.
+  Geprüft ist nur die Rechnung (`tests/model/bans.test.ts`).
+
+`BAN_LANE_FOCUS` und `BAN_ALLY_SHARE` gelten damit nur noch für OP.GG-Dateien; ohne bekannte eigene
+Lane (Custom ohne Positionen) rechnet auch mit eigenen Daten die alte Summe.
+
 ## Was offen bleibt (2.0)
 
 - **Seit 2.1 erledigt** (Messung 13 und 21): Die drei geschätzten Gewichte (übrige Gegner 0,35,

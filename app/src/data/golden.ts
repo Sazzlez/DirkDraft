@@ -107,6 +107,8 @@ export interface GoldenSet {
   tied: number;
   decimals: number;
   items: GoldenItem[];
+  /** New in 2.2 (engine.ts): bans as an expectation, own data only. */
+  expected?: boolean;
 }
 
 export interface GoldenProfile {
@@ -363,7 +365,7 @@ export class GoldenAdapter {
     const main = { text: mainReason(item, isBan ? null : lane) };
     return {
       champion,
-      value: isBan ? `${points(item.score)} Pkt` : percent(item.score, decimals),
+      value: isBan ? `${points(item.score, decimals)} Pkt` : percent(item.score, decimals),
       score: item.score,
       errorPoints: item.uncertaintyPoints,
       verdict: verdict.text,
@@ -383,9 +385,15 @@ export class GoldenAdapter {
     // The synergy with the duo partner's champion is named as such ("starkes Botlane-Duo mit Thresh
     // (dein Duo)"). A label only: the number behind it is the same as with anyone on that champion.
     const duo = isBan ? null : this.duoChampion(frame.state);
+    // Bans as an expectation (own data): a ban that stands among the seat's own first picks is marked —
+    // it takes the champion from the player too. Only while the seat has shown no pick of its own.
+    const seat = frame.state.allies.find((slot) => slot.cellId === set.cellId);
+    const undecided = !!seat && !seat.lockedChampionId && !seat.hoverChampionId;
+    const ownPicks = set.expected && undecided && frame.picks?.cellId === set.cellId ? frame.picks.items.slice(0, OWN_PICKS_MARKED).map((p) => p.championId) : [];
     const rows = (s: GoldenSet) =>
       s.items.map((item, i) => {
         const row = this.recommendation(item, i + 1, s.items[0]!, s.decimals, isBan, i < s.tied, toLane(s.lane));
+        if (s.expected) return expectedBan(row, item, item.banLane === s.lane && ownPicks.includes(item.championId));
         if (!duo) return row;
         const named = (text: string) => (SYNERGY_REASONS.some((start) => text === `${start} ${duo}`) ? `${text} (dein Duo)` : text);
         return { ...row, reason: named(row.reason), reasons: row.reasons.map((r) => ({ ...r, text: named(r.text) })) };
@@ -402,7 +410,12 @@ export class GoldenAdapter {
       hover: isBan ? null : this.hover(frame),
       note: hint ? this.pickNote(hint, frame) : null,
       // Picks: what the bars mean stands in the bar's tooltip (ContributionBar).
-      footnote: isBan ? 'Bann-Wert: so viel Winrate nimmt der Bann dem Gegner, mal der Chance, dass er den Champion überhaupt pickt.' : null,
+      footnote: !isBan
+        ? null
+        : set.expected
+          ? 'Bann-Wert: wie oft der Gegner den Champion pickt, mal dem, was er ihm bringt. Was auch euer Team picken könnte, zählt nicht — ein Bann nimmt ihn beiden.' +
+            (undecided ? ' Hover deinen Pick, dann zählt auch, was ihn schlägt.' : '')
+          : 'Bann-Wert: so viel Winrate nimmt der Bann dem Gegner, mal der Chance, dass er den Champion überhaupt pickt.',
     };
   }
 
@@ -431,7 +444,7 @@ export class GoldenAdapter {
       rows: bans.map((b) => ({
         champion: this.champion(b.championId) ?? { id: b.championId, key: '', name: `#${b.championId}` },
         lane: toLane(b.lane),
-        value: b.score === null ? '—' : `${points(b.score)} Pkt`,
+        value: b.score === null ? '—' : `${points(b.score, frame.bans?.expected ? 2 : 1)} Pkt`,
         by: b.by === null ? null : b.by === s.localCellId ? 'dein Hover' : `${label(b.by)} hovert ihn`,
         mine: b.championId === mine,
       })),
@@ -692,6 +705,31 @@ export function mainReason(item: GoldenItem, lane: Lane | null): string | undefi
     return `${percent(1 / (1 + Math.exp(-lead.logOdds!)), 1)} WR auf ${LANE_NAMES[lane]}`;
   }
   return pro?.text;
+}
+
+/** Bans as an expectation: so many of the seat's own first picks are marked when they stand in its ban list. */
+const OWN_PICKS_MARKED = 3;
+
+/** What the parts of an expected ban are called (own data; the 1.5 names describe the old sum). */
+const EXPECTED_BAN_LABELS: Record<string, string> = {
+  banStrength: 'Stärke auf seiner Lane',
+  banLaneThreat: 'Matchup gegen euren Pick',
+  banTeamThreat: 'Gegen eure anderen Picks',
+  banPopularity: 'Gegner pickt ihn',
+};
+
+/**
+ * A ban row on own data: the reason with how often the enemy takes the champion, the parts under
+ * their own names, and the mark for a champion the seat might pick itself.
+ */
+function expectedBan(row: RecommendationView, item: GoldenItem, ownPick: boolean): RecommendationView {
+  const chance = item.reasons.find((r) => r.text.startsWith('beim Gegner in '))?.text;
+  return {
+    ...row,
+    reason: chance && row.reason && row.reason !== chance ? `${row.reason} · ${chance}` : (chance ?? row.reason),
+    terms: item.breakdown.map((t) => ({ ...term(t), label: EXPECTED_BAN_LABELS[t.kind] ?? t.label, ...(t.isGate ? { verdict: '' } : {}) })),
+    badge: ownPick ? 'oben in deiner Pick-Liste' : null,
+  };
 }
 
 function toneOf(tone: string): Tone {

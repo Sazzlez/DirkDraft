@@ -24,7 +24,7 @@ import { isUncertain, LanePredictor, SeatPriors, type LanePredictionResult } fro
 import { MetaLookup, type MetaSnapshot } from './model/metaLookup';
 import { isAram, usesLanes, type QueueKind } from './model/queue';
 import { isGate, Recommender, termGate, termLabel, termPoints, type Recommendation, type RecommendationSet } from './model/recommender';
-import { countLeadingTies, decimalsOf, errorAsPoints } from './model/scoreError';
+import { countLeadingBanTies, countLeadingTies, decimalsOf, errorAsPoints } from './model/scoreError';
 import { TankShred } from './model/tankShred';
 import { planTeam, planTeamBans, type TeamPlan } from './model/teamPlanner';
 import { TraitTable } from './model/traits';
@@ -72,6 +72,8 @@ export interface FrameSet {
   tied: number;
   decimals: number;
   items: FrameItem[];
+  /** Bans on own data: the score is the expected change of the chance in points, with an error. */
+  expected?: true;
 }
 
 export interface FrameProfile {
@@ -542,9 +544,11 @@ function frameSet(s: RecommendationSet): FrameSet {
     cellId: s.cellId,
     lane: laneKey(s.lane),
     action: s.action,
-    tied: isBan ? 0 : countLeadingTies(s.items),
-    decimals: isBan ? 1 : decimalsOf(s.items),
+    tied: isBan ? countLeadingBanTies(s.items) : countLeadingTies(s.items),
+    // An expected ban is worth a tenth of a point or two: one decimal would read +0,1 on every row.
+    decimals: isBan ? (s.expected ? 2 : 1) : decimalsOf(s.items),
     items: s.items.map(frameItem),
+    ...(s.expected ? { expected: true as const } : {}),
   };
 }
 
