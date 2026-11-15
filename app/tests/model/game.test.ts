@@ -1,9 +1,9 @@
 // The game moment from the Live Client Data API: next buy against gold, next skill point, enemies.
 
 import { describe, expect, it } from 'vitest';
-import { buyOrder, gameModel, itemWorth, recipeForm, remainingCost, resistOf, type ItemInfo, type LiveGameData } from '../../src/core/game';
+import { buyOrder, DAMAGE_HINT_SHARE, gameModel, itemWorth, recipeForm, remainingCost, resistOf, type ItemInfo, type LiveGameData } from '../../src/core/game';
 import { Lane } from '../../src/core/model/lane';
-import { DamageType } from '../../src/core/model/metaLookup';
+import { DamageType, type MetaLookup } from '../../src/core/model/metaLookup';
 import type { RiotBuildPlan } from '../../src/core/riotBuilds';
 import { MetaBuilder } from './helpers';
 
@@ -327,7 +327,43 @@ describe('enemies', () => {
       { championId: 103, items: [], damage: DamageType.Magic },
     ]);
     expect(model.enemyMagic).toBeCloseTo(0.75, 12);
+    expect(model.enemyDamageBy).toBe('heads');
     expect(JSON.stringify(model)).not.toContain('Fremd');
+  });
+
+  it('weighs the enemies by the damage they deal per game, where the file counts it for all of them', () => {
+    // Three "magic" champions of five — but Lulu deals a quarter of what Veigar does (meta.json, 15.11.2026).
+    const own = new MetaBuilder()
+      .champion(122, 'Darius', { damage: DamageType.Physical })
+      .champion(45, 'Veigar', { damage: DamageType.Magic, physicalDamage: 682, magicDamage: 26436 })
+      .champion(27, 'Singed', { damage: DamageType.Magic, physicalDamage: 961, magicDamage: 22921 })
+      .champion(117, 'Lulu', { damage: DamageType.Magic, physicalDamage: 1072, magicDamage: 6003 })
+      .champion(804, 'Yunara', { damage: DamageType.Mixed, physicalDamage: 18222, magicDamage: 8961 })
+      .champion(254, 'Vi', { damage: DamageType.Physical, physicalDamage: 18300, magicDamage: 44 });
+    const against = (lookup: MetaLookup) => {
+      const data = game();
+      data.allPlayers = [data.allPlayers![0]!, ...['Veigar', 'Singed', 'Lulu', 'Yunara', 'Vi'].map((championName, i) => ({ riotId: `Fremd#${i}`, championName, team: 'CHAOS', items: [] }))];
+      return gameModel(data, lookup, plan, ITEMS)!;
+    };
+    const measured = against(own.build());
+    expect(measured.enemyDamageBy).toBe('amount');
+    expect(measured.enemyMagic).toBeCloseTo((26436 + 22921 + 6003 + 8961 + 44) / (27118 + 23882 + 7075 + 27183 + 18344), 12);
+    // 62 % of the damage: below the hint's two thirds, where the heads said 70 %.
+    expect(measured.enemyMagic).toBeLessThan(DAMAGE_HINT_SHARE);
+    expect(measured.enemyDamage).toBeNull();
+
+    // One champion without amounts (an older file): heads for all, as in the comp tile.
+    const partly = new MetaBuilder()
+      .champion(122, 'Darius', { damage: DamageType.Physical })
+      .champion(45, 'Veigar', { damage: DamageType.Magic, physicalDamage: 682, magicDamage: 26436 })
+      .champion(27, 'Singed', { damage: DamageType.Magic })
+      .champion(117, 'Lulu', { damage: DamageType.Magic })
+      .champion(804, 'Yunara', { damage: DamageType.Mixed })
+      .champion(254, 'Vi', { damage: DamageType.Physical });
+    const heads = against(partly.build());
+    expect(heads.enemyDamageBy).toBe('heads');
+    expect(heads.enemyMagic).toBeCloseTo(0.7, 12);
+    expect(heads.enemyDamage).toBe('magic');
   });
 
   it("names the plan's own item against a line-up of one damage type, and leaves the order alone", () => {

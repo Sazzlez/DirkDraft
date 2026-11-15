@@ -113,15 +113,19 @@ export function gameView(
     .filter((group) => group.items.length > 0);
 
   const hints: GameView['hints'] = [];
-  // Mixed champions count half to each side, so the share is said as a share, not as a head count.
-  const share = (value: number) => `Etwa ${Math.round(value * 100)} % des Schadens im Gegnerteam ist`;
+  // By amount: what these champions deal per game on average (own data). By heads (OP.GG files): how
+  // many of them deal mainly that type — said as that, not as a share of the damage.
+  const share = (value: number, kind: string) =>
+    model.enemyDamageBy === 'amount'
+      ? `Etwa ${Math.round(value * 100)} % des Schadens, den diese Gegner im Schnitt machen, ist ${kind}.`
+      : `Etwa ${Math.round(value * 100)} % der Gegner machen vor allem ${kind}en Schaden.`;
   // The plan's own item against it, by name: the hint stands beside the build and leaves its order
   // alone, but "Magieresistenz lohnt sich" beside a list that builds Thornmail gave nothing to act on.
   const answer = model.answerItem ? ` In deinem Build steht dafür: ${itemName(model.answerItem)}.` : '';
   if (model.enemyDamage === 'physical') {
-    hints.push({ title: 'Rüstung lohnt sich', detail: `${share(model.enemyPhysical)} physisch.${answer}`, tone: 'info' as Tone });
+    hints.push({ title: 'Rüstung lohnt sich', detail: `${share(model.enemyPhysical, 'physisch')}${answer}`, tone: 'info' as Tone });
   } else if (model.enemyDamage === 'magic') {
-    hints.push({ title: 'Magieresistenz lohnt sich', detail: `${share(model.enemyMagic)} magisch.${answer}`, tone: 'info' as Tone });
+    hints.push({ title: 'Magieresistenz lohnt sich', detail: `${share(model.enemyMagic, 'magisch')}${answer}`, tone: 'info' as Tone });
   }
 
   // What the list is buying towards has a measured alternative for this game's enemies

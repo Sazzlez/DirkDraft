@@ -565,7 +565,7 @@ export function timingMajority(p: CompProfile): 'early' | 'late' | null {
 }
 
 /** Physical and magic damage per game, when the file has both and they are not nothing. */
-function damageAmount(champion: ChampionEntry | null | undefined): { physical: number; magic: number } | null {
+export function damageAmount(champion: ChampionEntry | null | undefined): { physical: number; magic: number } | null {
   const physical = champion?.physicalDamage;
   const magic = champion?.magicDamage;
   if (typeof physical !== 'number' || typeof magic !== 'number') return null;

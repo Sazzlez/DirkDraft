@@ -6,6 +6,7 @@
 // find the own row and are dropped right there), and no timers — no cooldowns, no ultimate or
 // summoner timers, nothing the game does not show on its own scoreboard.
 
+import { damageAmount } from './model/compAnalyzer';
 import { DamageType, type MetaLookup } from './model/metaLookup';
 import type { RiotBuildPlan } from './riotBuilds';
 
@@ -239,9 +240,14 @@ export interface GameModel {
   /** Skill points already spent (Q + W + E + R levels). */
   skillPoints: number;
   enemies: EnemyView[];
-  /** Share of the enemy champions dealing mainly physical (magic) damage. */
+  /**
+   * The physical (magic) share of the enemy line-up's damage: of what its champions deal per game on
+   * average, where the file counts that for every one of them (`enemyDamageBy` 'amount', own data) —
+   * else the share of champions dealing mainly that type, a mixed one half each ('heads').
+   */
   enemyPhysical: number;
   enemyMagic: number;
+  enemyDamageBy: 'amount' | 'heads';
   /** The damage type the enemy line-up clearly deals most of (DAMAGE_HINT_SHARE); null on a mixed one. */
   enemyDamage: 'physical' | 'magic' | null;
   /**
@@ -476,8 +482,20 @@ function nextSkillOf(order: string, data: LiveGameData): GameModel['nextSkill'] 
   return null;
 }
 
-/** Physical / magic share of the enemy line-up, from each champion's damage type. */
-function damageShares(enemies: EnemyView[]): { physical: number; magic: number } {
+/**
+ * Physical / magic share of the enemy line-up's damage. By what each champion deals to champions per
+ * game on average, where the file has it for all five (own data) — a Lulu brings 6.000 magic damage,
+ * a Veigar 26.000, and counting both as "one magic champion" called a team 70 % magic that deals
+ * 61 % (15.11.2026). The same rule as the comp tile in the draft (CompAnalyzer.analyze). Otherwise
+ * by heads, from each champion's damage type.
+ */
+function damageShares(enemies: EnemyView[], meta: MetaLookup): { physical: number; magic: number; by: 'amount' | 'heads' } {
+  const amounts = enemies.map((enemy) => damageAmount(meta.champion(enemy.championId)));
+  if (enemies.length > 0 && amounts.every((amount) => amount !== null)) {
+    const sum = amounts.reduce((total, amount) => ({ physical: total.physical + amount!.physical, magic: total.magic + amount!.magic }), { physical: 0, magic: 0 });
+    const total = sum.physical + sum.magic;
+    return { physical: sum.physical / total, magic: sum.magic / total, by: 'amount' };
+  }
   let physical = 0;
   let magic = 0;
   let known = 0;
@@ -490,7 +508,7 @@ function damageShares(enemies: EnemyView[]): { physical: number; magic: number }
     } else continue;
     known++;
   }
-  return known === 0 ? { physical: 0, magic: 0 } : { physical: physical / known, magic: magic / known };
+  return known === 0 ? { physical: 0, magic: 0, by: 'heads' } : { physical: physical / known, magic: magic / known, by: 'heads' };
 }
 
 export function gameModel(
@@ -525,7 +543,7 @@ export function gameModel(
         damage: meta.champion(championId)?.damage ?? DamageType.Unknown,
       };
     });
-  const shares = damageShares(enemies);
+  const shares = damageShares(enemies, meta);
   const known = enemies.filter((e) => e.damage !== DamageType.Unknown).length;
   const enemyDamage = known < 3 ? null : shares.physical >= DAMAGE_HINT_SHARE ? 'physical' : shares.magic >= DAMAGE_HINT_SHARE ? 'magic' : null;
   const nextBuy = markSituational(nextBuyOf(order, owned, basket, items), situational);
@@ -549,5 +567,6 @@ export function gameModel(
     enemies,
     enemyPhysical: shares.physical,
     enemyMagic: shares.magic,
+    enemyDamageBy: shares.by,
   };
 }

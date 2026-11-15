@@ -29,6 +29,7 @@ const model = (overrides: Partial<GameModel> = {}): GameModel => ({
   enemies: [1, 2, 3, 4, 5].map((championId) => ({ championId, items: [], damage: championId <= 3 ? DamageType.Magic : championId === 4 ? DamageType.Mixed : DamageType.Physical })),
   enemyPhysical: 0.3,
   enemyMagic: 0.7,
+  enemyDamageBy: 'amount',
   enemyDamage: 'magic',
   answerItem: 2504,
   ...overrides,
@@ -41,13 +42,15 @@ describe('the damage hint', () => {
   it('names the item of the build that answers it', () => {
     // Without loaded assets an item's name is its number.
     expect(view(model()).hints).toEqual([
-      { title: 'Magieresistenz lohnt sich', detail: 'Etwa 70 % des Schadens im Gegnerteam ist magisch. In deinem Build steht dafür: #2504.', tone: 'info' },
+      { title: 'Magieresistenz lohnt sich', detail: 'Etwa 70 % des Schadens, den diese Gegner im Schnitt machen, ist magisch. In deinem Build steht dafür: #2504.', tone: 'info' },
     ]);
-    expect(view(model({ answerItem: null })).hints[0]!.detail).toBe('Etwa 70 % des Schadens im Gegnerteam ist magisch.');
+    expect(view(model({ answerItem: null })).hints[0]!.detail).toBe('Etwa 70 % des Schadens, den diese Gegner im Schnitt machen, ist magisch.');
     expect(view(model({ enemyDamage: 'physical', enemyPhysical: 0.8, enemyMagic: 0.2, answerItem: 3075 })).hints[0]).toMatchObject({
       title: 'Rüstung lohnt sich',
-      detail: 'Etwa 80 % des Schadens im Gegnerteam ist physisch. In deinem Build steht dafür: #3075.',
+      detail: 'Etwa 80 % des Schadens, den diese Gegner im Schnitt machen, ist physisch. In deinem Build steht dafür: #3075.',
     });
+    // A file without damage amounts (OP.GG) counts heads, and says so instead of calling it damage.
+    expect(view(model({ enemyDamageBy: 'heads', answerItem: null })).hints[0]!.detail).toBe('Etwa 70 % der Gegner machen vor allem magischen Schaden.');
     expect(view(model({ enemyDamage: null, answerItem: null })).hints).toEqual([]);
   });
 });

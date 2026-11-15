@@ -1634,6 +1634,38 @@ Kern 65,1 % aus 608 Spielen.
   (Messung 16, Regel 3). Offen bleibt der dort genannte Einfluss des Zeitpunkts (billige Kerne sind
   früher fertig).
 
+## 33. Der Schadensanteil der Gegner im Spiel (15.11.2026)
+
+**Anlass.** Im Spiel stand „Magieresistenz lohnt sich – etwa 70 % des Schadens im Gegnerteam ist
+magisch“. Gezählt waren Köpfe: Veigar, Singed und Lulu je ein magischer Champion, Yunara ein halber.
+
+**Befund.** Die Datei kennt seit 2.1 den Schaden an Champions je Spiel, physisch und magisch, für
+jeden Champion (`physicalDamage`, `magicDamage`); der Comp-Vergleich im Draft rechnet damit, der
+Hinweis im Spiel zählte weiter Köpfe. Lulu macht 6.000 magischen Schaden je Spiel, Veigar 26.400.
+Für Veigar, Singed, Lulu, Yunara und einen physischen Fünften (Vi) sind es 62 % statt 70 %.
+
+**Änderung.** `game.ts damageShares` rechnet wie `CompAnalyzer.analyze`: nach Schadensmenge, wenn
+die Datei sie für alle fünf Gegner hat, sonst nach Köpfen. Der Satz heißt dann „Etwa 62 % des
+Schadens, den diese Gegner im Schnitt machen, ist magisch“, nach Köpfen „Etwa 70 % der Gegner machen
+vor allem magischen Schaden“. Die Schwelle für den Hinweis bleibt bei zwei Dritteln (0,65, eine
+Setzung aus 1.5); die Lagen der situativen Items (`situationsOf`, 0,6 nach Köpfen) sind die des
+Sammlers und bleiben, sonst passten die gezählten Kaufanteile nicht mehr dazu.
+
+**Nicht gebaut: Gewichtung nach Itemwert.** Vorgeschlagen war, den Schaden jedes Gegners mit dem
+Wert seiner Items zu gewichten (wer gefeedet ist, macht mehr Schaden). In drei aufgezeichneten
+Spielen, alle fünf Minuten gerechnet:
+
+| Spiel | Köpfe | gemessener Schaden | dazu nach Itemwert |
+|---|---:|---:|---:|
+| Renekton, Wukong, Fizz, Miss Fortune, Thresh | 40 % magisch | 37 % | 40–43 % |
+| Kennen, Shaco, Zed, Aphelios, Pyke | 30 % | 35 % | 32–41 % |
+| Lux, Aphelios, Karthus, Corki, Twisted Fate (nur bis Minute 5) | 60 % | 61 % | 48 % |
+
+Der Itemwert verschiebt den Anteil um wenige Punkte, und wie viel Schaden 1.000 Gold mehr bei einem
+Champion bringen, ist nicht gemessen: Die Zählung müsste der Sammler liefern (Schaden je Spiel gegen
+Gold je Spiel). Bis dahin zeigt die Gegnerliste, wer die meisten Items hat, und der Hinweis bleibt
+bei dem, was gemessen ist.
+
 ## Was offen bleibt (2.0)
 
 - **Seit 2.1 erledigt** (Messung 13 und 21): Die drei geschätzten Gewichte (übrige Gegner 0,35,
