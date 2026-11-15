@@ -3,6 +3,53 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
+## 2.2.0 — 2026-11-15
+
+Anlass war eine Prüfung aus Spielersicht an sieben aufgezeichneten Ranked-Drafts und drei Spielen.
+
+- **Die Bann-Liste rechnet ehrlich.** Der Bann-Wert stand rund zwanzigmal zu hoch: Er rechnete die
+  Winrate mal einem Faktor, der ab 12,5 % Pickrate schon bei 1 stand, und er übersah, dass ein Bann den
+  Champion auch dem eigenen Team nimmt. Jetzt ist er eine Erwartung: wie oft der Gegner den Champion
+  pickt, mal dem, was er ihm bringt (Lane-Winrate, Matchup gegen euren gezeigten Champion, Paare über
+  die Lanes). Es zählt nur, was allein den Gegner trifft: deine eigene Lane und die Lanes, auf denen
+  ein Teammate schon einen Champion zeigt. Hoverst du vor dem Bann deinen Pick, rückt vor, was ihn
+  schlägt („schlägt deinen Braum“). Vor dem ersten Pick liegt ein Bann bei rund 0,1 Punkten, und die
+  Liste sagt, welche Banns gleichauf liegen. Ein Bann, der unter deinen ersten drei Picks steht, ist
+  markiert. Nur mit eigenen Daten; ob solche Banns öfter gewinnen, lässt sich nicht messen, weil die
+  Spieldaten keine Banns kennen (`docs/modellpruefung.md`, Messung 31).
+- **Nach der Lane-Phase: Team gegen Team.** Die Stärke-Skala ist um Minute 10 geprüft und galt in
+  Minute 35 immer noch dem Lane-Gegner. Ab Minute 14, oder wenn es keinen Lane-Gegner gibt, zeigt die
+  Kachel jetzt beide Teams: Level und Itemwert als Summe, mit Balken und ohne Urteil, weil das nicht
+  gemessen ist. Die Gegnerliste nennt Stufe und Itemwert jedes Gegners und markiert, wer die meisten
+  Items hat. Das Draft-Urteil („Ihr skaliert besser“) bleibt im Spiel stehen.
+- **Der Draft ist kürzer.** Am Hover steht statt „Platz 23 von 79“ der Abstand zum besten Pick in
+  Punkten: „passt · gleichauf mit Thresh“, „geht · 1,7 Punkte hinter Leona“ oder „klar schlechter“.
+  Darunter steht, welche Lücke des Teams der Pick offen lässt („Frontline bleibt offen“). Die
+  Draft-Chance ist eine Zeile mit der Zahl neben dem Titel, die Aufschlüsselung liegt hinter
+  „Woraus?“. Der Comp-Vergleich zeigt Lücken, Plan und AD/AP-Balken ohne die Punktreihen. Weg sind die
+  Schrittliste unter der Uhr, die Legende und die Fußzeile der Pick-Liste; was die Balken bedeuten,
+  steht als Tooltip am Balken.
+- **Einkaufsliste.** Der benutzte Armschutz des Suchenden zählt als Teil von Zhonyas; bisher empfahl
+  die Liste dessen Teile ein zweites Mal (1.100 Gold). Der Hinweis „Magieresistenz lohnt sich“ nennt
+  das passende Item aus deinem Build. Im Kaufkasten steht eine gemessene Alternative zu dem Item, auf
+  das du gerade sparst („Merkurs Schuhe statt Beschichtete Stahlkappen“). Späte Items rücken im Build
+  vor, wenn Spieler deines Champions sie gegen diese Aufstellung klar öfter kaufen; das trifft 11 von
+  348 Plänen (Messung 30).
+- **Der Schadensanteil der Gegner zählt Schaden, nicht Köpfe.** Lulu macht 6.000 magischen Schaden je
+  Spiel, Veigar 26.400; beide zählten als „ein magischer Champion“. Der Hinweis im Spiel rechnet jetzt
+  wie der Comp-Vergleich im Draft mit dem gemessenen Schaden je Champion (Messung 33).
+- **Items 4 bis 6: das Meistgespielte führt.** Die Zählung später Items ist nicht nach dem Kern davor
+  getrennt, deshalb gewann bei Kai'Sa ein Crit-Item aus 3,6 % der Käufe gegen Zhonyas aus 59 %. Fünf
+  Pläne wechseln auf das Meistgespielte (Messung 34).
+- **Combo-Hinweise am Pick.** Neben dem Namen steht, mit wem der Champion zusammenpasst: „Wombo mit
+  Amumu“, „Knock-up für Yasuo“, „Enchanter für Kog'Maw“. Das sind Hinweise ohne Gewicht; gemessen
+  bringen die Combos nichts über die Stärke der Champions hinaus (Messung 28).
+- **Der Team-Bedarf ist neu gemessen.** Offene Plätze zählen als das, was auf diesen Lanes gepickt
+  wird: „AD fehlt“ feuerte bei offenem Bot und Jungle in 18,5 % der Teams und stimmte in 1,9 % davon.
+  Frontline ist nur noch, wer das Tank-Tag trägt. Assassinen gegen ein Team ohne Frontline und
+  Tank-Shred gegen zwei Frontliner zählen, wie gemessen; Disengage ist ein Hinweis ohne Gewicht
+  (Messung 29).
+
 ## 2.1.0 — 2026-11-13
 
 - **Stärke-Skala im Spiel: du gegen deinen Lane-Gegner.** Eine Kachel in der Spielansicht zeigt, wer
