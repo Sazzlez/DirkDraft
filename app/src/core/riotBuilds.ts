@@ -19,6 +19,8 @@
 //    from ahead is never clear: Mejai's is bought 4,6 times as often ahead as behind (the next item
 //    1,5 times), and "ahead" by the team's gold still mixes the fed with the carried — 89 % against
 //    Zhonya's 71 % for Twisted Fate within "ahead".
+// 4. Items four to six keep their most played option, always (LATE_SLOTS): their counts are not
+//    split by the core, and a fourth item's rate is the rate of the builds it belongs to.
 //
 // κ per slot comes from the file itself: how far the options of that slot truly spread beyond
 // sampling noise (moment estimate over all rows). It decides whether a slot may follow win rates at
@@ -313,7 +315,18 @@ export type SameStateCheck = (
 ) => number | null;
 
 /** The slots bought with the game under way: an option there has to hold within the game state. */
-const STATE_SLOT: Partial<Record<Slot, 'boots' | 'late' | 'core'>> = { boots: 'boots', core: 'core', fourth: 'late', fifth: 'late', sixth: 'late' };
+const STATE_SLOT: Partial<Record<Slot, 'boots' | 'late' | 'core'>> = { boots: 'boots', core: 'core' };
+
+/**
+ * Items four to six never follow win rates: the most played free option leads. Their counts are not
+ * split by the core bought before them, so an option's rate is the rate of the builds it is bought
+ * in — not of the plan's core with that item on top. On the file of 15.11.2026 Kai'Sa's plan (Kraken
+ * Slayer, Guinsoo's, Terminus — no crit) took Lord Dominik's Regards as fourth item from 3,6 % of the
+ * buys (60 %) over Zhonya's Hourglass from 59 % (53 %); without it, Phantom Dancer from 7 % (58 %):
+ * the crit builds' fourth items. Five plans led their fourth item by rate (docs/modellpruefung.md,
+ * Messung 34). Until the collector counts late items by core, what players buy stands.
+ */
+const LATE_SLOTS: readonly Slot[] = ['fourth', 'fifth', 'sixth'];
 
 /**
  * Standard errors before another option replaces the most played one: two, a 98 % chance that it is
@@ -370,7 +383,7 @@ function ranked(options: readonly BuildCount[], choice: Choice): PlanOption[] {
     const edge = choice.sameState?.(choice.championId, choice.lane, state, items, base) ?? null;
     return edge !== null && edge >= LEAD_SIGMA;
   };
-  const clear = played.filter((o) => o !== most && clearance(o, most, mu, kappa) >= LEAD_SIGMA && holdsInState(o)).sort(byEstimate);
+  const clear = LATE_SLOTS.includes(choice.slot) ? [] : played.filter((o) => o !== most && clearance(o, most, mu, kappa) >= LEAD_SIGMA && holdsInState(o)).sort(byEstimate);
   const lead = clear[0] ?? most;
   return [lead, ...played.filter((o) => o !== lead).sort(byEstimate)].map(asOption);
 }

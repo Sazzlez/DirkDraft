@@ -140,9 +140,15 @@ describe('builds from own data', () => {
     expect(clear.boots[0]!.ids).toEqual([3111]);
     expect(asked).toContainEqual([1000, Lane.Top, 'boots', [3111], [3047]]);
 
+  });
+
+  it('keeps the most played item in places four to six, however clear another one looks (Messung 34)', () => {
+    // The counts of a fourth item are not split by the core before it: 60 % as fourth item is the
+    // rate of the builds that item belongs to, not of this core with it on top.
     const late = file(spread('fourth', [3089], [3041]));
+    expect(Number.isFinite(slotWeights(late).fourth)).toBe(true);
     expect(riotPlan(late, 1000, Lane.Top)!.late[0]!.ids).toEqual([3089]);
-    expect(riotPlan(late, 1000, Lane.Top, (_c, _l, slotKind) => (slotKind === 'late' ? 4 : null))!.late[0]!.ids).toEqual([3041]);
+    expect(riotPlan(late, 1000, Lane.Top, () => 4)!.late[0]!.ids).toEqual([3089]);
   });
 
   it('compares two cores by the items that tell them apart, and never by their order alone', () => {

@@ -1666,6 +1666,47 @@ Champion bringen, ist nicht gemessen: Die Zählung müsste der Sammler liefern (
 Gold je Spiel). Bis dahin zeigt die Gegnerliste, wer die meisten Items hat, und der Hinweis bleibt
 bei dem, was gemessen ist.
 
+## 34. Items 4 bis 6 im Plan: das Meistgespielte führt (15.11.2026)
+
+**Anlass.** Nebenbefund aus Messung 30: Bei 31 von 348 Plänen steht ein spätes Item hinter einem, das
+insgesamt klar seltener spät gekauft wird (`situational.json`, Slot „spät“, zwei Standardfehler).
+Auffälligster Fall: Kai'Sa Bot mit Lord Dominiks Grüße als viertem Item vor Zhonyas Stundenglas.
+
+**Zwei Ursachen.**
+
+1. **Führung nach Winrate (5 Pläne).** Regel 2 und 3 aus Messung 16 lassen eine Option führen, die
+   klar öfter gewinnt und das im selben Spielstand hält. Beim vierten Item waren das:
+
+   | Plan | führte | statt des Meistgespielten |
+   |---|---|---|
+   | Kai'Sa Bot | Lord Dominiks Grüße, 3,6 % der Käufe, 60 % | Zhonyas Stundenglas, 59 %, 53 % |
+   | Dr. Mundo Top | Panzer des toten Mannes, 8 %, 68 % | Geistessicht, 29 %, 56 % |
+   | Smolder Bot | Lord Dominiks Grüße, 11 %, 65 % | Klinge der Unendlichkeit, 34 %, 57 % |
+   | Wukong Jungle | Tanz des Todes, 21 %, 63 % | Schlund von Malmortius, 22 %, 54 % |
+   | Trundle Top | Tanz des Todes, 30 %, 57 % | Geistessicht, 33 %, 46 % |
+
+   Die Zählung des vierten Items ist nicht nach dem Kern davor getrennt. Kai'Sas Kern im Plan ist
+   Krakenbezwinger, Guinsoos Wutklinge, Terminus (kein Crit); Lord Dominiks als viertes Item kommt aus
+   den Crit-Builds. Seine 60 % sind die Winrate dieser Builds, nicht die des Plan-Kerns mit Lord
+   Dominiks obendrauf. Eine Mindestquote hilft nicht: Mit „mindestens 5 % der Käufe“ rückt
+   Phantomtänzer nach (7 %, 58 %), wieder ein Crit-Item. Die Nachmessung in Messung 16 („die
+   Abweichungen halten“) prüft, dass die Option auf neuen Spielen weiter öfter gewinnt — das tut sie,
+   in ihren eigenen Builds.
+
+   **Änderung:** Auf den Plätzen 4 bis 6 führt immer die meistgespielte freie Option
+   (`riotBuilds.ts LATE_SLOTS`). Kai'Sa: Zhonyas → Rabadons → Schutzengel. Die fünf Pläne oben
+   wechseln auf das Meistgespielte; Abweichungen vom Meistgespielten insgesamt 18 statt 23 (Start,
+   Schuhe, Kern, Support-Item behalten Regel 2 und 3).
+
+2. **Platz für Platz gezählt (27 Pläne, unverändert).** Der Plan nimmt für Platz 5 das Item, das am
+   häufigsten als fünftes gekauft wird. Katarina Mid: Rabadons → Leerenstab → Zhonyas, obwohl
+   Zhonyas insgesamt 1.422-mal spät gekauft wird und Leerenstab 765-mal — Zhonyas wird meist schon
+   als viertes gekauft (1.128-mal), von den Spielern, die Rabadons nicht zuerst nehmen. Was die
+   Spieler mit Rabadons als viertem danach kaufen, steht in den Zahlen nicht. Nach Gesamtkäufen zu
+   ordnen wäre nicht besser: Es zöge die zweitbeliebtesten vierten Items anderer Builds nach vorn
+   (Kai'Sa: Nashors Zahn vor Rabadons). **Offen**, bis der Sammler späte Items nach Kern oder als
+   Folge zählt.
+
 ## Was offen bleibt (2.0)
 
 - **Seit 2.1 erledigt** (Messung 13 und 21): Die drei geschätzten Gewichte (übrige Gegner 0,35,
