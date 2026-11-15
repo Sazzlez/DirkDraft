@@ -5,7 +5,7 @@
 // Left out on the user's word (07.11.2026): a postgame and "Mein Pool".
 
 import { DraftEngine } from '../core/engine';
-import { gameModel, championIdOf, enemyItemsOf, isBoots, isFinished, ownsItem, type LiveGameData } from '../core/game';
+import { gameModel, championIdOf, enemyItemsOf, isBoots, isFinished, ownsItem, recipeForm, remainingCost, type LiveGameData } from '../core/game';
 import { aramBuildFile, aramStatsFrom } from '../core/aram';
 import { Lane, laneFromKey } from '../core/model/lane';
 import { MetaLookup } from '../core/model/metaLookup';
@@ -531,21 +531,27 @@ export class LiveSession {
     // With a plan, the clear ones take their place in it for this game (core/situational); without
     // one there is nothing to take a place in, and they stay a list.
     const file = mode === 'lanes' ? (this.data?.situational ?? null) : null;
-    const built = file && basePlan ? situationalBuild(file, meta, basePlan, championId, situations, ownedIds, (id) => ownsItem(id, ownedIds, items), slots, this.swaps) : null;
+    // A plan item with a part already in the bag stays where it is in the late order.
+    const begun = (id: number) => remainingCost(id, ownedIds.map((owned) => recipeForm(owned, items)), items) < (items.get(id)?.total ?? 0);
+    const built = file && basePlan ? situationalBuild(file, meta, basePlan, championId, situations, ownedIds, (id) => ownsItem(id, ownedIds, items), slots, this.swaps, 3, begun) : null;
     const situational: RatedSuggestion[] | null = built
       ? built.suggestions
       : file
         ? situationalSuggestions(file, meta, championId, lane, situations, new Set(ownedIds), 3, slots).map((s) => ({ ...s, instead: null, adopt: false }))
         : null;
     const plan = built?.plan ?? basePlan;
-    const model = built && built.swaps.length > 0 ? (gameModel(game, meta, plan, items, new Set(built.swaps.map((swap) => swap.itemId))) ?? first) : first;
+    const moves = built?.moves ?? [];
+    // Marked in the path and the list: what a swap brought in and what moved forward for these enemies.
+    const marked = new Set([...(built?.swaps ?? []).map((swap) => swap.itemId), ...moves.map((move) => move.itemId)]);
+    const model = marked.size > 0 ? (gameModel(game, meta, plan, items, marked) ?? first) : first;
     this.diagnosticLine =
       `Spiel: Champion ${championId}, Lane ${plan?.lane ?? lane}, Slots ${slots.join('/')} · Lagen ${situations.join(',')} · ` +
       (situational === null
         ? 'keine situativen Daten'
         : situational.length === 0
           ? 'kein situativer Vorschlag'
-          : `Vorschläge ${situational.map((s) => `${s.itemId}@${s.slot}/${s.situation} (${s.timesMoreOften.toFixed(1)}×, ${s.games}${s.adopt ? `, statt ${s.instead}` : ''})`).join(', ')}`);
+          : `Vorschläge ${situational.map((s) => `${s.itemId}@${s.slot}/${s.situation} (${s.timesMoreOften.toFixed(1)}×, ${s.games}${s.adopt ? `, statt ${s.instead}` : ''})`).join(', ')}`) +
+      (moves.length > 0 ? ` · vorgezogen ${moves.map((m) => `${m.itemId} vor ${m.before} (Lage ${m.situation}, ${Math.round(m.share * 100)} % gegen ${Math.round(m.otherShare * 100)} %, ${m.games})`).join(', ')}` : '');
 
     const champion = this.adapter.champion(championId);
     const opponent = this.picked?.championId === championId ? this.adapter.champion(this.picked.opponentId) : null;
@@ -563,6 +569,7 @@ export class LiveSession {
         null,
         situational,
         mode === 'lanes' ? strengthOf(game, meta, items, this.picked?.championId === championId ? { lane, opponentId: this.picked.opponentId } : null) : null,
+        moves,
       ),
     };
   }

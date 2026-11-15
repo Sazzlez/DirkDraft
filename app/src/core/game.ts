@@ -108,6 +108,28 @@ export function ownsItem(id: number, owned: readonly number[], items: ReadonlyMa
   });
 }
 
+/**
+ * The item a recipe names for one that changed shape in the bag. A used Seeker's Armguard is a
+ * "Broken Armguard" with an id of its own (2421); Zhonya's recipe names only the unused one (2420),
+ * so the list told a Morgana who held the broken one to buy both Tomes and the Cloth Armor again
+ * (15.11.2026, 1.100 gold). Told by the data rather than a list: an item that builds into another
+ * whose recipe does not name it, but names one with the same parts and the same price.
+ */
+export function recipeForm(id: number, items: ReadonlyMap<number, ItemInfo>): number {
+  const info = items.get(id);
+  if (!info || info.from.length === 0) return id;
+  const parts = [...info.from].sort((a, b) => a - b).join();
+  for (const parent of info.into ?? []) {
+    const recipe = items.get(parent)?.from ?? [];
+    if (recipe.includes(id)) return id;
+    for (const part of recipe) {
+      const twin = items.get(part);
+      if (twin && twin.total === info.total && [...twin.from].sort((a, b) => a - b).join() === parts) return part;
+    }
+  }
+  return id;
+}
+
 /** ItemCatalog.IsFinished: an end point of the shop, not a component, boots or consumable. */
 export function isFinished(id: number, items: ReadonlyMap<number, ItemInfo>): boolean {
   const info = items.get(id);
@@ -130,6 +152,28 @@ export function enemyItemsOf(itemIds: readonly number[], items: ReadonlyMap<numb
     if (hasTag(info, 'LifeSteal') || hasTag(info, 'SpellVamp')) sustain++;
   }
   return { armor, magicResist, sustain };
+}
+
+/**
+ * A clear majority before a damage type is worth a hint; a 3:2 split (0.6) is no reason to itemise.
+ * 1.5's threshold, the same as the draft verdict's "Viel AD/AP beim Gegner".
+ */
+export const DAMAGE_HINT_SHARE = 0.65;
+
+/** Tags of items bought for what they deal, not for what they take. */
+const OFFENSE_TAGS: readonly string[] = ['Damage', 'SpellDamage', 'CriticalStrike', 'AttackSpeed', 'LifeSteal', 'SpellVamp', 'ArmorPenetration', 'MagicPenetration', 'OnHit'];
+
+/**
+ * The one resistance a defensive item is bought for: Thornmail armor, Kaenic Rookern magic resist.
+ * Null for items with both (Locket), with neither, and for those bought for their damage or their
+ * active (Zhonya's armor answers nothing a mage picked it for).
+ */
+export function resistOf(info: ItemInfo | undefined): 'armor' | 'magicResist' | null {
+  if (!info || OFFENSE_TAGS.some((tag) => hasTag(info, tag))) return null;
+  const armor = info.armor ?? 0;
+  const magicResist = info.magicResist ?? 0;
+  if (armor > 0 && magicResist === 0) return 'armor';
+  return magicResist > 0 && armor === 0 ? 'magicResist' : null;
 }
 
 export type Skill = 'Q' | 'W' | 'E' | 'R';
@@ -198,6 +242,14 @@ export interface GameModel {
   /** Share of the enemy champions dealing mainly physical (magic) damage. */
   enemyPhysical: number;
   enemyMagic: number;
+  /** The damage type the enemy line-up clearly deals most of (DAMAGE_HINT_SHARE); null on a mixed one. */
+  enemyDamage: 'physical' | 'magic' | null;
+  /**
+   * The plan's own item against that damage type — the first core or late item not yet owned that
+   * is bought for the matching resistance — unless it is what the list buys next anyway. The hint
+   * names it; the build's order stays as counted.
+   */
+  answerItem: number | null;
 }
 
 /** A starting item is only worth suggesting in the first minutes. */
@@ -454,7 +506,8 @@ export function gameModel(
 
   const gameTime = data.gameData?.gameTime ?? 0;
   const gold = Math.floor(data.activePlayer.currentGold ?? 0);
-  const owned = ownedItems(me);
+  // In the form the recipes name: a part that changed shape in the bag is still that part.
+  const owned = ownedItems(me).map((id) => recipeForm(id, items));
   const steps = pathOf(plan, owned, gameTime, items).map((step) => (situational.has(step.itemId) ? { ...step, situational: true } : step));
   const order = buyOrder(steps, plan?.bootsAfterItems ?? null);
   const bootsWorth = plan?.bootsWorth ?? null;
@@ -473,6 +526,12 @@ export function gameModel(
       };
     });
   const shares = damageShares(enemies);
+  const known = enemies.filter((e) => e.damage !== DamageType.Unknown).length;
+  const enemyDamage = known < 3 ? null : shares.physical >= DAMAGE_HINT_SHARE ? 'physical' : shares.magic >= DAMAGE_HINT_SHARE ? 'magic' : null;
+  const nextBuy = markSituational(nextBuyOf(order, owned, basket, items), situational);
+  const nextTarget = nextBuy ? (nextBuy.towards ?? nextBuy.itemId) : null;
+  const wanted = enemyDamage === 'physical' ? 'armor' : enemyDamage === 'magic' ? 'magicResist' : null;
+  const answer = wanted ? steps.find((s) => (s.slot === 'Kern' || s.slot === 'Spät') && !s.owned && resistOf(items.get(s.itemId)) === wanted) : undefined;
 
   return {
     gameTime,
@@ -480,7 +539,9 @@ export function gameModel(
     gold,
     championId: championIdOf(me, meta),
     path: steps,
-    nextBuy: markSituational(nextBuyOf(order, owned, basket, items), situational),
+    nextBuy,
+    enemyDamage,
+    answerItem: answer && answer.itemId !== nextTarget ? answer.itemId : null,
     basket,
     goldLeft: gold - basket.reduce((sum, buy) => sum + buy.cost, 0),
     nextSkill: plan ? nextSkillOf(plan.skillOrder, data) : null,

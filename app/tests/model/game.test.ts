@@ -1,7 +1,7 @@
 // The game moment from the Live Client Data API: next buy against gold, next skill point, enemies.
 
 import { describe, expect, it } from 'vitest';
-import { buyOrder, gameModel, itemWorth, remainingCost, type ItemInfo, type LiveGameData } from '../../src/core/game';
+import { buyOrder, gameModel, itemWorth, recipeForm, remainingCost, resistOf, type ItemInfo, type LiveGameData } from '../../src/core/game';
 import { Lane } from '../../src/core/model/lane';
 import { DamageType } from '../../src/core/model/metaLookup';
 import type { RiotBuildPlan } from '../../src/core/riotBuilds';
@@ -28,6 +28,17 @@ const ITEMS = new Map<number, ItemInfo>([
   [3867, { total: 400, from: [], purchasable: false, into: [3876, 3869] }],
   [3876, { total: 400, from: [3867] }],
   [3869, { total: 400, from: [3867] }],
+  // Zhonya's (Data Dragon 16.22): a Rod and the Seeker's Armguard. Used, the Armguard is a "Broken
+  // Armguard" with an id of its own — same parts, same price, builds into Zhonya's, in no recipe.
+  [1052, { total: 400, from: [] }],
+  [1029, { total: 300, from: [], armor: 15, tags: ['Armor'] }],
+  [1058, { total: 1200, from: [] }],
+  [2420, { total: 1600, from: [1052, 1029, 1052], into: [3157], armor: 25, tags: ['Armor', 'SpellDamage', 'Active'] }],
+  [2421, { total: 1600, from: [1052, 1029, 1052], into: [3157], armor: 25, tags: [] }],
+  [3157, { total: 3250, from: [1058, 2420], armor: 50, tags: ['Armor', 'SpellDamage', 'Active'] }],
+  // Thornmail and Kaenic Rookern: one resistance each, nothing else to be bought for.
+  [3075, { total: 2450, from: [], armor: 75, tags: ['Health', 'Armor'] }],
+  [2504, { total: 2900, from: [], magicResist: 80, tags: ['Health', 'SpellBlock', 'HealthRegen'] }],
   // What an inventory's worth leaves out: a potion and the trinket.
   [2003, { total: 50, from: [], tags: ['Consumable'] }],
   [3340, { total: 0, from: [], tags: ['Trinket', 'Vision'] }],
@@ -113,6 +124,26 @@ describe('items that changed shape', () => {
     const model = gameModel(game({ items: [3042], gold: 5000, time: 900 }), meta, tear, ITEMS)!;
     expect(model.path.find((s) => s.itemId === 3004)!.owned).toBe(true);
     expect(model.nextBuy).toBeNull();
+  });
+
+  it("a used Seeker's Armguard is still the part Zhonya's recipe names", () => {
+    expect(recipeForm(2421, ITEMS)).toBe(2420);
+    // What recipes name themselves, and plain parts, stay what they are.
+    expect(recipeForm(2420, ITEMS)).toBe(2420);
+    expect(recipeForm(3133, ITEMS)).toBe(3133);
+    expect(recipeForm(1036, ITEMS)).toBe(1036);
+
+    // The Morgana of 15.11.2026: broken Armguard in the bag, 1.195 gold. The Rod costs 1.200 —
+    // nothing to buy yet, and certainly not both Tomes and the Cloth Armor a second time.
+    const zhonya = { ...plan, core: [option([3157])] };
+    const waiting = gameModel(game({ items: [3047, 2421], gold: 1195, time: 1500 }), meta, zhonya, ITEMS)!;
+    expect(waiting.basket).toEqual([]);
+    expect(waiting.nextBuy).toEqual({ itemId: 3157, cost: 1650, affordable: false, towards: null, supportChoice: false });
+    // With the Rod's price at hand, the Rod.
+    const rod = gameModel(game({ items: [3047, 2421], gold: 1250, time: 1500 }), meta, zhonya, ITEMS)!;
+    expect(rod.basket).toEqual([{ itemId: 1058, cost: 1200, towards: 3157 }]);
+    // The unused one counts the same.
+    expect(gameModel(game({ items: [3047, 2420], gold: 1250, time: 1500 }), meta, zhonya, ITEMS)!.basket).toEqual(rod.basket);
   });
 
   it('counts spent skill points for the grid', () => {
@@ -297,6 +328,34 @@ describe('enemies', () => {
     ]);
     expect(model.enemyMagic).toBeCloseTo(0.75, 12);
     expect(JSON.stringify(model)).not.toContain('Fremd');
+  });
+
+  it("names the plan's own item against a line-up of one damage type, and leaves the order alone", () => {
+    expect(resistOf(ITEMS.get(3075))).toBe('armor');
+    expect(resistOf(ITEMS.get(2504))).toBe('magicResist');
+    // Zhonya's armor answers nothing it is bought for; a part without a resistance answers nothing.
+    expect(resistOf(ITEMS.get(3157))).toBeNull();
+    expect(resistOf(ITEMS.get(1036))).toBeNull();
+
+    // Thornmail fourth, Rookern fifth, as the build file counted them.
+    const tank = { ...plan, late: [option([3075]), option([2504])] };
+    const against = (enemies: string[], items: number[]) => {
+      const data = game({ items, gold: 500, time: 1800 });
+      data.allPlayers = [data.allPlayers![0]!, ...enemies.map((championName, i) => ({ riotId: `Fremd#${i}`, championName, team: 'CHAOS', items: [] }))];
+      return gameModel(data, meta, tank, ITEMS)!;
+    };
+    const magic = against(['Ahri', 'Ahri', 'Ahri', 'Jax'], [3047, 3071]);
+    expect(magic.enemyDamage).toBe('magic');
+    expect(magic.answerItem).toBe(2504);
+    // The order is the file's: Thornmail is still what the list builds next.
+    expect(magic.path.filter((s) => s.slot === 'Spät').map((s) => s.itemId)).toEqual([3075, 2504]);
+    expect(magic.nextBuy!.itemId).toBe(3075);
+    // Nothing to name once the answer is next anyway, on a mixed line-up, or with two enemies known.
+    expect(against(['Ahri', 'Ahri', 'Ahri', 'Jax'], [3047, 3071, 3075]).answerItem).toBeNull();
+    expect(against(['Ahri', 'Jax', 'Darius'], [3047, 3071])).toMatchObject({ enemyDamage: null, answerItem: null });
+    expect(against(['Ahri', 'Ahri'], [3047, 3071])).toMatchObject({ enemyDamage: null, answerItem: null });
+    // Against physical damage the armor item is the answer — here it is next, so nothing to add.
+    expect(against(['Darius', 'Darius', 'Darius'], [3047, 3071])).toMatchObject({ enemyDamage: 'physical', answerItem: null });
   });
 
   it('has nothing to say without the own row', () => {

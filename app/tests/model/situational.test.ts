@@ -8,6 +8,7 @@ import type { RiotBuildPlan } from '../../src/core/riotBuilds';
 import {
   applySwaps,
   boughtFromAhead,
+  lateOrder,
   rateSuggestions,
   situationalBuild,
   situationShare,
@@ -380,6 +381,63 @@ describe('a situational item in the plan\'s place', () => {
     const owned = situationalBuild(file, meta, plan, 1, [A, M], [3053], (id) => id === 3053, all, new SwapTracker());
     expect(owned.plan.late.map((o) => o.ids[0])).toEqual([3053, 7000]);
     expect(owned.suggestions.map((s) => [s.itemId, s.instead, s.adopt])).toEqual([[3065, null, false]]);
+  });
+
+  it('brings a late item of the plan forward when players buy it clearly more often against this line-up', () => {
+    const late = (ids: number[]) => ids.map((id) => option([id]));
+    const order = (f: RiotSituationalFile, ids: number[], situations: number[], open: (id: number) => boolean = () => true, fixed: (id: number) => boolean = () => false) => {
+      const result = lateOrder(f, meta, 1, TOP, late(ids), situations as never, open, fixed);
+      return { ids: result.late.map((o) => o.ids[0]), moves: result.moves };
+    };
+    // Against magic damage Spirit Visage is 38 % of the late buys, Sterak's 29 %: it moves in front.
+    const moved = order(file, [3053, 3065], [A, M]);
+    expect(moved.ids).toEqual([3065, 3053]);
+    expect(moved.moves).toEqual([{ itemId: 3065, before: 3053, situation: M, share: 400 / 1050, otherShare: 300 / 1050, games: 1000 }]);
+    // Not without the situation, and not the other way round.
+    expect(order(file, [3053, 3065], [A])).toEqual({ ids: [3053, 3065], moves: [] });
+    expect(order(file, [3065, 3053], [A, M])).toEqual({ ids: [3065, 3053], moves: [] });
+    // A hair more often is not clearly more often: 32 % against 30 % of 1.000 buys.
+    const near = { ...file, rows: file.rows.map((r) => (r[3] === M && r[5] === 3065 ? [...r.slice(0, 6), r[6]! * 0.8, r[7]! * 0.8] : r)) };
+    expect(order(near, [3053, 3065], [A, M]).moves).toEqual([]);
+    // Sterak's is bought far more often than item 7000 against magic damage — as everywhere. That
+    // says nothing about these enemies, so the order stays the file's.
+    expect(order(file, [7000, 3053], [A, M])).toEqual({ ids: [7000, 3053], moves: [] });
+    // Another situation at hand that says the opposite as clearly: nothing moves.
+    const T = SITUATION.Tanks;
+    const torn = { ...file, rows: [...file.rows, [1, TOP, L, T, E, 0, 1000, 500], [1, TOP, L, T, E, 3053, 500, 250], [1, TOP, L, T, E, 3065, 100, 50]] };
+    expect(order(torn, [3053, 3065], [A, M, T]).moves).toEqual([]);
+    // The move must be the line-up's doing. Spirit Visage ahead of Sterak's outside the situation too
+    // (1.040 buys against 900): the plan's order is not this game's to change.
+    const always = { ...file, rows: file.rows.map((r) => (r[3] === A && r[5] === 3065 ? [...r.slice(0, 6), r[6]! * 2.4, r[7]! * 2.4] : r)) };
+    expect(order(always, [3053, 3065], [A, M]).moves).toEqual([]);
+    // Sterak's bought among the first three items against magic damage, and never otherwise: it is
+    // missing from the late buys there because players already have it.
+    const C = SLOT.Core;
+    const early = { ...file, rows: [...file.rows, [1, TOP, C, A, E, 0, 1000, 500], [1, TOP, C, A, E, 3053, 100, 50], [1, TOP, C, M, E, 0, 400, 200], [1, TOP, C, M, E, 3053, 100, 50]] };
+    expect(order(early, [3053, 3065], [A, M]).moves).toEqual([]);
+    // Twenty own buys in the situation and a class that buys the item there: not enough of its own.
+    const thin: RiotSituationalFile = {
+      ...file,
+      rows: [...file.rows.filter((r) => r[3] !== M), [1, TOP, L, M, E, 0, 20, 10], [1, TOP, L, M, E, 3065, 20, 10]],
+      classes: [[0, TOP, L, A, E, 0, 4000, 2000], [0, TOP, L, A, E, 3065, 800, 400], [0, TOP, L, M, E, 0, 1000, 500], [0, TOP, L, M, E, 3065, 800, 400]],
+    };
+    expect(order(thin, [3053, 3065], [A, M]).moves).toEqual([]);
+    // An owned item keeps its place and is stepped over; an item with a part bought is not passed.
+    expect(order(file, [3053, 9999, 3065], [A, M], (id) => id !== 9999).ids).toEqual([3065, 9999, 3053]);
+    expect(order(file, [3053, 3065], [A, M], () => true, (id) => id === 3053).moves).toEqual([]);
+
+    // In the build for the game: the plan's order changes, the move is reported, the base plan is not touched.
+    const both = { ...plan, late: late([3053, 3065]) };
+    const built = situationalBuild(file, meta, both, 1, [A, M], [], () => false, all, new SwapTracker());
+    expect(built.plan.late.map((o) => o.ids[0])).toEqual([3065, 3053]);
+    expect(built.moves.map((m) => [m.itemId, m.before])).toEqual([[3065, 3053]]);
+    expect(built.swaps).toEqual([]);
+    expect(both.late.map((o) => o.ids[0])).toEqual([3053, 3065]);
+    // Sterak's begun: the order is the plan's again. And nothing moves once the late slot is closed.
+    expect(situationalBuild(file, meta, both, 1, [A, M], [], () => false, all, new SwapTracker(), 3, (id) => id === 3053).moves).toEqual([]);
+    expect(situationalBuild(file, meta, both, 1, [A, M], [], () => false, [SLOT.Boots, SLOT.Core], new SwapTracker()).moves).toEqual([]);
+    // A plan without anything to move reports none.
+    expect(situationalBuild(file, meta, plan, 1, [A, M], [], () => false, all, new SwapTracker()).moves).toEqual([]);
   });
 
   it('swaps an item once: what was replaced or brought in is not swapped again', () => {

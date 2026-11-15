@@ -518,6 +518,118 @@ export function applySwaps(plan: RiotBuildPlan, swaps: readonly Swap[]): RiotBui
   return { ...plan, boots: first(plan.boots), core: first(plan.core), late: plan.late.map(swapped) };
 }
 
+/** A late item of the plan brought forward for this game's enemies. */
+export interface Move {
+  itemId: number;
+  /** The plan item it now stands before. */
+  before: number;
+  situation: Situation;
+  /** Shares of the late slot's buys in that situation: its own and that of the item it passed. */
+  share: number;
+  otherShare: number;
+  /** The late buys those shares are of. */
+  games: number;
+}
+
+/**
+ * The plan's late items in the order the champion's players buy them against this line-up (user's
+ * wish, 15.11.2026: Braum was led to Thornmail against three magic damage dealers, with Kaenic
+ * Rookern one place behind it in his own plan).
+ *
+ * The plan lists items four to six as the build file counted them over all games. A later one moves
+ * in front of an earlier one only on the same evidence that lets a situational item into the build
+ * (rateSuggestions): in a situation of the line-up its share of the late buys stands
+ * MINIMUM_ADOPTION_Z standard errors clear of the other's. Counted over all 348 plans with late
+ * items on the file of 15.11.2026, that alone moved items in 46 of them, most for reasons that had
+ * nothing to do with the enemies. So the move must be the line-up's doing:
+ * - The champion's own players bought the item in that situation MINIMUM_GAMES times at least. A
+ *   share that rests on the class alone moved items for champions without a single late buy there.
+ * - Outside the situation it is not the one bought more often. Where it is ahead everywhere
+ *   (Katarina's Zhonya's before Void Staff), the plan's order is not this game's to change.
+ * - The item passed is not bought earlier against this line-up: Darius' players buy Force of Nature
+ *   among their first three items against magic damage — it is missing from the late buys there
+ *   because they already have it, not because Sterak's answers magic damage better.
+ * Where another situation at hand says the opposite just as clearly, nothing moves. Never a rule of
+ * thumb about resistances: Leona's players buy Thornmail before Rookern against magic damage too,
+ * and her plan stays as it is.
+ *
+ * `open`: not owned yet — owned items keep their places and are stepped over. `fixed`: an item that
+ * neither moves nor is passed: one a situational swap brought in, or one with a part already bought.
+ */
+export function lateOrder(
+  file: RiotSituationalFile,
+  meta: MetaLookup,
+  championId: number,
+  lane: number,
+  late: readonly PlanOption[],
+  situations: readonly Situation[],
+  open: (itemId: number) => boolean,
+  fixed: (itemId: number) => boolean = () => false,
+): { late: PlanOption[]; moves: Move[] } {
+  const lineUp = situations.filter((s) => s !== SITUATION.All && !ITEM_SITUATIONS.includes(s));
+  const at = late.map((option, index) => ({ option, index })).filter(({ option }) => option.ids.length === 1 && open(option.ids[0]!));
+  if (lineUp.length === 0 || at.length < 2) return { late: [...late], moves: [] };
+
+  const shareOf = (situation: Situation, item: number) => situationShare(file, meta, championId, lane, SLOT.Late, situation, item);
+  // The champion's own buys, without the class: in a situation, and in all games outside it.
+  const own = Index.of(file.rows);
+  const bought = (slot: Slot, situation: Situation, item: number) => own.all(championId, lane, slot, situation, item).games;
+  const outside = (slot: Slot, situation: Situation, item: number) => Math.max(0, bought(slot, SITUATION.All, item) - bought(slot, situation, item));
+  /** The item is bought among the first three more often against this line-up than otherwise. */
+  const earlier = (situation: Situation, item: number) => {
+    const inTotal = bought(SLOT.Core, situation, 0);
+    const outTotal = outside(SLOT.Core, situation, 0);
+    return inTotal > 0 && outTotal > 0 && bought(SLOT.Core, situation, item) / inTotal > outside(SLOT.Core, situation, item) / outTotal;
+  };
+  /** How clearly `item` is bought more often than `other` in a situation, in standard errors. */
+  const edge = (situation: Situation, item: number, other: number) => {
+    const mine = shareOf(situation, item);
+    const theirs = shareOf(situation, other);
+    if (mine.games <= 0) return null;
+    // Both shares are of the same buys; the difference of two shares of n buys.
+    const pooled = (mine.share + theirs.share) / 2;
+    const error = Math.sqrt((Math.max(1e-9, pooled * (1 - pooled)) * 2) / mine.games);
+    return { z: (mine.share - theirs.share) / error, share: mine.share, otherShare: theirs.share, games: mine.games };
+  };
+  const passes = (item: number, other: number): Omit<Move, 'itemId' | 'before'> | null => {
+    let best: (Omit<Move, 'itemId' | 'before'> & { z: number }) | null = null;
+    for (const situation of lineUp) {
+      if ((edge(situation, other, item)?.z ?? 0) >= MINIMUM_ADOPTION_Z) return null;
+      const found = edge(situation, item, other);
+      if (!found || found.z < MINIMUM_ADOPTION_Z || found.share < MINIMUM_SHARE) continue;
+      if (found.share <= shareOf(SITUATION.All, item).share) continue;
+      if (bought(SLOT.Late, situation, item) < MINIMUM_GAMES) continue;
+      if (outside(SLOT.Late, situation, item) > outside(SLOT.Late, situation, other) || earlier(situation, other)) continue;
+      if (!best || found.z > best.z) best = { situation, ...found };
+    }
+    if (!best) return null;
+    const { z: _z, ...move } = best;
+    return move;
+  };
+
+  const order = at.map(({ option }) => option);
+  const moves: Move[] = [];
+  for (let i = 1; i < order.length; i++) {
+    let j = i;
+    let reason: Omit<Move, 'itemId' | 'before'> | null = null;
+    while (j > 0) {
+      const item = order[j]!.ids[0]!;
+      const other = order[j - 1]!.ids[0]!;
+      if (fixed(item) || fixed(other)) break;
+      const found = passes(item, other);
+      if (!found) break;
+      reason = found;
+      [order[j - 1], order[j]] = [order[j]!, order[j - 1]!];
+      j--;
+    }
+    if (reason) moves.push({ itemId: order[j]!.ids[0]!, before: order[j + 1]!.ids[0]!, ...reason });
+  }
+
+  const result = [...late];
+  at.forEach(({ index }, k) => (result[index] = order[k]!));
+  return { late: result, moves };
+}
+
 /** How many suggestions are looked at for a place in the build; the tile shows fewer. */
 const RATED_SUGGESTIONS = 12;
 
@@ -528,6 +640,8 @@ export interface SituationalBuild {
   swaps: Swap[];
   /** For the tile: the swaps still to buy first, then the alternatives that stay beside the build. */
   suggestions: RatedSuggestion[];
+  /** The plan's own late items brought forward for this line-up (lateOrder). */
+  moves: Move[];
 }
 
 /**
@@ -537,7 +651,8 @@ export interface SituationalBuild {
  *
  * `owned`: the inventory's item ids. `has`: whether a plan item counts as owned (a transformed or
  * upgraded item stands for its original, core/game ownsItem). `slots`: the slots still open — boots
- * drop out once a pair is bought.
+ * drop out once a pair is bought. `begun`: a plan item with a part already bought; the late order
+ * leaves it where it is.
  */
 export function situationalBuild(
   file: RiotSituationalFile,
@@ -550,6 +665,7 @@ export function situationalBuild(
   slots: readonly Slot[],
   tracker: SwapTracker,
   take = 3,
+  begun: (itemId: number) => boolean = () => false,
 ): SituationalBuild {
   const base = [...(plan.boots[0]?.ids ?? []), ...(plan.core[0]?.ids ?? []), ...plan.late.flatMap((o) => o.ids)];
   const before = tracker.current;
@@ -571,7 +687,16 @@ export function situationalBuild(
   // Still to buy: not owned, and its slot not filled otherwise (another pair of boots, three other items).
   const toBuy = swaps.filter((swap) => !has(swap.itemId) && slots.includes(swap.slot));
   const beside = rated.filter((r) => !inPlan.has(r.itemId)).map((r) => ({ ...r, adopt: false }));
-  return { plan: applySwaps(plan, swaps), swaps, suggestions: [...toBuy, ...beside].slice(0, Math.max(take, toBuy.length)) };
+  const swapped = applySwaps(plan, swaps);
+  const ordered = slots.includes(SLOT.Late)
+    ? lateOrder(file, meta, championId, plan.lane, swapped.late, situations, (id) => !has(id), (id) => inPlan.has(id) || begun(id))
+    : { late: swapped.late, moves: [] };
+  return {
+    plan: ordered.moves.length > 0 ? { ...swapped, late: ordered.late } : swapped,
+    swaps,
+    suggestions: [...toBuy, ...beside].slice(0, Math.max(take, toBuy.length)),
+    moves: ordered.moves,
+  };
 }
 
 /**

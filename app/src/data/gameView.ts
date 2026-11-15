@@ -1,7 +1,7 @@
 // The game moment (core/game) as the game area shows it: names, pictures, sentences.
 
-import type { GameModel } from '../core/game';
-import { SITUATION_TEXT, SLOT, type RatedSuggestion, type SituationalSuggestion } from '../core/situational';
+import { DAMAGE_HINT_SHARE, type GameModel } from '../core/game';
+import { SITUATION_TEXT, SLOT, type Move, type RatedSuggestion, type SituationalSuggestion } from '../core/situational';
 import { DamageType } from '../core/model/metaLookup';
 import type { Strength } from '../core/strength';
 import type { ChampionRef, GameView, ItemRef, StrengthView, Tone } from '../core/view';
@@ -15,11 +15,7 @@ const DAMAGE: Record<number, GameView['enemies'][number]['damage']> = {
   [DamageType.Mixed]: 'gemischt',
 };
 
-/**
- * A clear majority before a damage type is worth a hint; a 3:2 split (0.6) is no reason to itemise.
- * 1.5's threshold, the same as the draft verdict's "Viel AD/AP beim Gegner".
- */
-export const DAMAGE_HINT_SHARE = 0.65;
+export { DAMAGE_HINT_SHARE };
 
 function clock(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
@@ -75,6 +71,8 @@ export function gameView(
   draftLine: string | null,
   situational: (SituationalSuggestion | RatedSuggestion)[] | null = null,
   strength: Strength | null = null,
+  /** The plan's own late items brought forward for this line-up (core/situational lateOrder). */
+  moves: readonly Move[] = [],
 ): GameView {
   const me = champion(model.championId) ?? { id: model.championId, key: '', name: `#${model.championId}` };
 
@@ -91,13 +89,35 @@ export function gameView(
 
   const hints: GameView['hints'] = [];
   // Mixed champions count half to each side, so the share is said as a share, not as a head count.
-  const known = model.enemies.filter((e) => e.damage !== DamageType.Unknown).length;
   const share = (value: number) => `Etwa ${Math.round(value * 100)} % des Schadens im Gegnerteam ist`;
-  if (known >= 3 && model.enemyPhysical >= DAMAGE_HINT_SHARE) {
-    hints.push({ title: 'Rüstung lohnt sich', detail: `${share(model.enemyPhysical)} physisch.`, tone: 'info' as Tone });
-  } else if (known >= 3 && model.enemyMagic >= DAMAGE_HINT_SHARE) {
-    hints.push({ title: 'Magieresistenz lohnt sich', detail: `${share(model.enemyMagic)} magisch.`, tone: 'info' as Tone });
+  // The plan's own item against it, by name: the hint stands beside the build and leaves its order
+  // alone, but "Magieresistenz lohnt sich" beside a list that builds Thornmail gave nothing to act on.
+  const answer = model.answerItem ? ` In deinem Build steht dafür: ${itemName(model.answerItem)}.` : '';
+  if (model.enemyDamage === 'physical') {
+    hints.push({ title: 'Rüstung lohnt sich', detail: `${share(model.enemyPhysical)} physisch.${answer}`, tone: 'info' as Tone });
+  } else if (model.enemyDamage === 'magic') {
+    hints.push({ title: 'Magieresistenz lohnt sich', detail: `${share(model.enemyMagic)} magisch.${answer}`, tone: 'info' as Tone });
   }
+
+  // What the list is buying towards has a measured alternative for this game's enemies
+  // (core/situational) that did not take its place: said where the buy is, not only further down.
+  const buying = model.nextBuy ? (model.nextBuy.towards ?? model.nextBuy.itemId) : null;
+  const other = buying === null ? undefined : situational?.find((s) => 'instead' in s && s.instead === buying && !s.adopt);
+  const buyAlternative = other && buying !== null ? { item: item(other.itemId), instead: item(buying), reason: SITUATION_TEXT[other.situation] } : null;
+
+  // First in the tile: what moved forward in the build, then what was brought in and the alternatives.
+  const pct = (r: number) => `${Math.round(r * 100)} %`;
+  const moved = moves.map((m) => {
+    const text = SITUATION_TEXT[m.situation];
+    return {
+      item: item(m.itemId),
+      instead: item(m.before),
+      adopted: true,
+      moved: true,
+      reason: text.charAt(0).toUpperCase() + text.slice(1),
+      stats: `${pct(m.share)} der späten Käufe, ${itemName(m.before)} ${pct(m.otherShare)} · ${m.games.toLocaleString('de-DE')} Käufe`,
+    };
+  });
 
   return {
     clock: clock(model.gameTime),
@@ -117,6 +137,7 @@ export function gameView(
       : null,
     basket: model.basket.map((buy) => ({ item: item(buy.itemId), cost: buy.cost, then: buy.towards ? item(buy.towards) : null, situational: buy.situational === true })),
     goldLeft: model.goldLeft,
+    buyAlternative,
     path,
     nextSkill: model.nextSkill ? { key: model.nextSkill.key, level: model.nextSkill.level, now: model.nextSkill.now } : null,
     skillPoints: model.skillPoints,
@@ -130,7 +151,7 @@ export function gameView(
     sample: null,
     strength: strength ? strengthView(strength, champion) : null,
     situational: situational
-      ? situational.map((s) => {
+      ? [...moved, ...situational.map((s) => {
           // The base choice it is an alternative to: the planned boots, or the next core or late item
           // not yet owned.
           const next = (slot: 'Kern' | 'Spät') =>
@@ -143,10 +164,13 @@ export function gameView(
             item: item(s.itemId),
             instead: instead ? item(instead) : null,
             adopted: 'adopt' in s && s.adopt,
+            moved: false,
             reason: text.charAt(0).toUpperCase() + text.slice(1),
             stats: situationalStats(s),
           };
-        })
-      : null,
+        })]
+      : moved.length > 0
+        ? moved
+        : null,
   };
 }

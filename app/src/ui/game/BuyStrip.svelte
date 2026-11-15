@@ -18,7 +18,18 @@
   const spent = $derived(buys.reduce((sum, buy) => sum + buy.cost, 0));
   const next = $derived(!support && buys.length === 0 ? game.nextBuy : null);
   const progress = $derived(next && next.cost > 0 ? Math.min(1, game.gold / next.cost) : 0);
+  // A measured alternative to the item the buys are for (core/situational): named where the gold is spent.
+  const other = $derived(game.buyAlternative);
 </script>
+
+{#snippet alternative()}
+  {#if other}
+    <p class="other">
+      <Icon kind="item" id={other.item.id} size={24} title={other.item.name} />
+      <span>Alternative: <b>{other.item.name}</b> statt {other.instead.name} · {other.reason}</span>
+    </p>
+  {/if}
+{/snippet}
 
 {#if support}
   <section class="buy">
@@ -56,6 +67,7 @@
         </span>
       {/if}
     </div>
+    {@render alternative()}
     <div class="bar" role="img" aria-label="{buys.map((buy) => `${buy.item.name} ${count(buy.cost)}`).join(', ')}, Rest {count(game.goldLeft)} Gold">
       {#each buys as buy, i (i)}<i class:alt={i % 2 === 1} style:flex-grow={buy.cost}></i>{/each}
       {#if game.goldLeft > 0}<i class="rest" style:flex-grow={game.goldLeft}></i>{/if}
@@ -87,6 +99,7 @@
         </span>
       {/if}
     </div>
+    {@render alternative()}
     <div class="bar" role="img" aria-label="{count(game.gold)} von {count(next.cost)} Gold">
       <i style:flex-grow={progress}></i>
       {#if progress < 1}<i class="rest" style:flex-grow={1 - progress}></i>{/if}
@@ -184,6 +197,22 @@
 
   .sit {
     color: var(--orange-text);
+    font-weight: 600;
+  }
+
+  /* The alternative to the buy's goal: one quiet line under the recipe. */
+  .other {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 0;
+    font-size: 11.5px;
+    line-height: 1.35;
+    color: var(--fg2);
+  }
+
+  .other b {
+    color: var(--fg);
     font-weight: 600;
   }
 

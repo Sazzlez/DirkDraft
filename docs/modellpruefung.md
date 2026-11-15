@@ -1482,6 +1482,61 @@ Tabellen für die offenen Plätze werden einmal je Datenstand gefüllt (`DraftEn
   zuerst an allen Spielen gesehen; die zurückgehaltenen Spiele sind dafür keine unberührte Prüfung.
   Mit dem nächsten Patch nachmessen.
 
+## 30. Späte Items in der Reihenfolge, die zu den Gegnern passt (15.11.2026, Nutzerwunsch)
+
+Anlass: ein aufgezeichnetes Spiel des Nutzers. Braum gegen Veigar, Singed und Lulu; der Hinweis sagte
+das ganze Spiel „Magieresistenz lohnt sich“, die Einkaufsliste führte ab Minute 35 zum Dornenpanzer,
+und Kaenischer Rookern stand im selben Plan einen Platz dahinter.
+
+Der Plan nennt die Items vier bis sechs so, wie `builds.json` sie über alle Spiele zählt. Seit dem
+15.11. rückt ein späteres vor ein früheres (`core/situational.ts`, `lateOrder`), wenn die Spieler des
+Champions es in einer Lage der Aufstellung (viel physischer Schaden, viel magischer Schaden, zwei
+Tanks, viel harte Kontrolle) klar öfter kaufen — dieselbe Schwelle wie bei den situativen Items
+(Messung 20): zwei Standardfehler Abstand zwischen den Kaufanteilen. Keine Faustregel über
+Resistenzen.
+
+Gezählt über alle 348 Pläne mit mindestens 300 Spielen und zwei späten Items (Datei vom 15.11.2026,
+jede Lage einzeln):
+
+| Regel | Pläne mit einer Umordnung |
+|---|---:|
+| nur „klar öfter gekauft in der Lage“ | 46 |
+| dazu die drei Bedingungen unten | 11 |
+
+Die 35 weggefallenen hatten mit den Gegnern nichts zu tun:
+
+- **Null eigene Käufe.** Der Anteil stützte sich allein auf die Klasse (Miss Fortune Mid, Shaco Top,
+  Nautilus Jungle: 0 späte Käufe in der Lage). Bedingung: mindestens 30 eigene Käufe des Items dort.
+- **Überall vorn.** Katarinas Zhonyas steht gegen viel physischen Schaden vor dem Leerenstab (532
+  gegen 271 Käufe) — außerhalb der Lage aber auch (890 gegen 494). Das ist eine Eigenheit der
+  Plan-Reihenfolge (das beste vierte Item ist nicht das meistgekaufte späte), keine Antwort auf die
+  Gegner. Bedingung: außerhalb der Lage wird das Item nicht öfter gekauft als das, an dem es
+  vorbeizieht.
+- **Früher gekauft.** Darius-Spieler kaufen Naturgewalt gegen viel magischen Schaden seltener als
+  viertes bis sechstes Item (20 % gegen 24 % sonst), weil sie sie dann schon unter den ersten drei
+  haben (27 % der Kern-Käufe gegen 11 % sonst). Steraks Pegel wäre „gegen viel magischen Schaden“ vorgerückt. Bedingung: das überholte Item
+  wird in der Lage nicht häufiger als Kern-Item gekauft als sonst.
+
+Was bleibt, liest sich wie das, was Spieler tun: Amumu Jungle gegen viel magischen Schaden Kaenischer
+Rookern vor Randuins Omen (178 gegen 107 Käufe; sonst 115 gegen 276), Trundle und Renekton Geistessicht
+vor Tanz des Todes bzw. Schutzengel, Zac gegen viel physischen Schaden Randuins Omen vor Jak'Sho,
+Kog'Maw dann Klinge des gestürzten Königs vor Ende der Weisheit, Yasuo gegen zwei Tanks Lord Dominiks
+Grüße vor Blutdürster.
+
+- **Im Anlass-Spiel ändert sich nichts.** Braum-Spieler kaufen Rookern gegen viel magischen Schaden
+  nur etwas öfter als Dornenpanzer (59 gegen 48 von 248 Käufen, rund ein Standardfehler), Leona-Spieler
+  weiterhin öfter Dornenpanzer (131 gegen 116). Dort nennt jetzt der Hinweis das passende Item des
+  Builds („In deinem Build steht dafür: Kaenischer Rookern“), ohne die Reihenfolge anzufassen.
+- Ein vorgezogenes Item ist markiert wie ein situatives (Punkt im Pfad, „situativ“ im Kaufkasten) und
+  steht in der Kachel „Situative Items“ als „vorgezogen · vor …“ mit beiden Kaufanteilen.
+- Ein Item mit einem schon gekauften Bauteil wird nicht überholt; gekaufte Items behalten ihren Platz.
+- **Nicht geprüft:** ob die Umordnung die Winrate hebt. Sie folgt dem Kaufverhalten, wie die
+  situativen Items; eine Winrate-Sicherung wie dort gibt es für sie nicht, weil beide Items ohnehin
+  im Plan stehen. Mit dem nächsten Patch die Zahl der Umordnungen neu zählen.
+- Nebenbefund, offen: Die Plan-Reihenfolge der späten Items weicht bei 35 Plänen deutlich von den
+  Kaufanteilen des späten Slots ab (Kai'Sa Bot: Lord Dominiks Grüße vor Zhonyas, obwohl Zhonyas gegen
+  viel physischen Schaden 50 % der späten Käufe stellt und sonst 49 %).
+
 ## Was offen bleibt (2.0)
 
 - **Seit 2.1 erledigt** (Messung 13 und 21): Die drei geschätzten Gewichte (übrige Gegner 0,35,

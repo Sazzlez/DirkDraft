@@ -285,6 +285,12 @@ export interface GameView {
   basket: { item: ItemRef; cost: number; then: ItemRef | null; situational: boolean }[];
   /** Gold left after the basket. */
   goldLeft: number;
+  /**
+   * A measured alternative to what the list is buying towards, for this game's enemies: Mercury's
+   * Treads beside the planned Steelcaps, "gegen viel magischen Schaden". Null when there is none
+   * or it already stands in the build.
+   */
+  buyAlternative: { item: ItemRef; instead: ItemRef; reason: string } | null;
   /** `situational`: an item that stands in the plan's place for this game's enemies. */
   path: { slot: string; items: (ItemRef & { owned: boolean; next: boolean; situational: boolean })[] }[];
   /** The plan's next point; `now`: a point is open right now (level above the points spent). */
@@ -324,6 +330,8 @@ export interface SituationalView {
   instead: ItemRef | null;
   /** In the build for this game, in the place of `instead`; else an alternative beside the build. */
   adopted: boolean;
+  /** One of the plan's own late items, brought forward for this game: it stands before `instead`. */
+  moved: boolean;
   /** "Gegen viel magischen Schaden" */
   reason: string;
   /** "58 % statt 51 % · 2.400 Spiele" */

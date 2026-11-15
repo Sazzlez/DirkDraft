@@ -55,7 +55,7 @@
         {/each}
       </div>
       {#if game.path.some((group) => group.items.some((item) => item.situational))}
-        <p class="tiny legend"><i class="dot"></i>Situatives Item: steht für dieses Spiel anstelle eines Items aus deinem Plan.</p>
+        <p class="tiny legend"><i class="dot"></i>Situatives Item: für dieses Spiel in den Build genommen oder vorgezogen.</p>
       {/if}
       {#if build}
         <div class="skills">
@@ -73,15 +73,15 @@
           <div class="alt">
             <Icon kind="item" id={s.item.id} size={34} title={s.item.name} />
             <span class="t">
-              <b>{s.item.name}<span class="badge" class:in={s.adopted}>{s.adopted ? 'im Build' : 'Alternative'}</span></b>
-              <span>{s.reason}{#if s.instead}{' · '}statt {s.instead.name}{/if}</span>
+              <b>{s.item.name}<span class="badge" class:in={s.adopted}>{s.moved ? 'vorgezogen' : s.adopted ? 'im Build' : 'Alternative'}</span></b>
+              <span>{s.reason}{#if s.instead}{' · '}{s.moved ? 'vor' : 'statt'} {s.instead.name}{/if}</span>
               <span class="num stats">{s.stats}</span>
             </span>
           </div>
         {:else}
           <p class="tiny">Gegen diese Gegner ist nichts klar besser als dein Build. Bleib dabei.</p>
         {/each}
-        <p class="tiny">Was Platin-Spieler deines Champions in derselben Lage häufiger kaufen, sofern es nicht schlechter abschneidet. Kaufen sie es dort klar öfter als ein Item aus deinem Plan, steht es für dieses Spiel an dessen Stelle im Build; alles andere bleibt eine Alternative.</p>
+        <p class="tiny">Was Platin-Spieler deines Champions in derselben Lage häufiger kaufen, sofern es nicht schlechter abschneidet. Kaufen sie es dort klar öfter als ein Item aus deinem Plan, steht es für dieses Spiel an dessen Stelle im Build; alles andere bleibt eine Alternative. Ein spätes Item aus deinem Plan, das sie dort klar öfter kaufen als ein früheres, rückt vor.</p>
       </Tile>
     </div>
   {/if}
