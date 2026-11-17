@@ -9,6 +9,7 @@ mod data;
 mod diagnostics;
 mod lcu;
 mod logfile;
+mod net;
 mod settings;
 mod shell;
 mod updater;

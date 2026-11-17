@@ -10,8 +10,8 @@ import type { Plan } from '../core/model/compAnalyzer';
 import { DataRefresher } from '../core/refresh';
 import type { Lane, ViewModel } from '../core/view';
 import { loadAssets } from '../data/assets';
-import { browserFetcher, loadDataSet, loadKept, type DataSet } from '../data/remote';
-import { inShell, shellCache } from '../platform/shell';
+import { DataStore, type DataSet } from '../data/remote';
+import { inShell, shellSource } from '../platform/shell';
 import { LiveSession, type ClientStatus } from './session';
 import { loadSettings, onSettings, settings } from './settings.svelte';
 import { checkForUpdate, update } from './update.svelte';
@@ -122,11 +122,12 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   });
   await loadSettings();
 
-  // The files live with the shell; the webview's fetch revalidates with its own HTTP cache.
+  // The shell fetches and keeps the files; the store reads and parses only what is new.
+  const store = new DataStore(shellSource);
   const refresher = new DataRefresher(
     async () => {
       // A failed download is only worth a word while there are no numbers at all.
-      const set = await loadDataSet(browserFetcher, shellCache).catch(() => null);
+      const set = await store.refresh().catch(() => null);
       session.setDataFailed(!set);
       if (!set) logLine('warn', 'Daten: keine brauchbare meta.json (offline?)');
       else for (const problem of set.problems) logLine('warn', `Daten: ${problem}`);
@@ -135,7 +136,7 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
     },
     (set) => void apply(set),
   );
-  refresher.start(await loadKept(shellCache));
+  refresher.start(await store.loadKept().catch(() => null));
 
   await listen<ClientStatus>('client://status', (e) => {
     session.onStatus(e.payload);

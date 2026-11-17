@@ -134,6 +134,18 @@ nicht; dann gilt in der App: Paar nach dem ersten Item, Stiefel mit dem Gold, da
 In keiner Datei stehen Spielernamen, PUUIDs oder Match-IDs. Die Spielerlisten, über die der Sammler
 neue Spiele findet, leben nur im Speicher eines Laufs.
 
+## Wie die App die Dateien lädt (seit 17.11.2026)
+
+Die Shell lädt, nicht die Seite (`app/src-tauri/src/data.rs`, `net.rs`): je Datei eine Anfrage mit dem
+gespeicherten ETag (`If-None-Match`). Antwortet GitHub „unverändert“, wird nichts geschrieben, nichts
+gelesen und nichts neu geparst. Eine neue Datei legt die Shell neben die behaltene Kopie
+(`<Name>.new`); die Seite liest und prüft sie und meldet dann „übernehmen“ oder „verwerfen“. Eine
+verworfene Version wird nicht noch einmal geladen (ihr ETag steht in `<Name>.rejected`), und eine
+kaputte Datei ersetzt nie die letzte gute. Vorher las die Seite bei jeder Prüfung ohne neue Daten
+40,6 MB und schrieb 20,3 MB über die IPC, alle 30 Minuten. Die Seite braucht dafür keinen Zugriff auf
+`raw.githubusercontent.com` mehr (CSP). Geprüft wird weiter alle 30 Minuten und nie im Champ Select
+oder im Spiel (`app/src/core/refresh.ts`).
+
 ## Was ein Lauf aushält (seit 17.11.2026)
 
 **Fehler bei einzelnen Spielen.** Gibt Riot ein Spiel nicht heraus (400, 403 auf diesem Spiel, sechsmal

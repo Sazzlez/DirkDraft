@@ -22,9 +22,11 @@ serde_json = "1"
 # Same major line as the vpk tool that packs the app (vpk 1.2.0).
 velopack = "1.2"
 # The League client and the game: TLS pinned to Riot's authority (ring, no system roots), HTTP,
-# the WAMP event socket.
+# the WAMP event socket. The same reqwest also fetches the data files and Data Dragon (net.rs), with
+# a client of its own on the public roots (webpki-roots); the client for the League client is built
+# from a TLS setup of its own (lcu/tls.rs) and trusts none of them. gzip: the data files are JSON.
 tokio = { version = "1", features = ["time", "sync", "macros", "rt"] }
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-manual-roots", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-manual-roots", "rustls-tls-webpki-roots", "gzip", "json"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 ring = "0.17"
 x509-parser = { version = "0.18", features = ["verify"] }

@@ -4,7 +4,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import type { DataCache } from '../data/remote';
+import type { CheckOutcome, DataSource } from '../data/remote';
 
 declare global {
   interface Window {
@@ -46,20 +46,14 @@ export function onTrayHint(show: () => void): void {
   if (inShell) void listen('shell://tray-hint', show);
 }
 
-/** The data files, kept by the shell (%LOCALAPPDATA%\DraftPilot\data\2.0). */
-export const shellCache: DataCache = {
-  async read(name) {
-    try {
-      return await invoke<string | null>('data_read', { name });
-    } catch {
-      return null;
-    }
-  },
-  async write(name, text) {
-    try {
-      await invoke('data_write', { name, text });
-    } catch {
-      // A full disk costs the offline copy, not the data in hand.
-    }
-  },
+/**
+ * The data files: fetched and kept by the shell (%LOCALAPPDATA%\DraftPilot\data\2.0, data.rs). The
+ * page reads them and says which staged download is good; it never fetches or writes one itself.
+ */
+export const shellSource: DataSource = {
+  read: (name) => invoke<string | null>('data_read', { name }),
+  check: () => invoke<CheckOutcome>('data_check'),
+  readStaged: (name) => invoke<string | null>('data_read_staged', { name }),
+  commit: (name) => invoke<void>('data_commit', { name }),
+  discard: (name) => invoke<void>('data_discard', { name }),
 };

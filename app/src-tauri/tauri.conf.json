@@ -13,7 +13,7 @@
     "security": {
       "csp": {
         "default-src": "'self'",
-        "connect-src": "'self' ipc: http://ipc.localhost https://raw.githubusercontent.com https://ddragon.leagueoflegends.com",
+        "connect-src": "'self' ipc: http://ipc.localhost https://ddragon.leagueoflegends.com",
         "img-src": "'self' data: https://ddragon.leagueoflegends.com",
         "style-src": "'self' 'unsafe-inline'",
         "font-src": "'self' data:"

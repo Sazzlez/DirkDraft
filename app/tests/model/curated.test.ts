@@ -14,7 +14,7 @@ import { LanePredictor } from '../../src/core/model/lanePredictor';
 import type { MetaSnapshot } from '../../src/core/model/metaLookup';
 import { Recommender } from '../../src/core/model/recommender';
 import { TraitTable } from '../../src/core/model/traits';
-import { checkCombos, checkTraits, CURATED_VERSION, FILES, loadDataSet, loadKept, type DataCache, type DataSet, type Fetcher } from '../../src/data/remote';
+import { checkCombos, checkTraits, CURATED_VERSION, DataStore, FILES, type DataSet, type DataSource } from '../../src/data/remote';
 import { LiveSession } from '../../src/live/session';
 import { MetaBuilder, SessionBuilder } from './helpers';
 
@@ -116,40 +116,47 @@ describe('the curated files among the downloads', () => {
     'traits.json': JSON.stringify({ version: CURATED_VERSION, champions: { Ahri: { engage: 1, peel: 0, cc: 2, scaling: 'mid', waveclear: 1 } } }),
     'combos.json': JSON.stringify({ version: CURATED_VERSION, combos: combosFile.combos, engageSkill: combosFile.engageSkill }),
   };
-  const memory = (): DataCache & { store: Map<string, string> } => {
-    const store = new Map<string, string>();
-    return { store, read: async (name) => store.get(name) ?? null, write: async (name, text) => void store.set(name, text) };
-  };
-  const serving =
-    (served: Record<string, string>): Fetcher =>
-    async (url) => {
-      const name = url.slice(url.lastIndexOf('/') + 1);
-      const text = served[name];
-      if (text === undefined) throw new Error('HTTP 404');
-      return { status: 'ok', text, etag: null };
-    };
 
-  it('downloads and keeps them like the numbers', async () => {
-    const cache = memory();
-    const set = (await loadDataSet(serving(files), cache))!;
+  /** The shell in memory: what is kept, and what the server offers as new. */
+  const shell = (server: Record<string, string>, kept: Record<string, string> = {}): DataSource & { kept: Record<string, string> } => {
+    const staged: Record<string, string> = {};
+    return {
+      kept,
+      read: async (name) => kept[name] ?? null,
+      check: async () => {
+        const fresh = Object.keys(server).filter((name) => kept[name] !== server[name]);
+        for (const name of fresh) staged[name] = server[name]!;
+        return { staged: fresh, problems: [], reached: true };
+      },
+      readStaged: async (name) => staged[name] ?? null,
+      commit: async (name) => void (kept[name] = staged[name]!),
+      discard: async (name) => void delete staged[name],
+    };
+  };
+
+  it('takes and keeps them like the numbers', async () => {
+    const source = shell(files);
+    const set = (await new DataStore(source).refresh())!;
     expect(set.traits).toEqual(JSON.parse(files['traits.json']!));
     expect(Object.keys((set.combos as { combos: object }).combos)).toEqual(Object.keys(combosFile.combos));
-    expect(cache.store.has('traits.json')).toBe(true);
+    expect(source.kept['traits.json']).toBe(files['traits.json']);
 
     // Offline next time: the kept copies.
-    const kept = (await loadKept(cache))!;
+    const kept = (await new DataStore(shell({}, source.kept)).loadKept())!;
     expect(kept.traits).toEqual(set.traits);
     expect(kept.combos).toEqual(set.combos);
   });
 
   it('does without them on a branch that has none yet, or a broken one', async () => {
-    const before = (await loadDataSet(serving({ 'meta.json': files['meta.json']! }), memory()))!;
+    const before = (await new DataStore(shell({ 'meta.json': files['meta.json']! })).refresh())!;
     expect(before.traits).toBeNull();
     expect(before.combos).toBeNull();
 
-    const broken = (await loadDataSet(serving({ ...files, 'traits.json': '{"version":1,"champions":{}}', 'combos.json': '{ kaputt' }), memory()))!;
+    const source = shell({ ...files, 'traits.json': '{"version":1,"champions":{}}', 'combos.json': '{ kaputt' });
+    const broken = (await new DataStore(source).refresh())!;
     expect(broken.traits).toBeNull();
     expect(broken.combos).toBeNull();
     expect(broken.problems.some((p) => p.startsWith('traits.json'))).toBe(true);
+    expect(source.kept['traits.json']).toBeUndefined();
   });
 });

@@ -1,9 +1,17 @@
 // DirkDraft's own data: meta.json (draft numbers), builds.json (builds), aram.json (plain ARAM,
-// standing in for Mayhem, which Riot does not hand out) and the curated traits.json and combos.json
-// (data/ in the repository), published by the collector to the branch "data" of the repository. Checked before use
-// and kept: a broken or missing download never replaces the last good copy, and without any copy
-// the app says so instead of inventing numbers. Nothing about the user is sent — plain GET requests
-// for public files. When the downloads may happen is the DataRefresher's business (core/refresh.ts).
+// standing in for Mayhem, which Riot does not hand out), situational.json and the curated traits.json
+// and combos.json (data/ in the repository), published by the collector to the branch "data".
+//
+// The shell downloads (src-tauri/src/data.rs): one conditional GET per file with the stored ETag,
+// and a file is written only when the server sends a new one. Until 17.11.2026 the page fetched
+// itself and, on every check without new data, read 40,6 MB and wrote 20,3 MB through the IPC — every
+// half hour. Now a check without new data reads nothing, writes nothing and parses nothing here.
+//
+// Checked before use and kept: a new file is staged by the shell, read and checked here, and only
+// then replaces the kept copy (commit) — a broken download never does, and is not fetched again
+// (discard). Without any copy the app says so instead of inventing numbers. Nothing about the user
+// is sent — plain GET requests for public files. When a check may happen is the DataRefresher's
+// business (core/refresh.ts).
 
 import type { MetaSnapshot } from '../core/model/metaLookup';
 import type { RiotAramFile } from '../core/aram';
@@ -11,8 +19,7 @@ import type { RiotBuildFile } from '../core/riotBuilds';
 import { readComboFile } from '../core/model/kits';
 import type { RiotSituationalFile } from '../core/situational';
 
-export const DATA_BASE = 'https://raw.githubusercontent.com/Sazzlez/DirkDraft/data';
-
+/** The files by name, as on the branch (https://raw.githubusercontent.com/Sazzlez/DirkDraft/data/, data.rs BASE and NAMES). */
 export const FILES = {
   meta: 'meta.json',
   builds: 'builds.json',
@@ -23,18 +30,31 @@ export const FILES = {
 } as const;
 export type DataFile = keyof typeof FILES;
 
-/** Where downloaded files are kept between runs (Tauri: app data folder; browser: localStorage). */
-export interface DataCache {
-  read(name: string): Promise<string | null>;
-  write(name: string, text: string): Promise<void>;
+/** What one check against the server found. */
+export interface CheckOutcome {
+  /** File names with a new version waiting: downloaded, not yet the kept copy. */
+  staged: string[];
+  problems: string[];
+  /** The server answered for at least one file. */
+  reached: boolean;
 }
 
 /**
- * One GET. With the stored ETag the server can answer "unchanged" without sending the file again —
- * which is what keeps a check every half hour at a few hundred bytes.
+ * Where the files are fetched and kept: the shell (platform/shell.ts shellSource). Reads hand out
+ * text; nothing here writes a file's content.
  */
-export type FetchResult = { status: 'notModified' } | { status: 'ok'; text: string; etag: string | null };
-export type Fetcher = (url: string, etag: string | null) => Promise<FetchResult>;
+export interface DataSource {
+  /** The kept copy of a file, or null. */
+  read(name: string): Promise<string | null>;
+  /** One round of conditional requests; unchanged files cost a few hundred bytes and nothing else. */
+  check(): Promise<CheckOutcome>;
+  /** A file the last check staged. */
+  readStaged(name: string): Promise<string | null>;
+  /** The staged file is good: it becomes the kept copy. */
+  commit(name: string): Promise<void>;
+  /** The staged file is unusable: thrown away, and that version is not fetched again. */
+  discard(name: string): Promise<void>;
+}
 
 export interface DataSet {
   meta: MetaSnapshot;
@@ -127,97 +147,98 @@ const CHECKS: Record<DataFile, (value: unknown) => string | null> = {
   combos: checkCombos,
 };
 
-interface Loaded {
-  value: unknown;
-  fresh: boolean;
-  changed: boolean;
-}
+const NAMES = Object.keys(FILES) as DataFile[];
 
-async function kept(name: DataFile, cache: DataCache): Promise<unknown | null> {
-  const text = await cache.read(FILES[name]);
-  if (text === null) return null;
+/** Text to a value the app can stand on, or the reason it cannot. */
+function parse(name: DataFile, text: string): { value: unknown } | { problem: string } {
   try {
     const value = JSON.parse(text) as unknown;
-    return CHECKS[name](value) ? null : value;
-  } catch {
-    return null;
-  }
-}
-
-async function one(name: DataFile, fetcher: Fetcher, cache: DataCache, problems: string[]): Promise<Loaded | null> {
-  const file = FILES[name];
-  const etagName = `${file}.etag`;
-  // An ETag without a usable copy is worthless: "unchanged" would leave nothing to read.
-  const copy = await kept(name, cache);
-  const etag = copy === null ? null : await cache.read(etagName);
-
-  try {
-    const answer = await fetcher(`${DATA_BASE}/${file}`, etag);
-    if (answer.status === 'notModified') {
-      if (copy !== null) return { value: copy, fresh: true, changed: false };
-      throw new Error('unverändert gemeldet, aber keine Kopie');
-    }
-    const value = JSON.parse(answer.text) as unknown;
     const problem = CHECKS[name](value);
-    if (problem) throw new Error(problem);
-    const before = await cache.read(file);
-    await cache.write(file, answer.text);
-    if (answer.etag) await cache.write(etagName, answer.etag);
-    return { value, fresh: true, changed: before !== answer.text };
+    return problem ? { problem } : { value };
   } catch (error) {
-    problems.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
+    return { problem: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * The files as the app holds them: parsed once and kept in memory, so a check that finds nothing
+ * new costs no read and no parse. One store per run of the app.
+ */
+export class DataStore {
+  private readonly values = new Map<DataFile, unknown>();
+  private keptRead = false;
+
+  constructor(private readonly source: DataSource) {}
+
+  /** The kept copies only — no network. What the app starts with, whatever the client is doing. */
+  async loadKept(): Promise<DataSet | null> {
+    await this.readKept();
+    return this.set(false, false, []);
   }
 
-  return copy === null ? null : { value: copy, fresh: false, changed: false };
-}
+  /**
+   * One check. Only the files the server has new are read and parsed; each replaces its kept copy
+   * once it passed its check, and is thrown away otherwise. Null without any usable meta.
+   */
+  async refresh(): Promise<DataSet | null> {
+    await this.readKept();
+    const problems: string[] = [];
+    let outcome: CheckOutcome;
+    try {
+      outcome = await this.source.check();
+    } catch (error) {
+      outcome = { staged: [], problems: [error instanceof Error ? error.message : String(error)], reached: false };
+    }
+    problems.push(...outcome.problems);
 
-/** All files, each downloaded (or confirmed unchanged) or else kept; null without any usable meta. */
-export async function loadDataSet(fetcher: Fetcher, cache: DataCache): Promise<DataSet | null> {
-  const problems: string[] = [];
-  const [meta, builds, aram, situational, traits, combos] = await Promise.all([
-    one('meta', fetcher, cache, problems),
-    one('builds', fetcher, cache, problems),
-    one('aram', fetcher, cache, problems),
-    one('situational', fetcher, cache, problems),
-    one('traits', fetcher, cache, problems),
-    one('combos', fetcher, cache, problems),
-  ]);
-  if (!meta) return null;
-  return {
-    meta: meta.value as MetaSnapshot,
-    builds: (builds?.value as RiotBuildFile | undefined) ?? null,
-    aram: (aram?.value as RiotAramFile | undefined) ?? null,
-    situational: (situational?.value as RiotSituationalFile | undefined) ?? null,
-    traits: (traits?.value as Record<string, unknown> | undefined) ?? null,
-    combos: (combos?.value as Record<string, unknown> | undefined) ?? null,
-    fresh: meta.fresh,
-    changed: meta.changed || !!builds?.changed || !!aram?.changed || !!situational?.changed || !!traits?.changed || !!combos?.changed,
-    problems,
-  };
-}
+    let changed = false;
+    for (const name of NAMES) {
+      const file = FILES[name];
+      if (!outcome.staged.includes(file)) continue;
+      const text = await this.source.readStaged(file).catch(() => null);
+      const read = text === null ? { problem: 'nicht lesbar' } : parse(name, text);
+      if ('problem' in read) {
+        problems.push(`${file}: ${read.problem}`);
+        await this.source.discard(file).catch(() => undefined);
+        continue;
+      }
+      // Kept first, then used: a copy that could not be written is still the data in hand.
+      await this.source.commit(file).catch((error: unknown) => problems.push(`${file}: ${error instanceof Error ? error.message : String(error)}`));
+      this.values.set(name, read.value);
+      changed = true;
+    }
+    return this.set(outcome.reached, changed, problems);
+  }
 
-/** The kept copies only — no network. What the app starts with, whatever the client is doing. */
-export async function loadKept(cache: DataCache): Promise<DataSet | null> {
-  const [meta, builds, aram, situational, traits, combos] = await Promise.all([
-    kept('meta', cache),
-    kept('builds', cache),
-    kept('aram', cache),
-    kept('situational', cache),
-    kept('traits', cache),
-    kept('combos', cache),
-  ]);
-  if (meta === null) return null;
-  return {
-    meta: meta as MetaSnapshot,
-    builds: (builds as RiotBuildFile | null) ?? null,
-    aram: (aram as RiotAramFile | null) ?? null,
-    situational: (situational as RiotSituationalFile | null) ?? null,
-    traits: (traits as Record<string, unknown> | null) ?? null,
-    combos: (combos as Record<string, unknown> | null) ?? null,
-    fresh: false,
-    changed: false,
-    problems: [],
-  };
+  /** The kept copies, read and parsed once per run. */
+  private async readKept(): Promise<void> {
+    if (this.keptRead) return;
+    this.keptRead = true;
+    await Promise.all(
+      NAMES.map(async (name) => {
+        const text = await this.source.read(FILES[name]).catch(() => null);
+        if (text === null) return;
+        const read = parse(name, text);
+        if ('value' in read) this.values.set(name, read.value);
+      }),
+    );
+  }
+
+  private set(fresh: boolean, changed: boolean, problems: string[]): DataSet | null {
+    const meta = this.values.get('meta');
+    if (!meta) return null;
+    return {
+      meta: meta as MetaSnapshot,
+      builds: (this.values.get('builds') as RiotBuildFile | undefined) ?? null,
+      aram: (this.values.get('aram') as RiotAramFile | undefined) ?? null,
+      situational: (this.values.get('situational') as RiotSituationalFile | undefined) ?? null,
+      traits: (this.values.get('traits') as Record<string, unknown> | undefined) ?? null,
+      combos: (this.values.get('combos') as Record<string, unknown> | undefined) ?? null,
+      fresh,
+      changed,
+      problems,
+    };
+  }
 }
 
 const BRACKETS: Record<string, string> = {
@@ -255,31 +276,3 @@ function age(ms: number): string {
   const days = Math.round(hours / 24);
   return days === 1 ? 'vor 1 Tag' : `vor ${days} Tagen`;
 }
-
-/**
- * The browser's fetch, for the preview. `no-cache` makes the browser revalidate with its own stored
- * ETag, so an unchanged file costs a 304 there too; the Tauri shell brings its own fetcher.
- */
-export const browserFetcher: Fetcher = async (url) => {
-  const response = await fetch(url, { cache: 'no-cache' });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return { status: 'ok', text: await response.text(), etag: response.headers.get('etag') };
-};
-
-/** localStorage as a cache, for the browser preview; every access may throw (private mode). */
-export const browserCache: DataCache = {
-  async read(name) {
-    try {
-      return localStorage.getItem(`dirkdraft:${name}`);
-    } catch {
-      return null;
-    }
-  },
-  async write(name, text) {
-    try {
-      localStorage.setItem(`dirkdraft:${name}`, text);
-    } catch {
-      // A full or blocked storage costs the offline copy, not the data in hand.
-    }
-  },
-};

@@ -51,7 +51,9 @@ Modelländerungen gilt: **messen statt vermuten** (siehe unten).
   `client.rs` (Befehle/Ereignisse), `lcu/` (Installation finden, lockfile, TLS gegen Riots v1/SHA-1-
   Zertifizierungsstelle von Hand geprüft, HTTP, WAMP-Socket, Scrubber, Live-Client-Poller, Import),
   `settings.rs` (liest/schreibt 1.5s `%APPDATA%\DraftPilot\settings.json`), `data.rs`
-  (Datenkopie `%LOCALAPPDATA%\DraftPilot\data\2.0`), `updater.rs` (Velopack, GitHub Releases).
+  (lädt die Dateien des Branches `data` mit ETag und hält sie in `%LOCALAPPDATA%\DraftPilot\data\2.0`;
+  seit 17.11.2026 lädt die Seite nichts mehr selbst), `net.rs` (HTTP-Client für GitHub und Data Dragon
+  mit öffentlichen Roots), `updater.rs` (Velopack, GitHub Releases).
 - `src/` (C#) — Kern-Referenz (`DraftPilot.Core`; die 1.5-App `DraftPilot.App` ist seit 17.11.2026 gelöscht), **Sammler**
   (`DraftPilot.Meta/Riot`, `DraftPilot.Tools riot collect|aram|export|export-aram|queues`,
   `priors`). `tests/` = xUnit.
