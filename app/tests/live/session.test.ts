@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { MetaSnapshot } from '../../src/core/model/metaLookup';
 import type { DataSet } from '../../src/data/remote';
+import { Lane } from '../../src/core/model/lane';
 import { LiveSession } from '../../src/live/session';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/^﻿/, '');
@@ -279,6 +280,49 @@ describe('LiveSession', () => {
     expect(view.connection.text).toBe('im Spiel');
     expect(view.game?.enemies).toHaveLength(5);
     expect(view.game?.situational).toBeNull();
+  });
+});
+
+describe('the lane in a game', () => {
+  const player = (riotId: string, champion: string, team: string, position: string) => ({ riotId, rawChampionName: `game_character_displayname_${champion}`, team, level: 3, items: [], position });
+  const game = (position: string) => ({
+    activePlayer: { riotId: 'Ich#1', level: 3, currentGold: 500, abilities: {} },
+    allPlayers: [player('Ich#1', 'Darius', 'ORDER', position), player('Fremd#1', 'Jax', 'CHAOS', 'TOP')],
+    gameData: { gameTime: 120, gameMode: 'CLASSIC' },
+  });
+  const started = (position: string) => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('InProgress');
+    live.onGame(game(position));
+    live.view();
+    return live.diagnosticLine ?? '';
+  };
+
+  it('without a draft is the position the game names, not the main lane', () => {
+    // Started into the game: no draft was seen. Darius in the jungle gets the jungle's build.
+    expect(started('JUNGLE')).toContain(`Lane ${Lane.Jungle},`);
+    expect(started('UTILITY')).toContain(`Lane ${Lane.Support},`);
+  });
+
+  it('without a draft and without a position is left to the main lane', () => {
+    expect(started('')).toContain(`Lane ${Lane.Unknown},`);
+    expect(started('NONE')).toContain(`Lane ${Lane.Unknown},`);
+  });
+
+  it('after a draft stays the lane of the draft', () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    for (const record of sessions('state-nachlock')) live.onSession(record.session ?? null);
+    live.onSession(null);
+    live.onPhase('InProgress');
+    // The game says "jungle" (a swap after the draft is not ours to guess): the draft's lane holds.
+    live.onGame(game('JUNGLE'));
+    live.view();
+    expect(live.diagnosticLine).toContain(`Lane ${Lane.Top},`);
   });
 });
 

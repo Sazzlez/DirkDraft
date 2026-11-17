@@ -7,7 +7,7 @@
 import { DraftEngine } from '../core/engine';
 import { buyable, buyablePlan, gameModel, championIdOf, enemyItemsOf, isBoots, isFinished, MAP_ARAM, MAP_RIFT, ownsItem, recipeForm, remainingCost, type LiveGameData } from '../core/game';
 import { aramBuildFile, aramStatsFrom } from '../core/aram';
-import { Lane, laneFromKey } from '../core/model/lane';
+import { Lane, laneFromKey, laneFromLcu } from '../core/model/lane';
 import { MetaLookup } from '../core/model/metaLookup';
 import { readComboFile } from '../core/model/kits';
 import { TraitTable } from '../core/model/traits';
@@ -514,7 +514,11 @@ export class LiveSession {
     const items = assets()?.itemInfo ?? new Map();
     const me = game.allPlayers?.find((p) => p.riotId && p.riotId === game.activePlayer?.riotId);
     const championId = me ? championIdOf(me, meta) : (this.picked?.championId ?? 0);
-    const lane = this.picked?.championId === championId ? this.picked.lane : Lane.Unknown;
+    // The lane of the draft. Without one (the app was started in the game, or the champion is not the
+    // one that was picked): the game's own word for the position, before the champion's main lane —
+    // a flex pick otherwise got the build of the lane it is played on most, not of the one it is on.
+    const drafted = this.picked?.championId === championId ? this.picked.lane : Lane.Unknown;
+    const lane = drafted !== Lane.Unknown ? drafted : laneFromLcu(me?.position);
     // The game's own word for the mode: ARAM, or KIWI for Mayhem.
     const gameMode = game.gameData?.gameMode;
     const mode: Mode = gameMode === 'KIWI' ? 'mayhem' : gameMode === 'ARAM' ? 'aram' : 'lanes';
