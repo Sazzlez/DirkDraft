@@ -4,10 +4,12 @@
     GitHub release - the same feed 1.x reads, so installed 1.x copies see 2.0 as a normal update.
 
 .DESCRIPTION
-    Stamps the version (Cargo.toml, package.json), runs the tests (Vitest, cargo), builds the
-    release exe (tauri build), packs it with vpk under the package id DirkDraft (same id, same
-    DirkDraft.exe as 1.x - docs/redesign/migration.md) and uploads it. Before the upload it commits
-    the version bump as "Release X.Y.Z", tags vX.Y.Z and pushes, like the 1.x script.
+    Stamps the version (Cargo.toml, package.json), runs the tests (Vitest, svelte-check, cargo),
+    builds the release exe (tauri build), packs it with vpk under the package id DirkDraft (same id,
+    same DirkDraft.exe as 1.x - docs/redesign/migration.md) and uploads it. Before the upload it
+    asks for the live checklist - what only a real client can show - and stops without an upload
+    unless every line is confirmed with "j"; then it commits the version bump as "Release X.Y.Z",
+    tags vX.Y.Z and pushes.
 
     -PackId DirkDraft-Beta packs a separate app (own folder, own shortcut "DirkDraft Beta") for
     trying a build without touching any installed DirkDraft - and never uploads. It also packs on
@@ -34,13 +36,18 @@ param(
 
     [string]$Notes,
 
-    [switch]$NoUpload
+    [switch]$NoUpload,
+
+    # The live checklist was gone through by hand already: for a run without a console, which
+    # cannot be asked. Without it such a run stops before the upload.
+    [switch]$LiveChecked
 )
 
 $ErrorActionPreference = 'Stop'
 
 # Native programs report success by exit code only; their stderr lines must not become terminating
-# errors when this script's output is redirected (see the 1.x release.ps1 for the story).
+# errors when this script's output is redirected: PowerShell 5.1 wraps each one in an ErrorRecord,
+# and with "Stop" the first of git's routine notes ended a release between packing and upload.
 function Use-NativeErrors {
     param([Parameter(Mandatory)][scriptblock]$Body)
     $previous = $ErrorActionPreference
@@ -81,11 +88,14 @@ $package = [regex]::Replace($package, '"version": "[^"]*"', "`"version`": `"$Ver
 Write-Host "Version $Version eingetragen."
 
 # --- 2. Test gate ----------------------------------------------------------------------------
-Write-Host 'Teste (Vitest, cargo)'
+Write-Host 'Teste (Vitest, svelte-check, cargo)'
 Push-Location $app
 try {
     Use-NativeErrors { & npx vitest run --reporter=dot }
     if ($LASTEXITCODE -ne 0) { throw "Vitest ist fehlgeschlagen (Exitcode $LASTEXITCODE) - kein Release." }
+    # Types and Svelte components: Vitest runs the model, not the window's markup.
+    Use-NativeErrors { & npm run check }
+    if ($LASTEXITCODE -ne 0) { throw "svelte-check ist fehlgeschlagen (Exitcode $LASTEXITCODE) - kein Release." }
 } finally { Pop-Location }
 Push-Location $tauri
 try {
@@ -104,7 +114,8 @@ try {
 # Only the exe: Tauri embeds the page, WebView2 comes with Windows (or with the installer below).
 if (Test-Path -LiteralPath $publishDir) { Remove-Item -LiteralPath $publishDir -Recurse -Force }
 New-Item -ItemType Directory -Force $publishDir | Out-Null
-Copy-Item (Join-Path $tauri 'target\release\DirkDraft.exe') $publishDir
+$exe = Join-Path $tauri 'target\release\DirkDraft.exe'
+Copy-Item $exe $publishDir
 
 # --- 4. Installer + delta packages -----------------------------------------------------------
 $vpkArgs = @(
@@ -135,6 +146,31 @@ Write-Host "Installer: $setup ($setupMb MB)"
 if ($NoUpload) {
     Write-Host 'Kein Upload.'
     exit 0
+}
+
+# --- 4b. Live checklist ----------------------------------------------------------------------
+# What no test reaches: the real client. Asked with the exe that was just built, before anything
+# is committed, tagged or uploaded.
+$liveChecks = @(
+    'Champ Select gelesen: Board, Picks und Banns stimmen mit dem Client ueberein',
+    'Runen-Import: ein Klick legt die Seite im Client an',
+    'Spielansicht: Einkaufsliste, Skillpunkt und Gegner im laufenden Spiel'
+)
+if ($LiveChecked) {
+    Write-Host 'Live-Checkliste: mit -LiveChecked als geprueft bestaetigt.'
+} else {
+    Write-Host ''
+    Write-Host "Live-Checkliste mit der eben gebauten DirkDraft.exe ($exe) - jede Zeile mit j bestaetigen:"
+    foreach ($check in $liveChecks) {
+        $answer = $null
+        # Without a console Read-Host throws: that is a "no".
+        try { $answer = Read-Host "  $check [j/n]" } catch { $answer = $null }
+        if ("$answer".Trim().ToLowerInvariant() -ne 'j') {
+            Write-Host "Nicht bestaetigt: $check"
+            Write-Host "Kein Upload. Nichts ist eingecheckt oder hochgeladen. Vor einem neuen Lauf mit Version $Version die Dateien dieser Version aus $releaseDir entfernen."
+            exit 1
+        }
+    }
 }
 
 # --- 5. GitHub CLI and token -----------------------------------------------------------------

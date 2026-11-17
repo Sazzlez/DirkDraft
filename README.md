@@ -89,9 +89,12 @@ Eine Version veröffentlichen (aus dem Haupt-Checkout auf `master`):
 .\app\scripts\release.ps1 -Version 2.0.0                           # echtes Release
 ```
 
-Das Skript trägt die Version ein, testet, baut (`tauri build`), packt mit `vpk` unter der Paket-ID
-`DirkDraft` (dieselbe wie 1.x, Kanal `win`), checkt „Release X.Y.Z" ein, setzt den Tag, schiebt und
-lädt hoch. Die Probe (`-PackId DirkDraft-Beta`) packt eine eigene App auf dem Kanal `beta` und lädt
+Das Skript trägt die Version ein, testet (Vitest, `npm run check`, `cargo test`), baut (`tauri build`)
+und packt mit `vpk` unter der Paket-ID `DirkDraft` (dieselbe wie 1.x, Kanal `win`). Vor dem Upload
+fragt es die Live-Checkliste ab (Champ Select gelesen, Runen-Import, Spielansicht); nur wenn jede
+Zeile mit „j“ bestätigt ist, checkt es „Release X.Y.Z" ein, setzt den Tag, schiebt und lädt hoch.
+Ohne Konsole bricht es dort ab, außer mit `-LiveChecked`. Dasselbe prüft `.github/workflows/ci.yml`
+bei jedem Push, dazu den Sammler (`dotnet build`, `dotnet test`). Die Probe (`-PackId DirkDraft-Beta`) packt eine eigene App auf dem Kanal `beta` und lädt
 nie hoch; ihr Update lässt sich mit `DIRKDRAFT_UPDATE_SOURCE=<Ordner>` gegen einen lokalen Feed testen
 (`docs/redesign/migration.md`). Voraussetzungen: `dotnet tool install -g vpk` (1.2.0, wie 1.x),
 GitHub CLI mit `gh auth login`.
