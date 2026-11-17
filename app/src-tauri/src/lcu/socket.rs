@@ -27,15 +27,52 @@ pub enum SocketEvent {
     Event { uri: String, kind: String, data: Option<String> },
 }
 
+/// Which failures of the reconnect loop get a log line: the first of a series. A series ends with a
+/// link that held (the test the backoff uses) — so a client that is not up yet, or one that accepts
+/// and drops at once, costs one line and not one every few seconds. Until 17.11.2026 the error was
+/// thrown away, and a socket that never came up left no trace of why.
+#[derive(Default)]
+struct FailureSeries {
+    failures: u32,
+}
+
+impl FailureSeries {
+    /// Counts a failed attempt; true for the one to log.
+    fn failed(&mut self) -> bool {
+        self.failures += 1;
+        self.failures == 1
+    }
+
+    /// A link held: the next failure starts a new series.
+    fn held(&mut self) {
+        self.failures = 0;
+    }
+}
+
+/// The error as one line for the log, never with the client's password in it.
+fn describe(error: &(dyn std::error::Error + Send + Sync), credentials: &Credentials) -> String {
+    let text = error.to_string().replace(['\r', '\n'], " ");
+    if credentials.password.is_empty() {
+        return text;
+    }
+    text.replace(&credentials.password, "***").replace(&credentials.authorization(), "***")
+}
+
 /// Connects, subscribes and pumps until the task is aborted, reconnecting with backoff: 500 ms,
 /// doubling to 5 s. The backoff resets only after a link that lived five seconds and delivered a
 /// frame — a client that accepts and drops at once must not be hammered twice a second.
 pub async fn run(credentials: Credentials, out: UnboundedSender<SocketEvent>) {
     let mut backoff = Duration::from_millis(500);
+    let mut series = FailureSeries::default();
     loop {
         let mut connected_at: Option<Instant> = None;
         let mut delivered = false;
-        let _ = pump(&credentials, &out, &mut connected_at, &mut delivered).await;
+        if let Err(error) = pump(&credentials, &out, &mut connected_at, &mut delivered).await {
+            if series.failed() {
+                let stage = if connected_at.is_some() { "Verbindung abgebrochen" } else { "keine Verbindung" };
+                log::warn!("Ereignis-Socket: {stage} ({}) — neue Versuche folgen, weitere Fehler dieser Serie stehen nicht im Log", describe(error.as_ref(), &credentials));
+            }
+        }
 
         if let Some(at) = connected_at {
             if out.send(SocketEvent::Down).is_err() {
@@ -43,6 +80,7 @@ pub async fn run(credentials: Credentials, out: UnboundedSender<SocketEvent>) {
             }
             if delivered && at.elapsed() >= Duration::from_secs(5) {
                 backoff = Duration::from_millis(500);
+                series.held();
             }
         }
         if out.is_closed() {
@@ -128,6 +166,46 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
+    }
+
+    #[test]
+    fn logs_the_first_failure_of_a_series_only() {
+        let mut series = FailureSeries::default();
+        // The client is not up yet: one line, then silence however long it takes.
+        assert!(series.failed());
+        for _ in 0..50 {
+            assert!(!series.failed());
+        }
+        // A link held, then the socket drops again: a new series, a new line.
+        series.held();
+        assert!(series.failed());
+        assert!(!series.failed());
+    }
+
+    #[test]
+    fn the_logged_error_never_carries_the_password() {
+        let credentials = Credentials { port: 50123, password: "geheim-123".to_string() };
+        let error: Box<dyn std::error::Error + Send + Sync> =
+            format!("HTTP error: 403 for riot:geheim-123\r\nAuthorization: {}", credentials.authorization()).into();
+        let line = describe(error.as_ref(), &credentials);
+        assert!(!line.contains("geheim-123"));
+        assert!(!line.contains(&credentials.authorization()));
+        assert!(!line.contains('\n'));
+        assert!(line.starts_with("HTTP error: 403"));
+    }
+
+    #[tokio::test]
+    async fn a_port_nobody_listens_on_is_an_error_before_any_link() {
+        let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+        let credentials = Credentials { port, password: "x".to_string() };
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut connected_at = None;
+        let mut delivered = false;
+        let result = pump(&credentials, &tx, &mut connected_at, &mut delivered).await;
+        assert!(result.is_err());
+        assert!(connected_at.is_none());
+        assert!(rx.try_recv().is_err());
+        assert!(!describe(result.unwrap_err().as_ref(), &credentials).is_empty());
     }
 
     #[test]
