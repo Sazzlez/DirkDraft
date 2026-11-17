@@ -68,7 +68,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         if: steps.key.outputs.present == 'true'
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       # The newest state of an earlier run; a fresh start on the very first run or a new patch.
       - name: Stand laden
