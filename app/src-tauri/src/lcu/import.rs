@@ -2,10 +2,15 @@
 // since 07.11.2026 on the user's wish, the two summoner spells. The page decides nothing about slots
 // for the spells — the TS core (core/loadout.ts) already put Flash on the player's key.
 //
-// Rune pages follow 1.5's rule: DirkDraft deletes only pages it created itself (prefix DirkRunen,
+// Rune pages follow 1.5's rule: DirkDraft touches only pages it created itself (prefix DirkRunen,
 // or DraftPilot from before the rename). When the account's page limit forces replacing a foreign
 // page, nothing is written: the answer names the page and the page asks the user; only a second
-// call that names the same page as agreed goes ahead. Everything is decided before the first delete.
+// call that names the same page as agreed goes ahead. Everything is decided before the first write.
+//
+// Since 17.11.2026 a page is written over in place (PUT /lol-perks/v1/pages/{id}) instead of deleted
+// and created anew: between the DELETE and the POST the page was gone, and a POST the client then
+// refused left the user without it. 1.x only ever used POST and DELETE, so PUT is the untried part:
+// a client that answers it with a refusal gets the old way (delete, create) as before.
 
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
@@ -81,11 +86,20 @@ pub fn page_name(title: &str) -> String {
     format!("{PAGE_PREFIX} · {title}").chars().take(MAX_NAME_CHARS).collect()
 }
 
-/// What has to happen to make room, decided before anything is deleted.
+/// The page the new one is written over.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Overwrite {
+    pub id: i64,
+    /// The name of a foreign page the user agreed to lose; None for one of our own.
+    pub foreign: Option<String>,
+}
+
+/// What has to happen to make room, decided before anything is written.
 #[derive(Debug, PartialEq)]
 pub enum Plan {
-    /// Delete these own pages (and the agreed foreign one, if any), then create.
-    Go { delete: Vec<i64>, sacrifice: Option<(i64, String)> },
+    /// Write the page: over `overwrite` (one of our own, or the agreed foreign one), or as a new
+    /// page where a slot is free. `delete`: our other pages, removed once the new one is written.
+    Go { overwrite: Option<Overwrite>, delete: Vec<i64> },
     /// A foreign page would have to go and the user has not agreed to this one yet.
     Ask(String),
     Refuse(&'static str),
@@ -105,7 +119,9 @@ pub fn plan(pages: &[Page], owned: i64, agreed: Option<&str>) -> Plan {
         return Plan::Refuse("Mehr Seiten belegt als Plätze vorhanden — bitte im Client aufräumen.");
     }
     if needed < 1 {
-        return Plan::Go { delete: ours, sacrifice: None };
+        // One of our own pages takes the new runes; any further ones are leftovers.
+        let overwrite = ours.first().map(|&id| Overwrite { id, foreign: None });
+        return Plan::Go { overwrite, delete: ours.into_iter().skip(1).collect() };
     }
 
     // Offer the oldest foreign page: the one whose loss is most likely already priced in.
@@ -115,7 +131,25 @@ pub fn plan(pages: &[Page], owned: i64, agreed: Option<&str>) -> Plan {
     if agreed != Some(oldest.name.as_str()) {
         return Plan::Ask(oldest.name.clone());
     }
-    Plan::Go { delete: ours, sacrifice: Some((oldest.id, oldest.name.clone())) }
+    Plan::Go { overwrite: Some(Overwrite { id: oldest.id, foreign: Some(oldest.name.clone()) }), delete: ours }
+}
+
+/// The writes the import needs. The client answers them; the tests answer from a script.
+trait Writes {
+    async fn send(&self, method: Method, path: &str, body: Option<&serde_json::Value>) -> Result<(), String>;
+}
+
+impl Writes for Lcu {
+    async fn send(&self, method: Method, path: &str, body: Option<&serde_json::Value>) -> Result<(), String> {
+        Lcu::send(self, method, path, body).await
+    }
+}
+
+/// The HTTP status at the head of a write's error ("405: …", http.rs), or None when nothing came
+/// back at all (client gone, timeout).
+fn refused_with(error: &str) -> Option<u16> {
+    let (status, _) = error.split_once(':')?;
+    status.trim().parse().ok().filter(|code| (100..600).contains(code))
 }
 
 pub async fn run(lcu: &Lcu, request: ImportRequest) -> ImportOutcome {
@@ -144,15 +178,15 @@ pub async fn run(lcu: &Lcu, request: ImportRequest) -> ImportOutcome {
                             confirm: Some(name),
                         }
                     }
-                    Plan::Go { delete, sacrifice } => rune_work = Some((page, delete, sacrifice)),
+                    Plan::Go { overwrite, delete } => rune_work = Some((page, overwrite, delete)),
                 },
                 _ => problems.push("Client hat die Runenseiten nicht verraten — läuft er noch?".into()),
             }
         }
     }
 
-    if let Some((page, delete, sacrifice)) = rune_work {
-        match write_page(lcu, page, delete, sacrifice).await {
+    if let Some((page, overwrite, delete)) = rune_work {
+        match write_page(lcu, page, overwrite, delete).await {
             Ok(()) => done.push("Runen"),
             Err(problem) => problems.push(problem),
         }
@@ -172,18 +206,9 @@ pub async fn run(lcu: &Lcu, request: ImportRequest) -> ImportOutcome {
     result
 }
 
-/// The page itself: own pages out, the agreed foreign one out, the new one in as the current page.
-async fn write_page(lcu: &Lcu, page: &PageRequest, delete: Vec<i64>, sacrifice: Option<(i64, String)>) -> Result<(), String> {
-    for id in delete {
-        lcu.send(Method::DELETE, &format!("/lol-perks/v1/pages/{id}"), None)
-            .await
-            .map_err(|error| format!("Alte DirkRunen-Seite ließ sich nicht löschen ({error})."))?;
-    }
-    if let Some((id, name)) = &sacrifice {
-        lcu.send(Method::DELETE, &format!("/lol-perks/v1/pages/{id}"), None)
-            .await
-            .map_err(|error| format!("Seite „{name}“ ließ sich nicht löschen ({error})."))?;
-    }
+/// The page itself, as the current page. Over an existing page it is written in place, so there is
+/// no moment without it; a client that refuses that gets the old way: delete it, create anew.
+async fn write_page<W: Writes>(lcu: &W, page: &PageRequest, overwrite: Option<Overwrite>, delete: Vec<i64>) -> Result<(), String> {
     let body = json!({
         "name": page_name(&page.title),
         "primaryStyleId": page.primary_style_id,
@@ -192,10 +217,47 @@ async fn write_page(lcu: &Lcu, page: &PageRequest, delete: Vec<i64>, sacrifice: 
         "selectedPerkIds": page.selected_perk_ids.iter().take(9).collect::<Vec<_>>(),
         "current": true,
     });
-    lcu.send(Method::POST, "/lol-perks/v1/pages", Some(&body)).await.map_err(|error| {
+
+    match &overwrite {
+        // A free slot: nothing has to go.
+        None => lcu.send(Method::POST, "/lol-perks/v1/pages", Some(&body)).await.map_err(|error| format!("Client hat die Seite abgelehnt ({error})."))?,
+        Some(target) => match lcu.send(Method::PUT, &format!("/lol-perks/v1/pages/{}", target.id), Some(&body)).await {
+            Ok(()) => {
+                // "current" in the body may be ignored on an existing page: say it outright. The runes
+                // are written either way, so a refusal here costs a click in the client, not the import.
+                if let Err(error) = lcu.send(Method::PUT, "/lol-perks/v1/currentpage", Some(&json!(target.id))).await {
+                    log::warn!("Runen: Seite geschrieben, aber nicht als aktuelle gesetzt ({error})");
+                }
+            }
+            // The client answered and said no (PUT is untried against the real client): the way 1.x went.
+            Err(error) if refused_with(&error).is_some() => {
+                log::warn!("Runen: Überschreiben abgelehnt ({error}) — alter Weg: löschen und neu anlegen");
+                replace_page(lcu, target, &body).await?;
+            }
+            // Nothing came back: nothing was written and nothing is lost.
+            Err(error) => return Err(format!("Client hat die Seite nicht angenommen ({error}).")),
+        },
+    }
+
+    // Our leftovers go last: the new page is safe by now, and a failure here loses nothing.
+    for id in delete {
+        if let Err(error) = lcu.send(Method::DELETE, &format!("/lol-perks/v1/pages/{id}"), None).await {
+            log::warn!("Runen: alte DirkRunen-Seite ließ sich nicht löschen ({error})");
+        }
+    }
+    Ok(())
+}
+
+/// The old way, for a client that refuses to write over a page: the page out, the new one in.
+async fn replace_page<W: Writes>(lcu: &W, target: &Overwrite, body: &serde_json::Value) -> Result<(), String> {
+    lcu.send(Method::DELETE, &format!("/lol-perks/v1/pages/{}", target.id), None).await.map_err(|error| match &target.foreign {
+        Some(name) => format!("Seite „{name}“ ließ sich nicht löschen ({error})."),
+        None => format!("Alte DirkRunen-Seite ließ sich nicht löschen ({error})."),
+    })?;
+    lcu.send(Method::POST, "/lol-perks/v1/pages", Some(body)).await.map_err(|error| {
         // The one failure that loses something: say so instead of hiding it.
-        match &sacrifice {
-            Some((_, name)) => format!("Seite „{name}“ wurde entfernt, aber der Client hat die neue Seite abgelehnt ({error})."),
+        match &target.foreign {
+            Some(name) => format!("Seite „{name}“ wurde entfernt, aber der Client hat die neue Seite abgelehnt ({error})."),
             None => format!("Client hat die Seite abgelehnt ({error})."),
         }
     })
@@ -226,7 +288,8 @@ mod tests {
     #[test]
     fn replaces_own_pages_when_there_is_room() {
         let pages = [page(1, "Meine", 5), page(2, "DirkRunen · Darius vs Jax", 9), page(3, "DraftPilot · alt", 1)];
-        assert_eq!(plan(&pages, 3, None), Plan::Go { delete: vec![2, 3], sacrifice: None });
+        // The first of our pages takes the new runes, the other is a leftover.
+        assert_eq!(plan(&pages, 3, None), Plan::Go { overwrite: Some(Overwrite { id: 2, foreign: None }), delete: vec![3] });
     }
 
     #[test]
@@ -234,7 +297,7 @@ mod tests {
         let pages = [page(1, "Neu", 50), page(2, "Alt", 10)];
         assert_eq!(plan(&pages, 2, None), Plan::Ask("Alt".into()));
         assert_eq!(plan(&pages, 2, Some("Neu")), Plan::Ask("Alt".into()));
-        assert_eq!(plan(&pages, 2, Some("Alt")), Plan::Go { delete: vec![], sacrifice: Some((2, "Alt".into())) });
+        assert_eq!(plan(&pages, 2, Some("Alt")), Plan::Go { overwrite: Some(Overwrite { id: 2, foreign: Some("Alt".into()) }), delete: vec![] });
     }
 
     #[test]
@@ -248,7 +311,109 @@ mod tests {
     fn ignores_riots_preset_pages() {
         let mut preset = page(9, "Preset", 0);
         preset.is_editable = false;
-        assert_eq!(plan(&[preset, page(1, "Meine", 1)], 2, None), Plan::Go { delete: vec![], sacrifice: None });
+        // A free slot and no page of ours: a new page, nothing written over.
+        assert_eq!(plan(&[preset, page(1, "Meine", 1)], 2, None), Plan::Go { overwrite: None, delete: vec![] });
+    }
+
+    /// A client that answers from a script and writes down what it was asked.
+    struct Script<F: Fn(&Method, &str) -> Result<(), String>> {
+        answer: F,
+        calls: std::sync::Mutex<Vec<String>>,
+        bodies: std::sync::Mutex<Vec<serde_json::Value>>,
+    }
+
+    impl<F: Fn(&Method, &str) -> Result<(), String>> Script<F> {
+        fn new(answer: F) -> Self {
+            Self { answer, calls: Default::default(), bodies: Default::default() }
+        }
+
+        fn calls(&self) -> Vec<String> {
+            self.calls.lock().unwrap().clone()
+        }
+    }
+
+    impl<F: Fn(&Method, &str) -> Result<(), String>> Writes for Script<F> {
+        async fn send(&self, method: Method, path: &str, body: Option<&serde_json::Value>) -> Result<(), String> {
+            self.calls.lock().unwrap().push(format!("{method} {path}"));
+            if let Some(body) = body {
+                self.bodies.lock().unwrap().push(body.clone());
+            }
+            (self.answer)(&method, path)
+        }
+    }
+
+    fn runes() -> PageRequest {
+        PageRequest { title: "Darius vs Jax".into(), primary_style_id: 8000, sub_style_id: 8400, selected_perk_ids: (1..=10).collect() }
+    }
+
+    const OURS: Overwrite = Overwrite { id: 7, foreign: None };
+
+    fn foreign() -> Overwrite {
+        Overwrite { id: 4, foreign: Some("Alt".into()) }
+    }
+
+    #[tokio::test]
+    async fn writes_over_an_own_page_in_place_and_makes_it_the_current_one() {
+        let client = Script::new(|_, _| Ok(()));
+        assert_eq!(write_page(&client, &runes(), Some(OURS), vec![9]).await, Ok(()));
+        // No delete before the write: the page is never gone. The leftover goes last.
+        assert_eq!(client.calls(), ["PUT /lol-perks/v1/pages/7", "PUT /lol-perks/v1/currentpage", "DELETE /lol-perks/v1/pages/9"]);
+        let bodies = client.bodies.lock().unwrap();
+        assert_eq!(bodies[0]["name"], "DirkRunen · Darius vs Jax");
+        assert_eq!(bodies[0]["selectedPerkIds"].as_array().unwrap().len(), 9);
+        assert_eq!(bodies[0]["current"], true);
+        assert_eq!(bodies[1], json!(7));
+    }
+
+    #[tokio::test]
+    async fn writes_over_the_agreed_foreign_page_without_deleting_it_first() {
+        let client = Script::new(|_, _| Ok(()));
+        assert_eq!(write_page(&client, &runes(), Some(foreign()), vec![]).await, Ok(()));
+        assert_eq!(client.calls(), ["PUT /lol-perks/v1/pages/4", "PUT /lol-perks/v1/currentpage"]);
+    }
+
+    #[tokio::test]
+    async fn a_free_slot_gets_a_new_page() {
+        let client = Script::new(|_, _| Ok(()));
+        assert_eq!(write_page(&client, &runes(), None, vec![]).await, Ok(()));
+        assert_eq!(client.calls(), ["POST /lol-perks/v1/pages"]);
+    }
+
+    #[tokio::test]
+    async fn a_client_that_refuses_put_gets_the_old_way() {
+        let client = Script::new(|method, _| if *method == Method::PUT { Err("405: Method Not Allowed".into()) } else { Ok(()) });
+        assert_eq!(write_page(&client, &runes(), Some(OURS), vec![9]).await, Ok(()));
+        assert_eq!(client.calls(), ["PUT /lol-perks/v1/pages/7", "DELETE /lol-perks/v1/pages/7", "POST /lol-perks/v1/pages", "DELETE /lol-perks/v1/pages/9"]);
+    }
+
+    #[tokio::test]
+    async fn the_old_way_says_what_was_lost_when_the_client_refuses_the_new_page_too() {
+        let client = Script::new(|method, _| if *method == Method::DELETE { Ok(()) } else { Err("400: Invalid page".into()) });
+        let problem = write_page(&client, &runes(), Some(foreign()), vec![]).await.unwrap_err();
+        assert_eq!(problem, "Seite „Alt“ wurde entfernt, aber der Client hat die neue Seite abgelehnt (400: Invalid page).");
+    }
+
+    #[tokio::test]
+    async fn no_answer_to_the_put_deletes_nothing() {
+        // The client is gone: no status, so no "refused" — and nothing may be deleted on a guess.
+        let client = Script::new(|_, _| Err("error sending request for url (https://127.0.0.1:50123/…)".into()));
+        let problem = write_page(&client, &runes(), Some(foreign()), vec![9]).await.unwrap_err();
+        assert!(problem.starts_with("Client hat die Seite nicht angenommen"));
+        assert_eq!(client.calls(), ["PUT /lol-perks/v1/pages/4"]);
+    }
+
+    #[tokio::test]
+    async fn a_page_that_is_written_but_not_made_current_is_still_an_import() {
+        let client = Script::new(|_, path| if path.ends_with("currentpage") { Err("404: not found".into()) } else { Ok(()) });
+        assert_eq!(write_page(&client, &runes(), Some(OURS), vec![]).await, Ok(()));
+    }
+
+    #[test]
+    fn tells_a_refusal_from_no_answer() {
+        assert_eq!(refused_with("405: Method Not Allowed"), Some(405));
+        assert_eq!(refused_with("400: {\"message\":\"Max pages reached\"}"), Some(400));
+        assert_eq!(refused_with("error sending request for url (https://127.0.0.1:50123/x): connection refused"), None);
+        assert_eq!(refused_with("operation timed out"), None);
     }
 
     #[test]
