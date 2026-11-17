@@ -126,6 +126,11 @@ eine Warnung im Lauf nennen die Zahl und den letzten Grund. Der Lauf endet nur b
 einer Liga-Seite oder Spiel-Liste (beides heißt: der Schlüssel) oder nach 20 Fehlern in Folge (Ausfall).
 Der Stand wird bei jedem Ende gesichert, auch beim Abbruch (`CollectorFailures.cs`).
 
+**Export auch nach Fehlern.** „Exportieren“, „Spiel-Liste sichern“ und „Veroeffentlichen“ laufen auch,
+wenn ein Schritt davor fehlgeschlagen ist; ein Fehler in „ARAM sammeln“ hält die Ranked-Dateien
+desselben Laufs nicht mehr zurück. Ob eine Datei veröffentlicht werden darf, entscheidet allein der
+Schutz unten.
+
 **Schutz vor einem leeren Stand.** Der Stand liegt im Actions-Cache. Fehlt der einmal, beginnt der
 Sammler bei null, und sein Export würde wenige Tausend Spiele an die Stelle von 270.000 setzen. Vor
 dem Push vergleicht `riot guard` deshalb die `games` der neuen `meta.json` (und der `aram.json`) mit der

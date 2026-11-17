@@ -104,17 +104,31 @@ jobs:
             ${{ env.ARAM_STATE }}
           key: riot-state-${{ github.run_id }}
 
+      # From here on every step also runs after a failed one (always()): a failure in "ARAM sammeln"
+      # used to keep the ranked files of the same run from being published. Whether a file may be
+      # published is the guard's call (Veroeffentlichen), not the outcome of the steps before.
+      # Each export by itself, so one failing does not keep the other from the guard.
       - name: Exportieren
-        if: steps.key.outputs.present == 'true'
+        if: always() && steps.key.outputs.present == 'true'
         run: |
-          dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export --state "$STATE" --tier "$TIERS" --out publish/builds.json --meta-out publish/meta.json --situational-out publish/situational.json --games-out private/games.json.gz --matchups-out private/matchups.json.gz
-          dotnet run --project src/DraftPilot.Tools -c Release --no-build -- riot export-aram --state "$ARAM_STATE" --out publish/aram.json
+          status=0
+          if [ -f "$STATE" ]; then
+            dotnet run --project src/DraftPilot.Tools -c Release -- riot export --state "$STATE" --tier "$TIERS" --out publish/builds.json --meta-out publish/meta.json --situational-out publish/situational.json --games-out private/games.json.gz --matchups-out private/matchups.json.gz || status=1
+          else
+            echo "::warning::Kein Ranked-Stand ($STATE) - kein Export."
+          fi
+          if [ -f "$ARAM_STATE" ]; then
+            dotnet run --project src/DraftPilot.Tools -c Release -- riot export-aram --state "$ARAM_STATE" --out publish/aram.json || status=1
+          else
+            echo "::warning::Kein ARAM-Stand ($ARAM_STATE) - kein Export."
+          fi
+          exit $status
 
       # The counted games themselves (ten champions and a result each, no players, no match ids) and
       # the matchup builds, for measuring the draft model (docs/draft-konzept.md). Not published: an
       # artifact of the run, kept a week; each run's files hold everything counted so far.
       - name: Spiel-Liste sichern
-        if: steps.key.outputs.present == 'true' && hashFiles('private/games.json.gz') != ''
+        if: always() && steps.key.outputs.present == 'true' && hashFiles('private/games.json.gz') != ''
         uses: actions/upload-artifact@v4
         with:
           name: games
@@ -124,7 +138,7 @@ jobs:
 
       # What is published now: the new files are held against it, and what is not replaced stays.
       - name: Veroeffentlichten Stand holen
-        if: steps.key.outputs.present == 'true'
+        if: always() && steps.key.outputs.present == 'true'
         run: |
           mkdir -p published publish
           if git fetch -q --depth 1 origin data 2>/dev/null; then
@@ -140,7 +154,7 @@ jobs:
       # published; the published files stay, and the run says so as an error with both numbers. Any
       # exit code but 0 keeps what is published - also when the tool itself does not run.
       - name: Veroeffentlichen
-        if: steps.key.outputs.present == 'true'
+        if: always() && steps.key.outputs.present == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
