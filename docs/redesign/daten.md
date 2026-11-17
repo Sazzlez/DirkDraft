@@ -177,6 +177,39 @@ Damit der Sammler diesen Stand nimmt: die Caches `riot-state-…` unter *Actions
 alle neueren `state-backup`-Artefakte entfernen; der nächste Lauf stellt dann aus dem verbliebenen
 neuesten Backup wieder her.
 
+## Neu zählen nach Hotfix und Rework (`data/resets.json`, seit 17.11.2026)
+
+Der Sammler unterscheidet nur ganze Patches. Ein Hotfix mitten im Patch mischt deshalb die Spiele
+davor und danach bis zum Patchende, und in den Tagen nach einem Patch zeigt die App für einen
+reworkten Champion die Zahlen seines alten Kits (der Rückfall auf den Vorpatch, oben). Dagegen steht
+`data/resets.json`, von Hand gepflegt — auch am Handy über GitHub (Datei öffnen, Stift, speichern;
+auf `master`, denn von dort baut jeder Lauf):
+
+```json
+[
+  { "champion": "Mel", "patch": "16.23", "reason": "hotfix", "note": "Hotfix vom 20.11.: W-Schaden" },
+  { "champion": "MonkeyKing", "patch": "16.24", "reason": "rework", "note": "neues Kit" }
+]
+```
+
+- `champion`: der Data-Dragon-Key (`MonkeyKing`); der Anzeigename (`Wukong`, `Kai'Sa`) wird auch
+  verstanden. `patch`: der Patch, in dem es passiert ist. `reason`: `hotfix` oder `rework`. `note`:
+  frei; zwei Hotfixes desselben Champions im selben Patch brauchen verschiedene Notizen (das Datum),
+  sonst gilt der zweite als schon angewendet.
+- **Sammler:** Zu Beginn jedes Laufs wendet er die Einträge des laufenden Patches an, die der Stand
+  noch nicht kennt. Der Champion verschwindet aus allen Zählungen des Patches — Lane-Zeilen, Duelle
+  und `versus`, Duos, Banns, Schaden, Builds, situative Items, Matchup-Builds, im ARAM-Stand Winrate
+  und Builds — und zählt ab dann neu. Der Eintrag steht danach im Stand (`appliedResets`); ein zweiter
+  Lauf ändert nichts mehr. Die Spiel-Zeilen bleiben. Bis der Champion wieder genug Spiele hat, fehlt
+  er in den Listen oder steht dünn da; seine Pickrate zählt bis zum Patchende nur die Spiele seit dem
+  Eintrag.
+- **Export im Rückfallfenster:** Solange der neue Patch zu dünn ist und der Vorpatch veröffentlicht
+  wird, fehlen Champions mit einem `rework` für den neuen Patch in `meta.json`, `builds.json`,
+  `situational.json` und `aram.json`. Besser keine Zahl als die des alten Kits. Ein `hotfix` ändert
+  am Rückfall nichts.
+- Ein unlesbarer Eintrag oder ein unbekannter Champion ist eine Warnung im Lauf, nie sein Ende.
+- Tests: `tests/DraftPilot.Core.Tests/ChampionResetTests.cs`.
+
 ## Was am Ende einzutragen ist
 
 Im Repository unter *Settings → Secrets and variables → Actions*:

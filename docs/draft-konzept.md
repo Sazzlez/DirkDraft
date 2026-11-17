@@ -102,6 +102,12 @@ Ausgeliefert wird die beste.
   Kit, nicht am Patch. Diese Beziehungen werden über die letzten drei Patches gelernt, mit mehr
   Gewicht auf dem neuesten. Das verdreifacht die Daten genau dort, wo sie am dünnsten sind. Dafür muss
   der Sammler die Spiel-Zeilen der letzten drei Patches behalten (Phase 1b).
+- **Ausnahme Rework (seit 17.11.2026):** Beides gilt nur, solange das Kit dasselbe ist. Für einen
+  Champion mit einem `rework`-Eintrag in `data/resets.json` lässt das Lernen über mehrere Patches —
+  Synergien und Counter über drei Patches ebenso wie der alte Patch als Vorwissen für die Stärke —
+  alle Patches vor dem Rework aus: Seine älteren Spiel-Zeilen zählen für ihn und für jedes Paar mit
+  ihm nicht. Ein `hotfix`-Eintrag ändert daran nichts (das Kit bleibt), er lässt nur die Zählung des
+  laufenden Patches neu beginnen (`docs/redesign/daten.md`, „Neu zählen nach Hotfix und Rework“).
 - **Früh oder spät:** Die Spiel-Zeilen tragen Spieldauer und Gold-Vorsprung nach 15 Minuten. Daraus
   lässt sich messen, welche Champions früh und welche spät gewinnen, und ob ein Team mit zu wenig
   Spätphase gegen ein spät starkes Team verliert.

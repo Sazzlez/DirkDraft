@@ -107,6 +107,9 @@ public sealed class CollectorState
     /// </summary>
     public PreviousPatch? Previous { get; set; }
 
+    /// <summary>Entries of data/resets.json already applied to this patch's counts (<see cref="ChampionResets"/>).</summary>
+    public List<string> AppliedResets { get; set; } = [];
+
     /// <summary>
     /// Starts counting a new patch (or platform). The counts of the patch that ends become
     /// <see cref="Previous"/> and its game lines move to the front of <see cref="OlderGames"/> — both
@@ -197,7 +200,8 @@ public sealed class RiotCollector(
     ItemCatalog items,
     CollectorOptions options,
     Action<string>? log = null,
-    ChampionStatics? statics = null)
+    ChampionStatics? statics = null,
+    ResetPlan? resets = null)
 {
     private static readonly string[] Divisions = ["I", "II", "III", "IV"];
 
@@ -253,6 +257,11 @@ public sealed class RiotCollector(
 
             state.StartPatch(patch, options.Platform);
         }
+
+        // A hotfix or rework entered since the last run (data/resets.json): its champion leaves this
+        // patch's counts and starts over. Before the tallies below are filled from the state.
+        if (resets is not null)
+            ChampionResets.Apply(state, resets, log);
 
         var tally = new RiotBuildTally();
         tally.Add(state.Tally.Builds);

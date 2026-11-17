@@ -55,6 +55,9 @@ public sealed class AramState
     /// <summary>The last patch's count, published until the new one has enough games.</summary>
     public RiotAramFile? Previous { get; set; }
 
+    /// <summary>Entries of data/resets.json already applied to this patch's count (<see cref="ChampionResets"/>).</summary>
+    public List<string> AppliedResets { get; set; } = [];
+
     public static AramState Load(string path)
     {
         if (!File.Exists(path))
@@ -90,7 +93,8 @@ public sealed partial class AramJson : JsonSerializerContext;
 /// to have played more. The list of players lives in memory for one run and is never stored or
 /// published.
 /// </summary>
-public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOptions options, Action<string>? log = null)
+/// <param name="resets">Champions to count anew after a hotfix or rework (data/resets.json); null for none.</param>
+public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOptions options, Action<string>? log = null, ResetPlan? resets = null)
 {
     private static readonly TimeSpan FirstLookBack = TimeSpan.FromDays(14);
     private static readonly string[] Divisions = ["I", "II", "III", "IV"];
@@ -138,6 +142,10 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
             state.Seen = [];
             state.Tally = new RiotAramFile();
         }
+
+        // A hotfix or rework entered since the last run: its champion starts over within the patch.
+        if (resets is not null)
+            ChampionResets.Apply(state, resets, log);
 
         var tally = new RiotAramTally();
         tally.Add(state.Tally);

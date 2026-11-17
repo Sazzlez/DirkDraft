@@ -29,7 +29,7 @@ internal static class RiotCommand
             "export" => await ExportAsync(options, ct),
             "aram" => await AramAsync(options, ct),
             "queues" => await QueuesAsync(options, ct),
-            "export-aram" => ExportAram(options),
+            "export-aram" => await ExportAramAsync(options, ct),
             "guard" => Guard(options),
             _ => Usage(),
         };
@@ -172,11 +172,22 @@ internal static class RiotCommand
 
         // Early in a patch the new count is thin; until it has enough games the previous patch's
         // numbers are published instead, under their own patch, so the app knows they trail.
-        var (patch, buildFile, metaCounts, situationalCounts) = (state.Patch, state.Tally, state.Meta, state.Situational);
-        if (state.Meta.Matches < enough && state.Previous is { } previous && previous.Meta.Matches > state.Meta.Matches)
+        // A champion reworked with the new patch is left out of that fallback (ExportSources,
+        // data/resets.json): the file is only read when the fallback is on.
+        var plan = ResetPlan.None;
+        if (ExportSources.IsFallback(state, enough))
         {
-            (patch, buildFile, metaCounts, situationalCounts) = (previous.Patch, previous.Tally, previous.Meta, previous.Situational);
+            using var lookup = new HttpClient();
+            plan = await ResetsAsync(options, lookup, await LatestVersionAsync(lookup, ct), ct);
+        }
+
+        var source = ExportSources.Ranked(state, enough, plan);
+        var (patch, buildFile, metaCounts, situationalCounts) = (source.Patch, source.Builds, source.Meta, source.Situational);
+        if (source.IsFallback)
+        {
             Console.WriteLine($"Patch {state.Patch} hat erst {state.Meta.Matches:N0} Spiele — veröffentlicht wird Patch {patch} ({metaCounts.Matches:N0}).");
+            if (source.LeftOut.Count > 0)
+                Annotate("notice", $"Rework in Patch {state.Patch}: Champion {string.Join(", ", source.LeftOut)} fehlt in den Rückfall-Daten von Patch {patch}.");
         }
 
         var tally = new RiotBuildTally();
@@ -269,7 +280,12 @@ internal static class RiotCommand
 
         var state = AramState.Load(statePath);
         using var api = new RiotApiClient(key);
-        var collector = new AramCollector(api, catalog, aram, line => Console.WriteLine($"{DateTime.Now:HH:mm:ss} {line}"));
+        var collector = new AramCollector(
+            api,
+            catalog,
+            aram,
+            line => Console.WriteLine($"{DateTime.Now:HH:mm:ss} {line}"),
+            await ResetsAsync(options, http, catalog.Version, ct));
         var report = await collector.RunAsync(state, s => s.Save(statePath), ct);
         Console.WriteLine(
             $"Fertig: {report.Counted} ARAM-Spiele gezählt, {report.Skipped} übersprungen, {report.Requests} Abrufe "
@@ -277,6 +293,34 @@ internal static class RiotCommand
         ReportFailures(report, "ARAM");
         return 0;
     }
+
+    /// <summary>
+    /// data/resets.json with the champions its names stand for (<see cref="ChampionResets"/>). What
+    /// the file gets wrong is a warning on the run's page, never the end of the run.
+    /// </summary>
+    private static ResetPlan Resets(Dictionary<string, string> options, IEnumerable<ChampionEntry> champions)
+    {
+        var entries = ChampionResets.Load(ResetsPath(options), out var problems);
+        foreach (var problem in problems)
+            Annotate("warning", problem);
+
+        return new ResetPlan(entries, ResetPlan.Names(champions));
+    }
+
+    /// <summary>The same where the champions are not at hand yet: fetched only when the file has entries.</summary>
+    private static async Task<ResetPlan> ResetsAsync(Dictionary<string, string> options, HttpClient http, string version, CancellationToken ct)
+    {
+        var entries = ChampionResets.Load(ResetsPath(options), out var problems);
+        foreach (var problem in problems)
+            Annotate("warning", problem);
+        if (entries.Count == 0)
+            return ResetPlan.None;
+
+        var champions = RiotMetaExport.ParseDataDragon(await http.GetStringAsync($"{DataDragon}/cdn/{version}/data/en_US/champion.json", ct));
+        return new ResetPlan(entries, ResetPlan.Names(champions));
+    }
+
+    private static string ResetsPath(Dictionary<string, string> options) => options.GetValueOrDefault("resets", Path.Combine("data", "resets.json"));
 
     /// <summary>Requests Riot failed on and the run skipped: one line, a warning on the run's page on GitHub.</summary>
     private static void ReportFailures(CollectorReport report, string what)
@@ -306,7 +350,7 @@ internal static class RiotCommand
         return 0;
     }
 
-    private static int ExportAram(Dictionary<string, string> options)
+    private static async Task<int> ExportAramAsync(Dictionary<string, string> options, CancellationToken ct)
     {
         if (!options.TryGetValue("out", out var outPath) || outPath.Length == 0)
             return Usage();
@@ -317,12 +361,24 @@ internal static class RiotCommand
         var enough = int.Parse(options.GetValueOrDefault("min-patch-games", "500"), CultureInfo.InvariantCulture);
         var state = AramState.Load(statePath);
 
-        var source = state.Tally.Games < enough && state.Previous is { } previous && previous.Games > state.Tally.Games ? previous : state.Tally;
+        // The fallback of the patch before, without the champions reworked with the new one (as in the ranked export).
+        var plan = ResetPlan.None;
+        if (ExportSources.IsFallback(state, enough))
+        {
+            using var lookup = new HttpClient();
+            plan = await ResetsAsync(options, lookup, await LatestVersionAsync(lookup, ct), ct);
+        }
+
+        var chosen = ExportSources.Aram(state, enough, plan);
+        var source = chosen.Tally;
         if (source.Games == 0)
         {
             Console.WriteLine("Noch keine ARAM-Spiele gezählt — keine aram.json.");
             return 0;
         }
+
+        if (chosen.LeftOut.Count > 0)
+            Annotate("notice", $"Rework in Patch {state.Patch}: Champion {string.Join(", ", chosen.LeftOut)} fehlt in den ARAM-Rückfall-Daten von Patch {source.Patch}.");
 
         var tally = new RiotAramTally();
         tally.Add(source);
@@ -369,7 +425,8 @@ internal static class RiotCommand
             catalog,
             new CollectorOptions { Tiers = tiers, Duration = TimeSpan.FromMinutes(minutes) },
             line => Console.WriteLine($"{DateTime.Now:HH:mm:ss} {line}"),
-            new ChampionStatics(champions.ToDictionary(champion => champion.Id), traits));
+            new ChampionStatics(champions.ToDictionary(champion => champion.Id), traits),
+            Resets(options, champions));
 
         var report = await collector.RunAsync(state, s => s.Save(statePath), ct);
 
