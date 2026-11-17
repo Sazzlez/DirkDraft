@@ -44,7 +44,9 @@ public sealed record CollectorOptions
     public int DuelGamesPerPatch { get; init; } = 40_000;
 }
 
-public sealed record CollectorReport(int Counted, int Skipped, int Requests, int Throttled, TimeSpan Elapsed);
+/// <param name="Failed">Requests Riot failed on and the run skipped (<see cref="CollectorFailures"/>).</param>
+/// <param name="LastFailure">What the last of them said.</param>
+public sealed record CollectorReport(int Counted, int Skipped, int Requests, int Throttled, TimeSpan Elapsed, int Failed = 0, string? LastFailure = null);
 
 /// <summary>
 /// What the collector carries from one run to the next. No player is in it: the players are found
@@ -213,6 +215,30 @@ public sealed class RiotCollector(
     /// <summary>Leads kept waiting per bracket; beyond it a league page's player adds none.</summary>
     private const int MaxLeads = 400;
 
+    /// <summary>Which failed requests the run skips and which end it.</summary>
+    private readonly CollectorFailures _failures = new();
+
+    /// <summary>
+    /// One request, with a failure weighed instead of thrown: false when Riot failed and the run goes
+    /// on without this answer. A null body with true is a 404.
+    /// </summary>
+    /// <param name="game">The request is for one game (the match or its timeline).</param>
+    private async Task<(bool Answered, string? Body)> TryGetAsync(string host, string pathAndQuery, bool game, CancellationToken ct)
+    {
+        try
+        {
+            var body = await api.GetAsync(host, pathAndQuery, ct).ConfigureAwait(false);
+            _failures.Succeeded();
+            return (true, body);
+        }
+        catch (RiotApiException failure)
+        {
+            _failures.Failed(failure, game);
+            log?.Invoke($"Übersprungen: {failure.Message}");
+            return (false, null);
+        }
+    }
+
     public async Task<CollectorReport> RunAsync(CollectorState state, Action<CollectorState> save, CancellationToken ct)
     {
         var clock = Stopwatch.StartNew();
@@ -282,6 +308,10 @@ public sealed class RiotCollector(
             save(state);
         }
 
+        // What was counted stays counted, also when the run ends on a rejected key or an outage: the
+        // counts change only once a game is read in full, so the state is whole at every await.
+        try
+        {
         while (clock.Elapsed < options.Duration && !ct.IsCancellationRequested
             && (options.MaxPages is not { } pages || pagesFetched < pages || leads.Values.Any(queue => queue.Count > 0)))
         {
@@ -321,7 +351,14 @@ public sealed class RiotCollector(
                     if (!TryNumber(matchId, out var number) || !seen.Add(number))
                         continue;
 
-                    var matchJson = await api.GetAsync(options.Region, $"/lol/match/v5/matches/{matchId}", ct).ConfigureAwait(false);
+                    // A game Riot fails on is one game less; it stays in "seen" and is not asked again.
+                    var (matchAnswered, matchJson) = await TryGetAsync(options.Region, $"/lol/match/v5/matches/{matchId}", game: true, ct).ConfigureAwait(false);
+                    if (!matchAnswered)
+                    {
+                        skipped++;
+                        continue;
+                    }
+
                     if (matchJson is null)
                         continue;
 
@@ -349,7 +386,7 @@ public sealed class RiotCollector(
                         continue;
                     }
 
-                    var timelineJson = await api.GetAsync(options.Region, $"/lol/match/v5/matches/{matchId}/timeline", ct).ConfigureAwait(false);
+                    var (_, timelineJson) = await TryGetAsync(options.Region, $"/lol/match/v5/matches/{matchId}/timeline", game: true, ct).ConfigureAwait(false);
                     if (timelineJson is null)
                     {
                         skipped++;
@@ -404,8 +441,13 @@ public sealed class RiotCollector(
             }
         }
 
-        Persist();
-        return new CollectorReport(counted, skipped, api.Requests, api.Throttled, clock.Elapsed);
+        }
+        finally
+        {
+            Persist();
+        }
+
+        return new CollectorReport(counted, skipped, api.Requests, api.Throttled, clock.Elapsed, _failures.Count, _failures.LastReason);
     }
 
     /// <summary>
@@ -418,10 +460,13 @@ public sealed class RiotCollector(
         var bound = _pages.GetValueOrDefault(key, 200);
         var page = 1 + _random.Next(bound);
 
-        var json = await api.GetAsync(
+        var (answered, json) = await TryGetAsync(
             options.Platform,
             $"/lol/league/v4/entries/RANKED_SOLO_5x5/{tier.ToUpperInvariant()}/{division}?page={page}",
+            game: false,
             ct).ConfigureAwait(false);
+        if (!answered)
+            return [];   // Riot failed on this page: another one next time, the bound stays
 
         using var document = RiotMatchReader.TryParse(json);
         if (json is not null && document is null)
@@ -448,9 +493,10 @@ public sealed class RiotCollector(
             ? DateTimeOffset.FromUnixTimeMilliseconds(state.OldPatchLatestMs)
             : DateTimeOffset.UtcNow - FirstLookBack;
 
-        var json = await api.GetAsync(
+        var (_, json) = await TryGetAsync(
             options.Region,
             $"/lol/match/v5/matches/by-puuid/{Uri.EscapeDataString(puuid)}/ids?queue={RiotMatchReader.RankedSoloQueue}&type=ranked&startTime={since.ToUnixTimeSeconds()}&count={options.MatchesPerPlayer}",
+            game: false,
             ct).ConfigureAwait(false);
 
         using var document = RiotMatchReader.TryParse(json);

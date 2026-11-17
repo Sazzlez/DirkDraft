@@ -76,8 +76,13 @@ public sealed class RiotApiClient : IDisposable
                 Requests++;
                 response = await _http.GetAsync(url, ct).ConfigureAwait(false);
             }
-            catch (Exception ex) when ((ex is HttpRequestException || (ex is TaskCanceledException && !ct.IsCancellationRequested)) && attempt < MaxAttempts)
+            catch (Exception ex) when (ex is HttpRequestException || (ex is TaskCanceledException && !ct.IsCancellationRequested))
             {
+                // No answer at all, six times: the same kind of failure as six 5xx, for the caller to
+                // weigh (CollectorFailures) — not a raw network exception that ends whatever ran.
+                if (attempt >= MaxAttempts)
+                    throw new RiotApiException($"Riot antwortet nicht auf {Describe(pathAndQuery)} ({ex.GetType().Name}).");
+
                 await _delay(Backoff(attempt), ct).ConfigureAwait(false);
                 continue;
             }

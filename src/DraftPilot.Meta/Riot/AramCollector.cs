@@ -101,6 +101,26 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
     private readonly Random _random = new();
     private readonly Dictionary<string, int> _pages = [];
 
+    /// <summary>Which failed requests the run skips and which end it (as in <see cref="RiotCollector"/>).</summary>
+    private readonly CollectorFailures _failures = new();
+
+    /// <summary>One request, with a failure weighed instead of thrown; a null body with true is a 404.</summary>
+    private async Task<(bool Answered, string? Body)> TryGetAsync(string host, string pathAndQuery, bool game, CancellationToken ct)
+    {
+        try
+        {
+            var body = await api.GetAsync(host, pathAndQuery, ct).ConfigureAwait(false);
+            _failures.Succeeded();
+            return (true, body);
+        }
+        catch (RiotApiException failure)
+        {
+            _failures.Failed(failure, game);
+            log?.Invoke($"ARAM übersprungen: {failure.Message}");
+            return (false, null);
+        }
+    }
+
     public async Task<CollectorReport> RunAsync(AramState state, Action<AramState> save, CancellationToken ct)
     {
         var clock = Stopwatch.StartNew();
@@ -136,6 +156,9 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
         var asked = new HashSet<string>(StringComparer.Ordinal);
         var pages = 0;
 
+        // What was counted stays counted, also when the run ends on a rejected key or an outage.
+        try
+        {
         while (clock.Elapsed < options.Duration && !ct.IsCancellationRequested)
         {
             // Out of leads: a fresh page of a league list.
@@ -161,7 +184,14 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
                 if (!RiotCollector.TryNumber(matchId, out var number) || !seen.Add(number))
                     continue;
 
-                var matchJson = await api.GetAsync(options.Region, $"/lol/match/v5/matches/{matchId}", ct).ConfigureAwait(false);
+                // A game Riot fails on is one game less; it stays in "seen" and is not asked again.
+                var (matchAnswered, matchJson) = await TryGetAsync(options.Region, $"/lol/match/v5/matches/{matchId}", game: true, ct).ConfigureAwait(false);
+                if (!matchAnswered)
+                {
+                    skipped++;
+                    continue;
+                }
+
                 if (matchJson is null)
                     continue;
 
@@ -186,7 +216,7 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
                     continue;
                 }
 
-                var timelineJson = await api.GetAsync(options.Region, $"/lol/match/v5/matches/{matchId}/timeline", ct).ConfigureAwait(false);
+                var (_, timelineJson) = await TryGetAsync(options.Region, $"/lol/match/v5/matches/{matchId}/timeline", game: true, ct).ConfigureAwait(false);
                 if (timelineJson is null)
                 {
                     skipped++;
@@ -219,8 +249,13 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
             }
         }
 
-        Persist();
-        return new CollectorReport(counted, skipped, api.Requests, api.Throttled, clock.Elapsed);
+        }
+        finally
+        {
+            Persist();
+        }
+
+        return new CollectorReport(counted, skipped, api.Requests, api.Throttled, clock.Elapsed, _failures.Count, _failures.LastReason);
     }
 
     /// <summary>The queue ids of a player's latest games, to find the one a mode runs under now.</summary>
@@ -273,10 +308,13 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
         var bound = _pages.GetValueOrDefault(key, 200);
         var page = 1 + _random.Next(bound);
 
-        var json = await api.GetAsync(
+        var (answered, json) = await TryGetAsync(
             options.Platform,
             $"/lol/league/v4/entries/RANKED_SOLO_5x5/{tier.ToUpperInvariant()}/{division}?page={page}",
+            game: false,
             ct).ConfigureAwait(false);
+        if (!answered)
+            return [];   // Riot failed on this page: another one next time, the bound stays
 
         using var document = RiotMatchReader.TryParse(json);
         if (json is not null && document is null)
@@ -305,9 +343,10 @@ public sealed class AramCollector(RiotApiClient api, ItemCatalog items, AramOpti
         var ids = new List<string>();
         foreach (var queue in options.Queues)
         {
-            var json = await api.GetAsync(
+            var (_, json) = await TryGetAsync(
                 options.Region,
                 $"/lol/match/v5/matches/by-puuid/{Uri.EscapeDataString(puuid)}/ids?queue={queue}&startTime={since.ToUnixTimeSeconds()}&count={options.MatchesPerPlayer}",
+                game: false,
                 ct).ConfigureAwait(false);
             using var document = RiotMatchReader.TryParse(json);
             if (document is not null && document.RootElement.ValueKind == JsonValueKind.Array)

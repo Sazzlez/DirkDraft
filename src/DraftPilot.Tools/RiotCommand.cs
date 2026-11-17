@@ -245,8 +245,20 @@ internal static class RiotCommand
         Console.WriteLine(
             $"Fertig: {report.Counted} ARAM-Spiele gezählt, {report.Skipped} übersprungen, {report.Requests} Abrufe "
             + $"({report.Throttled}× gedrosselt) in {report.Elapsed:h\\:mm\\:ss}. Bestand: {state.Tally.Games:N0} Spiele → {statePath}");
+        ReportFailures(report, "ARAM");
         return 0;
     }
+
+    /// <summary>Requests Riot failed on and the run skipped: one line, a warning on the run's page on GitHub.</summary>
+    private static void ReportFailures(CollectorReport report, string what)
+    {
+        if (report.Failed > 0)
+            Annotate("warning", $"{what}: {report.Failed} Abrufe fehlgeschlagen und übersprungen, zuletzt: {report.LastFailure}");
+    }
+
+    /// <summary>A line GitHub Actions shows on the run's page ("::warning::…"); a plain line anywhere else.</summary>
+    internal static void Annotate(string level, string text)
+        => Console.WriteLine(Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true" ? $"::{level}::{text}" : text);
 
     private static async Task<int> QueuesAsync(Dictionary<string, string> options, CancellationToken ct)
     {
@@ -336,6 +348,7 @@ internal static class RiotCommand
             $"Fertig: {report.Counted} Spiele gezählt, {report.Skipped} übersprungen, {report.Requests} Abrufe "
             + $"({report.Throttled}× gedrosselt) in {report.Elapsed:h\\:mm\\:ss}. Bestand: "
             + string.Join(", ", state.Tally.Matches.Select(m => $"{m.Key} {m.Value}")) + $" → {statePath}");
+        ReportFailures(report, "Ranked");
         return 0;
     }
 
