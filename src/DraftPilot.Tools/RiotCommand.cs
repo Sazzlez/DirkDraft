@@ -30,6 +30,7 @@ internal static class RiotCommand
             "aram" => await AramAsync(options, ct),
             "queues" => await QueuesAsync(options, ct),
             "export-aram" => ExportAram(options),
+            "guard" => Guard(options),
             _ => Usage(),
         };
     }
@@ -45,9 +46,37 @@ internal static class RiotCommand
             riot aram [--queues 450] [--tiers platinum] [--minutes 30] [--state build/aram-state.json.gz] [--key-file datei]
             riot queues --riot-id "Name#TAG" [--games 20] [--key-file datei]
             riot export-aram --out aram.json [--keep 6] [--min-games 3] [--min-patch-games 500] [--state build/aram-state.json.gz]
+            riot guard --new meta.json [--old veröffentlichte-meta.json] [--label Ranked]   (Exitcode 3: nicht veröffentlichen)
             (Riot-ID für queues auch über die Umgebungsvariable RIOT_ID)
             """);
         return 2;
+    }
+
+    /// <summary>Exit code of <c>riot guard</c> when the published file has to stay.</summary>
+    internal const int KeepPublished = 3;
+
+    /// <summary>
+    /// Before the push: may the new file replace the published one (<see cref="PublishGuard"/>)? Exit
+    /// code 0 says yes; <see cref="KeepPublished"/> says no, with both numbers as an error on the
+    /// run's page.
+    /// </summary>
+    private static int Guard(Dictionary<string, string> options)
+    {
+        if (!options.TryGetValue("new", out var newPath) || newPath.Length == 0)
+            return Usage();
+
+        var label = options.GetValueOrDefault("label", Path.GetFileName(newPath));
+        var verdict = PublishGuard.Check(ReadOrNull(options.GetValueOrDefault("old", string.Empty)), ReadOrNull(newPath));
+        if (verdict.Publish)
+        {
+            Console.WriteLine($"{label}: {verdict.Reason}");
+            return 0;
+        }
+
+        Annotate("error", $"{label}: {verdict.Reason}");
+        return KeepPublished;
+
+        static string? ReadOrNull(string path) => path.Length > 0 && File.Exists(path) ? File.ReadAllText(path) : null;
     }
 
     /// <summary>What the state holds: games per bracket, and how far the most played champions have got.</summary>

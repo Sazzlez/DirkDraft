@@ -122,18 +122,67 @@ jobs:
           retention-days: 7
           compression-level: 0
 
+      # What is published now: the new files are held against it, and what is not replaced stays.
+      - name: Veroeffentlichten Stand holen
+        if: steps.key.outputs.present == 'true'
+        run: |
+          mkdir -p published publish
+          if git fetch -q --depth 1 origin data 2>/dev/null; then
+            git archive FETCH_HEAD | tar -x -C published
+          else
+            echo "::notice::Noch kein Branch data - erste Veroeffentlichung."
+          fi
+
       # One commit, force-pushed: the branch holds the current files and no history of old ones.
+      # Before that, the guard (riot guard, PublishGuard.cs): the state lives in the Actions cache, and
+      # when that is gone once the next run starts at zero - its export must not put a few thousand
+      # games where 270.000 stood. On the same patch a count below half of the published one is not
+      # published; the published files stay, and the run says so as an error with both numbers. Any
+      # exit code but 0 keeps what is published - also when the tool itself does not run.
       - name: Veroeffentlichen
         if: steps.key.outputs.present == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          tool() { dotnet run --project src/DraftPilot.Tools -c Release --no-build -- "$@"; }
+          keep() {
+            for f in "$@"; do
+              if [ -f "published/$f" ]; then cp "published/$f" "publish/$f"; else rm -f "publish/$f"; fi
+            done
+          }
+          changed=0
+
+          # Ranked: three files of one count, published together or not at all.
+          if tool riot guard --label Ranked --old published/meta.json --new publish/meta.json \
+              && [ -f publish/builds.json ] && [ -f publish/situational.json ]; then
+            changed=1
+          else
+            keep meta.json builds.json situational.json
+          fi
+
+          if tool riot guard --label ARAM --old published/aram.json --new publish/aram.json; then
+            changed=1
+          else
+            keep aram.json
+          fi
+
+          # Whatever else is published and was not written anew stays on the branch.
+          for path in published/*; do
+            [ -f "$path" ] || continue
+            f=$(basename "$path")
+            [ -f "publish/$f" ] || cp "$path" "publish/$f"
+          done
+
+          if [ "$changed" -eq 0 ]; then
+            echo "::notice::Nichts Neues zu veroeffentlichen - der veroeffentlichte Stand bleibt."
+            exit 0
+          fi
+
           cd publish
           git init -q -b data
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add builds.json meta.json situational.json
-          if [ -f aram.json ]; then git add aram.json; fi
+          git add -A .
           git commit -q -m "Daten $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
 

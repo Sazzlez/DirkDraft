@@ -118,6 +118,34 @@ nicht; dann gilt in der App: Paar nach dem ersten Item, Stiefel mit dem Gold, da
 In keiner Datei stehen Spielernamen, PUUIDs oder Match-IDs. Die Spielerlisten, über die der Sammler
 neue Spiele findet, leben nur im Speicher eines Laufs.
 
+## Was ein Lauf aushält (seit 17.11.2026)
+
+**Fehler bei einzelnen Spielen.** Gibt Riot ein Spiel nicht heraus (400, 403 auf diesem Spiel, sechsmal
+5xx oder gar keine Antwort), zählt der Sammler es als übersprungen und macht weiter; der Bericht und
+eine Warnung im Lauf nennen die Zahl und den letzten Grund. Der Lauf endet nur bei 401, bei 403 auf
+einer Liga-Seite oder Spiel-Liste (beides heißt: der Schlüssel) oder nach 20 Fehlern in Folge (Ausfall).
+Der Stand wird bei jedem Ende gesichert, auch beim Abbruch (`CollectorFailures.cs`).
+
+**Schutz vor einem leeren Stand.** Der Stand liegt im Actions-Cache. Fehlt der einmal, beginnt der
+Sammler bei null, und sein Export würde wenige Tausend Spiele an die Stelle von 270.000 setzen. Vor
+dem Push vergleicht `riot guard` deshalb die `games` der neuen `meta.json` (und der `aram.json`) mit der
+veröffentlichten aus dem Branch `data`:
+
+| Fall | Folge |
+|---|---|
+| gleicher Patch, neue Datei unter 50 % der veröffentlichten Spiele | nicht veröffentlichen; `::error::` mit beiden Zahlen, der veröffentlichte Stand bleibt |
+| neue Datei zählt keine Spiele | nicht veröffentlichen |
+| neue Datei von einem älteren Patch als dem veröffentlichten | nicht veröffentlichen (ein alter Stand, etwa aus einem Backup) |
+| anderer (neuerer) Patch, oder noch nichts veröffentlicht | normal weiter |
+
+`meta.json`, `builds.json` und `situational.json` gehören zu einer Zählung und werden zusammen
+veröffentlicht oder gar nicht; `aram.json` wird für sich geprüft. Was nicht ersetzt wird, bleibt auf
+dem Branch stehen. Von Hand:
+
+```
+dotnet run --project src/DraftPilot.Tools -- riot guard --old alt/meta.json --new neu/meta.json   # Exitcode 3: nicht veröffentlichen
+```
+
 ## Was am Ende einzutragen ist
 
 Im Repository unter *Settings → Secrets and variables → Actions*:
