@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the page may do with its own window: drag, minimise, hide to the tray, pin.",
+  "description": "What the page may do with its own window: drag, minimise, hide to the tray, pin. And one way out: the release notes of this repository in the browser.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -11,6 +11,10 @@
     "core:window:allow-close",
     "core:window:allow-show",
     "core:window:allow-set-focus",
-    "core:window:allow-set-always-on-top"
+    "core:window:allow-set-always-on-top",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://github.com/Sazzlez/DirkDraft/*" }]
+    }
   ]
 }

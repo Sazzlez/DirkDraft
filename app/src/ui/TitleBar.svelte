@@ -3,7 +3,7 @@
   import Segment from './Segment.svelte';
   import { hideToTray, minimize, onTrayHint } from '../platform/shell';
   import { changeSetting, settings } from '../live/settings.svelte';
-  import { applyUpdate, update } from '../live/update.svelte';
+  import { applyUpdate, openReleaseNotes, update } from '../live/update.svelte';
 
   let {
     view,
@@ -32,7 +32,7 @@
 <svelte:window onclick={(e) => { if (menuOpen && !(e.target as Element | null)?.closest('.popover, .menu')) menuOpen = false; }} />
 
 <!-- Tauri drags by the element under the mouse, not its parent: every passive part carries the mark. -->
-<header class="bar" data-tauri-drag-region>
+<header class="bar" class:has-update={update.available !== null} data-tauri-drag-region>
   <div class="left" data-tauri-drag-region>
     <span class="logo" aria-hidden="true" data-tauri-drag-region><svg viewBox="0 0 20 20"><path d="M5.65 5.5h4.2a4.5 4.5 0 0 1 0 9h-4.2z" /></svg></span>
     <b data-tauri-drag-region>DirkDraft</b>
@@ -45,6 +45,7 @@
 
   <div class="right" data-tauri-drag-region>
     {#if update.available}
+      <button class="notes" onclick={() => void openReleaseNotes()} title="Öffnet die Notizen zu Version {update.available} auf GitHub im Browser.">Was ist neu</button>
       <button
         class="update"
         onclick={() => void applyUpdate()}
@@ -91,6 +92,9 @@
   {#if menuOpen}
     <div class="popover">
       <p class="num">{view.data.text}</p>
+      {#if update.available}
+        <button onclick={() => { menuOpen = false; void openReleaseNotes(); }}>Was ist neu in {update.available}</button>
+      {/if}
       <button onclick={openSettings}>Einstellungen</button>
     </div>
   {/if}
@@ -219,6 +223,19 @@
     text-overflow: ellipsis;
   }
 
+  /* A link, not a second button: the pill beside it stays the one thing to click. */
+  .notes {
+    flex: 0 0 auto;
+    height: 26px;
+    padding: 0 4px;
+    margin-right: 8px;
+    color: var(--blue-text);
+    font: var(--t-caption);
+    white-space: nowrap;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
   .update:disabled {
     opacity: 0.7;
     cursor: default;
@@ -334,6 +351,18 @@
     display: none;
   }
 
+  /* An update is waiting: link, update label and data line fit in full only in a wide window. Below
+     it the two pills take their short texts, so that nothing is cut off at the default width. */
+  @container app (max-width: 1499px) {
+    .has-update .long {
+      display: none;
+    }
+
+    .has-update .short {
+      display: inline;
+    }
+  }
+
   @container app (max-width: 1099px) {
     .status .text {
       display: none;
@@ -350,6 +379,12 @@
 
     .status {
       padding: 0 8px;
+    }
+
+    /* No room beside the pills here: the link is in the narrow menu, and the pill's tooltip says
+       what the click does. */
+    .notes {
+      display: none;
     }
   }
 

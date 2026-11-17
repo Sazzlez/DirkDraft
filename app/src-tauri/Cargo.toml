@@ -34,6 +34,7 @@ tokio-tungstenite = { version = "0.30", default-features = false, features = ["c
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 base64 = "0.22"
 log = "0.4"
+tauri-plugin-opener = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows-version = "0.1"

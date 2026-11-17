@@ -1,6 +1,7 @@
-// Updates as in 1.5: one check against GitHub Releases at start, "Version X ist da" in the title
-// bar, and only a click downloads, installs and restarts (fixed rule: nothing without the user's
-// click). Velopack installed the app; outside an install (development) there is nothing to update.
+// Updates as in 1.5: a check against GitHub Releases — at the first idle moment and every six hours
+// after it, the page keeps the clock (core/updateCheck.ts) —, "Version X ist da" in the title bar,
+// and only a click downloads, installs and restarts (fixed rule: nothing without the user's click).
+// Velopack installed the app; outside an install (development) there is nothing to update.
 
 use std::sync::Mutex;
 

@@ -1,7 +1,9 @@
-// The update pill: one check at start (updater.rs), "Version X ist da", and a click that downloads,
-// installs and restarts. Nothing happens without that click.
+// The update pill: a check at the first idle moment and every six hours after it (core/updateCheck,
+// updater.rs), "Version X ist da", and a click that downloads, installs and restarts. Nothing happens
+// without that click. Beside it "Was ist neu": the release's page on GitHub, in the browser.
 
 import { invoke } from '@tauri-apps/api/core';
+import { releaseUrl } from '../core/updateCheck';
 import { inShell } from '../platform/shell';
 
 export const update = $state<{ available: string | null; current: string | null; busy: boolean; error: string | null }>({
@@ -18,8 +20,17 @@ export async function checkForUpdate(): Promise<void> {
     update.current = status.current;
     update.available = status.available;
   } catch {
-    // Offline or GitHub down: no pill, the next start asks again.
+    // Offline or GitHub down: no pill, the next check asks again.
   }
+}
+
+/**
+ * Opens the new version's release notes in the browser (tauri-plugin-opener). The capability allows
+ * this one repository's pages and nothing else.
+ */
+export async function openReleaseNotes(): Promise<void> {
+  if (!inShell || !update.available) return;
+  await invoke('plugin:opener|open_url', { url: releaseUrl(update.available) }).catch(() => undefined);
 }
 
 export async function applyUpdate(): Promise<void> {

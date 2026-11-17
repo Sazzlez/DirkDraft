@@ -8,6 +8,7 @@ import { listen } from '@tauri-apps/api/event';
 import { spellSlots } from '../core/loadout';
 import type { Plan } from '../core/model/compAnalyzer';
 import { DataRefresher } from '../core/refresh';
+import { UpdateChecker } from '../core/updateCheck';
 import type { Lane, ViewModel } from '../core/view';
 import { loadAssets, setAssetSource, type AssetNames } from '../data/assets';
 import { DataStore, type DataSet } from '../data/remote';
@@ -179,10 +180,21 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   );
   refresher.start(await store.loadKept().catch(() => null));
 
+  // The version for the lobby; the title bar's pill reads the same check (live/update). Asked at the
+  // first idle moment and every six hours after it, never during a draft or a game.
+  const installed = await getVersion().catch(() => null);
+  session.setVersion(installed, null);
+  const updates = new UpdateChecker(async () => {
+    await checkForUpdate();
+    session.setVersion(update.current ?? installed, update.available);
+    render();
+  });
+
   await listen<ClientStatus>('client://status', (e) => {
     session.onStatus(e.payload);
     if (!e.payload.clientRunning) {
       void refresher.onPhase(null, Date.now());
+      void updates.onPhase(null, Date.now());
       // The client is gone and its patch with it: the tables of the numbers' patch again.
       void ensureAssets();
     }
@@ -192,6 +204,7 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   await listen<string>('client://phase', (e) => {
     session.onPhase(e.payload);
     void refresher.onPhase(e.payload, Date.now());
+    void updates.onPhase(e.payload, Date.now());
     askPatch();
     render();
   });
@@ -215,19 +228,14 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   }
   if (snapshot.game) session.onGame(snapshot.game);
   void refresher.onPhase(snapshot.status.clientRunning ? snapshot.phase : null, Date.now());
+  void updates.onPhase(snapshot.status.clientRunning ? snapshot.phase : null, Date.now());
   askPatch();
   render();
-
-  // The version for the lobby; the title bar's pill reads the same check (live/update).
-  void (async () => {
-    await checkForUpdate();
-    session.setVersion(update.current ?? (await getVersion().catch(() => null)), update.available);
-    render();
-  })();
 
   // The champion select clock counts down between events; the refresher checks whether it is due.
   ticker ??= setInterval(() => {
     void refresher.tick(Date.now());
+    void updates.tick(Date.now());
     if (session.view().board) render();
   }, 1000);
 }

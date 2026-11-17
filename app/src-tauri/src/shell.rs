@@ -67,6 +67,9 @@ pub fn run() {
                 .with_state_flags(StateFlags::SIZE | StateFlags::POSITION)
                 .build(),
         )
+        // "Was ist neu": opens the release's page in the browser. The capability allows this
+        // repository's pages only (capabilities/default.json).
+        .plugin(tauri_plugin_opener::init())
         .manage(crate::updater::UpdaterState::default())
         .manage(crate::diagnostics::Diagnostics::new(settings.diagnostics()))
         .manage(ShellState {
