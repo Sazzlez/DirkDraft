@@ -27,9 +27,10 @@ import { isGate, Recommender, termGate, termLabel, termPoints, type Recommendati
 import { countLeadingBanTies, countLeadingTies, decimalsOf, errorAsPoints } from './model/scoreError';
 import { TankShred } from './model/tankShred';
 import { planTeam, planTeamBans, type TeamPlan } from './model/teamPlanner';
+import { BUNDLED_COMBOS, type ComboFile } from './model/kits';
 import { TraitTable } from './model/traits';
 import { TurnTracker, type RecommendationTarget } from './model/turnTracker';
-import priors from './model/data/pick_order_priors.json';
+import priors from '../../../data/pick_order_priors.json';
 
 /** Rows per list, as in 1.5. */
 export const LIST_LIMIT = 8;
@@ -223,6 +224,8 @@ export interface EngineOptions {
   aramRounded?: boolean;
   /** Who shreds tanks, from the own build file (B4); none without one. */
   tankShred?: TankShred;
+  /** The combo lists as downloaded with the numbers; the built-in copy without them (kits.ts). */
+  combos?: ComboFile;
 }
 
 export class DraftEngine {
@@ -232,6 +235,7 @@ export class DraftEngine {
   readonly aramStats: ReadonlyMap<number, AramStat>;
   readonly aramRounded: boolean;
   private readonly shred: TankShred;
+  private readonly combos: ComboFile;
 
   private readonly turns = new TurnTracker();
   /** Own data: what the picks to come are likely to bring — counted once, it depends on the data alone. */
@@ -247,6 +251,7 @@ export class DraftEngine {
     this.aramStats = options.aramStats ?? new Map();
     this.aramRounded = options.aramRounded ?? true;
     this.shred = options.tankShred ?? TankShred.none;
+    this.combos = options.combos ?? BUNDLED_COMBOS;
   }
 
   /** Champions the local player may pick (owned or free this week); null until the client said. */
@@ -352,7 +357,7 @@ export class DraftEngine {
     // Own data: what both line-ups will lack at the end, open seats taken as average picks.
     if (this.openSeats === undefined) this.openSeats = meta.isOwnData ? new OpenSeats(new CompAnalyzer(meta, this.traits, this.shred), meta, this.traits, this.shred) : null;
     const open = this.openSeats;
-    const recommender = new Recommender(meta, this.traits, this.shred, this.chosenPlan, open);
+    const recommender = new Recommender(meta, this.traits, this.shred, this.chosenPlan, open, this.combos);
 
     let picks: FrameSet | null = null;
     let bans: FrameSet | null = null;

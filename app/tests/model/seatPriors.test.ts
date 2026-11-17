@@ -6,7 +6,7 @@
 // inline instead of to temp files, and a document that does not parse is handed over as it is.
 
 import { describe, expect, it } from 'vitest';
-import shipped from '../../src/core/model/data/pick_order_priors.json';
+import shipped from '../../../data/pick_order_priors.json';
 import { ALL_LANES, Lane, LANE_COUNT } from '../../src/core/model/lane';
 import { SeatPriors } from '../../src/core/model/lanePredictor';
 

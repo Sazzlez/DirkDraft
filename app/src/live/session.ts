@@ -9,6 +9,7 @@ import { gameModel, championIdOf, enemyItemsOf, isBoots, isFinished, ownsItem, r
 import { aramBuildFile, aramStatsFrom } from '../core/aram';
 import { Lane, laneFromKey } from '../core/model/lane';
 import { MetaLookup } from '../core/model/metaLookup';
+import { readComboFile } from '../core/model/kits';
 import { TraitTable } from '../core/model/traits';
 import { momentOf, type GameflowPhase } from '../core/moment';
 import { aramPlan, riotPlan, type RiotBuildPlan } from '../core/riotBuilds';
@@ -53,6 +54,9 @@ interface Picked {
   mode: Mode;
 }
 
+/** The traits built into the app (data/champion_traits.json at build time), read once. */
+const BUNDLED_TRAITS = TraitTable.bundled();
+
 export class LiveSession {
   status: ClientStatus | null = null;
   phase: GameflowPhase | null = null;
@@ -61,7 +65,8 @@ export class LiveSession {
   private meta: MetaLookup | null = null;
   private engine: DraftEngine | null = null;
   private adapter = new GoldenAdapter([]);
-  private readonly traits = TraitTable.bundled();
+  /** The curated traits: the built-in copy until a downloaded one is in (setData). */
+  private traits = BUNDLED_TRAITS;
 
   private session: Record<string, unknown> | null = null;
   private sessionAt = 0;
@@ -86,8 +91,13 @@ export class LiveSession {
     this.data = set;
     this.meta = new MetaLookup(set.meta);
     this.adapter = new GoldenAdapter(set.meta.champions);
+    // Traits and combos as published with the numbers beat the copies built into the app: a new
+    // champion has its traits without a release. A file that reads as nothing leaves the copy.
+    const loaded = set.traits ? TraitTable.fromJson(set.traits) : TraitTable.empty;
+    this.traits = loaded.count > 0 ? loaded : BUNDLED_TRAITS;
     this.engine = new DraftEngine(set.meta, {
       traits: this.traits,
+      combos: (set.combos ? readComboFile(set.combos) : null) ?? undefined,
       aramStats: set.aram ? aramStatsFrom(set.aram) : undefined,
       aramRounded: !set.aram,
       tankShred: TankShred.fromBuilds(set.builds),

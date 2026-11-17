@@ -1,7 +1,8 @@
 # Eigene Daten (M4)
 
 DirkDraft 2.0 liest keine OP.GG-Daten mehr. Alle Zahlen kommen aus Spielen, die der Sammler mit
-einem Riot-Schlüssel selbst zählt, und liegen als vier Dateien im Branch `data`:
+einem Riot-Schlüssel selbst zählt, und liegen als vier Dateien im Branch `data`, neben zwei von Hand
+gepflegten:
 
 | Datei | Inhalt | Quelle |
 |---|---|---|
@@ -9,6 +10,19 @@ einem Riot-Schlüssel selbst zählt, und liegen als vier Dateien im Branch `data
 | `builds.json` | Runen, Spells, Start, Schuhe, Kern, Items 4–6, Support-Item, Skill-Reihenfolge je Champion und Lane; seit 11.11.2026 dazu der Kaufzeitpunkt der Schuhe (unten) | dieselben Spiele |
 | `situational.json` | Stiefel, Kern (Items 1–3) und Items 4–6 je Champion, Lane und Gegner-Lage (viel AD, viel AP, 2+ Tanks, viel harte Kontrolle), mit dem Gesamtwert des Platzes zum Vergleich; dazu dieselben Zahlen je Klasse | dieselben Spiele |
 | `aram.json` | Winrate je Champion (Bank), ARAM-Builds — auch für Mayhem | normales ARAM (Queue 450), Spieler aus den Platin-Ranglisten |
+| `traits.json` | Champion-Merkmale nach Einschätzung: Engage, Peel, CC, Skalierung, Waveclear, Poke, Split, Pick | `data/champion_traits.json` im Repo, von Hand gepflegt |
+| `combos.json` | Combo-Listen für die Hinweise am Pick (Wombo, Knock-up für Yasuo, Enchanter mit Hypercarry) | `data/combos.json` im Repo, von Hand gepflegt |
+
+**Eine Quelle für die gepflegten Dateien (seit 17.11.2026).** Traits, Combos und Platz-Priors liegen
+nur noch in `data/` im Hauptordner. Vorher lagen Traits und Priors doppelt vor (dort und in
+`app/src/core/model/data/`), die Combo-Listen standen in `app/src/core/model/kits.ts`, und alles war
+in die App eingebaut: Ein neuer Champion hatte bis zum nächsten Release keine Traits, ein reworkter
+behielt seine alten. Jetzt legt der Export `traits.json` und `combos.json` bei jedem Lauf mit in den
+Branch `data` (dieselben Dokumente ohne `$comment`, mit `version`), und die App lädt sie mit den
+anderen Dateien. Die eingebaute Kopie (aus `data/` zur Bauzeit) gilt nur, bis der erste Download da
+ist, und wenn eine geladene Datei nichts Lesbares enthält. Die Platz-Priors hängen an keinem Champion
+und bleiben eingebaut. Fehlt einem Champion aus Data Dragon ein Eintrag in den Traits, meldet der
+Export `::warning::Champion ohne Traits: …` und schreibt eine Zeile in die Zusammenfassung des Laufs.
 
 `meta.json` hat das Format, das das Modell schon immer gelesen hat (`MetaSnapshot`), mit drei neuen
 Feldern: `source: "riot"`, `platform`, `games`. Daran erkennt die App, dass die Duelle vollständig

@@ -4,6 +4,8 @@
 #   situational.json - boots and items four to six per enemy situation (AD/AP-heavy, tanks, CC)
 #   aram.json   - plain ARAM: win rate per champion for the bench, builds. It stands in for ARAM
 #                 Mayhem, whose games Riot's API does not hand out (403, measured 07.11.2026).
+#   traits.json, combos.json - the curated files of data/ (champion traits, combo lists), so a new
+#                 champion's traits reach the app without a release.
 #
 # One key for everybody: the Riot key lives only in the repository secret RIOT_API_KEY, never in
 # the code or the app. Each run collects for about five and a half hours (the hosted runner allows
@@ -181,7 +183,7 @@ jobs:
         run: |
           status=0
           if [ -f "$STATE" ]; then
-            dotnet run --project src/DraftPilot.Tools -c Release -- riot export --state "$STATE" --tier "$TIERS" --out publish/builds.json --meta-out publish/meta.json --situational-out publish/situational.json --games-out private/games.json.gz --matchups-out private/matchups.json.gz || status=1
+            dotnet run --project src/DraftPilot.Tools -c Release -- riot export --state "$STATE" --tier "$TIERS" --out publish/builds.json --meta-out publish/meta.json --situational-out publish/situational.json --games-out private/games.json.gz --matchups-out private/matchups.json.gz --traits-out publish/traits.json --combos-out publish/combos.json || status=1
           else
             echo "::warning::Kein Ranked-Stand ($STATE) - kein Export."
           fi

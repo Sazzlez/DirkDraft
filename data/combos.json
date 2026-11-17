@@ -1,0 +1,43 @@
+{
+  "$comment": [
+    "Ability combos inside a team, as a hint at a pick (app/src/core/model/kits.ts): which champions",
+    "belong to which list. Judgement, clear cases only - a champion that is absent is neutral.",
+    "",
+    "Narrow on purpose (user, 15.11.2026): with wide lists nearly every second team had a wombo and",
+    "the tag stood at every engage champion. The combos count nothing in the percentage: measured on",
+    "207.968 games no combo wins measurably more than the lane strengths of its champions say",
+    "(docs/modellpruefung.md, Messung 28).",
+    "",
+    "Champions by name as Data Dragon spells them; case and punctuation are ignored, the key counts",
+    "too. engageSkill: the skill an AoE engage holds them with, by loose name (lower case, letters",
+    "only); R where nothing is said.",
+    "",
+    "The single source since 17.11.2026: the collector's export publishes this file to the data",
+    "branch as combos.json, the app downloads it with the numbers and keeps this copy only until the",
+    "first download is in. A new champion needs no release to get its tag."
+  ],
+  "version": 1,
+  "combos": {
+    "aoeEngage": [
+      "Amumu", "Malphite", "Sejuani", "Zac", "Rell", "Jarvan IV", "Wukong", "Diana", "Leona", "Ornn", "Galio", "Neeko", "Kennen",
+      "Annie", "Seraphine", "Sona", "Orianna", "Gnar"
+    ],
+    "aoeDamage": [
+      "Miss Fortune", "Orianna", "Yasuo", "Katarina", "Kennen", "Fiddlesticks", "Rumble", "Brand", "Samira", "Nilah", "Seraphine",
+      "Vladimir", "Aurelion Sol", "Zyra"
+    ],
+    "knockUp": [
+      "Malphite", "Alistar", "Gragas", "Ornn", "Zac", "Wukong", "Jarvan IV", "Rakan", "Rell", "Diana", "Orianna", "Sejuani", "Nami", "Janna",
+      "Cho'Gath", "Gnar"
+    ],
+    "yasuo": ["Yasuo"],
+    "enchanter": ["Lulu", "Yuumi", "Milio", "Janna", "Soraka", "Nami", "Sona", "Renata Glasc"],
+    "hypercarry": ["Kog'Maw", "Jinx", "Vayne", "Twitch", "Zeri", "Aphelios", "Master Yi", "Bel'Veth", "Kayle"]
+  },
+  "engageSkill": {
+    "zac": "E und R",
+    "rell": "W und R",
+    "jarvaniv": "E-Q und R",
+    "galio": "W und R"
+  }
+}

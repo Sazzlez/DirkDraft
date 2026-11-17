@@ -10,7 +10,7 @@
 import { CompAnalyzer, EMPTY_PROFILE, type CompProfile, type Plan } from './compAnalyzer';
 import { BOT_DUO_WEIGHT, isBotDuo, lineUpEdge, STRENGTH_WEIGHT, VERSUS_WEIGHT, versusKind, type DraftSeat } from './draftModel';
 import { effectiveChampionId, isLocked, type DraftState, type TurnAction } from './draftState';
-import { KitTable } from './kits';
+import { BUNDLED_COMBOS, KitTable, type ComboFile } from './kits';
 import { ALL_LANES, Lane, laneDisplay } from './lane';
 import type { LanePrediction, LanePredictionResult } from './lanePredictor';
 import type { LaneView, MatchupView, MetaLookup, SynergyView } from './metaLookup';
@@ -247,9 +247,11 @@ export class Recommender {
      * they depend on the data alone and cost a quarter of a second to fill. Left out, built here.
      */
     open: OpenSeats | null | undefined = undefined,
+    /** Own data: the combo lists, as downloaded or as built in. */
+    combos: ComboFile = BUNDLED_COMBOS,
   ) {
     this.comp = new CompAnalyzer(meta, traits, shred, chosenPlan);
-    this.kits = meta.isOwnData ? new KitTable(meta.champions) : null;
+    this.kits = meta.isOwnData ? new KitTable(meta.champions, combos) : null;
     this.open = open !== undefined ? open : meta.isOwnData ? new OpenSeats(this.comp, meta, traits, shred) : null;
   }
 

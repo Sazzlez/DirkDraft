@@ -1,5 +1,6 @@
-// DirkDraft's own data: meta.json (draft numbers), builds.json (builds) and aram.json (plain ARAM,
-// standing in for Mayhem, which Riot does not hand out), published by the collector to the branch "data" of the repository. Checked before use
+// DirkDraft's own data: meta.json (draft numbers), builds.json (builds), aram.json (plain ARAM,
+// standing in for Mayhem, which Riot does not hand out) and the curated traits.json and combos.json
+// (data/ in the repository), published by the collector to the branch "data" of the repository. Checked before use
 // and kept: a broken or missing download never replaces the last good copy, and without any copy
 // the app says so instead of inventing numbers. Nothing about the user is sent — plain GET requests
 // for public files. When the downloads may happen is the DataRefresher's business (core/refresh.ts).
@@ -7,11 +8,19 @@
 import type { MetaSnapshot } from '../core/model/metaLookup';
 import type { RiotAramFile } from '../core/aram';
 import type { RiotBuildFile } from '../core/riotBuilds';
+import { readComboFile } from '../core/model/kits';
 import type { RiotSituationalFile } from '../core/situational';
 
 export const DATA_BASE = 'https://raw.githubusercontent.com/Sazzlez/DirkDraft/data';
 
-export const FILES = { meta: 'meta.json', builds: 'builds.json', aram: 'aram.json', situational: 'situational.json' } as const;
+export const FILES = {
+  meta: 'meta.json',
+  builds: 'builds.json',
+  aram: 'aram.json',
+  situational: 'situational.json',
+  traits: 'traits.json',
+  combos: 'combos.json',
+} as const;
 export type DataFile = keyof typeof FILES;
 
 /** Where downloaded files are kept between runs (Tauri: app data folder; browser: localStorage). */
@@ -34,6 +43,12 @@ export interface DataSet {
   aram: RiotAramFile | null;
   /** Situational items for the game view; null until published. */
   situational: RiotSituationalFile | null;
+  /**
+   * The curated champion traits and combo lists as published with the numbers (data/ in the
+   * repository); absent or null until downloaded — the copies built into the app stand in.
+   */
+  traits?: Record<string, unknown> | null;
+  combos?: Record<string, unknown> | null;
   /** Whether the server was reached this time, or the numbers are the kept copy only. */
   fresh: boolean;
   /** Whether any file differs from the kept copy — false means nothing to swap in. */
@@ -85,11 +100,31 @@ export function checkSituational(value: unknown): string | null {
   return null;
 }
 
+/** The layout of traits.json and combos.json this reader understands (CuratedFiles.Version in C#). */
+export const CURATED_VERSION = 1;
+
+export function checkTraits(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return 'keine Daten';
+  const file = value as { version?: unknown; champions?: unknown };
+  if (file.version !== CURATED_VERSION) return `unbekannte Version ${String(file.version)}`;
+  const champions = file.champions;
+  if (!champions || typeof champions !== 'object' || Array.isArray(champions) || Object.keys(champions).length === 0) return 'keine Champions';
+  return null;
+}
+
+export function checkCombos(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return 'keine Daten';
+  if ((value as { version?: unknown }).version !== CURATED_VERSION) return `unbekannte Version ${String((value as { version?: unknown }).version)}`;
+  return readComboFile(value) ? null : 'Listen fehlen';
+}
+
 const CHECKS: Record<DataFile, (value: unknown) => string | null> = {
   meta: checkMeta,
   builds: checkBuilds,
   aram: checkAram,
   situational: checkSituational,
+  traits: checkTraits,
+  combos: checkCombos,
 };
 
 interface Loaded {
@@ -139,11 +174,13 @@ async function one(name: DataFile, fetcher: Fetcher, cache: DataCache, problems:
 /** All files, each downloaded (or confirmed unchanged) or else kept; null without any usable meta. */
 export async function loadDataSet(fetcher: Fetcher, cache: DataCache): Promise<DataSet | null> {
   const problems: string[] = [];
-  const [meta, builds, aram, situational] = await Promise.all([
+  const [meta, builds, aram, situational, traits, combos] = await Promise.all([
     one('meta', fetcher, cache, problems),
     one('builds', fetcher, cache, problems),
     one('aram', fetcher, cache, problems),
     one('situational', fetcher, cache, problems),
+    one('traits', fetcher, cache, problems),
+    one('combos', fetcher, cache, problems),
   ]);
   if (!meta) return null;
   return {
@@ -151,19 +188,23 @@ export async function loadDataSet(fetcher: Fetcher, cache: DataCache): Promise<D
     builds: (builds?.value as RiotBuildFile | undefined) ?? null,
     aram: (aram?.value as RiotAramFile | undefined) ?? null,
     situational: (situational?.value as RiotSituationalFile | undefined) ?? null,
+    traits: (traits?.value as Record<string, unknown> | undefined) ?? null,
+    combos: (combos?.value as Record<string, unknown> | undefined) ?? null,
     fresh: meta.fresh,
-    changed: meta.changed || !!builds?.changed || !!aram?.changed || !!situational?.changed,
+    changed: meta.changed || !!builds?.changed || !!aram?.changed || !!situational?.changed || !!traits?.changed || !!combos?.changed,
     problems,
   };
 }
 
 /** The kept copies only — no network. What the app starts with, whatever the client is doing. */
 export async function loadKept(cache: DataCache): Promise<DataSet | null> {
-  const [meta, builds, aram, situational] = await Promise.all([
+  const [meta, builds, aram, situational, traits, combos] = await Promise.all([
     kept('meta', cache),
     kept('builds', cache),
     kept('aram', cache),
     kept('situational', cache),
+    kept('traits', cache),
+    kept('combos', cache),
   ]);
   if (meta === null) return null;
   return {
@@ -171,6 +212,8 @@ export async function loadKept(cache: DataCache): Promise<DataSet | null> {
     builds: (builds as RiotBuildFile | null) ?? null,
     aram: (aram as RiotAramFile | null) ?? null,
     situational: (situational as RiotSituationalFile | null) ?? null,
+    traits: (traits as Record<string, unknown> | null) ?? null,
+    combos: (combos as Record<string, unknown> | null) ?? null,
     fresh: false,
     changed: false,
     problems: [],

@@ -1,8 +1,12 @@
 // Port of DraftPilot.Core.Data.ChampionTraits / TraitTable (1.5): the judgement-only traits no API
 // reports (engage, peel, cc, scaling, waveclear; since 2.1 poke, split, pick), keyed by Data Dragon
 // key, case-insensitive.
+//
+// The file is data/champion_traits.json in the repository root, the one the collector reads too:
+// built in from there (the copy that lay in src/core/model/data went on 17.11.2026) and, since then,
+// downloaded with the numbers — the built-in copy only stands until the first download is in.
 
-import bundled from './data/champion_traits.json';
+import bundled from '../../../../data/champion_traits.json';
 
 export type ScalingCurve = 'unknown' | 'early' | 'mid' | 'late';
 

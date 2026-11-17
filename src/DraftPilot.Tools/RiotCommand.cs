@@ -42,7 +42,7 @@ internal static class RiotCommand
             riot show <champion> <lane> [--tier platinum] [--state build/riot-state.json.gz]
             riot status [--state build/riot-state.json.gz]
             riot export --out builds.json [--meta-out meta.json] [--situational-out situational.json] [--games-out games.json.gz] [--matchups-out matchups.json.gz] [--tier platinum] [--keep 6] [--min-games 3]
-                        [--min-patch-games 2000] [--state build/riot-state.json.gz]
+                        [--min-patch-games 2000] [--state build/riot-state.json.gz] [--traits-out traits.json] [--combos-out combos.json]
             riot aram [--queues 450] [--tiers platinum] [--minutes 30] [--state build/aram-state.json.gz] [--key-file datei]
             riot queues --riot-id "Name#TAG" [--games 20] [--key-file datei]
             riot export-aram --out aram.json [--keep 6] [--min-games 3] [--min-patch-games 500] [--state build/aram-state.json.gz]
@@ -209,6 +209,29 @@ internal static class RiotCommand
 
         var metaPath = options.GetValueOrDefault("meta-out", string.Empty);
         var situationalPath = options.GetValueOrDefault("situational-out", string.Empty);
+        // The curated files go to the branch beside the numbers (CuratedFiles): the app downloads
+        // them with the rest, so a new champion's traits need no release.
+        var traitsPath = options.GetValueOrDefault("traits", Path.Combine("data", "champion_traits.json"));
+        foreach (var (option, curated, required, what) in new[]
+        {
+            ("traits-out", traitsPath, "champions", "Traits"),
+            ("combos-out", options.GetValueOrDefault("combos", Path.Combine("data", "combos.json")), "combos", "Combos"),
+        })
+        {
+            if (options.GetValueOrDefault(option, string.Empty) is not { Length: > 0 } target)
+                continue;
+
+            if (CuratedFiles.Publish(File.Exists(curated) ? File.ReadAllText(curated) : null, required) is { } published)
+            {
+                Write(target, published);
+                Console.WriteLine($"{what}: {new FileInfo(target).Length / 1024:N0} KB → {target}");
+            }
+            else
+            {
+                Annotate("warning", $"{what}: {curated} fehlt oder ist nicht lesbar — nicht veröffentlicht, der Stand auf dem Branch bleibt.");
+            }
+        }
+
         if (metaPath.Length == 0 && situationalPath.Length == 0)
             return 0;
 
@@ -216,6 +239,15 @@ internal static class RiotCommand
         var version = await LatestVersionAsync(http, ct);
         var champions = RiotMetaExport.ParseDataDragon(
             await http.GetStringAsync($"{DataDragon}/cdn/{version}/data/en_US/champion.json", ct));
+
+        // A champion of the game the traits do not know loses every comp rule that reads them, and
+        // nobody notices: said on the run's page and in its summary.
+        var withoutTraits = CuratedFiles.WithoutTraits(champions, TraitTable.Load(traitsPath));
+        if (withoutTraits.Count > 0)
+        {
+            Annotate("warning", $"Champion ohne Traits: {string.Join(", ", withoutTraits)}");
+            Summary($"**Champion ohne Traits** ({withoutTraits.Count}): {string.Join(", ", withoutTraits)} — in `data/champion_traits.json` eintragen.");
+        }
 
         if (situationalPath.Length > 0)
         {
@@ -334,6 +366,13 @@ internal static class RiotCommand
     /// <summary>A line GitHub Actions shows on the run's page ("::warning::…"); a plain line anywhere else.</summary>
     internal static void Annotate(string level, string text)
         => Console.WriteLine(Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true" ? $"::{level}::{text}" : text);
+
+    /// <summary>A line for the run's summary page on GitHub (Markdown); nothing anywhere else.</summary>
+    private static void Summary(string markdown)
+    {
+        if (Environment.GetEnvironmentVariable("GITHUB_STEP_SUMMARY") is { Length: > 0 } path)
+            File.AppendAllText(path, markdown + Environment.NewLine);
+    }
 
     private static async Task<int> QueuesAsync(Dictionary<string, string> options, CancellationToken ct)
     {

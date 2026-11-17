@@ -13,7 +13,7 @@ import { Recommender } from '../../src/core/model/recommender';
 import { logit, SYNERGY_DAMPING } from '../../src/core/model/scoreModel';
 import { blindRisk, planTeam, TEAM_CANDIDATES } from '../../src/core/model/teamPlanner';
 import { TraitTable } from '../../src/core/model/traits';
-import priors from '../../src/core/model/data/pick_order_priors.json';
+import priors from '../../../data/pick_order_priors.json';
 import { GoldenAdapter, type GoldenFrame } from '../../src/data/golden';
 import { SessionBuilder } from './helpers';
 

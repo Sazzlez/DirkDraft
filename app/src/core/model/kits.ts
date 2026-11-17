@@ -12,52 +12,69 @@
 //
 // The lists are judgement, clear cases only (absent = neutral): build/wombo-entwurf.md. The wide
 // ones the user fixed on 15.11.2026 were measured and stay with the measurement; the app shows the
-// narrow ones below, which the measurement can read as well (--lists shown).
+// narrow ones, which the measurement can read as well (--lists shown).
+//
+// They live in data/combos.json in the repository root (since 17.11.2026; before, in this file):
+// built in from there, published by the collector with the numbers and downloaded like them, so a
+// new champion gets its tag without a release. The built-in copy stands until the first download.
 
+import bundled from '../../../../data/combos.json';
 import { neutral, type Reason } from './reason';
+
+const loose = (text: string): string => text.toLowerCase().replace(/[^a-z]/g, '');
 
 /**
  * The lists the chips are shown from — narrow on purpose (user, 15.11.2026: "Listen enger fassen").
  * With the wide lists the measurement ran on (tools/measure/combos.ts, WIDE) nearly every second team
- * had a wombo and the tag stood at every engage champion; a tag at every row says nothing. Here only
- * the kits a comp is built around. Champions by name as Data Dragon spells them (matched loosely:
- * case and punctuation ignored, the key also counts).
+ * had a wombo and the tag stood at every engage champion; a tag at every row says nothing. Only the
+ * kits a comp is built around:
+ *   aoeEngage  — an ult that reliably holds several enemies in one place;
+ *   aoeDamage  — an area ult that needs enemies standing together to be worth it;
+ *   knockUp    — a reliable knock-up over an area: what the ult of Yasuo needs;
+ *   hypercarry — decides fights alone once it is fed and protected.
  */
-export const COMBOS = {
-  /** An ult that reliably holds several enemies in one place. */
-  aoeEngage: [
-    'Amumu', 'Malphite', 'Sejuani', 'Zac', 'Rell', 'Jarvan IV', 'Wukong', 'Diana', 'Leona', 'Ornn', 'Galio', 'Neeko', 'Kennen',
-    'Annie', 'Seraphine', 'Sona', 'Orianna', 'Gnar',
-  ],
-  /** An area ult that needs enemies standing together to be worth it. */
-  aoeDamage: [
-    'Miss Fortune', 'Orianna', 'Yasuo', 'Katarina', 'Kennen', 'Fiddlesticks', 'Rumble', 'Brand', 'Samira', 'Nilah', 'Seraphine',
-    'Vladimir', 'Aurelion Sol', 'Zyra',
-  ],
-  /** A reliable knock-up over an area: what the ult of Yasuo needs. */
-  knockUp: [
-    'Malphite', 'Alistar', 'Gragas', 'Ornn', 'Zac', 'Wukong', 'Jarvan IV', 'Rakan', 'Rell', 'Diana', 'Orianna', 'Sejuani', 'Nami', 'Janna',
-    "Cho'Gath", 'Gnar',
-  ],
-  yasuo: ['Yasuo'],
-  enchanter: ['Lulu', 'Yuumi', 'Milio', 'Janna', 'Soraka', 'Nami', 'Sona', 'Renata Glasc'],
-  /** Decides fights alone once it is fed and protected. */
-  hypercarry: ["Kog'Maw", 'Jinx', 'Vayne', 'Twitch', 'Zeri', 'Aphelios', 'Master Yi', "Bel'Veth", 'Kayle'],
-} as const;
+export const COMBO_NAMES = ['aoeEngage', 'aoeDamage', 'knockUp', 'yasuo', 'enchanter', 'hypercarry'] as const;
 
-export type Combo = keyof typeof COMBOS;
+export type Combo = (typeof COMBO_NAMES)[number];
 export type ComboSets = Record<Combo, ReadonlySet<number>>;
 export type ComboLists = Readonly<Record<Combo, readonly string[]>>;
 
-/** The skill an AoE engage holds them with, for the hint; "R" where the list says nothing else. */
-const ENGAGE_SKILL: Readonly<Record<string, string>> = {
-  zac: 'E und R',
-  rell: 'W und R',
-  jarvaniv: 'E-Q und R',
-  galio: 'W und R',
-};
+/**
+ * data/combos.json as the app reads it: the lists, champions by name as Data Dragon spells them
+ * (matched loosely: case and punctuation ignored, the key also counts), and the skill an AoE engage
+ * holds them with, by loose name — "R" where the file says nothing else.
+ */
+export interface ComboFile {
+  combos: ComboLists;
+  engageSkill: Readonly<Record<string, string>>;
+}
 
-const loose = (text: string): string => text.toLowerCase().replace(/[^a-z]/g, '');
+/** Reads combos.json; null when a list is missing or is no list of names — the copy at hand stays then. */
+export function readComboFile(document: unknown): ComboFile | null {
+  const file = document as { combos?: unknown; engageSkill?: unknown } | null;
+  if (!file || typeof file !== 'object' || !file.combos || typeof file.combos !== 'object' || Array.isArray(file.combos)) return null;
+  const lists = file.combos as Record<string, unknown>;
+  const combos = {} as Record<Combo, readonly string[]>;
+  for (const name of COMBO_NAMES) {
+    const names = lists[name];
+    if (!Array.isArray(names) || !names.every((entry) => typeof entry === 'string')) return null;
+    combos[name] = names as string[];
+  }
+  const engageSkill: Record<string, string> = {};
+  if (file.engageSkill && typeof file.engageSkill === 'object' && !Array.isArray(file.engageSkill)) {
+    for (const [name, skill] of Object.entries(file.engageSkill as Record<string, unknown>)) {
+      if (typeof skill === 'string' && skill.length > 0) engageSkill[loose(name)] = skill;
+    }
+  }
+  return { combos, engageSkill };
+}
+
+/** The copy built into the app, data/combos.json at build time. */
+export const BUNDLED_COMBOS: ComboFile = readComboFile(bundled) ?? { combos: { aoeEngage: [], aoeDamage: [], knockUp: [], yasuo: [], enchanter: [], hypercarry: [] }, engageSkill: {} };
+
+/** The built-in lists, for the measurement (tools/measure/combos.ts, --lists shown). */
+export const COMBOS: ComboLists = BUNDLED_COMBOS.combos;
+
 
 interface Named {
   id: number;
@@ -98,10 +115,13 @@ const list = (names: readonly string[]): string => (names.length <= 1 ? (names[0
 
 export class KitTable {
   private readonly sets: ComboSets;
+  private readonly skills: Readonly<Record<string, string>>;
   private readonly names = new Map<number, string>();
 
-  constructor(champions: readonly Named[]) {
-    this.sets = comboSets(champions).sets;
+  /** `file`: the lists as downloaded with the numbers; the built-in copy without them. */
+  constructor(champions: readonly Named[], file: ComboFile = BUNDLED_COMBOS) {
+    this.sets = comboSets(champions, file.combos).sets;
+    this.skills = file.engageSkill;
     for (const c of champions) this.names.set(c.id, c.name);
   }
 
@@ -115,7 +135,7 @@ export class KitTable {
 
   private withSkill(id: number): string {
     const name = this.name(id);
-    return `${name} (${ENGAGE_SKILL[loose(name)] ?? 'R'})`;
+    return `${name} (${this.skills[loose(name)] ?? 'R'})`;
   }
 
   /** The teammates in a list, the candidate itself left out, at most two by name. */
@@ -146,7 +166,7 @@ export class KitTable {
       found.push(
         neutral(
           `Engage für ${list(damagers.map((id) => this.name(id)))}`,
-          `Dieser Pick hält mit ${ENGAGE_SKILL[loose(this.name(candidate))] ?? 'R'} mehrere Gegner an einer Stelle fest (AoE-CC), ${list(damagers.map((id) => this.name(id)))} ${hits} sie dort alle mit AoE-Schaden. ${wombo}`,
+          `Dieser Pick hält mit ${this.skills[loose(this.name(candidate))] ?? 'R'} mehrere Gegner an einer Stelle fest (AoE-CC), ${list(damagers.map((id) => this.name(id)))} ${hits} sie dort alle mit AoE-Schaden. ${wombo}`,
         ),
       );
     }

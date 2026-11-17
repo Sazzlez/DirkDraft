@@ -2,11 +2,11 @@
 //
 // Guards the shipped champion_traits.json. Champions missing from it silently lose every
 // composition check — which is exactly what happened when seven post-release champions were
-// absent — so the file itself is under test, not just the code that reads it. The port bundles
-// the file at src/core/model/data/, so it is imported rather than located on disk.
+// absent — so the file itself is under test, not just the code that reads it. It is the one file
+// of the repository's data/ folder, which the app builds in and the collector publishes.
 
 import { describe, expect, it } from 'vitest';
-import file from '../../src/core/model/data/champion_traits.json';
+import file from '../../../data/champion_traits.json';
 import { TraitTable } from '../../src/core/model/traits';
 
 const champions = (file as unknown as { champions: Record<string, { scaling?: unknown }> }).champions;
