@@ -81,6 +81,35 @@ jobs:
           key: riot-state-${{ github.run_id }}
           restore-keys: riot-state-
 
+      # No state in the cache (GitHub drops a cache after a week unused, and anyone with write access
+      # can clear it): the newest backup, if there is one. Without it the count starts over - and the
+      # guard before the push keeps that thin count from replacing the published files.
+      - name: Stand aus Backup holen
+        if: steps.key.outputs.present == 'true' && hashFiles(env.STATE, env.ARAM_STATE) == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE_BACKUP_KEY: ${{ secrets.STATE_BACKUP_KEY }}
+        run: |
+          if [ -z "$STATE_BACKUP_KEY" ]; then
+            echo "::warning::Kein Stand im Cache und kein STATE_BACKUP_KEY - die Zaehlung beginnt neu."
+            exit 0
+          fi
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=state-backup&per_page=30" --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | last | .id // empty')
+          if [ -z "$id" ]; then
+            echo "::warning::Kein Stand im Cache und kein Backup - die Zaehlung beginnt neu."
+            exit 0
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > state-backup.zip
+          unzip -o -q state-backup.zip
+          set -o pipefail
+          if openssl enc -d -aes-256-cbc -pbkdf2 -pass env:STATE_BACKUP_KEY -in state-backup.tar.enc | tar -x; then
+            echo "::warning::Kein Stand im Cache - aus dem Backup wiederhergestellt (Artefakt $id)."
+          else
+            rm -f "$STATE" "$ARAM_STATE"
+            echo "::error::Das Backup (Artefakt $id) laesst sich nicht entschluesseln - falscher STATE_BACKUP_KEY? Die Zaehlung beginnt neu."
+          fi
+          rm -f state-backup.zip state-backup.tar.enc
+
       - name: Ranked sammeln
         if: steps.key.outputs.present == 'true'
         run: >
@@ -103,6 +132,45 @@ jobs:
             ${{ env.STATE }}
             ${{ env.ARAM_STATE }}
           key: riot-state-${{ github.run_id }}
+
+      # Once a day - the first run of a UTC day that gets here - both states as an artifact, kept 14
+      # days: until 17.11.2026 the state lived in the cache alone. Encrypted, because anyone signed in
+      # to GitHub can download the artifacts of a public repository and the state holds the match ids
+      # already looked at ("seen"), which the project never publishes. The key is the repository secret
+      # STATE_BACKUP_KEY; without it everything runs as before, with a warning.
+      - name: Stand-Backup vorbereiten
+        id: backup
+        if: always() && steps.key.outputs.present == 'true' && hashFiles(env.STATE, env.ARAM_STATE) != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE_BACKUP_KEY: ${{ secrets.STATE_BACKUP_KEY }}
+        run: |
+          if [ -z "$STATE_BACKUP_KEY" ]; then
+            echo "::warning::STATE_BACKUP_KEY fehlt - kein Backup, der Stand liegt nur im Actions-Cache."
+            exit 0
+          fi
+          today=$(date -u +%F)
+          last=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=state-backup&per_page=30" --jq '[.artifacts[] | select(.expired == false) | .created_at] | sort | last // ""' | cut -c1-10)
+          if [ "$last" = "$today" ]; then
+            echo "Das Backup von heute ($today) gibt es schon."
+            exit 0
+          fi
+          files=()
+          for f in "$STATE" "$ARAM_STATE"; do
+            if [ -f "$f" ]; then files+=("$f"); fi
+          done
+          set -o pipefail
+          tar -cf - "${files[@]}" | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:STATE_BACKUP_KEY -out state-backup.tar.enc
+          echo "upload=true" >> "$GITHUB_OUTPUT"
+
+      - name: Stand-Backup hochladen
+        if: always() && steps.backup.outputs.upload == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: state-backup
+          path: state-backup.tar.enc
+          retention-days: 14
+          compression-level: 0
 
       # From here on every step also runs after a failed one (always()): a failure in "ARAM sammeln"
       # used to keep the ranked files of the same run from being published. Whether a file may be

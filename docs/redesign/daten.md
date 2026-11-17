@@ -151,11 +151,40 @@ dem Branch stehen. Von Hand:
 dotnet run --project src/DraftPilot.Tools -- riot guard --old alt/meta.json --new neu/meta.json   # Exitcode 3: nicht veröffentlichen
 ```
 
+**Backup des Stands.** Einmal am Tag — der erste Lauf eines UTC-Tages, der so weit kommt — lädt der
+Workflow beide Stände (`riot-state.json.gz`, `aram-state.json.gz`) als Artefakt `state-backup` hoch,
+14 Tage aufbewahrt. Verschlüsselt (`openssl enc -aes-256-cbc -pbkdf2`, Schlüssel im Secret
+`STATE_BACKUP_KEY`), weil die Artefakte eines öffentlichen Repos jeder angemeldete GitHub-Nutzer laden
+kann und der Stand die schon angesehenen Match-IDs enthält (`seen`), die das Projekt nie
+veröffentlicht. Fehlt das Secret, läuft alles wie bisher, mit einer Warnung im Lauf.
+
+**Wiederherstellung.** Findet „Stand laden“ keinen Cache (GitHub löscht einen Cache nach einer Woche
+ohne Zugriff; wer schreiben darf, kann ihn leeren), holt „Stand aus Backup holen“ das neueste
+`state-backup`, entschlüsselt es und zählt von dort weiter. Ohne Backup, ohne Secret oder mit falschem
+Schlüssel beginnt die Zählung neu; der Schutz oben hält den dünnen Stand dann von der Veröffentlichung
+ab, bis er wieder die Hälfte des veröffentlichten erreicht oder ein neuer Patch beginnt.
+
+Von Hand, etwa um einen älteren Stand als den neuesten zurückzuholen:
+
+```
+gh run list --workflow collect-builds.yml --limit 30            # den Lauf des gewünschten Tages suchen
+gh run download <Lauf> -n state-backup                          # → state-backup.tar.enc
+openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:<Schlüssel> -in state-backup.tar.enc | tar -x
+dotnet run --project src/DraftPilot.Tools -- riot status --state riot-state.json.gz
+```
+
+Damit der Sammler diesen Stand nimmt: die Caches `riot-state-…` unter *Actions → Caches* löschen und
+alle neueren `state-backup`-Artefakte entfernen; der nächste Lauf stellt dann aus dem verbliebenen
+neuesten Backup wieder her.
+
 ## Was am Ende einzutragen ist
 
 Im Repository unter *Settings → Secrets and variables → Actions*:
 
 - `RIOT_API_KEY` — der Personal Key. Ohne ihn tut der Workflow nichts.
+- `STATE_BACKUP_KEY` — der Schlüssel für das tägliche Backup des Stands, eine lange Zufallsfolge
+  (etwa aus `openssl rand -base64 32`). Außerhalb von GitHub aufbewahren: Ohne ihn ist ein Backup
+  nicht zu lesen, und GitHub zeigt ein Secret nie wieder an.
 - `RIOT_ID` wird nicht mehr gebraucht (darf stehen bleiben).
 
 **Warum normales ARAM statt Mayhem:** Mayhem läuft unter Queue **2400** (`gameMode` `KIWI`,
