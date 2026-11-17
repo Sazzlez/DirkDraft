@@ -16,16 +16,28 @@ pub struct Settings {
 impl Settings {
     pub fn load() -> Self {
         let path = std::env::var_os("APPDATA").map(|dir| PathBuf::from(dir).join("DraftPilot").join("settings.json"));
-        let Some(file) = &path else {
-            return Self { path, values: Map::new(), writable: false };
-        };
-        match std::fs::read_to_string(file) {
-            Err(_) => Self { path, values: Map::new(), writable: true },
+        match path {
+            Some(file) => Self::read(file),
+            None => Self { path: None, values: Map::new(), writable: false },
+        }
+    }
+
+    /// Reads the file at `file`. Only a file that is not there starts an empty, writable set. Any
+    /// other failure — the file locked for a moment by a scanner or by 1.5 saving, no permission —
+    /// leaves the defaults for this run and writes nothing: until 17.11.2026 the next change then
+    /// wrote the one changed key over a file full of settings.
+    fn read(file: PathBuf) -> Self {
+        match std::fs::read_to_string(&file) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Self { path: Some(file), values: Map::new(), writable: true },
+            Err(error) => {
+                log::warn!("settings.json nicht lesbar ({error}) — wird in diesem Lauf nicht überschrieben");
+                Self { path: Some(file), values: Map::new(), writable: false }
+            }
             Ok(text) => match serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}')) {
-                Ok(Value::Object(values)) => Self { path, values, writable: true },
+                Ok(Value::Object(values)) => Self { path: Some(file), values, writable: true },
                 _ => {
-                    log::warn!("settings.json nicht lesbar — wird nicht überschrieben");
-                    Self { path, values: Map::new(), writable: false }
+                    log::warn!("settings.json ist kein gültiges JSON — wird nicht überschrieben");
+                    Self { path: Some(file), values: Map::new(), writable: false }
                 }
             },
         }
@@ -249,5 +261,53 @@ mod tests {
         let settings = Settings { path: None, values: Map::new(), writable: false };
         assert!(!settings.flag(KEEP_ON_TOP.0, KEEP_ON_TOP.1));
         settings.save();
+    }
+
+    #[test]
+    fn a_missing_file_is_created_by_the_first_change() {
+        let dir = std::env::temp_dir().join(format!("dirkdraft-settings-new-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let file = dir.join("settings.json");
+
+        let mut settings = Settings::read(file.clone());
+        assert!(settings.writable);
+        settings.set_flag(KEEP_ON_TOP.0, true);
+        let written: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+        assert_eq!(written["keepOnTop"], true);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_file_that_cannot_be_read_right_now_keeps_its_settings() {
+        let dir = std::env::temp_dir().join(format!("dirkdraft-settings-locked-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        // A read that fails for another reason than "not there": the name is taken by a folder
+        // (the same class of error as a file locked by a scanner at start).
+        let file = dir.join("settings.json");
+        std::fs::create_dir_all(&file).unwrap();
+        let failure = std::fs::read_to_string(&file).unwrap_err();
+        assert_ne!(failure.kind(), std::io::ErrorKind::NotFound);
+
+        let mut settings = Settings::read(file.clone());
+        assert!(!settings.writable);
+        // Defaults for this run, and a change is not saved.
+        assert!(settings.flag(AUTO_SHOW_ON_CHAMP_SELECT.0, AUTO_SHOW_ON_CHAMP_SELECT.1));
+        settings.set_flag(KEEP_ON_TOP.0, true);
+        assert!(file.is_dir());
+        assert!(!dir.join("settings.json.tmp").exists());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_broken_file_is_not_overwritten() {
+        let dir = std::env::temp_dir().join(format!("dirkdraft-settings-broken-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("settings.json");
+        std::fs::write(&file, r#"{"keepOnTop": tr"#).unwrap();
+
+        let mut settings = Settings::read(file.clone());
+        settings.set_flag(KEEP_ON_TOP.0, false);
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), r#"{"keepOnTop": tr"#);
+        let _ = std::fs::remove_dir_all(dir);
     }
 }
