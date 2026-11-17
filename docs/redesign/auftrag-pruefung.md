@@ -52,7 +52,7 @@ Modelländerungen gilt: **messen statt vermuten** (siehe unten).
   Zertifizierungsstelle von Hand geprüft, HTTP, WAMP-Socket, Scrubber, Live-Client-Poller, Import),
   `settings.rs` (liest/schreibt 1.5s `%APPDATA%\DraftPilot\settings.json`), `data.rs`
   (Datenkopie `%LOCALAPPDATA%\DraftPilot\data\2.0`), `updater.rs` (Velopack, GitHub Releases).
-- `src/` (C#) — 1.5-App (`DraftPilot.App`, nur noch Vergleich), Kern-Referenz, **Sammler**
+- `src/` (C#) — Kern-Referenz (`DraftPilot.Core`; die 1.5-App `DraftPilot.App` ist seit 17.11.2026 gelöscht), **Sammler**
   (`DraftPilot.Meta/Riot`, `DraftPilot.Tools riot collect|aram|export|export-aram|queues`,
   `priors`). `tests/` = xUnit.
 - `.github/workflows/collect-builds.yml` — Sammler auf GitHub (Platin Solo/Duo EUW + normales ARAM),

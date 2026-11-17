@@ -78,8 +78,9 @@ cd src-tauri; cargo test
 ```
 
 Der Sammler und die Werkzeuge sind C# (`src/DraftPilot.Tools`, `riot collect|aram|export|…`),
-siehe `docs/redesign/daten.md`. `src/DraftPilot.App` ist das alte 1.x-Fenster und dient noch als
-Vergleich.
+siehe `docs/redesign/daten.md`. Das alte 1.x-Fenster (`src/DraftPilot.App`, WPF) und seine Skripte
+`release.ps1` und `publish.ps1` im Hauptordner gibt es seit November 2026 nicht mehr; `DraftPilot.Core`
+bleibt als Kern-Referenz für Sammler, Werkzeuge und Tests.
 
 Eine Version veröffentlichen (aus dem Haupt-Checkout auf `master`):
 

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Renders src\DraftPilot.App\Assets\app.ico from the vector definition below.
+    Renders the app icon (the mug) as an .ico from the vector definition below.
 
 .DESCRIPTION
     The icon is a stroked coffee mug on a blue-to-green gradient tile. Keeping the drawing here
@@ -13,7 +13,8 @@
     ANSI, and any non-ASCII character in here turns into a parse error on a German system.
 
 .PARAMETER OutIco
-    Target file. Defaults to the app's Assets\app.ico.
+    Target file. Defaults to build\app.ico: the 1.x app it was drawn for is gone, and the Tauri app
+    keeps its own icon set in app\src-tauri\icons.
 
 .PARAMETER PreviewDir
     Optional. Also writes one PNG per size plus a 1024 px version, for eyeballing the result.
@@ -30,7 +31,8 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationCore, PresentationFramework, WindowsBase
 
 if (-not $OutIco) {
-    $OutIco = Join-Path (Split-Path $PSScriptRoot -Parent) 'src\DraftPilot.App\Assets\app.ico'
+    $OutIco = Join-Path (Split-Path $PSScriptRoot -Parent) 'build\app.ico'
+    New-Item -ItemType Directory -Force (Split-Path $OutIco -Parent) | Out-Null
 }
 
 # Everything is laid out on a 1024 grid; each target size is drawn fresh from it.

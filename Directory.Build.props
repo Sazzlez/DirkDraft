@@ -7,10 +7,8 @@
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
 
     <!--
-      InvariantGlobalization is deliberately NOT set. It saves a few megabytes, but WPF needs real
-      culture data for data binding (XmlLanguage.GetSpecificCulture throws without it) and the app
-      crashes on the first bound control. It would also pin number formatting to English, which is
-      wrong for a German user reading percentages.
+      InvariantGlobalization is deliberately NOT set: the tools write reports for a German reader
+      (de-DE percentages and thousands separators), and invariant mode would pin them to English.
     -->
   </PropertyGroup>
 </Project>
