@@ -178,6 +178,12 @@ impl<F: Fn(Update)> Source<F> {
         self.tear_down();
         self.generation += 1;
         let generation = self.generation;
+        // A client that restarted in the middle of a draft: the lobby's answer still under way belongs
+        // to the old instance and is dropped with its generation. Without forgetting that it was
+        // asked, nobody asked again — every session waited for that answer, and the draft stayed
+        // empty to its end. The draft on screen stays (as with a dropped socket); the next session
+        // asks the new instance.
+        self.reset_party();
 
         let lcu = Lcu::new(&credentials);
         let (socket_tx, mut socket_rx) = mpsc::unbounded_channel();
@@ -343,12 +349,18 @@ impl<F: Fn(Update)> Source<F> {
         });
     }
 
-    fn end_session(&mut self) {
-        // The next draft asks for its own party.
+    /// Forgets the party and any ask under way: the next session asks anew, and a late answer to
+    /// the old ask is not taken for it.
+    fn reset_party(&mut self) {
         self.party = None;
         self.party_asked = false;
         self.party_ask += 1;
         self.waiting_session = None;
+    }
+
+    fn end_session(&mut self) {
+        // The next draft asks for its own party.
+        self.reset_party();
         if self.session_open {
             self.session_open = false;
             (self.out)(Update::Session(None));
@@ -367,5 +379,81 @@ mod tests {
         assert!(!outside_champ_select("ChampSelect"));
         assert!(!outside_champ_select(""));
         assert!(!outside_champ_select("SomethingNew"));
+    }
+
+    const DRAFT: &str = r#"{"localPlayerCellId":0,"myTeam":[{"cellId":0,"championId":122}],"theirTeam":[]}"#;
+
+    /// A source whose sessions land in a list, and a port on which nothing listens.
+    fn source() -> (Source<impl Fn(Update)>, mpsc::UnboundedReceiver<Inner>, std::sync::Arc<std::sync::Mutex<Vec<Option<String>>>>, u16) {
+        let sessions = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen = sessions.clone();
+        let (tx, rx) = mpsc::unbounded_channel();
+        let source = Source {
+            out: move |update| {
+                if let Update::Session(session) = update {
+                    seen.lock().unwrap().push(session);
+                }
+            },
+            tx,
+            link: None,
+            generation: 0,
+            session_open: false,
+            socket_delivered_session: false,
+            socket_delivered_phase: false,
+            party: None,
+            party_ask: 0,
+            party_asked: false,
+            waiting_session: None,
+        };
+        let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+        (source, rx, sessions, port)
+    }
+
+    #[tokio::test]
+    async fn a_client_restarted_in_a_draft_asks_for_the_party_again() {
+        let (mut source, mut rx, sessions, port) = source();
+        source.connect(Credentials { port, password: "alt".to_string() });
+
+        // The first session of the draft waits for the lobby's answer.
+        source.session(DRAFT);
+        assert!(source.party_asked);
+        assert!(sessions.lock().unwrap().is_empty());
+
+        // The client restarts before that answer is in: new lockfile, new generation.
+        source.connect(Credentials { port, password: "neu".to_string() });
+        assert!(!source.party_asked, "the ask of the old instance must be forgotten");
+        assert!(source.waiting_session.is_none());
+
+        // The new instance sends the draft again. Whatever the old one still answers is dropped;
+        // the session must go out with the answer to the new ask.
+        source.session(DRAFT);
+        let arrived = tokio::time::timeout(std::time::Duration::from_secs(60), async {
+            while sessions.lock().unwrap().is_empty() {
+                let message = rx.recv().await.expect("the channel stays open");
+                source.handle(message);
+            }
+        })
+        .await;
+        assert!(arrived.is_ok(), "the draft stayed empty after the restart");
+        let out = sessions.lock().unwrap();
+        assert!(out[0].as_deref().is_some_and(|session| session.contains("\"championId\":122")));
+    }
+
+    #[tokio::test]
+    async fn an_answer_to_the_old_ask_is_not_taken_for_the_new_one() {
+        let (mut source, _rx, sessions, _port) = source();
+        source.generation = 1;
+        source.party_asked = true;
+        source.waiting_session = Some(DRAFT.to_string());
+
+        // Same generation, but the draft it was asked for has ended and a new one has asked.
+        source.end_session();
+        source.party_asked = true;
+        source.waiting_session = Some(DRAFT.to_string());
+        source.handle(Inner::Party(1, 0, scrub::Party::default()));
+        assert!(sessions.lock().unwrap().is_empty());
+
+        source.handle(Inner::Party(1, 1, scrub::Party::default()));
+        assert_eq!(sessions.lock().unwrap().len(), 1);
     }
 }
