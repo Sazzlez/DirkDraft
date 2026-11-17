@@ -226,6 +226,31 @@ describe('LiveSession', () => {
     expect(live.view().board!.enemies.find((s) => s.cellId === enemy.cellId)!.lane).toBe(enemy.lane);
   });
 
+  it('a null in a later session does not end the draft: the lane set by hand stays, and it is said once', () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    const last = sessions('build-demo').filter((r) => r.session).at(-1)!.session!;
+    live.onSession(last);
+    expect(live.takeNotes()).toEqual([]);
+    const enemy = live.view().board!.enemies.find((s) => s.champion && s.laneEditable)!;
+    const other = (['top', 'jungle', 'mid', 'adc', 'support'] as const).find((l) => l !== enemy.lane)!;
+    live.setManualLane(enemy.cellId, other);
+
+    // The same session, as a client would send it with a field it has no value for.
+    const withNull = { ...last, rerollsRemaining: null };
+    live.onSession(withNull);
+    const board = live.view().board!;
+    expect(board.enemies.find((s) => s.cellId === enemy.cellId)).toMatchObject({ lane: other, laneManual: true });
+    expect(live.takeNotes()).toEqual(['Session: null als fehlend gelesen (rerollsRemaining)']);
+
+    // Every further session of this draft has it too: not said again.
+    live.onSession(withNull);
+    live.onSession({ ...withNull, isCustomGame: null });
+    expect(live.takeNotes()).toEqual([]);
+  });
+
   it('data from an older patch than the client widen the error bars and say so', () => {
     const live = new LiveSession();
     live.setData(data);

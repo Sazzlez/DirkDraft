@@ -125,6 +125,13 @@ export class LiveSession {
    */
   diagnosticLine: string | null = null;
 
+  /** Lines for the log that are said once (the bridge takes them): never a name, only what was odd. */
+  private notes: string[] = [];
+
+  takeNotes(): string[] {
+    return this.notes.splice(0);
+  }
+
   /** The last download found no usable numbers (offline, GitHub down): said while there are none. */
   private dataFailed = false;
 
@@ -160,7 +167,8 @@ export class LiveSession {
     this.session = parsed;
     this.sessionAt = now;
     if (!this.engine) return;
-    const { frame } = this.engine.update(parsed);
+    const { frame, note } = this.engine.update(parsed);
+    if (note) this.notes.push(note);
     this.frame = frame as unknown as GoldenFrame;
     if (parsed && frame.state.isActive) {
       this.lastActive = this.frame;

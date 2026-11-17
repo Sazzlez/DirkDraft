@@ -162,6 +162,42 @@ describe('DraftStateTests', () => {
     expect(draftStateFrom(JSON.parse(json)).isActive).toBe(false);
   });
 
+  it('a null number or switch reads like a missing field, and is named', () => {
+    // One null used to make the whole session invalid: the board went empty in the middle of a draft.
+    const json = `{
+      "localPlayerCellId": 0,
+      "queueId": null,
+      "isCustomGame": null,
+      "rerollsRemaining": null,
+      "benchEnabled": null,
+      "myTeam": [ { "cellId": 0, "championId": 122, "championPickIntent": null, "team": null, "inParty": null } ],
+      "theirTeam": [ { "cellId": 5, "championId": null } ],
+      "actions": [ [ { "id": null, "actorCellId": 0, "type": "pick", "championId": null, "completed": null, "isAllyAction": true, "isInProgress": true } ] ],
+      "bans": { "myTeamBans": [ 51 ], "theirTeamBans": [] },
+      "benchChampions": [ { "championId": null } ],
+      "timer": { "phase": "BAN_PICK" }
+    }`;
+
+    const nullFields = new Set<string>();
+    const state = draftStateFrom(JSON.parse(json), nullFields);
+
+    expect(state.isActive).toBe(true);
+    expect(state.allies[0]).toMatchObject({ cellId: 0, lockedChampionId: 122, hoverChampionId: 0 });
+    expect(state.allies[0]!.inParty).toBeUndefined();
+    expect(state.enemies[0]).toMatchObject({ cellId: 5, lockedChampionId: 0 });
+    expect(state.turn).toMatchObject({ cellId: 0, isLocalPlayer: true });
+    expect(state.allyBans).toEqual([51]);
+    expect(state.bench).toEqual([]);
+    expect(state.rerollsRemaining).toBe(0);
+    expect([...nullFields].sort()).toEqual(['benchEnabled', 'championId', 'championPickIntent', 'completed', 'id', 'inParty', 'isCustomGame', 'queueId', 'rerollsRemaining', 'team']);
+  });
+
+  it('a value of the wrong kind still makes the session invalid', () => {
+    expect(draftStateFrom({ localPlayerCellId: 'eins', myTeam: [{ cellId: 0 }] }).isActive).toBe(false);
+    expect(draftStateFrom({ localPlayerCellId: 0, myTeam: [{ cellId: 0, championId: 1.5 }] }).isActive).toBe(false);
+    expect(draftStateFrom({ localPlayerCellId: 0, myTeam: [{ cellId: 0 }], isSpectating: 'nein' }).isActive).toBe(false);
+  });
+
   it('NullActionGroupsAndPlayers_AreSkipped', () => {
     const json = `{
       "localPlayerCellId": 0,

@@ -38,6 +38,8 @@ let lastDiagnostic: string | null = null;
 
 function render(): void {
   notify(session.view());
+  // What was odd about a session, said once per draft (field names only).
+  for (const note of session.takeNotes()) logLine('warn', note);
   // What the game view decided, once per change: situations seen and suggestions shown, item ids only.
   if (session.diagnosticLine && session.diagnosticLine !== lastDiagnostic) {
     lastDiagnostic = session.diagnosticLine;

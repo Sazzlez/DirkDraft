@@ -119,13 +119,22 @@ function prop(obj: unknown, name: string): unknown {
   return undefined;
 }
 
-/** Thrown where System.Text.Json would throw: the whole session then reads as no session. */
+/** Thrown for a value of the wrong kind (text where a number belongs): the whole session then reads as no session. */
 class SessionFormatError extends Error {}
+
+/**
+ * Where the numbers and switches that were `null` are noted while a session is read. A `null` reads
+ * like a field that is not there (the client sends them, and a new client may send more). Until
+ * 17.11.2026 a single one made the whole session invalid: the board went empty mid-draft, and the
+ * engine took that for the draft's end and dropped the lanes set by hand, the chosen plan and the
+ * owned-champions filter.
+ */
+let nulls: Set<string> | null = null;
 
 function num(obj: unknown, name: string, fallback = 0): number {
   const value = prop(obj, name);
   if (value === undefined || value === null) {
-    if (value === null) throw new SessionFormatError(name);
+    if (value === null) nulls?.add(name);
     return fallback;
   }
   if (typeof value === 'number') return Math.trunc(value) === value ? value : fail(name);
@@ -136,6 +145,10 @@ function num(obj: unknown, name: string, fallback = 0): number {
 function bool(obj: unknown, name: string): boolean {
   const value = prop(obj, name);
   if (value === undefined) return false;
+  if (value === null) {
+    nulls?.add(name);
+    return false;
+  }
   if (typeof value === 'boolean') return value;
   return fail(name);
 }
@@ -180,14 +193,20 @@ interface Action {
 
 // ---- DraftState.From -------------------------------------------------------------------------------
 
-/** Parses a session object (already JSON.parse'd). Malformed sessions read as inactive. */
-export function draftStateFrom(session: unknown): DraftState {
+/**
+ * Parses a session object (already JSON.parse'd). Malformed sessions read as inactive. The names of
+ * numbers and switches that were `null` (read as missing) go into `nullFields`, for the log.
+ */
+export function draftStateFrom(session: unknown, nullFields?: Set<string>): DraftState {
   if (session === null || session === undefined || typeof session !== 'object' || Array.isArray(session)) return INACTIVE;
+  nulls = nullFields ?? null;
   try {
     return fromSession(session);
   } catch (error) {
     if (error instanceof SessionFormatError) return INACTIVE;
     throw error;
+  } finally {
+    nulls = null;
   }
 }
 

@@ -241,6 +241,8 @@ export class DraftEngine {
   /** Own data: what the picks to come are likely to bring — counted once, it depends on the data alone. */
   private openSeats: OpenSeats | null | undefined;
   private wasActive = false;
+  /** Whether this draft's nulls were already reported (update's `note`). */
+  private nullsNoted = false;
   private lastProgress = 0;
   private lastLocal = -1;
 
@@ -310,11 +312,21 @@ export class DraftEngine {
    * champ select). A new draft resets the turn tracker: the session went active, fewer champions
    * are taken than before, or the local seat moved.
    */
-  update(session: unknown): { isNewDraft: boolean; state: DraftState; frame: DraftFrame } {
-    const state = draftStateFrom(session);
+  update(session: unknown): { isNewDraft: boolean; state: DraftState; frame: DraftFrame; note: string | null } {
+    const nullFields = new Set<string>();
+    const state = draftStateFrom(session, nullFields);
     const progress = state.unavailable.size;
     const isNewDraft = state.isActive && (!this.wasActive || progress < this.lastProgress || state.localCellId !== this.lastLocal);
-    if (isNewDraft) this.turns.reset();
+    if (isNewDraft) {
+      this.turns.reset();
+      this.nullsNoted = false;
+    }
+    // Said once per draft, with the field names only: enough to see that the client changed.
+    let note: string | null = null;
+    if (state.isActive && nullFields.size > 0 && !this.nullsNoted) {
+      this.nullsNoted = true;
+      note = `Session: null als fehlend gelesen (${[...nullFields].sort().join(', ')})`;
+    }
     if (isNewDraft || !state.isActive) {
       this.selectable = null;
       this.manualLanes.clear();
@@ -327,7 +339,7 @@ export class DraftEngine {
     const target = this.turns.resolve(state);
     const mine = localSlot(state);
     const hover = mine && !isLocked(mine) && mine.hoverChampionId > 0 ? mine.hoverChampionId : 0;
-    return { isNewDraft, state, frame: this.evaluate(state, target, hover) };
+    return { isNewDraft, state, frame: this.evaluate(state, target, hover), note };
   }
 
   /** The seat a click chose, while it holds; null when the list follows the clock. */
