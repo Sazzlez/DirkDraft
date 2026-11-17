@@ -47,7 +47,9 @@ nimmt nur markierte Zeilen (`RiotGames.HasLevelsBeforeDuel`; `docs/modellpruefun
 
 Die Zeilen liegen im
 Bestand (der laufende Patch und die zwei davor; ein Wechsel der Region verwirft sie) und als Artefakt `games` jedes Laufs (`games.json.gz`, eine Woche
-aufbewahrt, nie veröffentlicht). Herunterladen: `gh run download <Lauf> -n games`.
+aufbewahrt). Sie stehen nicht im Branch `data` und die App liest sie nicht; als Artefakt eines
+öffentlichen Repos kann sie aber jeder angemeldete GitHub-Nutzer laden. Ihr Inhalt hat keine Namen,
+keine PUUIDs und keine Match-IDs. Herunterladen: `gh run download <Lauf> -n games`.
 
 **Situative Items** (Spielansicht, gleichnamige Kachel): nur gemessen, keine Faustregeln.
 

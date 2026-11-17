@@ -173,7 +173,8 @@ public sealed class PatchGames
 
 /// <summary>
 /// The game lines the collector hands to the measurement — the current patch and up to two before
-/// it: an artifact of the run, never published, never read by the app.
+/// it: an artifact of the run, not on the data branch and never read by the app. Anyone signed in
+/// to GitHub can download the artifacts of a public repository; the lines hold no player and no match id.
 /// </summary>
 public sealed class RiotGamesFile
 {

@@ -75,7 +75,7 @@ public sealed class RiotMatchupTally
     }
 }
 
-/// <summary>The matchup counts as handed to the measurement: an artifact of the run, not published yet.</summary>
+/// <summary>The matchup counts as handed to the measurement: an artifact of the run (downloadable by anyone signed in to GitHub), not on the data branch yet.</summary>
 public sealed class RiotMatchupFile
 {
     public int Version { get; set; } = 1;

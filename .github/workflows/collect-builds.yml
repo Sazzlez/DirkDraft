@@ -193,8 +193,10 @@ jobs:
           exit $status
 
       # The counted games themselves (ten champions and a result each, no players, no match ids) and
-      # the matchup builds, for measuring the draft model (docs/draft-konzept.md). Not published: an
-      # artifact of the run, kept a week; each run's files hold everything counted so far.
+      # the matchup builds, for measuring the draft model (docs/draft-konzept.md). Not on the data
+      # branch and not read by the app - but an artifact of a public repository: anyone signed in to
+      # GitHub can download it. Nothing in it names a player or a match. Kept a week; each run's files
+      # hold everything counted so far.
       - name: Spiel-Liste sichern
         if: always() && steps.key.outputs.present == 'true' && hashFiles('private/games.json.gz') != ''
         uses: actions/upload-artifact@v4

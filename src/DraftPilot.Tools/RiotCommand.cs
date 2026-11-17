@@ -126,7 +126,8 @@ internal static class RiotCommand
         var state = CollectorState.Load(statePath);
 
         // The counted games of the current patch and the two before it, for measuring the draft
-        // model — never published (the workflow keeps the file as a run artifact).
+        // model. Not on the data branch; the workflow keeps the file as a run artifact, which anyone
+        // signed in to GitHub can download from a public repository. It names no player and no match.
         var gamesPath = options.GetValueOrDefault("games-out", string.Empty);
         if (gamesPath.Length > 0)
         {
@@ -148,7 +149,8 @@ internal static class RiotCommand
             Console.WriteLine($"Spiel-Liste: {string.Join(", ", gamesFile.Patches.Select(p => $"{p.Games.Count:N0} Spiele von Patch {p.Patch} ({p.Games.Count(RiotGames.HasLanePart):N0} mit Minute 10, {p.Games.Count(RiotGames.HasDuelSample):N0} mit Duellen, {p.Games.Sum(line => RiotGames.Duels(line).Count()):N0} Duelle)"))}, {new FileInfo(gamesPath).Length / 1024:N0} KB → {gamesPath}");
         }
 
-        // What players take against each lane opponent, this patch — not published yet (run artifact).
+        // What players take against each lane opponent, this patch — not on the data branch yet (a run
+        // artifact, downloadable like the game lines; counts per champion only).
         var matchupsPath = options.GetValueOrDefault("matchups-out", string.Empty);
         if (matchupsPath.Length > 0)
         {
