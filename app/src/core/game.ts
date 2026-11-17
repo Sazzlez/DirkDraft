@@ -8,7 +8,7 @@
 
 import { damageAmount } from './model/compAnalyzer';
 import { DamageType, type MetaLookup } from './model/metaLookup';
-import type { RiotBuildPlan } from './riotBuilds';
+import type { PlanOption, RiotBuildPlan } from './riotBuilds';
 
 // ---- the API's shape (only what is read) ------------------------------------------------------
 
@@ -52,6 +52,44 @@ export interface ItemInfo {
   magicResist?: number;
   /** The item this one transforms from (Muramana from Manamune, Seraph's from Archangel's). */
   specialRecipe?: number;
+  /** The maps the shop sells it on, as Data Dragon numbers them (11 the Rift, 12 the Howling Abyss); absent: no word on it. */
+  maps?: number[];
+}
+
+/** Summoner's Rift and the Howling Abyss, as Data Dragon numbers its maps. */
+export const MAP_RIFT = 11;
+export const MAP_ARAM = 12;
+
+/**
+ * Whether the list may tell the player to buy the item: the loaded catalog knows it, the shop sells
+ * it, and it does so on this map. The build file is counted on its own patch and the catalog is the
+ * client's — an item Riot took out or moved to another mode in between must not stand in the list
+ * as the next buy. Without a catalog (nothing loaded yet) everything passes: an item without a
+ * picture is better than an empty list.
+ */
+export function buyable(id: number, items: ReadonlyMap<number, ItemInfo>, map: number = MAP_RIFT): boolean {
+  if (items.size === 0) return true;
+  const info = items.get(id);
+  return !!info && info.purchasable !== false && (info.maps === undefined || info.maps.includes(map));
+}
+
+/** The plan without the items that cannot be bought on this map (`buyable`); the same plan when all can. */
+export function buyablePlan(plan: RiotBuildPlan, items: ReadonlyMap<number, ItemInfo>, map: number = MAP_RIFT): RiotBuildPlan {
+  const ok = (id: number) => buyable(id, items, map);
+  const all = (options: readonly PlanOption[]) => options.every((option) => option.ids.every(ok));
+  if (all(plan.starters) && all(plan.boots) && all(plan.core) && all(plan.late) && all(plan.supportOptions) && (plan.supportChoice?.ids.every(ok) ?? true)) return plan;
+  // An option keeps what is left of it; one that is left with nothing goes.
+  const keep = (options: readonly PlanOption[]): PlanOption[] => options.map((option) => ({ ...option, ids: option.ids.filter(ok) })).filter((option) => option.ids.length > 0);
+  const supportOptions = keep(plan.supportOptions);
+  return {
+    ...plan,
+    starters: keep(plan.starters),
+    boots: keep(plan.boots),
+    core: keep(plan.core),
+    late: keep(plan.late),
+    supportOptions,
+    supportChoice: plan.supportChoice && plan.supportChoice.ids.every(ok) ? plan.supportChoice : (supportOptions[0] ?? null),
+  };
 }
 
 /** Basic boots; every finished pair is built from them. */

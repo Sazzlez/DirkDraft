@@ -136,6 +136,7 @@ pub fn run() {
             crate::data::data_check,
             crate::data::data_commit,
             crate::data::data_discard,
+            crate::ddragon::assets_load,
             crate::updater::update_check,
             crate::updater::update_apply,
             settings_get,

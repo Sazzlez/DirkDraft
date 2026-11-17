@@ -9,7 +9,7 @@ import { spellSlots } from '../core/loadout';
 import type { Plan } from '../core/model/compAnalyzer';
 import { DataRefresher } from '../core/refresh';
 import type { Lane, ViewModel } from '../core/view';
-import { loadAssets } from '../data/assets';
+import { loadAssets, setAssetSource, type AssetNames } from '../data/assets';
 import { DataStore, type DataSet } from '../data/remote';
 import { inShell, shellSource } from '../platform/shell';
 import { LiveSession, type ClientStatus } from './session';
@@ -81,6 +81,7 @@ function askPatch(): void {
       if (version) {
         session.setClientPatch(version);
         render();
+        void ensureAssets();
       }
     })
     .catch(() => undefined)
@@ -89,8 +90,34 @@ function askPatch(): void {
     });
 }
 
+/** The patch of the numbers in hand: what the tables are loaded for while the client has not said its own. */
+let dataPatch: string | null = null;
+let shownAssets: AssetNames | null = null;
+
+/** The version the names, prices and pictures should be of: the client's own, else the data's. */
+const wantedAssets = (): string | null => session.clientVersion ?? dataPatch;
+
+/**
+ * Loads the tables for the wanted version where they are not loaded yet, and shows them. Called at
+ * every occasion — new numbers, the client's patch, every data check — so a start without a network
+ * gets its names once there is one, and a client that patched gets the new tables.
+ */
+function ensureAssets(): Promise<void> {
+  const wanted = wantedAssets();
+  if (!wanted) return Promise.resolve();
+  return loadAssets(wanted).then(
+    (names) => {
+      if (names === shownAssets) return;
+      shownAssets = names;
+      render();
+    },
+    () => undefined,
+  );
+}
+
 async function apply(set: DataSet): Promise<void> {
-  await loadAssets(set.meta.patch).catch(() => undefined);
+  dataPatch = set.meta.patch;
+  await ensureAssets();
   session.setData(set);
   // Which numbers the suggestions came from: a later check needs the same file's date.
   logLine(
@@ -122,10 +149,24 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
   });
   await loadSettings();
 
+  // Data Dragon's tables come from the shell too (ddragon.rs): kept on disk per version.
+  setAssetSource(async (wanted, language) => {
+    const tables = await invoke<{ version: string; champion: string; item: string; summoner: string; runes: string }>('assets_load', { patch: wanted, language });
+    return {
+      version: tables.version,
+      champion: JSON.parse(tables.champion) as unknown,
+      item: JSON.parse(tables.item) as unknown,
+      summoner: JSON.parse(tables.summoner) as unknown,
+      runes: JSON.parse(tables.runes) as unknown,
+    };
+  });
+
   // The shell fetches and keeps the files; the store reads and parses only what is new.
   const store = new DataStore(shellSource);
   const refresher = new DataRefresher(
     async () => {
+      // The same occasion for the tables: missing after an offline start, or of an older patch.
+      void ensureAssets();
       // A failed download is only worth a word while there are no numbers at all.
       const set = await store.refresh().catch(() => null);
       session.setDataFailed(!set);
@@ -140,7 +181,11 @@ export async function startLive(onView: (view: ViewModel) => void): Promise<void
 
   await listen<ClientStatus>('client://status', (e) => {
     session.onStatus(e.payload);
-    if (!e.payload.clientRunning) void refresher.onPhase(null, Date.now());
+    if (!e.payload.clientRunning) {
+      void refresher.onPhase(null, Date.now());
+      // The client is gone and its patch with it: the tables of the numbers' patch again.
+      void ensureAssets();
+    }
     askPatch();
     render();
   });

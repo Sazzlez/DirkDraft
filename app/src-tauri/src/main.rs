@@ -6,6 +6,7 @@
 
 mod client;
 mod data;
+mod ddragon;
 mod diagnostics;
 mod lcu;
 mod logfile;

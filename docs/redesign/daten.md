@@ -146,6 +146,21 @@ kaputte Datei ersetzt nie die letzte gute. Vorher las die Seite bei jeder Prüfu
 `raw.githubusercontent.com` mehr (CSP). Geprüft wird weiter alle 30 Minuten und nie im Champ Select
 oder im Spiel (`app/src/core/refresh.ts`).
 
+## Namen, Preise und Bilder aus Data Dragon (seit 17.11.2026)
+
+Die Tabellen (Champions, Items, Beschwörerzauber, Runen) lädt ebenfalls die Shell
+(`app/src-tauri/src/ddragon.rs`, Befehl `assets_load`) und behält sie je Version auf der Platte
+(`%LOCALAPPDATA%\DraftPilot\data\2.0\ddragon\<Version>\<Sprache>\`). Geladen wird für den Patch des
+Clients, sobald der ihn nennt, sonst für den Patch der Daten: genau diese Version, sonst die neueste
+desselben Patches, sonst die neueste überhaupt. Ohne Netz nimmt die Shell die behaltene Kopie, notfalls
+die eines älteren Patches; die Seite fragt dann bei der nächsten Gelegenheit wieder (jede Datenprüfung,
+neuer Client-Patch, Client beendet). Vorher gab es einen Ladeversuch je Programmlauf: Ein Start ohne
+Netz ließ die Namen bis zum nächsten Start leer, und nach einem Client-Patch blieben die alten Tabellen.
+
+Items, die der Katalog des Client-Patches nicht kennt, die nicht im Shop stehen oder die es auf der
+Karte nicht gibt (Kluft 11, Heulende Schlucht 12), fallen aus Plan und Vorschlägen
+(`buyable`, `buyablePlan` in `app/src/core/game.ts`). Ohne Katalog wird nichts gefiltert.
+
 ## Was ein Lauf aushält (seit 17.11.2026)
 
 **Fehler bei einzelnen Spielen.** Gibt Riot ein Spiel nicht heraus (400, 403 auf diesem Spiel, sechsmal

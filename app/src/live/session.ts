@@ -5,7 +5,7 @@
 // Left out on the user's word (07.11.2026): a postgame and "Mein Pool".
 
 import { DraftEngine } from '../core/engine';
-import { gameModel, championIdOf, enemyItemsOf, isBoots, isFinished, ownsItem, recipeForm, remainingCost, type LiveGameData } from '../core/game';
+import { buyable, buyablePlan, gameModel, championIdOf, enemyItemsOf, isBoots, isFinished, MAP_ARAM, MAP_RIFT, ownsItem, recipeForm, remainingCost, type LiveGameData } from '../core/game';
 import { aramBuildFile, aramStatsFrom } from '../core/aram';
 import { Lane, laneFromKey } from '../core/model/lane';
 import { MetaLookup } from '../core/model/metaLookup';
@@ -368,6 +368,11 @@ export class LiveSession {
     if (this.session) this.onSession(this.session, this.sessionAt);
   }
 
+  /** The version the client runs ("16.23.1"), or null: the pictures and tables are loaded for it. */
+  get clientVersion(): string | null {
+    return this.clientPatch;
+  }
+
   get hasClientPatch(): boolean {
     return this.clientPatch !== null;
   }
@@ -513,7 +518,10 @@ export class LiveSession {
     // The game's own word for the mode: ARAM, or KIWI for Mayhem.
     const gameMode = game.gameData?.gameMode;
     const mode: Mode = gameMode === 'KIWI' ? 'mayhem' : gameMode === 'ARAM' ? 'aram' : 'lanes';
-    const basePlan = championId ? this.planFor(championId, lane, mode) : null;
+    // What the shop of this map does not sell — by the client's own catalog — is no buy to suggest.
+    const map = mode === 'lanes' ? MAP_RIFT : MAP_ARAM;
+    const counted = championId ? this.planFor(championId, lane, mode) : null;
+    const basePlan = counted ? buyablePlan(counted, items, map) : null;
     // Read once with the base plan: the enemies decide which situations are on.
     const first = gameModel(game, meta, basePlan, items);
     if (!first) {
@@ -536,12 +544,14 @@ export class LiveSession {
     // A plan item with a part already in the bag stays where it is in the late order.
     const begun = (id: number) => remainingCost(id, ownedIds.map((owned) => recipeForm(owned, items)), items) < (items.get(id)?.total ?? 0);
     const built = file && basePlan ? situationalBuild(file, meta, basePlan, championId, situations, ownedIds, (id) => ownsItem(id, ownedIds, items), slots, this.swaps, 3, begun) : null;
-    const situational: RatedSuggestion[] | null = built
+    const suggested: RatedSuggestion[] | null = built
       ? built.suggestions
       : file
         ? situationalSuggestions(file, meta, championId, lane, situations, new Set(ownedIds), 3, slots).map((s) => ({ ...s, instead: null, adopt: false }))
         : null;
-    const plan = built?.plan ?? basePlan;
+    const situational = suggested?.filter((s) => buyable(s.itemId, items, map)) ?? null;
+    // A situational item that took a place in the plan passes the same filter.
+    const plan = built ? buyablePlan(built.plan, items, map) : basePlan;
     const moves = built?.moves ?? [];
     // Marked in the path and the list: what a swap brought in and what moved forward for these enemies.
     const marked = new Set([...(built?.swaps ?? []).map((swap) => swap.itemId), ...moves.map((move) => move.itemId)]);
