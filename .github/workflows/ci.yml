@@ -69,6 +69,17 @@ jobs:
       - run: dotnet build DraftPilot.sln -c Release
       - run: dotnet test DraftPilot.sln -c Release --no-build
 
+  # The workflow files themselves. collect-builds.yml runs on a schedule only: a mistake in it shows
+  # nowhere on a push and would stop the collection the next time it is due.
+  workflows:
+    name: Workflows (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
+
   # One picture per moment, width and theme, to look at a layout change without opening the app.
   # The portraits come from Data Dragon over the network, so a failure here never fails the run.
   shots:
