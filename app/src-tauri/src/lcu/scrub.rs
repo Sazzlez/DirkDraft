@@ -6,6 +6,9 @@
 // One thing is read from the identities before they go: which teammates queued together with the
 // local player. The lobby he queued from lists his party; a teammate whose identity is in that list
 // keeps a bare `inParty: true`. No name and no id of anyone reaches the page for it.
+//
+// One thing is added: the map the draft is for (`mapId`), read from the gameflow session — whose
+// player lists stay here; only that one number leaves this file.
 
 use std::collections::{HashMap, HashSet};
 
@@ -54,14 +57,29 @@ impl Party {
     }
 }
 
+/// The map of the game being set up, out of /lol-gameflow/v1/session: 11 is Summoner's Rift, 12 the
+/// Howling Abyss. None for anything that names no map. Nothing else of that answer is kept — it
+/// lists the players.
+pub fn map_id(gameflow_session: &str) -> Option<i64> {
+    let value: Value = serde_json::from_str(gameflow_session).ok()?;
+    let id = |v: Option<&Value>| v.and_then(Value::as_i64).filter(|id| *id > 0);
+    id(value.get("map").and_then(|map| map.get("id")))
+        .or_else(|| id(value.get("gameData").and_then(|game| game.get("queue")).and_then(|queue| queue.get("mapId"))))
+}
+
 /// The session without chat token and identities, or None when it is not a JSON object. The
 /// teammates found in `party` keep `inParty: true` — never the local player's own seat, never an
-/// enemy.
-pub fn session(json: &str, party: &Party) -> Option<String> {
+/// enemy. `map` goes in as `mapId` where the client named one.
+pub fn session(json: &str, party: &Party, map: Option<i64>) -> Option<String> {
     let mut value: Value = serde_json::from_str(json).ok()?;
     let session = value.as_object_mut()?;
     for field in SESSION_FIELDS {
         session.remove(field);
+    }
+    // Only what this file read itself says which map it is.
+    session.remove("mapId");
+    if let Some(map) = map {
+        session.insert("mapId".to_string(), Value::from(map));
     }
     let local = session.get("localPlayerCellId").and_then(Value::as_i64);
     for team in ["myTeam", "theirTeam"] {
@@ -156,7 +174,7 @@ mod tests {
         let raw = r#"{"chatDetails":{"token":"jwt"},"gameId":7,"localPlayerCellId":2,
             "myTeam":[{"cellId":2,"championId":122,"gameName":"Ich","tagLine":"EUW","puuid":"p","summonerId":1,"spell1Id":4}],
             "theirTeam":[{"cellId":5,"championId":24,"gameName":"Fremd","puuid":"q"}]}"#;
-        let clean: Value = serde_json::from_str(&session(raw, &Party::default()).unwrap()).unwrap();
+        let clean: Value = serde_json::from_str(&session(raw, &Party::default(), None).unwrap()).unwrap();
         assert!(clean.get("chatDetails").is_none());
         assert!(clean.get("gameId").is_none());
         assert_eq!(clean["localPlayerCellId"], 2);
@@ -166,6 +184,23 @@ mod tests {
         assert!(me.get("gameName").is_none() && me.get("puuid").is_none() && me.get("summonerId").is_none());
         assert!(clean["theirTeam"][0].get("gameName").is_none());
         assert!(!clean.to_string().contains("Fremd"));
+    }
+
+    #[test]
+    fn the_map_comes_from_the_gameflow_session_and_nothing_else_does() {
+        let gameflow = r#"{"gameData":{"queue":{"id":2400,"mapId":12},"teamOne":[{"summonerName":"Fremd","puuid":"q"}]},"map":{"id":12,"name":"Howling Abyss"},"phase":"ChampSelect"}"#;
+        assert_eq!(map_id(gameflow), Some(12));
+        assert_eq!(map_id(r#"{"gameData":{"queue":{"mapId":11}}}"#), Some(11));
+        for none in ["", "null", r#"{"httpStatus":404}"#, r#"{"map":{"id":0}}"#, r#"{"map":{"id":"elf"}}"#] {
+            assert_eq!(map_id(none), None, "{none}");
+        }
+
+        let raw = r#"{"localPlayerCellId":0,"mapId":99,"myTeam":[{"cellId":0,"championId":1}],"theirTeam":[]}"#;
+        let with: Value = serde_json::from_str(&session(raw, &Party::default(), Some(12)).unwrap()).unwrap();
+        assert_eq!(with["mapId"], 12);
+        // Not read: no map at all, whatever the session itself claims.
+        let without: Value = serde_json::from_str(&session(raw, &Party::default(), None).unwrap()).unwrap();
+        assert!(without.get("mapId").is_none());
     }
 
     const DUO: &str = r#"{"localPlayerCellId":1,
@@ -178,7 +213,7 @@ mod tests {
     #[test]
     fn the_party_becomes_a_bare_flag_on_the_teammates_from_the_lobby() {
         let lobby = r#"{"members":[{"puuid":"me","summonerId":11,"summonerName":"Ich"},{"puuid":"duo","summonerId":12,"summonerName":"Duo"}]}"#;
-        let text = session(DUO, &Party::from_lobby(lobby)).unwrap();
+        let text = session(DUO, &Party::from_lobby(lobby), None).unwrap();
         let clean: Value = serde_json::from_str(&text).unwrap();
         let flags: Vec<bool> = clean["myTeam"].as_array().unwrap().iter().map(|p| p["inParty"] == true).collect();
         // The duo partner only: not the own seat, not a stranger, and not a flag that came from outside.
@@ -195,7 +230,7 @@ mod tests {
     #[test]
     fn the_party_matches_by_summoner_id_where_the_puuid_is_missing() {
         let lobby = r#"{"members":[{"summonerId":11},{"summonerId":12}]}"#;
-        let clean: Value = serde_json::from_str(&session(DUO, &Party::from_lobby(lobby)).unwrap()).unwrap();
+        let clean: Value = serde_json::from_str(&session(DUO, &Party::from_lobby(lobby), None).unwrap()).unwrap();
         assert_eq!(clean["myTeam"][2]["inParty"], true);
         assert!(clean["myTeam"][0].get("inParty").is_none());
     }
@@ -203,7 +238,7 @@ mod tests {
     #[test]
     fn alone_or_without_a_lobby_nobody_is_in_the_party() {
         for lobby in [r#"{"members":[{"puuid":"me","summonerId":11}]}"#, "", "null", r#"{"httpStatus":404}"#, r#"{"members":[{"puuid":"","summonerId":0}]}"#] {
-            let clean: Value = serde_json::from_str(&session(DUO, &Party::from_lobby(lobby)).unwrap()).unwrap();
+            let clean: Value = serde_json::from_str(&session(DUO, &Party::from_lobby(lobby), None).unwrap()).unwrap();
             assert!(clean["myTeam"].as_array().unwrap().iter().all(|p| p.get("inParty").is_none()), "{lobby}");
         }
     }

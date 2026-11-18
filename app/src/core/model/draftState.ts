@@ -62,6 +62,8 @@ export interface DraftState {
   /** Banned or locked anywhere in the draft. */
   unavailable: ReadonlySet<number>;
   queue: QueueKind;
+  /** The map the client named for this draft (11 = Summoner's Rift); absent where it named none. */
+  mapId?: number;
   bench: readonly number[];
   benchEnabled: boolean;
   rerollsRemaining: number;
@@ -214,6 +216,7 @@ function fromSession(session: unknown): DraftState {
   // Read every field first, as the deserializer would, so a malformed one fails the whole session.
   const localCellId = num(session, 'localPlayerCellId', -1);
   const queueId = num(session, 'queueId');
+  const mapId = num(session, 'mapId');
   const isCustomGame = bool(session, 'isCustomGame');
   const isSpectating = bool(session, 'isSpectating');
   const benchEnabled = bool(session, 'benchEnabled');
@@ -271,6 +274,7 @@ function fromSession(session: unknown): DraftState {
     isActive: true,
     localCellId,
     queue: queueFromId(queueId, isCustomGame),
+    ...(mapId > 0 ? { mapId } : {}),
     allies,
     enemies,
     allyBans: ally,

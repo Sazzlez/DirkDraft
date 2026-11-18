@@ -70,9 +70,21 @@ function fromKnownId(queueId: number): QueueKind {
   }
 }
 
-/** Whether the mode has the five Summoner's Rift lanes the model reasons about. */
-export const usesLanes = (kind: QueueKind): boolean =>
-  kind !== 'aram' && kind !== 'aramMayhem' && kind !== 'arena' && kind !== 'rotating';
+/** Summoner's Rift, as /lol-gameflow/v1/session names it (map.id). */
+export const MAP_SUMMONERS_RIFT = 11;
+
+/**
+ * Whether the draft has the five Summoner's Rift lanes the model reasons about. The map decides
+ * where the client named it (`mapId`, 0 = not named): a queue this list does not know — a new mode —
+ * used to count as the Rift, and got lanes, picks and builds for a game without them. The modes the
+ * list knows as lane-less stay so on any map (URF is played on the Rift, and is not what was
+ * counted). Without a map — recordings from before 17.11.2026, a failed read — the list alone
+ * decides, as before. The list also stays for the names (queueDisplay).
+ */
+export const usesLanes = (kind: QueueKind, mapId = 0): boolean => {
+  if (kind === 'aram' || kind === 'aramMayhem' || kind === 'arena' || kind === 'rotating') return false;
+  return mapId > 0 ? mapId === MAP_SUMMONERS_RIFT : true;
+};
 
 export const isAram = (kind: QueueKind): boolean => kind === 'aram' || kind === 'aramMayhem';
 

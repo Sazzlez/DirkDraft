@@ -137,6 +137,32 @@ describe('LiveSession', () => {
     expect(aram.emptyText).toMatch(/ARAM-Zahlen/);
   });
 
+  it('a queue nobody knows: lanes and a list on the Rift, a word why on any other map', () => {
+    const live = new LiveSession();
+    live.setData(data);
+    live.onStatus(connected);
+    live.onPhase('ChampSelect');
+    const last = sessions('state-myturn').filter((r) => r.session).at(-1)!.session!;
+
+    // A new mode on the Howling Abyss: no lane on any seat, no list, no build.
+    live.onSession({ ...last, queueId: 31337, mapId: 12 });
+    const abyss = live.view();
+    expect(abyss.board!.usesLanes).toBe(false);
+    expect(abyss.main.kind).toBe('lobby');
+    expect(abyss.emptyText).toMatch(/Dieser Modus hat keine Lanes/);
+    expect(abyss.board!.allies.every((slot) => slot.lane === null)).toBe(true);
+
+    // A new queue on the Rift is the game the numbers are about.
+    live.onSession({ ...last, queueId: 31337, mapId: 11 });
+    const rift = live.view();
+    expect(rift.board!.usesLanes).toBe(true);
+    expect(rift.main.kind).not.toBe('lobby');
+
+    // The map not named: as before, the Rift is assumed.
+    live.onSession({ ...last, queueId: 31337 });
+    expect(live.view().board!.usesLanes).toBe(true);
+  });
+
   it('names every queue and says where Flex numbers come from', () => {
     const live = new LiveSession();
     live.setData(data);

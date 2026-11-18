@@ -29,6 +29,8 @@ const SESSION: &str = "/lol-champ-select/v1/session";
 const GAMEFLOW: &str = "/lol-gameflow/v1/gameflow-phase";
 /// The lobby the local player queued from: its members are his party (scrub::Party).
 const LOBBY: &str = "/lol-lobby/v2/lobby";
+/// The game being set up: its map says whether the draft has the Rift's lanes (scrub::map_id).
+const GAMEFLOW_SESSION: &str = "/lol-gameflow/v1/session";
 const LOCKFILE_TICK: Duration = Duration::from_millis(500);
 const LOCKFILE_GRACE: Duration = Duration::from_millis(1500);
 /// How often a missing League installation is looked for again.
@@ -79,8 +81,8 @@ pub enum Update {
 enum Inner {
     Socket(u64, SocketEvent),
     Seed(u64, Option<String>, Option<Read>),
-    /// The party of the draft that asked for it (generation, ask).
-    Party(u64, u64, scrub::Party),
+    /// The party and the map of the draft that asked for them (generation, ask).
+    Party(u64, u64, scrub::Party, Option<i64>),
 }
 
 struct Link {
@@ -103,6 +105,8 @@ struct Source<F: Fn(Update)> {
     /// Counts the asks, so a late answer of an ended draft is not taken for the next one.
     party_ask: u64,
     party_asked: bool,
+    /// The map of the running draft, asked with the party; None where the client named none.
+    map: Option<i64>,
     /// The newest session while the party is being asked; it goes out with the answer.
     waiting_session: Option<String>,
 }
@@ -141,6 +145,7 @@ pub async fn run(explicit_lockfile: Option<PathBuf>, out: impl Fn(Update) + Send
         party: None,
         party_ask: 0,
         party_asked: false,
+        map: None,
         waiting_session: None,
     };
     let mut missing_since: Option<Instant> = None;
@@ -258,8 +263,9 @@ impl<F: Fn(Update)> Source<F> {
                 }
             }
             Inner::Socket(generation, event) if generation == self.generation => self.socket(event),
-            Inner::Party(generation, ask, party) if generation == self.generation && ask == self.party_ask && self.party_asked => {
+            Inner::Party(generation, ask, party, map) if generation == self.generation && ask == self.party_ask && self.party_asked => {
                 self.party = Some(party);
+                self.map = map;
                 if let Some(json) = self.waiting_session.take() {
                     self.session(&json);
                 }
@@ -326,14 +332,14 @@ impl<F: Fn(Update)> Source<F> {
             self.waiting_session = Some(json.to_string());
             return;
         };
-        if let Some(clean) = scrub::session(json, party) {
+        if let Some(clean) = scrub::session(json, party, self.map) {
             self.session_open = true;
             (self.out)(Update::Session(Some(clean)));
         }
     }
 
-    /// Reads the lobby once; whatever comes back (also nothing) answers the ask, so a session never
-    /// waits longer than the one request.
+    /// Reads the lobby and the game being set up once, side by side; whatever comes back (also
+    /// nothing) answers the ask, so a session never waits longer than the slower of the two requests.
     fn ask_party(&mut self) {
         let Some(link) = &self.link else {
             self.party = Some(scrub::Party::default());
@@ -344,8 +350,10 @@ impl<F: Fn(Update)> Source<F> {
         let generation = self.generation;
         let ask = self.party_ask;
         tokio::spawn(async move {
-            let party = lcu.read(LOBBY).await.body.map(|body| scrub::Party::from_lobby(&body)).unwrap_or_default();
-            let _ = tx.send(Inner::Party(generation, ask, party));
+            let (lobby, game) = tokio::join!(lcu.read(LOBBY), lcu.read(GAMEFLOW_SESSION));
+            let party = lobby.body.map(|body| scrub::Party::from_lobby(&body)).unwrap_or_default();
+            let map = game.body.and_then(|body| scrub::map_id(&body));
+            let _ = tx.send(Inner::Party(generation, ask, party, map));
         });
     }
 
@@ -353,6 +361,7 @@ impl<F: Fn(Update)> Source<F> {
     /// the old ask is not taken for it.
     fn reset_party(&mut self) {
         self.party = None;
+        self.map = None;
         self.party_asked = false;
         self.party_ask += 1;
         self.waiting_session = None;
@@ -403,6 +412,7 @@ mod tests {
             party: None,
             party_ask: 0,
             party_asked: false,
+            map: None,
             waiting_session: None,
         };
         let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
@@ -450,10 +460,20 @@ mod tests {
         source.end_session();
         source.party_asked = true;
         source.waiting_session = Some(DRAFT.to_string());
-        source.handle(Inner::Party(1, 0, scrub::Party::default()));
+        source.handle(Inner::Party(1, 0, scrub::Party::default(), Some(11)));
         assert!(sessions.lock().unwrap().is_empty());
 
-        source.handle(Inner::Party(1, 1, scrub::Party::default()));
-        assert_eq!(sessions.lock().unwrap().len(), 1);
+        // The answer to the running draft's ask carries its map into every session of that draft.
+        source.handle(Inner::Party(1, 1, scrub::Party::default(), Some(12)));
+        source.session(DRAFT);
+        {
+            let out = sessions.lock().unwrap();
+            assert_eq!(out.len(), 2);
+            assert!(out.iter().all(|session| session.as_deref().is_some_and(|s| s.contains("\"mapId\":12"))));
+        }
+
+        // The next draft starts without a map until its own answer is in.
+        source.end_session();
+        assert_eq!(source.map, None);
     }
 }

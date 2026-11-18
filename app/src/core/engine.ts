@@ -376,14 +376,14 @@ export class DraftEngine {
     let hoverResult: DraftFrame['hover'] = null;
     let bench: DraftFrame['aramBench'] = null;
 
-    if (state.isActive && target && usesLanes(state.queue)) {
+    if (state.isActive && target && usesLanes(state.queue, state.mapId)) {
       const own = target.slot.cellId === state.localCellId ? this.selectable : null;
       picks = frameSet(recommender.recommend(state, { ...target, action: 'pick' }, enemyPredictions, allyPredictions, own, LIST_LIMIT));
       bans = frameSet(recommender.recommend(state, { ...target, action: 'ban' }, enemyPredictions, allyPredictions, null, LIST_LIMIT));
     }
 
     const mine = localSlot(state);
-    if (state.isActive && hover !== 0 && mine && usesLanes(state.queue)) {
+    if (state.isActive && hover !== 0 && mine && usesLanes(state.queue, state.mapId)) {
       const evaluation = recommender.evaluate(state, { slot: mine, action: 'pick', isFollowingTurn: false }, hover, enemyPredictions, allyPredictions, this.selectable);
       if (evaluation) {
         const compOf = (item: Recommendation): number => item.breakdown.find((term) => term.kind === 'composition')?.logOdds ?? 0;
@@ -441,7 +441,7 @@ export class DraftEngine {
         ? pickHintOf(picks, advised.cellId === mine?.cellId && hoverResult ? hoverResult.item : null, advised.cellId, state.allyPickOrder)
         : null;
     const gap =
-      state.isActive && usesLanes(state.queue) && advised && !isLocked(advised)
+      state.isActive && usesLanes(state.queue, state.mapId) && advised && !isLocked(advised)
         ? gapOf(
             advised.cellId,
             comp.analyze(state.allies.filter((slot) => slot !== advised).map(effectiveChampionId)),
@@ -455,7 +455,7 @@ export class DraftEngine {
         isActive: state.isActive,
         phase: state.phase,
         queue: state.queue,
-        usesLanes: usesLanes(state.queue),
+        usesLanes: usesLanes(state.queue, state.mapId),
         localCellId: state.localCellId,
         allies: state.allies.map(frameSlot),
         enemies: state.enemies.map(frameSlot),
@@ -502,7 +502,7 @@ export class DraftEngine {
       gap,
       pickHint,
       chosenPlan: this.chosenPlan,
-      teamPlan: party && state.isActive && usesLanes(state.queue) ? frameTeamPlan(planTeam(recommender, meta, state, enemyPredictions, allyPredictions, this.selectable, party)) : null,
+      teamPlan: party && state.isActive && usesLanes(state.queue, state.mapId) ? frameTeamPlan(planTeam(recommender, meta, state, enemyPredictions, allyPredictions, this.selectable, party)) : null,
       teamBans:
         party && bans && state.phase !== 'finalization'
           ? (planTeamBans(recommender, meta, state, enemyPredictions, allyPredictions, party)?.map((b) => ({ ...b, lane: laneKey(b.lane) })) ?? null)

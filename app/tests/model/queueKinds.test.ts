@@ -53,6 +53,43 @@ describe('QueueKindsTests', () => {
     expect(laneCaveat(kind)).toBe('');
   });
 
+  // Since 17.11.2026 the client's own word for the map decides where it is known (mapId in the
+  // scrubbed session, read from /lol-gameflow/v1/session): a queue the list does not know is a new
+  // mode, and it got lanes, picks and builds whatever it was played on.
+  it('an unknown queue has lanes on the Rift and none on any other map', () => {
+    const kind = queueFromId(31337);
+
+    expect(usesLanes(kind, 11)).toBe(true);
+    expect(usesLanes(kind, 12)).toBe(false);
+    expect(usesLanes(kind, 30)).toBe(false);
+    // Not named (a recording from before, a failed read): the list alone, as before.
+    expect(usesLanes(kind, 0)).toBe(true);
+    expect(usesLanes(kind)).toBe(true);
+  });
+
+  it('the queues of the Rift keep their lanes, also with a map that is not named', () => {
+    for (const id of [420, 440, 400, 430, 480, 490, 700]) {
+      expect(usesLanes(queueFromId(id), 11), String(id)).toBe(true);
+      expect(usesLanes(queueFromId(id)), String(id)).toBe(true);
+    }
+    expect(usesLanes(queueFromId(0, true), 11)).toBe(true);
+    // A custom game on the Howling Abyss sends no queue id: the map is the only word there is.
+    expect(usesLanes(queueFromId(0, true), 12)).toBe(false);
+  });
+
+  it('a mode the list knows as lane-less stays so on the Rift', () => {
+    // URF, One for All and Ultimate Spellbook are played on map 11 and are not what was counted.
+    for (const id of [900, 1900, 1020, 1400, 1700, 450, 2400]) expect(usesLanes(queueFromId(id), 11), String(id)).toBe(false);
+  });
+
+  it('the draft carries the map the client named, and none where it named none', () => {
+    const session = { localPlayerCellId: 0, queueId: 31337, myTeam: [{ cellId: 0, championId: 0 }] };
+    expect(draftStateFrom({ ...session, mapId: 12 }).mapId).toBe(12);
+    expect(draftStateFrom(session).mapId).toBeUndefined();
+    expect(draftStateFrom({ ...session, mapId: 0 }).mapId).toBeUndefined();
+    expect(draftStateFrom({ ...session, mapId: null }).mapId).toBeUndefined();
+  });
+
   it('ACustomLobby_IsRecognisedByItsOwnFlag', () => {
     // No queue id is sent for a custom game, so the flag is the only signal.
     const kind = queueFromId(0, true);
