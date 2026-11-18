@@ -13,7 +13,7 @@ import { Recommender, type Recommendation, type RecommendationSet } from '../../
 import { countLeadingBanTies } from '../../src/core/model/scoreError';
 import { logit, sigmoid } from '../../src/core/model/scoreModel';
 import { TraitTable } from '../../src/core/model/traits';
-import { GoldenAdapter, type GoldenFrame } from '../../src/data/golden';
+import { BAN_EVEN_BELOW, GoldenAdapter, OWN_BANS_SHOWN, type GoldenFrame } from '../../src/data/golden';
 import { MetaBuilder, SessionBuilder } from './helpers';
 
 const Thresh = 1, Nami = 2, Braum = 3, Zyra = 4, Garen = 5, Darius = 6, MasterYi = 7, Jarvan = 8, Ahri = 9, Jinx = 10;
@@ -176,5 +176,53 @@ describe('the ban tile on own data', () => {
     expect(decided.items.every((item) => item.badge === null)).toBe(true);
     expect(decided.footnote).not.toMatch(/Hover deinen Pick/);
     expect(decided.footnote).toMatch(/ein Bann nimmt ihn beiden/);
+  });
+
+  // Since 17.11.2026: on the real numbers the best ban is worth about a tenth of a point (Twitch
+  // 0.126, Nami 0.120), and a long list of such rows claimed a choice that is none.
+  describe('is short and says when the choice hardly matters', () => {
+    const snapshot = builder().snapshotRef() as MetaSnapshot;
+    const frame = new DraftEngine(snapshot).update(banning().build()).frame as unknown as GoldenFrame;
+    const adapter = new GoldenAdapter(snapshot.champions);
+    const set = frame.bans!;
+    /** The same list with other values: the first `scores` replace the leaders'. */
+    const withScores = (tied: number, ...scores: number[]) =>
+      adapter.pickTile({ ...set, tied, items: set.items.map((item, i) => (i < scores.length ? { ...item, score: scores[i]! } : item)) }, frame, 'Banns für dich');
+
+    it('shows the first three of the model’s list, in its order', () => {
+      expect(set.items.length).toBeGreaterThan(OWN_BANS_SHOWN);
+      const view = adapter.pickTile(set, frame, 'Banns für dich');
+      expect(view.items.map((item) => item.champion.id)).toEqual(set.items.slice(0, 3).map((item) => item.championId));
+      // The tie group never counts rows that are not shown.
+      expect(view.tied).toBe(Math.min(set.tied, 3));
+      // The model's own list is not cut: the team's ban plan and the golden files read it whole.
+      expect(frame.bans!.items.length).toBe(set.items.length);
+    });
+
+    it('says so when the leaders are tied', () => {
+      expect(set.tied).toBeGreaterThanOrEqual(2);
+      expect(adapter.pickTile(set, frame, 'Banns für dich').even).toBe('kaum Unterschied – bann, was dich stört');
+      expect(withScores(2, 1.4, 1.39).even).toBe('kaum Unterschied – bann, was dich stört');
+    });
+
+    it('says so when the best ban is worth less than half a point', () => {
+      expect(withScores(0, 0.49, 0.2).even).toBe('kaum Unterschied – bann, was dich stört');
+      expect(withScores(0, BAN_EVEN_BELOW, 0.2).even).toBeNull();
+    });
+
+    it('says nothing when one ban clearly leads', () => {
+      const clear = withScores(0, 0.8, 0.2, 0.1);
+      expect(clear.even).toBeNull();
+      expect(clear.tied).toBe(0);
+      expect(clear.items).toHaveLength(3);
+    });
+
+    it('leaves the pick list as long as it is, and without the line', () => {
+      const picking = new DraftEngine(snapshot).update(banning().onClock(4, 'pick').build()).frame as unknown as GoldenFrame;
+      if (!picking.picks) return;
+      const view = adapter.pickTile(picking.picks, picking, 'Picks für dich');
+      expect(view.items.length).toBe(picking.picks.items.length);
+      expect(view.even).toBeNull();
+    });
   });
 });

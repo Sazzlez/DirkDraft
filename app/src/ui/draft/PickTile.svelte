@@ -44,9 +44,7 @@
         <button class="more" onclick={() => (showAll = false)}>Weniger zeigen</button>
       {:else}
         <button class="more" onclick={() => (showAll = true)}>
-          {#if isBan}
-            Weitere Banns · {rest.length}
-          {:else if tiedHidden > 0}
+          {#if tiedHidden > 0}
             {tiedHidden} weitere gleichauf · {rest.length - tiedHidden} dahinter
           {:else}
             {rest.length} weitere
@@ -56,6 +54,10 @@
       {/if}
     {/if}
   </div>
+
+  {#if tile.even}
+    <p class="even">{tile.even}</p>
+  {/if}
 
   {#if tile.footnote}
     <p class="foot">{tile.footnote}</p>
@@ -104,6 +106,14 @@
     fill: none;
     stroke: var(--fg4);
     stroke-width: 1.5;
+  }
+
+  /* Bans that hardly differ: said plainly under the three rows. */
+  .even {
+    margin: 12px 4px 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg2);
   }
 
   .foot {

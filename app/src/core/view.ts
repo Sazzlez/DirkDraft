@@ -148,6 +148,8 @@ export interface PickTileView {
   note: PickNote | null;
   /** Bans: what the ban value means. Picks have none. */
   footnote: string | null;
+  /** Bans: one line under the list when the suggestions hardly differ. Picks have none. */
+  even: string | null;
 }
 
 /** The comp gap for a counter or last pick. */

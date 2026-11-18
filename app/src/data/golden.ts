@@ -401,12 +401,18 @@ export class GoldenAdapter {
     // The pick position belongs to the seat the list is for (B1).
     const hint = !isBan && frame.target?.cellId === set.cellId ? (frame.pickHint ?? null) : null;
     const safest = hint?.safest?.championId ?? null;
+    // The own ban list is short: on the real numbers the best ban is worth about a tenth of a point,
+    // and a long list of near-equal rows claimed a choice that is none. Order and values are the
+    // model's; only the first three are shown. The team's ban plan (teamBans) is not touched.
+    const shown = isBan ? rows(set).slice(0, OWN_BANS_SHOWN) : rows(set);
+    const even = isBan && shown.length > 0 && (set.tied >= 2 || set.items[0]!.score < BAN_EVEN_BELOW);
     return {
       kind: isBan ? 'bans' : 'picks',
       title,
       lane: toLane(set.lane),
-      tied: set.tied,
-      items: rows(set).map((row) => (row.champion.id === safest ? { ...row, badge: 'sicherer Blind Pick' } : row)),
+      tied: Math.min(set.tied, shown.length),
+      items: shown.map((row) => (row.champion.id === safest ? { ...row, badge: 'sicherer Blind Pick' } : row)),
+      even: even ? 'kaum Unterschied – bann, was dich stört' : null,
       hover: isBan ? null : this.hover(frame),
       note: hint ? this.pickNote(hint, frame) : null,
       // Picks: what the bars mean stands in the bar's tooltip (ContributionBar).
@@ -706,6 +712,15 @@ export function mainReason(item: GoldenItem, lane: Lane | null): string | undefi
   }
   return pro?.text;
 }
+
+/** The own ban list shows so many suggestions (user's rule, 17.11.2026). */
+export const OWN_BANS_SHOWN = 3;
+
+/**
+ * Below this many points for the best ban — or with the leaders tied — the list says that the choice
+ * hardly matters (user's rule, 17.11.2026; on the real numbers the best ban is worth about 0.1).
+ */
+export const BAN_EVEN_BELOW = 0.5;
 
 /** Bans as an expectation: so many of the seat's own first picks are marked when they stand in its ban list. */
 const OWN_PICKS_MARKED = 3;
