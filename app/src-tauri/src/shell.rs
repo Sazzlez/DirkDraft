@@ -235,10 +235,20 @@ fn settings_set(
     key: String,
     value: serde_json::Value,
 ) -> Result<(), String> {
-    if key == settings::DIAGNOSTICS.0 {
-        diagnostics.set_enabled(value.as_bool().unwrap_or(true));
+    let mut settings = state.settings.lock().map_err(|_| "Einstellungen gesperrt".to_string())?;
+    apply_setting(&mut settings, &diagnostics, &key, value)
+}
+
+/// Checks the value, saves it, and only then lets the recording follow. Until 17.11.2026 the switch
+/// was thrown first: a value that was no yes or no turned the recording on ("anything else means
+/// yes") and was then refused by the settings — recording on, switch shown off.
+fn apply_setting(settings: &mut Settings, diagnostics: &crate::diagnostics::Diagnostics, key: &str, value: serde_json::Value) -> Result<(), String> {
+    let recording = (key == settings::DIAGNOSTICS.0).then(|| value.as_bool()).flatten();
+    settings.set_from_page(key, value)?;
+    if let Some(on) = recording {
+        diagnostics.set_enabled(on);
     }
-    state.settings.lock().map_err(|_| "Einstellungen gesperrt".to_string())?.set_from_page(&key, value)
+    Ok(())
 }
 
 /// The pin: always on top, remembered for the next start (keepOnTop, as in 1.5).
@@ -406,6 +416,32 @@ mod tests {
 
     fn settings(json: &str) -> Settings {
         Settings::from_values(serde_json::from_str::<serde_json::Value>(json).unwrap().as_object().cloned().unwrap())
+    }
+
+    #[test]
+    fn the_recording_follows_the_switch_only_for_a_valid_value() {
+        let mut settings = settings("{}");
+        let diagnostics = crate::diagnostics::Diagnostics::new(false);
+
+        // No yes or no: refused, and the recording stays as it was — off.
+        for odd in [serde_json::json!("ja"), serde_json::json!(1), serde_json::Value::Null] {
+            assert!(apply_setting(&mut settings, &diagnostics, settings::DIAGNOSTICS.0, odd).is_err());
+            assert!(!diagnostics.is_enabled());
+            assert!(!settings.diagnostics());
+        }
+
+        assert!(apply_setting(&mut settings, &diagnostics, settings::DIAGNOSTICS.0, serde_json::json!(true)).is_ok());
+        assert!(diagnostics.is_enabled() && settings.diagnostics());
+        // And an odd value does not turn a running recording off either.
+        assert!(apply_setting(&mut settings, &diagnostics, settings::DIAGNOSTICS.0, serde_json::json!("aus")).is_err());
+        assert!(diagnostics.is_enabled());
+        assert!(apply_setting(&mut settings, &diagnostics, settings::DIAGNOSTICS.0, serde_json::json!(false)).is_ok());
+        assert!(!diagnostics.is_enabled() && !settings.diagnostics());
+
+        // Another key never touches the recording, and an unknown one is refused.
+        assert!(apply_setting(&mut settings, &diagnostics, settings::KEEP_ON_TOP.0, serde_json::json!(true)).is_ok());
+        assert!(apply_setting(&mut settings, &diagnostics, "lockfilePath", serde_json::json!("C:/x")).is_err());
+        assert!(!diagnostics.is_enabled());
     }
 
     #[test]

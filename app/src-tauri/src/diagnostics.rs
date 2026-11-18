@@ -71,6 +71,11 @@ impl Diagnostics {
         }
     }
 
+    #[cfg(test)]
+    pub fn is_enabled(&self) -> bool {
+        self.0.lock().is_ok_and(|inner| inner.enabled)
+    }
+
     /// A champion select session (scrubbed JSON), or None when it ended.
     pub fn on_session(&self, session: Option<&str>) {
         let Ok(mut inner) = self.0.lock() else { return };
