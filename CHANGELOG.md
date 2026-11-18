@@ -3,6 +3,42 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
+## Noch nicht veröffentlicht
+
+Anlass war ein Code-Review von 2.2.0 und des Sammlers.
+
+- **Die Bann-Liste ist kurz.** Sie zeigt höchstens drei Vorschläge statt einer langen Liste fast
+  gleicher Zeilen. Liegen die besten gleichauf oder ist der beste Bann weniger als 0,5 Punkte wert,
+  steht darunter „kaum Unterschied – bann, was dich stört“. Rechnung und Reihenfolge sind dieselben,
+  der Team-Bann-Plan bleibt, wie er ist.
+- **Namen, Preise und Bilder passen zum Client.** Sie kommen für den Patch, den dein Client gerade
+  spielt, und werden nach einem Client-Patch neu geladen; bisher blieb bis zum Neustart der alte Stand.
+  Startet die App ohne Netz, nimmt sie die Kopie von der Platte und lädt nach, sobald es wieder geht;
+  bisher blieben die Namen bis zum nächsten Start leer. Items, die es auf dem Patch oder auf der Karte
+  nicht zu kaufen gibt, stehen nicht mehr im Build.
+- **Updates ohne Neustart der App.** Die App sucht alle sechs Stunden nach einer neuen Version, nie im
+  Champ Select oder im Spiel. Neben dem Update-Hinweis öffnet „Was ist neu“ die Notizen zum Release.
+- **Runen übernehmen überschreibt die Seite.** Bisher wurde die alte DirkRunen-Seite gelöscht und eine
+  neue angelegt; lehnte der Client die neue ab, war die alte weg. Jetzt wird die Seite an Ort und
+  Stelle überschrieben. Nimmt der Client das nicht an, läuft der bisherige Weg.
+- **Im Spiel der Build deiner Lane.** Wurde die App erst im Spiel gestartet, bekam ein Flex-Pick den
+  Build seiner meistgespielten Lane. Jetzt zählt die Position, die das Spiel nennt.
+- **Der Draft bleibt stehen.** Startet der Client mitten im Champ Select neu, kommt der Draft wieder,
+  statt bis zum Ende leer zu bleiben. Ein einzelnes leeres Feld vom Client leert das Brett nicht mehr
+  und verwirft nicht mehr von Hand gesetzte Lanes und die Plan-Wahl.
+- **Neue Modi bekommen keine Lanes angedichtet.** Ob ein Draft Lanes hat, entscheidet die Karte, die
+  der Client nennt. Ein Modus, den DirkDraft noch nicht kennt, zeigt abseits von Summoner’s Rift keine
+  Pick-Liste und keinen Build mehr.
+- **Einstellungen gehen nicht verloren.** War die Datei beim Start kurz gesperrt, schrieb die nächste
+  Änderung eine fast leere Datei über alle Einstellungen. Jetzt wird in so einem Lauf nichts
+  überschrieben.
+- **Weniger Arbeit im Hintergrund.** Die halbstündliche Suche nach neuen Daten las und schrieb auch
+  ohne neue Daten jedes Mal alle Dateien (rund 40 MB). Jetzt wird nur geladen, was sich geändert hat.
+- **Daten.** Die Traits neuer Champions kommen mit den Daten statt erst mit dem nächsten Release. Nach
+  einem Rework oder Hotfix lässt sich ein Champion neu zählen, statt alte und neue Spiele zu mischen.
+  Der Sammler überspringt einzelne Spiele, die Riot nicht herausgibt, statt den Lauf abzubrechen, und
+  veröffentlicht keine Zählung mehr, die nach einem verlorenen Stand bei null begonnen hat.
+
 ## 2.2.0 — 2026-11-15
 
 Anlass war eine Prüfung aus Spielersicht an sieben aufgezeichneten Ranked-Drafts und drei Spielen.
