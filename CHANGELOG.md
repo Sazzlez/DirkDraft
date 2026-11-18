@@ -3,7 +3,7 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
-## Noch nicht veröffentlicht
+## 2.3.0 — 2026-11-18
 
 Anlass war ein Code-Review von 2.2.0 und des Sammlers.
 
