@@ -260,6 +260,16 @@ auf `master`, denn von dort baut jeder Lauf):
 - Ein unlesbarer Eintrag oder ein unbekannter Champion ist eine Warnung im Lauf, nie sein Ende.
 - Tests: `tests/DraftPilot.Core.Tests/ChampionResetTests.cs`.
 
+## Sammler auf einem eigenen Rechner (vorbereitet, seit 18.11.2026)
+
+Der Workflow läuft rund 22 Stunden am Tag auf GitHubs Runnern; das ist nicht, wofür sie gedacht sind.
+`tools/collector/` enthält deshalb denselben Lauf als Skript für einen eigenen Linux-Rechner: bauen,
+sammeln, exportieren, derselbe Schutz vor dem Push (`riot guard`), Push in den Branch `data` per
+Deploy-Key, systemd-Dienst mit Timer, Stand auf der Platte und ein tägliches verschlüsseltes Backup im
+selben Format wie das Artefakt `state-backup`. Ein Trockenlauf (`--dry-run`) macht alles außer dem Push.
+Anleitung: `tools/collector/LIESMICH.md`. Umgestellt ist nichts: Der Workflow läuft weiter, bis er von
+Hand abgeschaltet wird, und beide dürfen nie zugleich auf demselben Schlüssel sammeln.
+
 ## Was am Ende einzutragen ist
 
 Im Repository unter *Settings → Secrets and variables → Actions*:

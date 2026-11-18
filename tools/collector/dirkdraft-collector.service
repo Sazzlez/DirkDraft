@@ -1,0 +1,28 @@
+# Ein Lauf des Sammlers (tools/collector/collect.sh). Gestartet vom Timer daneben, nie zweimal
+# zugleich: systemd startet eine laufende Unit nicht noch einmal, und das Skript sperrt den Stand.
+[Unit]
+Description=DirkDraft: Spiele sammeln und Daten veroeffentlichen
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=dirkdraft
+Group=dirkdraft
+EnvironmentFile=/etc/dirkdraft-collector.env
+# Legt /var/lib/dirkdraft-collector an und gibt es dem Benutzer.
+StateDirectory=dirkdraft-collector
+StateDirectoryMode=0750
+Environment=HOME=/var/lib/dirkdraft-collector
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+Environment=DOTNET_NOLOGO=1
+ExecStart=/opt/dirkdraft/tools/collector/collect.sh
+# Ein Lauf dauert rund fuenfeinhalb Stunden; danach Export und Push.
+TimeoutStartSec=7h
+Nice=10
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

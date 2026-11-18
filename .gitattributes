@@ -1,0 +1,5 @@
+# The collector's files run on Linux: a shell script or a systemd unit with CRLF does not start.
+tools/collector/*.sh text eol=lf
+tools/collector/*.service text eol=lf
+tools/collector/*.timer text eol=lf
+tools/collector/*.example text eol=lf

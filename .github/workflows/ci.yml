@@ -68,6 +68,52 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet build DraftPilot.sln -c Release
       - run: dotnet test DraftPilot.sln -c Release --no-build
+      # The script for a collector on a machine of one's own (tools/collector) runs nowhere in CI: at
+      # least its syntax, and that it is stored executable and with Unix line ends.
+      - name: Sammler-Skript pruefen
+        run: |
+          bash -n tools/collector/collect.sh
+          shellcheck -S error tools/collector/collect.sh
+          test -x tools/collector/collect.sh
+          if grep -q 
+  # The workflow files themselves. collect-builds.yml runs on a schedule only: a mistake in it shows
+  # nowhere on a push and would stop the collection the next time it is due.
+  workflows:
+    name: Workflows (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
+
+  # One picture per moment, width and theme, to look at a layout change without opening the app.
+  # The portraits come from Data Dragon over the network, so a failure here never fails the run.
+  shots:
+    name: Bilder (Playwright)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: app/screenshots/
+          retention-days: 7
+          if-no-files-found: ignore
+\r' tools/collector/collect.sh; then echo "CRLF in collect.sh"; exit 1; fi
 
   # The workflow files themselves. collect-builds.yml runs on a schedule only: a mistake in it shows
   # nowhere on a push and would stop the collection the next time it is due.

@@ -1,0 +1,12 @@
+# Startet den naechsten Lauf zehn Minuten nach dem Ende des letzten, und drei Minuten nach dem
+# Hochfahren. So ist der Schluessel wie beim Workflow fast durchgehend beschaeftigt, aber nie doppelt.
+[Unit]
+Description=DirkDraft: Sammler-Takt
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=10min
+Unit=dirkdraft-collector.service
+
+[Install]
+WantedBy=timers.target
