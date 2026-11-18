@@ -32,7 +32,11 @@ const show = (value: unknown): string => {
   return text.length > 160 ? `${text.slice(0, 157)}…` : text;
 };
 
-describe.runIf(process.env.REBASE_GOLDEN === '1')('rebase onto the current model', () => {
+// Plain describe or describe.skip rather than describe.runIf, which only Vitest has: the file runs
+// under Bun's test runner too.
+const onRequest = process.env.REBASE_GOLDEN === '1' ? describe : describe.skip;
+
+onRequest('rebase onto the current model', () => {
   it('writes every differing value into the references', () => {
     const ctx = loadContext();
     const report: string[] = [];

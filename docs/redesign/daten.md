@@ -85,8 +85,12 @@ keine PUUIDs und keine Match-IDs. Herunterladen: `gh run download <Lauf> -n game
 - *Stiefel* nur für die Lagen der Aufstellung (AD, AP, Tanks, harte Kontrolle): Die Item-Lagen
   entstehen erst, wenn Stiefel längst gekauft sind (0,2 % / 0,0 % / 2,9 % der Stiefelkäufe, gemessen
   07.11.2026). Mit gekauften Stiefeln keine Stiefel-Vorschläge mehr.
-- Angezeigt als Alternative neben dem Plan, nie als Ersatz; Items aus dem Plan (Stiefel, Kern,
-  Items 4–6) oder im Inventar werden nicht vorgeschlagen; höchstens drei.
+- Seit 11.11.2026 übernimmt ein situatives Item seinen Platz im Build: Kaufen die Spieler des
+  Champions es in der Lage klar statt eines Plan-Items, steht es für dieses Spiel an dessen Stelle und
+  ist als situativ markiert. Seit 13.11.2026 rückt nur eine Lage der gegnerischen Aufstellung ein Item
+  in den Build; die Lagen aus den Items der Gegner bleiben Vorschläge. Was nicht eindeutig ist, steht
+  als Alternative neben dem Plan; Items aus dem Plan oder im Inventar werden nicht vorgeschlagen;
+  höchstens drei (`app/src/core/situational.ts`, `docs/modellpruefung.md` Messung 20).
 - Dateiformat Version 2 (`RiotSituationalFile.CurrentVersion`): Zeilen `[Champion, Lane, Slot, Lage,
   Spielstand, Item, Spiele, Siege]`, Item 0 = Summe des Platzes.
 
@@ -94,10 +98,13 @@ Flex nutzt die Solo/Duo-Zahlen. Beim Patchwechsel bleibt der alte Bestand als R�
 veröffentlicht, bis der neue Patch 2.000 Spiele hat (ARAM: 500); die App fragt den Client nach seinem
 Patch, nennt im Draft beide Patches und verbreitert die Lane-Fehlerbalken je Patch Rückstand.
 
-**Builds** aus `builds.json`: je Slot die Option mit der besten Winrate, die ihre Spiele hergeben —
-zur Rate des Slots geglättet, mit einem Gewicht, das die Datei selbst misst (wahre Streuung der
-Optionen über alle Zeilen). Auf den ersten 6.185 Spielen war diese Streuung in jedem Slot null; dann
-entscheidet die Spielzahl. Gleiche Zauberpaare (beide Tastenfolgen) und Runenseiten (Nebenrunen in
+**Builds** aus `builds.json`: Seit 2.1.0 führt je Slot die meistgespielte Option. Eine andere übernimmt
+nur, wenn sie klar besser ist: zwei Standardfehler auf den geglätteten Raten, und nur in einem Slot,
+dessen Optionen wirklich streuen. Bei Stiefeln und Items muss das zusätzlich im selben Spielstand
+beim Kauf gelten; ohne diese Zählung bleibt die meistgespielte Option. Items 4 bis 6 behalten immer
+die meistgespielte Option (seit 2.2.0). Geglättet wird zur Rate des Slots, mit einem Gewicht, das die
+Datei selbst misst (wahre Streuung der Optionen über alle Zeilen); es ordnet auch die gezeigten
+Alternativen (`app/src/core/riotBuilds.ts`, `docs/modellpruefung.md` Messungen 11 und 16). Gleiche Zauberpaare (beide Tastenfolgen) und Runenseiten (Nebenrunen in
 beliebiger Reihenfolge) zählen als eine Option. Details: `docs/modellpruefung.md`, Messungen 10–12.
 
 **Kaufzeitpunkt der Schuhe** (`builds.json`, seit 11.11.2026, aus der Zeitleiste, ohne zusätzliche

@@ -151,7 +151,8 @@ pub const GLASS_EFFECT: (&str, bool) = ("glassEffect", true);
 /// Off unless switched on: only the developer's own machine needs it (user's word, 07.11.2026); the
 /// small log (logfile.rs) runs everywhere, so "Diagnose speichern" still helps a friend with a fault.
 pub const DIAGNOSTICS: (&str, bool) = ("diagnostics", false);
-/// 2.1: plan the own team's open seats together, for a fixed five in Flex (D1). Off by default.
+/// 2.1: plan the own team's open seats together, for the party the client names (duo to a fixed
+/// five). On by default; the settings page turns it off.
 pub const TEAM_MODE: (&str, bool) = ("teamMode", true);
 /// An empty file of this name next to settings.json switches the recording on by default.
 pub const DIAGNOSTICS_MARKER: &str = "diagnostics.on";

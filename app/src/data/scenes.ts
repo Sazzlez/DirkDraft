@@ -4,7 +4,7 @@
 
 import type { ViewModel, Moment, ChampionRef, GameView, BuildView, StrengthView, VerdictLine } from '../core/view';
 import { LANE_NAMES } from '../core/view';
-import { loadAssets, itemName } from './assets';
+import { loadAssets } from './assets';
 import { DraftEngine, stateFromFrame, type DraftFrame } from '../core/engine';
 import type { AramStat } from '../core/model/advisors';
 import { MetaLookup, type MetaSnapshot } from '../core/model/metaLookup';
