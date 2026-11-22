@@ -137,6 +137,8 @@ public sealed record ParticipantBuild(
 /// <param name="DurationSeconds">How long the game ran; 0 when unknown.</param>
 /// <param name="LaneKills">The duels between lane opponents, in order; empty without a timeline.</param>
 /// <param name="MinuteTen">Each player's minute frame at ten minutes (participant id → numbers); null without one.</param>
+/// <param name="TeamFights">The teamfights from minute 14 on, in order; null where the timeline had no minute frames.</param>
+/// <param name="Objectives">Dragons, Elder, Baron, Atakhan and souls, in order; null where the timeline had no minute frames.</param>
 public sealed record MatchReading(
     string Patch,
     long CreatedAtMs,
@@ -147,7 +149,9 @@ public sealed record MatchReading(
     IReadOnlyDictionary<int, long[]>? TeamGold = null,
     int DurationSeconds = 0,
     IReadOnlyList<LaneKill>? LaneKills = null,
-    IReadOnlyDictionary<int, PlayerFrame>? MinuteTen = null)
+    IReadOnlyDictionary<int, PlayerFrame>? MinuteTen = null,
+    IReadOnlyList<TeamFight>? TeamFights = null,
+    IReadOnlyList<ObjectiveTaken>? Objectives = null)
 {
     public IReadOnlyList<int> BannedChampions => Bans ?? [];
 
@@ -197,6 +201,53 @@ public readonly record struct BootsVisit(int Worth, int Spent, bool Bought);
 public sealed record LaneKill(long TimeMs, int KillerId, int VictimId, IReadOnlyList<PlayerMoment> Lane);
 
 /// <summary>
+/// A teamfight: kills close together in time and place with at least
+/// <see cref="RiotMatchReader.FightMinimumPerSide"/> players of each team in them — the evidence for
+/// the teamfight scale (docs/teamfight-skala.md).
+/// </summary>
+/// <param name="TimeMs">The first kill; the players stand as they did the millisecond before it.</param>
+/// <param name="Victims">Everyone who died in the fight, in order; a team's kills are the other team's victims.</param>
+/// <param name="TookPart">
+/// Everyone seen in the fight: killers, helpers, victims, whoever hurt a victim or was hurt by one.
+/// Someone who only shielded or only took damage from a survivor stays unseen; someone dead until the
+/// fight's last kill is left out, even where a damage list still names him.
+/// </param>
+/// <param name="DeadAtStart">Who was waiting to respawn when the fight began, by Riot's death timer (<see cref="RiotMatchReader.RespawnMs"/>).</param>
+/// <param name="Players">Level and items of all ten at the start, by participant id.</param>
+public sealed record TeamFight(
+    long TimeMs,
+    IReadOnlyList<int> Victims,
+    IReadOnlyList<int> TookPart,
+    IReadOnlyList<int> DeadAtStart,
+    IReadOnlyList<PlayerMoment> Players);
+
+/// <summary>
+/// What a monster gives a team for its fights. The numbers are the game line's
+/// (<see cref="RiotGames.Format"/>): a soul is 20 plus its dragon.
+/// </summary>
+public enum ObjectiveKind
+{
+    InfernalDragon = 1,
+    MountainDragon = 2,
+    OceanDragon = 3,
+    CloudDragon = 4,
+    HextechDragon = 5,
+    ChemtechDragon = 6,
+    ElderDragon = 7,
+    Baron = 8,
+    Atakhan = 9,
+    InfernalSoul = 21,
+    MountainSoul = 22,
+    OceanSoul = 23,
+    CloudSoul = 24,
+    HextechSoul = 25,
+    ChemtechSoul = 26,
+}
+
+/// <summary>A monster taken, or a soul given, by a team (Riot's team id, 100 or 200).</summary>
+public readonly record struct ObjectiveTaken(long TimeMs, int TeamId, ObjectiveKind Kind);
+
+/// <summary>
 /// Reads Riot's MATCH-V5 match and timeline answers into <see cref="ParticipantBuild"/>s. The match
 /// knows the runes, spells, lane and result; the timeline knows the order — which is the whole
 /// difference between "had these items at the end" and "built them in this order".
@@ -224,6 +275,51 @@ public static class RiotMatchReader
 
     /// <summary>Magical Footwear: free boots after twelve minutes, none to buy before.</summary>
     public const int MagicalFootwearRune = 8304;
+
+    /// <summary>
+    /// Teamfights count from here on: where the game view swaps the lane scale for team against team
+    /// (<c>LANE_PHASE_SECONDS</c> in app/src/core/strength.ts).
+    /// </summary>
+    public const long FightsFromMs = 14 * 60_000;
+
+    /// <summary>
+    /// A kill belongs to a fight when it comes at most this long after the fight's last kill. In a
+    /// real Platinum game (22.11.2026) the kills of one fight lay up to 13 seconds apart, the next
+    /// fight began more than 20 seconds later.
+    /// </summary>
+    public const long FightGapMs = 15_000;
+
+    /// <summary>
+    /// …and at most this far (map units, the map is some 15.000 across) from one of its kills. A
+    /// fight at Baron spread over 4.400 units in that game, each kill within 2.900 of another; a
+    /// skirmish on another lane at the same time lies 5.000 and more away.
+    /// </summary>
+    public const int FightReach = 3_500;
+
+    /// <summary>
+    /// Smaller than this on either side is a skirmish, not a teamfight. Kept from three on, so that
+    /// the measurement can still decide between three and four (docs/teamfight-skala.md).
+    /// </summary>
+    public const int FightMinimumPerSide = 3;
+
+    /// <summary>Riot's base death timer per level, in seconds (League of Legends Wiki, "Death").</summary>
+    private static readonly double[] BaseRespawnSeconds = [10, 10, 12, 12, 14, 16, 20, 25, 28, 32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50, 52.5];
+
+    /// <summary>
+    /// How long a champion who dies at this level and moment waits to respawn: the base timer, growing
+    /// from minute 15 by 0,425 % every half minute, from minute 30 by 0,3 %, from minute 45 by 1,45 %,
+    /// at most +50 %. Riot does not put respawns in the timeline; this is the wiki's formula, close
+    /// enough to tell who was missing when a fight began.
+    /// </summary>
+    public static long RespawnMs(int level, long deathMs)
+    {
+        var minutes = deathMs / 60_000.0;
+        var growth = minutes < 15 ? 0
+            : minutes < 30 ? Math.Ceiling(2 * (minutes - 15)) * 0.00425
+            : minutes < 45 ? 0.1275 + Math.Ceiling(2 * (minutes - 30)) * 0.003
+            : 0.2175 + Math.Ceiling(2 * (minutes - 45)) * 0.0145;
+        return (long)Math.Round(BaseRespawnSeconds[Math.Clamp(level, 1, 18) - 1] * (1 + Math.Min(growth, 0.5)) * 1000);
+    }
 
     /// <summary>
     /// The ten players' PUUIDs, for finding more active players of the same rank while a run lasts.
@@ -360,10 +456,142 @@ public static class RiotMatchReader
         }
 
         const int minuteTen = (int)(RiotGames.LaneAtMs / 60_000);
+        // Without minute frames there was no timeline worth the name: no fights to tell, not "none".
+        var timed = frames.Any(frame => frame.Count > 0);
         return new MatchReading(
             patch, created, queue, counts, participants, Bans(info), TeamGold(timeline.RootElement, info), Int(info, "gameDuration"),
             LaneKills(events, participants, frames, items),
-            frames.Count > minuteTen && frames[minuteTen].Count > 0 ? frames[minuteTen] : null);
+            frames.Count > minuteTen && frames[minuteTen].Count > 0 ? frames[minuteTen] : null,
+            timed ? TeamFights(events, participants, frames, items) : null,
+            timed ? Objectives(events) : null);
+    }
+
+    /// <summary>
+    /// The teamfights (<see cref="TeamFight"/>). Kills join the fight they are near in time
+    /// (<see cref="FightGapMs"/>) and place (<see cref="FightReach"/>); two fights at the same time on
+    /// two ends of the map stay two. Kept from <see cref="FightsFromMs"/> on, with at least
+    /// <see cref="FightMinimumPerSide"/> players of each team seen in the fight.
+    /// </summary>
+    private static List<TeamFight> TeamFights(List<TimelineEvent> events, List<ParticipantBuild> players, List<Dictionary<int, PlayerFrame>> frames, ItemCatalog items)
+    {
+        var teamOf = new Dictionary<int, int>();
+        foreach (var player in players.Where(p => p.ParticipantId > 0))
+            teamOf.TryAdd(player.ParticipantId, player.TeamId);
+
+        var kills = events.Where(e => e.Type == "CHAMPION_KILL" && teamOf.ContainsKey(e.VictimId)).ToList();
+        var clusters = new List<List<TimelineEvent>>();
+        var open = new List<List<TimelineEvent>>();
+        foreach (var kill in kills)
+        {
+            open.RemoveAll(fight => kill.Timestamp - fight[^1].Timestamp > FightGapMs);
+            var home = open.Where(fight => fight.Any(other => Near(other, kill))).OrderByDescending(fight => fight[^1].Timestamp).FirstOrDefault();
+            if (home is null)
+            {
+                home = [];
+                open.Add(home);
+                clusters.Add(home);
+            }
+            home.Add(kill);
+        }
+
+        var fights = new List<TeamFight>();
+        foreach (var fight in clusters)
+        {
+            var start = fight[0].Timestamp;
+            if (start < FightsFromMs)
+                continue;
+
+            // Who was waiting to respawn when the fight began, and until when.
+            var dead = new Dictionary<int, long>();
+            foreach (var id in teamOf.Keys.Order())
+            {
+                var death = kills.LastOrDefault(k => k.VictimId == id && k.Timestamp < start);
+                var back = death is null ? 0 : death.Timestamp + RespawnMs(LevelAt(id, death.Timestamp - 1, events, frames), death.Timestamp);
+                if (back > start)
+                    dead[id] = back;
+            }
+
+            var seen = new HashSet<int>();
+            foreach (var kill in fight)
+            {
+                seen.Add(kill.KillerId);
+                seen.Add(kill.VictimId);
+                seen.UnionWith(kill.Assists);
+                seen.UnionWith(kill.Involved);
+            }
+            seen.IntersectWith(teamOf.Keys);
+            // The damage lists reach back further than one fight: a Xayah dead for 23 seconds still
+            // stood in one with her feathers (22.11.2026). Whoever was dead until the last kill was not there.
+            seen.RemoveWhere(id => dead.TryGetValue(id, out var back) && back > fight[^1].Timestamp);
+            var sides = seen.GroupBy(id => teamOf[id]).Select(side => side.Count()).ToList();
+            if (sides.Count < 2 || sides.Any(count => count < FightMinimumPerSide))
+                continue;
+
+            fights.Add(new TeamFight(
+                start,
+                [.. fight.Select(kill => kill.VictimId)],
+                [.. seen.Order()],
+                [.. dead.Keys.Order()],
+                [.. teamOf.Keys.Order().Select(id => Moment(id, start - 1, events, frames, items))]));
+        }
+
+        return fights;
+    }
+
+    /// <summary>Whether two kills are close enough for one fight; a kill without a place is near any.</summary>
+    private static bool Near(TimelineEvent a, TimelineEvent b)
+    {
+        if (a.X < 0 || a.Y < 0 || b.X < 0 || b.Y < 0)
+            return true;
+        long dx = a.X - b.X, dy = a.Y - b.Y;
+        return dx * dx + dy * dy <= (long)FightReach * FightReach;
+    }
+
+    /// <summary>
+    /// Dragons by kind, the Elder, Baron, Atakhan, and the souls (<see cref="ObjectiveTaken"/>). The
+    /// soul event with team 0 at the third dragon only tells the map which soul it will be; it is left out.
+    /// </summary>
+    private static List<ObjectiveTaken> Objectives(List<TimelineEvent> events)
+    {
+        var taken = new List<ObjectiveTaken>();
+        foreach (var e in events)
+        {
+            ObjectiveKind? kind = e.Type switch
+            {
+                "ELITE_MONSTER_KILL" => e.MonsterType switch
+                {
+                    "DRAGON" => e.MonsterSubType switch
+                    {
+                        "FIRE_DRAGON" => ObjectiveKind.InfernalDragon,
+                        "EARTH_DRAGON" => ObjectiveKind.MountainDragon,
+                        "WATER_DRAGON" => ObjectiveKind.OceanDragon,
+                        "AIR_DRAGON" => ObjectiveKind.CloudDragon,
+                        "HEXTECH_DRAGON" => ObjectiveKind.HextechDragon,
+                        "CHEMTECH_DRAGON" => ObjectiveKind.ChemtechDragon,
+                        "ELDER_DRAGON" => ObjectiveKind.ElderDragon,
+                        _ => null,
+                    },
+                    "BARON_NASHOR" => ObjectiveKind.Baron,
+                    "ATAKHAN" => ObjectiveKind.Atakhan,
+                    _ => null,
+                },
+                "DRAGON_SOUL_GIVEN" => e.Name.ToUpperInvariant() switch
+                {
+                    "INFERNAL" => ObjectiveKind.InfernalSoul,
+                    "MOUNTAIN" => ObjectiveKind.MountainSoul,
+                    "OCEAN" => ObjectiveKind.OceanSoul,
+                    "CLOUD" => ObjectiveKind.CloudSoul,
+                    "HEXTECH" => ObjectiveKind.HextechSoul,
+                    "CHEMTECH" => ObjectiveKind.ChemtechSoul,
+                    _ => null,
+                },
+                _ => null,
+            };
+            if (kind is { } k && e.TeamId > 0)
+                taken.Add(new ObjectiveTaken(e.Timestamp, e.TeamId, k));
+        }
+
+        return taken;
     }
 
     private static bool IsBot(Lane lane) => lane is Lane.Adc or Lane.Support;
@@ -496,6 +724,22 @@ public static class RiotMatchReader
 
     private static PlayerMoment Moment(int id, long timeMs, List<TimelineEvent> events, List<Dictionary<int, PlayerFrame>> frames, ItemCatalog items)
     {
+        var held = new List<int>();
+        foreach (var e in events)
+        {
+            if (e.Timestamp > timeMs)
+                break;
+            if (e.ParticipantId == id && e.Type != "LEVEL_UP")
+                Apply(held, e);
+        }
+
+        var worth = held.Where(items.CountsForWorth).ToList();
+        return new PlayerMoment(id, LevelAt(id, timeMs, events, frames), worth.Sum(items.Gold), worth.Sum(items.Armor), worth.Sum(items.MagicResist));
+    }
+
+    /// <summary>A player's level at a moment: the last minute frame's, and the level-ups since.</summary>
+    private static int LevelAt(int id, long timeMs, List<TimelineEvent> events, List<Dictionary<int, PlayerFrame>> frames)
+    {
         var level = 1;
         for (var minute = (int)Math.Min(timeMs / 60_000, frames.Count - 1); minute >= 0; minute--)
         {
@@ -506,22 +750,15 @@ public static class RiotMatchReader
             }
         }
 
-        var held = new List<int>();
         foreach (var e in events)
         {
             if (e.Timestamp > timeMs)
                 break;
-            if (e.ParticipantId != id)
-                continue;
-
-            if (e.Type == "LEVEL_UP")
+            if (e.ParticipantId == id && e.Type == "LEVEL_UP")
                 level = Math.Max(level, e.Level);
-            else
-                Apply(held, e);
         }
 
-        var worth = held.Where(items.CountsForWorth).ToList();
-        return new PlayerMoment(id, level, worth.Sum(items.Gold), worth.Sum(items.Armor), worth.Sum(items.MagicResist));
+        return level;
     }
 
     /// <summary>Each minute frame's numbers per player (participant id → level, total gold, experience).</summary>
@@ -734,7 +971,15 @@ public static class RiotMatchReader
                     VictimId: Int(e, "victimId"),
                     Assists: e.TryGetProperty("assistingParticipantIds", out var helpers) && helpers.ValueKind == JsonValueKind.Array
                         ? [.. helpers.EnumerateArray().Where(h => h.ValueKind == JsonValueKind.Number && h.TryGetInt32(out _)).Select(h => h.GetInt32())]
-                        : []));
+                        : [],
+                    X: e.TryGetProperty("position", out var place) && place.ValueKind == JsonValueKind.Object ? Int(place, "x") : -1,
+                    Y: place.ValueKind == JsonValueKind.Object ? Int(place, "y") : -1,
+                    InvolvedIds: DamagePlayers(e),
+                    MonsterType: Text(e, "monsterType"),
+                    MonsterSubType: Text(e, "monsterSubType"),
+                    // A monster's killer team, a soul's receiving team (0 when the soul is only announced).
+                    TeamId: Int(e, "killerTeamId") is > 0 and var killers ? killers : Int(e, "teamId"),
+                    Name: Text(e, "name")));
             }
         }
 
@@ -743,13 +988,46 @@ public static class RiotMatchReader
         return [.. list.OrderBy(e => e.Timestamp)];
     }
 
+    /// <summary>
+    /// The players in a kill's damage lists: who hurt the victim (<c>victimDamageReceived</c>, the
+    /// source) and whom the victim hurt (<c>victimDamageDealt</c>, the target); 0 is a tower, a
+    /// minion or a monster. Read for kills only — every other event has none.
+    /// </summary>
+    private static IReadOnlyList<int> DamagePlayers(JsonElement e)
+    {
+        if (Text(e, "type") != "CHAMPION_KILL")
+            return [];
+
+        var ids = new List<int>();
+        foreach (var list in (ReadOnlySpan<string>)["victimDamageReceived", "victimDamageDealt"])
+        {
+            if (!e.TryGetProperty(list, out var entries) || entries.ValueKind != JsonValueKind.Array)
+                continue;
+            foreach (var entry in entries.EnumerateArray())
+            {
+                if (entry.ValueKind == JsonValueKind.Object && Int(entry, "participantId") is > 0 and var id && !ids.Contains(id))
+                    ids.Add(id);
+            }
+        }
+
+        return ids;
+    }
+
     private static int Int(JsonElement element, string property)
         => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number) ? number : 0;
 
     private static string Text(JsonElement element, string property)
         => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : string.Empty;
 
+    /// <param name="X">Where a kill or a monster fell, in map units; −1 where the event has no place.</param>
+    /// <param name="InvolvedIds">A kill's players from its damage lists (<see cref="DamagePlayers(JsonElement)"/>).</param>
+    /// <param name="TeamId">A monster's killer team or a soul's team; 0 for everything else.</param>
+    /// <param name="Name">A soul's kind ("Cloud", …).</param>
     private sealed record TimelineEvent(
         string Type, long Timestamp, int ParticipantId, int ItemId, int BeforeId, int AfterId, int SkillSlot, string LevelUpType,
-        int Level, int KillerId, int VictimId, IReadOnlyList<int> Assists);
+        int Level, int KillerId, int VictimId, IReadOnlyList<int> Assists,
+        int X = -1, int Y = -1, IReadOnlyList<int>? InvolvedIds = null, string MonsterType = "", string MonsterSubType = "", int TeamId = 0, string Name = "")
+    {
+        public IReadOnlyList<int> Involved => InvolvedIds ?? [];
+    }
 }

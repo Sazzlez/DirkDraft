@@ -98,6 +98,9 @@ den Moment. Den sieht man selbst auf dem Bildschirm.
 
 ## Nach der Lane-Phase: Team gegen Team (15.11.2026)
 
+*Abgelöst durch das Konzept einer gemessenen Teamfight-Skala, `docs/teamfight-skala.md` (22.11.2026);
+bis deren Messung besteht, gilt der Stand hier.*
+
 Anlass: ein aufgezeichnetes Spiel des Nutzers. Als Braum-Support stand die Skala in Minute 35 auf
 „Deutlich stärker“ gegen die gegnerische Botlane — aus den Items seines ADC, lange nachdem die Lanes
 aufgelöst waren. Geprüft ist die Skala nur an Duellen zwischen 10:00 und 11:00 (Messung 27).

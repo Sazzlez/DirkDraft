@@ -83,9 +83,12 @@ function readDuels(lines: readonly number[][]): { duels: Duel[]; sampled: number
   lines.forEach((line, game) => {
     if (line.length < LANE_PART || (line.length > LANE_PART && line[LANE_PART] === NO_DUELS)) return;
     sampled++;
-    const marked = line.length > LANE_PART && line[line.length - 1] === LEVELS_BEFORE_DUEL;
+    // The −2 closes the duels: at the end of the line, or (since format 5) before the teamfights' −3.
+    let end = LANE_PART;
+    while (end < line.length && line[end]! > 0 && end + 1 + line[end]! <= line.length) end += 1 + line[end]!;
+    const marked = end > LANE_PART && line[end] === LEVELS_BEFORE_DUEL;
     if (marked) markedLines++;
-    for (let at = LANE_PART; at < line.length; ) {
+    for (let at = LANE_PART; at < end; ) {
       const length = line[at]!;
       if (length <= 0 || at + 1 + length > line.length) break;
       const d = line.slice(at + 1, at + 1 + length);

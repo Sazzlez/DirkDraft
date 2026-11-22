@@ -42,6 +42,17 @@ public sealed record CollectorOptions
 
     /// <summary>At most this many lines of a patch keep their duels: about 600.000 duels, some 12 MB packed.</summary>
     public int DuelGamesPerPatch { get; init; } = 40_000;
+
+    /// <summary>
+    /// Every n-th line keeps its objectives and teamfights (<see cref="RiotGames.FightsFollow"/>). A
+    /// Platinum game has some six fights of three or more a side from minute 14 on, two or three of
+    /// four or more (one game read on 22.11.2026), about 180 numbers a line. Every fourth line reaches
+    /// the patch's share in some five days at 1.400 games an hour. 0 keeps none.
+    /// </summary>
+    public int FightEvery { get; init; } = 4;
+
+    /// <summary>At most this many lines of a patch keep their teamfights: some 100.000 of four or more a side, about 7 MB packed.</summary>
+    public int FightGamesPerPatch { get; init; } = 40_000;
 }
 
 /// <param name="Failed">Requests Riot failed on and the run skipped (<see cref="CollectorFailures"/>).</param>
@@ -281,6 +292,7 @@ public sealed class RiotCollector(
         }
         var games = new List<int[]>(state.Games);
         var duelGames = games.Count(RiotGames.HasDuelSample);
+        var fightGames = games.Count(RiotGames.HasFightSample);
         var matchups = new RiotMatchupTally();
         matchups.Add(state.Matchups ?? []);
         var seen = new HashSet<long>(state.Seen);
@@ -421,7 +433,12 @@ public sealed class RiotCollector(
                         var keepDuels = options.DuelEvery > 0 && games.Count % options.DuelEvery == 0 && duelGames < options.DuelGamesPerPatch;
                         if (keepDuels)
                             duelGames++;
-                        games.Add(RiotGames.Keep(line, keepDuels));
+                        // The teamfights the same way, in their own sample.
+                        var keepFights = options.FightEvery > 0 && games.Count % options.FightEvery == 0 && fightGames < options.FightGamesPerPatch;
+                        var kept = RiotGames.Keep(line, keepDuels, keepFights);
+                        if (RiotGames.HasFightSample(kept))
+                            fightGames++;
+                        games.Add(kept);
                     }
                     if (statics is not null)
                         situational.Add(reading, Profile, items);

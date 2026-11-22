@@ -59,6 +59,15 @@ der Stand eine Millisekunde vor dem Kill. In den Zeilen davor (ohne −2) enthä
 und seines Helfers den Aufstieg durch den Kill selbst, in rund jedem fünften Duell — wer Level misst,
 nimmt nur markierte Zeilen (`RiotGames.HasLevelsBeforeDuel`; `docs/modellpruefung.md`, Messung 27).
 
+Seit Version 5 (22.11.2026) trägt **jede vierte** Zeile, höchstens 40.000 je Patch, hinter dem Duell-Teil
+einen Teamfight-Teil für die Teamfight-Skala (`docs/teamfight-skala.md`): eine **−3**, dann die Drachen nach
+Art, Elder, Baron, Atakhan und Seelen mit Sekunde und Seite, dann jeder Teamfight ab Minute 14 mit Sekunde,
+Kills beider Seiten, wer zu Beginn tot war, wer im Kampf zu sehen war, und Level und Itemwert aller zehn.
+Teamfight: Kills höchstens 15 s auseinander und 3.500 Einheiten von einem anderen Kill des Kampfes, je
+Seite mindestens drei gesehen. Die −2 der Duelle steht damit nicht mehr zwingend am Zeilenende, sondern
+hinter dem letzten Duell; `RiotGames.HasLevelsBeforeDuel` und `npm run measure:duels` lesen das so. Rund
+180 Zahlen je Zeile, etwa 7 MB gepackt je Patch.
+
 Die Zeilen liegen im
 Bestand (der laufende Patch und die zwei davor; ein Wechsel der Region verwirft sie) und als Artefakt `games` jedes Laufs (`games.json.gz`, eine Woche
 aufbewahrt). Sie stehen nicht im Branch `data` und die App liest sie nicht; als Artefakt eines

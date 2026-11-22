@@ -12,7 +12,9 @@ namespace DraftPilot.Core.Data;
 /// (what a matchup does to the laning phase, docs/modellpruefung.md §13) and a sample of lines the
 /// duels. Since version 4 a line with its duels ends in <see cref="LevelsBeforeDuel"/>: its levels
 /// are the ones going into the duel (before, the winner's level-up from the kill was counted in).
-/// No player, no match id, no date.
+/// Since version 5 a sample of lines carries, behind the duel part and opened by
+/// <see cref="FightsFollow"/>, the objectives and the teamfights from minute 14 on — the evidence for
+/// the teamfight scale (docs/teamfight-skala.md). No player, no match id, no date.
 /// </summary>
 public static class RiotGames
 {
@@ -31,7 +33,16 @@ public static class RiotGames
         "Gold und Erfahrung (ab Platz 15) trägt seit Version 3 jede Zeile mit gelesener Minute 10, die Duelle nur " +
         "ein Teil davon. Zeilen ohne Minute 10 und alle aus Version 1 enden nach 15 Zahlen, in Version 2 auch die ohne Duelle. " +
         "Seit Version 4 endet eine Zeile mit ihren Duellen auf −2: Level und Items sind der Stand unmittelbar vor dem Kill. " +
-        "In Zeilen ohne diese −2 enthält das Level des Siegers (und seines Helfers) den Level-Aufstieg durch den Kill selbst.";
+        "In Zeilen ohne diese −2 enthält das Level des Siegers (und seines Helfers) den Level-Aufstieg durch den Kill selbst. " +
+        "Seit Version 5 folgt in einem Teil der Zeilen hinter dem Duell-Teil (nach −1 oder −2, oder direkt nach Platz 34) " +
+        "eine −3, dann die Zahl N und N Zahlen Objekte — je Objekt Sekunde, Seite (0 = Plätze 0–4, 1 = Plätze 5–9), Art " +
+        "(1 Infernal-, 2 Mountain-, 3 Ocean-, 4 Cloud-, 5 Hextech-, 6 Chemtech-Drache, 7 Elder, 8 Baron, 9 Atakhan, " +
+        "21–26 Seele der Drachenart 1–6) —, dann je Teamfight: Länge L, danach L Zahlen — Sekunde des ersten Kills, Kills der " +
+        "Seite 0, Kills der Seite 1, Plätze tot zu Beginn (Bit je Platz, nach Riots Respawn-Zeit geschätzt), Plätze im " +
+        "Kampf gesehen (Bit je Platz: Killer, Helfer, Opfer, wer ein Opfer traf oder von ihm getroffen wurde), dann je Platz " +
+        "0–9 Level und Itemwert eine Millisekunde vor dem ersten Kill. Teamfight: Kills höchstens 15 s nach dem vorigen Kill " +
+        "des Kampfes und höchstens 3.500 Einheiten von einem seiner Kills, ab Minute 14, je Seite mindestens 3 gesehen. " +
+        "Eine Zeile mit −3 ohne Teamfights ist ein Spiel ohne Teamfights.";
 
     /// <summary>Closes a line whose duels were not kept, so that it never reads as a game without any.</summary>
     public const int NoDuels = -1;
@@ -42,6 +53,15 @@ public static class RiotGames
     /// before it (docs/modellpruefung.md, Messung 27) — whoever measures levels takes only marked lines.
     /// </summary>
     public const int LevelsBeforeDuel = -2;
+
+    /// <summary>
+    /// Opens the fight part since version 5: the line was sampled for its teamfights, and an empty
+    /// part means a game without any. Lines without it were not sampled (or counted before).
+    /// </summary>
+    public const int FightsFollow = -3;
+
+    /// <summary>One teamfight's numbers: second, the two sides' kills, two place masks, level and item worth of ten.</summary>
+    public const int FightLength = 5 + 2 * 10;
 
     /// <summary>The moment the early-game lead is read at: the end of the laning phase.</summary>
     public const long EarlyLeadAtMs = 15 * 60_000;
@@ -112,24 +132,88 @@ public static class RiotGames
         // Only a line with duels has levels to vouch for; one without stays as long as it was.
         if (result.Count > FixedLength)
             result.Add(LevelsBeforeDuel);
+
+        if (game.TeamFights is { } fights && game.Objectives is { } objectives)
+        {
+            var side = new Dictionary<int, int> { [sides[0].Key] = 0, [sides[1].Key] = 1 };
+            result.Add(FightsFollow);
+            var taken = objectives.Where(o => side.ContainsKey(o.TeamId)).ToList();
+            result.Add(3 * taken.Count);
+            foreach (var objective in taken)
+                result.AddRange([Second(objective.TimeMs), side[objective.TeamId], (int)objective.Kind]);
+
+            var byPlace = places.ToDictionary(pair => pair.Value, pair => pair.Key);
+            foreach (var fight in fights)
+            {
+                var moments = fight.Players.ToDictionary(m => m.ParticipantId);
+                int Mask(IEnumerable<int> ids) => ids.Where(places.ContainsKey).Aggregate(0, (mask, id) => mask | 1 << places[id]);
+                int KillsOf(int s) => fight.Victims.Count(id => places.TryGetValue(id, out var at) && at / 5 != s);
+
+                result.Add(FightLength);
+                result.AddRange([Second(fight.TimeMs), KillsOf(0), KillsOf(1), Mask(fight.DeadAtStart), Mask(fight.TookPart)]);
+                for (var place = 0; place < 10; place++)
+                {
+                    var m = byPlace.TryGetValue(place, out var id) ? moments.GetValueOrDefault(id) : null;
+                    result.AddRange([m?.Level ?? 0, m?.ItemGold ?? 0]);
+                }
+            }
+        }
+
         return [.. result];
     }
 
+    private static int Second(long timeMs) => (int)Math.Clamp(timeMs / 1000, 0, int.MaxValue);
+
     /// <summary>
-    /// The line as the collector keeps it. With its duels: whole. Without: the draft part and the
-    /// numbers after ten minutes, closed by <see cref="NoDuels"/> — some twenty numbers more per game,
-    /// where the duels would be some three hundred; the draft part alone when no minute ten was read.
+    /// The line as the collector keeps it. With its duels: the duel part whole. Without: the draft
+    /// part and the numbers after ten minutes, closed by <see cref="NoDuels"/> — some twenty numbers
+    /// more per game, where the duels would be some three hundred; the draft part alone when no minute
+    /// ten was read. The fight part (<see cref="FightsFollow"/>) stays only with <paramref name="withFights"/>.
     /// </summary>
-    public static int[] Keep(int[] line, bool withDuels)
+    public static int[] Keep(int[] line, bool withDuels, bool withFights = false)
     {
-        if (withDuels || line.Length < FixedLength)
+        if (line.Length < FixedLength)
             return line;
-        for (var at = DraftLength; at < FixedLength; at++)
+
+        var fightsAt = FightPartAt(line);
+        int[] kept;
+        if (withDuels)
         {
-            if (line[at] != 0)
-                return [.. line[..FixedLength], NoDuels];
+            if (withFights || fightsAt == line.Length)
+                return line;
+            kept = line[..fightsAt];
         }
-        return line[..DraftLength];
+        else if (line[DraftLength..FixedLength].Any(value => value != 0))
+        {
+            kept = [.. line[..FixedLength], NoDuels];
+        }
+        else
+        {
+            return line[..DraftLength];
+        }
+
+        return withFights && fightsAt < line.Length ? [.. kept, .. line[fightsAt..]] : kept;
+    }
+
+    /// <summary>
+    /// Where the fight part begins: behind the duels and their closing −1 or −2; the line's length
+    /// when it has none.
+    /// </summary>
+    private static int FightPartAt(int[] line)
+    {
+        var at = DuelPartEnd(line);
+        if (at < line.Length && line[at] is NoDuels or LevelsBeforeDuel)
+            at++;
+        return at < line.Length && line[at] == FightsFollow ? at : line.Length;
+    }
+
+    /// <summary>The first place behind the last duel: a closing number, the fight part, or the end.</summary>
+    private static int DuelPartEnd(int[] line)
+    {
+        var at = FixedLength;
+        while (at < line.Length && line[at] > 0 && at + 1 + line[at] <= line.Length)
+            at += 1 + line[at];
+        return Math.Min(at, line.Length);
     }
 
     /// <summary>Whether the line carries gold and experience after ten minutes.</summary>
@@ -141,8 +225,45 @@ public static class RiotGames
     /// </summary>
     public static bool HasDuelSample(int[] line) => line.Length == FixedLength || (line.Length > FixedLength && line[FixedLength] != NoDuels);
 
-    /// <summary>Whether the line's duels carry the levels going into them (version 4, <see cref="LevelsBeforeDuel"/>).</summary>
-    public static bool HasLevelsBeforeDuel(int[] line) => line.Length > FixedLength && line[^1] == LevelsBeforeDuel;
+    /// <summary>
+    /// Whether the line's duels carry the levels going into them (version 4, <see cref="LevelsBeforeDuel"/>
+    /// behind the last duel — at the end of the line, or before the fight part).
+    /// </summary>
+    public static bool HasLevelsBeforeDuel(int[] line)
+    {
+        var at = DuelPartEnd(line);
+        return at > FixedLength && at < line.Length && line[at] == LevelsBeforeDuel;
+    }
+
+    /// <summary>Whether the line was sampled for its teamfights (version 5) — then an empty list means a game without any.</summary>
+    public static bool HasFightSample(int[] line) => line.Length >= FixedLength && FightPartAt(line) < line.Length;
+
+    /// <summary>The line's objectives, each as second, side and kind (<see cref="ObjectiveKind"/>); none without the fight part.</summary>
+    public static IEnumerable<int[]> Objectives(int[] line)
+    {
+        var at = FightPartAt(line) + 1;
+        if (at >= line.Length)
+            yield break;
+        var count = line[at];
+        for (var i = at + 1; i + 2 < line.Length && i + 2 <= at + count; i += 3)
+            yield return line[i..(i + 3)];
+    }
+
+    /// <summary>The line's teamfights, each as its own numbers (<see cref="FightLength"/>); none without the fight part.</summary>
+    public static IEnumerable<int[]> Fights(int[] line)
+    {
+        var start = FightPartAt(line) + 1;
+        if (start >= line.Length)
+            yield break;
+        for (var at = start + 1 + Math.Max(0, line[start]); at < line.Length;)
+        {
+            var length = line[at];
+            if (length <= 0 || at + 1 + length > line.Length)
+                yield break;
+            yield return line[(at + 1)..(at + 1 + length)];
+            at += 1 + length;
+        }
+    }
 
     /// <summary>A player's number back as champion and lane.</summary>
     public static (int ChampionId, Lane Lane) Decode(int player) => (player / 8, (Lane)(player % 8 - 1));
@@ -182,9 +303,10 @@ public sealed class RiotGamesFile
     /// 2 since 08.11.2026: lanes after ten minutes and the lane duels. 3 since 09.11.2026: the numbers
     /// after ten minutes in every line, the duels in a sample (<see cref="RiotGames.Format"/>). 4 since
     /// 13.11.2026: new lines with duels end in −2, their levels are the ones before the kill; the lines
-    /// counted before stay as they are.
+    /// counted before stay as they are. 5 since 22.11.2026: a sample of lines carries objectives and
+    /// teamfights behind the duel part (<see cref="RiotGames.FightsFollow"/>).
     /// </summary>
-    public int Version { get; set; } = 4;
+    public int Version { get; set; } = 5;
 
     public string Platform { get; set; } = string.Empty;
 

@@ -623,14 +623,142 @@ public class RiotBuildTests
         Assert.Equal(4, duels.Count);
         Assert.Equal([200, 0, 5, 0, 3, 750, 15, 0, 5, 2, 450, 0, 0], duels[0]);
         Assert.Equal([300, 3, 8, 3, 4, 450, 0, 0, 4, 3, 0, 0, 0, 8, 4, 450, 0, 0, 9, 3, 0, 0, 0], duels[1]);
-        // Four duels, then the mark that the levels are the ones going into them (version 4).
-        Assert.Equal(RiotGames.FixedLength + 4 + 13 + 23 + 13 + 13 + 1, line.Length);
-        Assert.Equal(RiotGames.LevelsBeforeDuel, line[^1]);
+        // Four duels, then the mark that the levels are the ones going into them (version 4), then the
+        // fight part of a game with minute frames but neither teamfights nor monsters (version 5).
+        Assert.Equal(RiotGames.FixedLength + 4 + 13 + 23 + 13 + 13 + 1 + 2, line.Length);
+        Assert.Equal([RiotGames.LevelsBeforeDuel, RiotGames.FightsFollow, 0], line[^3..]);
         Assert.True(RiotGames.HasLevelsBeforeDuel(line));
         Assert.True(RiotGames.HasDuelSample(line));
+        Assert.True(RiotGames.HasFightSample(line));
+        Assert.Empty(RiotGames.Fights(line));
         Assert.False(RiotGames.HasLevelsBeforeDuel(RiotGames.Keep(line, withDuels: false)));
-        Assert.False(RiotGames.HasLevelsBeforeDuel(line[..^1]));   // a line counted before 13.11.2026
+        Assert.False(RiotGames.HasLevelsBeforeDuel(RiotGames.Keep(line, withDuels: true)[..^1]));   // a line counted before 13.11.2026
     }
+
+    /// <summary>
+    /// The same ten players with a timeline written for teamfights: minute frames at 0, 10 (level 9)
+    /// and 14 (level 10), monsters, kills before minute 14, one teamfight at 14:10 that spreads over
+    /// 4.000 units, a bot duel far away at the same time, and a kill too late to belong to the fight.
+    /// </summary>
+    private static string FightTimeline()
+    {
+        static string Frame(int level)
+            => "{" + string.Join(",", Enumerable.Range(1, 10).Select(id =>
+                $"\"{id}\":{{\"participantId\":{id},\"level\":{level},\"totalGold\":500,\"currentGold\":0,\"xp\":0}}")) + "}";
+        static string Buy(long t, int id, int item) => $"{{\"type\":\"ITEM_PURCHASED\",\"timestamp\":{t},\"participantId\":{id},\"itemId\":{item}}}";
+        static string Monster(long t, int team, string type, string subType = "")
+            => $"{{\"type\":\"ELITE_MONSTER_KILL\",\"timestamp\":{t},\"killerId\":7,\"killerTeamId\":{team},\"monsterType\":\"{type}\""
+               + (subType.Length > 0 ? $",\"monsterSubType\":\"{subType}\"" : "") + ",\"position\":{\"x\":9866,\"y\":4414}}";
+        static string Soul(long t, int team, string name) => $"{{\"type\":\"DRAGON_SOUL_GIVEN\",\"timestamp\":{t},\"name\":\"{name}\",\"teamId\":{team}}}";
+        static string Damage(int[] ids) => string.Join(",", ids.Select(id => $"{{\"participantId\":{id},\"physicalDamage\":100,\"name\":\"X\"}}"));
+        static string Kill(long t, int killer, int victim, int x, int y, int[]? helpers = null, int[]? hurt = null, int[]? hit = null)
+            => $"{{\"type\":\"CHAMPION_KILL\",\"timestamp\":{t},\"killerId\":{killer},\"victimId\":{victim},\"position\":{{\"x\":{x},\"y\":{y}}}"
+               + (helpers is { Length: > 0 } ? $",\"assistingParticipantIds\":[{string.Join(",", helpers)}]" : "")
+               + $",\"victimDamageReceived\":[{Damage(hurt ?? [])}],\"victimDamageDealt\":[{Damage(hit ?? [])}]}}";
+
+        var events = new[]
+        {
+            Buy(4000, 1, 1055), Buy(4000, 2, 2003), Buy(5000, 6, 1054), Buy(600000, 8, 1036),
+            Monster(360000, 100, "DRAGON", "FIRE_DRAGON"),
+            Monster(420000, 200, "HORDE"),                          // Voidgrubs: nothing for a fight
+            Monster(660000, 200, "DRAGON", "CHEMTECH_DRAGON"),
+            Soul(660500, 0, "Chemtech"),                            // only announces the soul
+            Kill(800000, 3, 9, 5000, 5000),                         // 9 dies at level 9: back at 13:48
+            "{\"type\":\"LEVEL_UP\",\"timestamp\":820000,\"participantId\":6,\"level\":13}",
+            Kill(830000, 2, 6, 5200, 5200),                         // 6 dies at level 13: back at 14:30
+            "{\"type\":\"LEVEL_UP\",\"timestamp\":849000,\"participantId\":1,\"level\":11}",
+            // The teamfight. The third kill is 4.100 units from the first, but 2.500 from the second.
+            Kill(850000, 1, 7, 9000, 9000, helpers: [2], hurt: [1, 2, 0], hit: [3]),
+            Kill(852000, 10, 5, 2000, 12000, hurt: [10]),           // at the same time across the map: a bot duel
+            // 6 still stands in the damage list from before his death, as in Riot's own timelines.
+            Kill(856000, 8, 3, 10500, 9500, helpers: [9], hurt: [8, 9, 6], hit: [4]),
+            Kill(866000, 2, 8, 12800, 10500, helpers: [1, 4]),
+            Kill(883000, 4, 10, 12900, 10600, hurt: [4]),           // 17 s after the fight's last kill: not part of it
+            Monster(1020000, 200, "ATAKHAN"),
+            Soul(1140000, 200, "Chemtech"),
+            Monster(1200000, 100, "BARON_NASHOR"),
+            Monster(1260000, 200, "DRAGON", "ELDER_DRAGON"),
+        };
+
+        var frames = Enumerable.Range(0, 23).Select(minute =>
+        {
+            var participants = minute switch
+            {
+                0 => Frame(1),
+                10 => Frame(9),
+                14 => Frame(10),
+                _ => null,
+            };
+            return $"{{\"timestamp\":{minute * 60_000 + 10}"
+                + (participants is null ? "" : $",\"participantFrames\":{participants}")
+                + $",\"events\":[{(minute == 0 ? string.Join(",", events) : "")}]}}";
+        });
+        return $"{{\"metadata\":{{}},\"info\":{{\"frameInterval\":60000,\"frames\":[{string.Join(",", frames)}]}}}}";
+    }
+
+    [Fact]
+    public void TeamFights_AreKillsCloseInTimeAndPlaceWithThreeOrMoreASide()
+    {
+        var reading = RiotMatchReader.Read(Match, FightTimeline(), DuelItems);
+
+        var fight = Assert.Single(reading.TeamFights!);
+        Assert.Equal(850_000, fight.TimeMs);
+        Assert.Equal([7, 3, 8], fight.Victims);
+        // Blue 1–4 (3 only in the first kill's damage list, 4 only in the second's), red 7–9; 10 and 5
+        // fought elsewhere. 6 is in a damage list, but was dead until after the last kill.
+        Assert.Equal([1, 2, 3, 4, 7, 8, 9], fight.TookPart);
+        // 6 died at 13:50 on level 13 (40 s); 9 died at 13:20 on level 9 (28 s) and was back in time.
+        Assert.Equal([6], fight.DeadAtStart);
+        Assert.Equal(
+            ["1 L11 450g", "2 L10 0g", "3 L10 0g", "4 L10 0g", "5 L10 0g", "6 L13 450g", "7 L10 0g", "8 L10 350g", "9 L10 0g", "10 L10 0g"],
+            fight.Players.Select(m => $"{m.ParticipantId} L{m.Level} {m.ItemGold}g"));
+
+        Assert.Equal(
+            [
+                new ObjectiveTaken(360_000, 100, ObjectiveKind.InfernalDragon),
+                new ObjectiveTaken(660_000, 200, ObjectiveKind.ChemtechDragon),
+                new ObjectiveTaken(1_020_000, 200, ObjectiveKind.Atakhan),
+                new ObjectiveTaken(1_140_000, 200, ObjectiveKind.ChemtechSoul),
+                new ObjectiveTaken(1_200_000, 100, ObjectiveKind.Baron),
+                new ObjectiveTaken(1_260_000, 200, ObjectiveKind.ElderDragon),
+            ],
+            reading.Objectives!);
+
+        var line = RiotGames.Encode(reading)!;
+        // The two bot kills are duels; their −2 stands before the fight part.
+        Assert.Equal(2, RiotGames.Duels(line).Count());
+        Assert.True(RiotGames.HasLevelsBeforeDuel(line));
+        Assert.True(RiotGames.HasFightSample(line));
+        Assert.Equal(
+            new[] { new[] { 360, 0, 1 }, new[] { 660, 1, 6 }, new[] { 1020, 1, 9 }, new[] { 1140, 1, 26 }, new[] { 1200, 0, 8 }, new[] { 1260, 1, 7 } },
+            RiotGames.Objectives(line));
+        // Blue (places 0–4 = ids 1–5) killed 7 and 8, red killed 3; place 5 (6, red top) dead = 32;
+        // places 0–3 and 6–8 seen = 15 + 448.
+        Assert.Equal(
+            [850, 2, 1, 32, 463, 11, 450, 10, 0, 10, 0, 10, 0, 10, 0, 13, 450, 10, 0, 10, 350, 10, 0, 10, 0],
+            Assert.Single(RiotGames.Fights(line)));
+
+        // Only sampled lines keep it; the others read as before.
+        Assert.False(RiotGames.HasFightSample(RiotGames.Keep(line, withDuels: true)));
+        Assert.True(RiotGames.HasFightSample(RiotGames.Keep(line, withDuels: false, withFights: true)));
+    }
+
+    [Fact]
+    public void TeamFights_NeedMinuteFrames()
+    {
+        // The fixture game's timeline has no minute frames: no fights to tell, and no fight part.
+        var plain = RiotMatchReader.Read(Match, Timeline, Items);
+        Assert.Null(plain.TeamFights);
+        Assert.False(RiotGames.HasFightSample(RiotGames.Encode(plain)!));
+    }
+
+    [Theory]
+    [InlineData(9, 830_000, 28_000)]          // before minute 15: the base timer
+    [InlineData(1, 1_200_000, 10_425)]        // minute 20: +4,25 %
+    [InlineData(18, 2_100_000, 60_769)]       // minute 35: +15,75 %
+    [InlineData(18, 3_600_000, 78_750)]       // minute 60: at most +50 %
+    public void RespawnTime_FollowsRiotsDeathTimer(int level, long deathMs, long respawnMs)
+        => Assert.Equal(respawnMs, RiotMatchReader.RespawnMs(level, deathMs));
 
     private static HttpResponseMessage Ok(string body, string? appLimit = null)
     {
