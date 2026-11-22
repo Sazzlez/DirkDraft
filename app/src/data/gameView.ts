@@ -37,10 +37,26 @@ export function strengthLabel(value: number): string {
   return size < 2.5 ? word.charAt(0).toUpperCase() + word.slice(1) : `Deutlich ${word}`;
 }
 
+/** The phases of „Dieses Duell“, as the export counts them (mean level under 6, under 11, from 11). */
+export const DUEL_PHASES = ['früh · Lvl 1–5', 'Mitte · 6–10', 'spät · 11+'];
+
+/**
+ * Below this difference in log-odds (about 54 to 46 at equal level and items) a phase of the duel is
+ * „offen“. On the clean duels of 22.11.2026 that is about a third of the matchups in each phase; half
+ * of them lie within 0,25.
+ */
+export const DUEL_EVEN = 0.15;
+
 /** The strength scale (core/strength) as the tile shows it: the opponents' pictures, the step and what it is made of. */
 export function strengthView(strength: Strength, champion: (id: number) => ChampionRef | null): StrengthView {
   const tone = (diff: number): 'up' | 'down' | 'even' => (diff > 0 ? 'up' : diff < 0 ? 'down' : 'even');
   const signed = (diff: number): string => (diff === 0 ? '±0' : `${diff > 0 ? '+' : '−'}${Math.abs(diff).toLocaleString('de-DE')}`);
+  const nameOf = (id: number): string => champion(id)?.name ?? `#${id}`;
+  // Who is stronger in each phase at equal level and items: the champion one against one, "ihr" and
+  // "Gegner" on the bot lane. It says who, never what to do, and moves on without a flash.
+  const bot = strength.mine.championIds.length > 1;
+  const whoOf = (diff: number): string =>
+    Math.abs(diff) < DUEL_EVEN ? 'offen' : diff > 0 ? (bot ? 'ihr' : nameOf(strength.mine.championIds[0]!)) : bot ? 'Gegner' : nameOf(strength.theirs.championIds[0]!);
   return {
     opponents: strength.theirs.championIds.map((id) => champion(id) ?? { id, key: '', name: `#${id}` }),
     value: strength.value,
@@ -55,8 +71,15 @@ export function strengthView(strength: Strength, champion: (id: number) => Champ
         tone: tone(strength.worthDiff),
       },
     ],
-    // How the two champions do in duels by phase: only once the collector exports it (Messung 27).
-    phases: null,
+    // How the champions do in duels by phase (Messung 35): only where meta.json brings their strengths.
+    phases: strength.duel
+      ? strength.duel.map((diff, phase) => ({
+          label: DUEL_PHASES[phase]!,
+          who: whoOf(diff),
+          tone: Math.abs(diff) < DUEL_EVEN ? 'even' : diff > 0 ? 'up' : 'down',
+          now: phase === strength.phase,
+        }))
+      : null,
   };
 }
 

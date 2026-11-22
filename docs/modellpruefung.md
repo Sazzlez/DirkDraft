@@ -1284,7 +1284,8 @@ Sammlers, nie das Gold in der Tasche.
 - Champion-Stärke je Abschnitt und Resistenzen stehen nicht in der Skala. Sie kommen erst, wenn sie
   an sauberen Zeilen gemessen sind und der Sammler die Champion-Stärke ausgibt.
 - Neu messen, sobald 40.000 Duelle mit −2 gezählt sind (`npm run measure:duels` nimmt sie dann von
-  selbst).
+  selbst). — *Erledigt am 22.11.2026 mit 391.952 sauberen Duellen, siehe Messung 35: früh ist die
+  Skala zu vorsichtig, die Champion-Stärke je Abschnitt besteht.*
 
 ## 28. Fähigkeiten-Combos im Team (15.11.2026)
 
@@ -1706,6 +1707,110 @@ Auffälligster Fall: Kai'Sa Bot mit Lord Dominiks Grüße als viertem Item vor Z
    ordnen wäre nicht besser: Es zöge die zweitbeliebtesten vierten Items anderer Builds nach vorn
    (Kai'Sa: Nashors Zahn vor Rabadons). **Offen**, bis der Sammler späte Items nach Kern oder als
    Folge zählt.
+
+## 35. Die Lane-Skala an sauberen Duellen nachgemessen (22.11.2026)
+
+Die offene Nachmessung aus Messung 27: `npm run measure:duels` am Artefakt vom 22.11.2026 (Patch 16.22
+und 16.23, 367.410 Zeilen). 26.933 Zeilen tragen die −2, also das Level vor dem Kill; das sind
+**391.952 saubere Duelle**, fast zehnmal die Schwelle von 40.000. Das Werkzeug misst damit
+von selbst nur an ihnen. Zurückgehalten werden dieselben 2 von 10 Spielen wie immer. Den vollen
+Bericht schreibt das Werkzeug nach `build/measure-duels.md`.
+
+**Über das ganze Spiel** (Log-Loss auf den 78.093 zurückgehaltenen Duellen; Münzwurf 0,6931):
+
+| Variante | Log-Loss | Gewinn gegen | in Standardfehlern |
+|---|---:|---|---:|
+| Level + Itemwert (je Lane) | 0,6152 | nur Level | +22,8 |
+| + Resistenzen gegen die Schadensart des Gegners | 0,6135 | Level + Itemwert | +7,9 |
+| Level + Itemwert je Abschnitt | 0,6094 | Level + Itemwert | +14,8 |
+| + Champion-Stärke je Lane und Abschnitt | 0,5965 | je Abschnitt | +22,3 |
+| + das Paar (Champion gegen genau diesen Champion) | 0,5964 | Champion-Stärke | +4,3 |
+
+- **Die Gewichte hängen am Abschnitt.** Früh ist ein Level und sind 1.000 Gold viel mehr wert als
+  später; bei Level 11+ ist 1.000 Gold Itemwert im Jungle fast nichts mehr wert (+0,09).
+- **Die Champion-Stärke je Lane und Abschnitt besteht deutlich**, auf jeder Lane einzeln (Top +12,4,
+  Jungle +9,8, Mid +11,1, Bot +11,2 Standardfehler). Damit ist die Zeile „Dieses Duell“ belegt. Die
+  größten Effekte passen zum Spiel: spät stark Nasus, Yone, Urgot, Viego; früh stark Briar, Nocturne;
+  schwach Taliyah, Karthus und Ivern im Jungle sowie Twisted Fate spät.
+- **Resistenzen** sagen messbar etwas, aber wenig (+0,0017 Log-Loss).
+- **Das Paar** ist jetzt messbar, aber praktisch ohne Wirkung (+0,0001). Es bleibt draußen, wie in
+  Messung 27.
+
+**In der Lane-Phase, wo die App die Skala zeigt (vor 14:00).** Das sind 271.933 saubere Duelle,
+54.272 davon zurückgehalten. Etwa die Hälfte fällt in Level 1–5, die andere in Level 6–10; Level 11+
+kommt vor 14:00 kaum vor (1.296 Duelle). Verglichen wurden die heutigen Gewichte der App (Top, Jungle
+und Mid 0,46 je Level und 0,81 je 1.000 Gold, Bot 0,18 und 0,41, gemessen nur in Minute 10–11) mit
+Gewichten je Abschnitt, ohne Seite angepasst:
+
+| Gewichte je Abschnitt (vor 14:00) | Level 1–5: Level / 1.000 Gold | Level 6+: Level / 1.000 Gold |
+|---|---:|---:|
+| Top, Jungle und Mid zusammen | 0,89 / 1,27 | 0,49 / 0,70 |
+| Bot (Summen beider Spieler) | 0,48 / 0,42 | 0,30 / 0,32 |
+| *zum Vergleich, je Lane: Top* | 0,78 / 1,20 | 0,38 / 0,79 |
+| *Jungle* | 1,45 / 1,45 | 0,87 / 0,51 |
+| *Mid* | 0,99 / 1,42 | 0,58 / 0,72 |
+
+| Auf den zurückgehaltenen Duellen vor 14:00 | Log-Loss | Gewinn | in Standardfehlern |
+|---|---:|---:|---:|
+| App heute | 0,6304 | +0,0627 gegen Münzwurf | +42,8 |
+| Solo zusammen und Bot, je Abschnitt | 0,6249 | +0,0055 gegen die App | +13,2 |
+| je Lane und Abschnitt | 0,6245 | +0,0005 gegen „zusammen“ | +2,6 |
+
+**Die heutige Skala ist früh zu vorsichtig.** So oft gewinnt die Seite, die sie vorn sieht
+(vorhergesagt / gewonnen):
+
+| Abschnitt | Ausgeglichen | Leicht stärker | Stärker | Deutlich stärker |
+|---|---:|---:|---:|---:|
+| App heute, Level 1–5 | 51,9 / 53,9 % | **62,6 / 71,0 %** | **75,0 / 84,1 %** | 84,3 / 85,4 % (123) |
+| App heute, Level 6–10 | 53,7 / 53,6 % | 63,8 / 64,8 % | 75,9 / 74,6 % | 88,1 / 85,7 % |
+| je Abschnitt, Level 1–5 | 51,6 / 52,4 % | 64,2 / 65,4 % | 75,4 / 76,0 % | 87,2 / 84,9 % |
+| je Abschnitt, Level 6–10 | 53,7 / 54,3 % | 63,8 / 64,9 % | 75,9 / 75,6 % | 87,8 / 86,8 % |
+
+In den ersten Minuten zeigt die App also oft „Leicht stärker“, wo die Seite in Wahrheit 71 % der
+Duelle gewinnt, und „Stärker“ bei 84 %. Von Level 6 an stimmt sie, wie in Messung 27 geprüft. Mit
+Gewichten je Abschnitt stimmen die Stufen in beiden Abschnitten auf ±1–2 Prozentpunkte.
+
+**Was daraus folgt:**
+
+1. Die Lane-Skala rechnet mit Gewichten je Abschnitt.
+2. Die Champion-Stärke je Lane und Abschnitt geht in die Skala und in die Zeile „Dieses Duell“.
+3. Resistenzen und das Paar bleiben draußen: messbar, aber zu klein.
+
+### Umgesetzt (22.11.2026)
+
+Der Export des Sammlers (`riot export`, `LaneScaleModel` in `DraftPilot.Core/Data/LaneScale.cs`)
+rechnet bei jedem Lauf aus den sauberen Duellen aller behaltenen Patches:
+- die Gewichte je Lane (Top, Jungle, Mid, Bot) und Abschnitt, ohne Seite (jedes Duell auch gespiegelt);
+- darauf die Champion-Stärke je Champion, Lane und Abschnitt, zur 0 gezogen mit τ 0,45.
+
+Beides steht in `meta.json` unter `laneScale`. Mit weniger als 40.000 sauberen Duellen fehlt der
+Teil. Die App (`core/strength.ts`) nimmt ihn, wenn er da ist; sonst rechnet sie mit den Gewichten je
+Lane und Abschnitt aus dieser Messung, ohne Champion-Stärke und ohne „Dieses Duell“.
+
+**Je Lane statt zwei gemeinsamer Paare.** Vorgeschlagen waren zwei Paare, Top, Jungle und Mid
+zusammen. Zusammen mit der Champion-Stärke ist das falsch: Gemeinsame Gewichte passen spät schlecht
+auf den Jungle, wo Gold kaum zählt, und die Champion-Stärken fangen den Unterschied auf (Viego im
+Jungle spät +2,2 statt +1,0). Geprüft auf den zurückgehaltenen Duellen, genau so, wie der Export rechnet:
+
+| Variante (Gewichte je Abschnitt + Champion-Stärke je Lane und Abschnitt) | ganzes Spiel | vor 14:00 |
+|---|---:|---:|
+| Top, Jungle, Mid zusammen; Bot eigen | 0,5975 | 0,6150 |
+| je Lane | **0,5965** | **0,6145** |
+| Gewinn der Champion-Stärke gegen die Gewichte allein (je Lane) | +22,2 Standardfehler | +16,8 Standardfehler |
+
+So oft gewinnt vor 14:00 die Seite, die die Skala vorn sieht (vorhergesagt / gewonnen, je Lane mit
+Champion-Stärke):
+
+| Abschnitt | Ausgeglichen | Leicht stärker | Stärker | Deutlich stärker |
+|---|---:|---:|---:|---:|
+| Level 1–5 | 53,5 / 53,6 % | 63,5 / 64,6 % | 75,8 / 74,9 % | 87,4 / 85,2 % |
+| Level 6–10 | 53,6 / 53,6 % | 63,8 / 65,8 % | 75,9 / 76,6 % | 87,9 / 87,1 % |
+
+τ: Auf einem inneren Viertel der Anpass-Spiele sagen 0,3 bis 0,6 gleich gut vorher (0,45 am besten).
+„Dieses Duell“ nennt eine Phase „offen“, wenn die Champions dort weniger als 0,15 Log-Odds
+auseinanderliegen; das trifft je Phase auf etwa ein Drittel der Matchups zu, die Hälfte liegt unter
+0,25. Der Export rechnet die Zahlen vom 22.11. in C# nach (Gewichte auf ±0,02 gleich, etwa 2,5 s für
+392.000 Duelle, 145 KB mehr in `meta.json`).
 
 ## Was offen bleibt (2.0)
 

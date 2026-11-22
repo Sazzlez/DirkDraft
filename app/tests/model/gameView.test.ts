@@ -98,6 +98,8 @@ describe('after the lane phase', () => {
     theirs: { championIds: [1], levels: [5], worth: 900 },
     levelDiff: 0,
     worthDiff: 300,
+    phase: 0,
+    duel: null,
     chance: 0.55,
     value: 0.4,
   };

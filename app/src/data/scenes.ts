@@ -518,8 +518,10 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
   const items = assets()?.itemInfo ?? new Map();
   const model = gameModel(sample, meta, applySwaps(plan, swaps), items, new Set(swaps.map((s) => s.itemId)));
   // The first look is the scale as the app reckons it from this sample game (core/strength); the
-  // phases under it are still sample text, and so are the two other looks.
+  // phases under it are reckoned too where the meta brings champion strengths (own data with
+  // `laneScale`), sample text otherwise — as are the two other looks.
   const reckoned = variant === 'ahead' ? strengthOf(sample, meta, items) : null;
+  const reckonedView = reckoned ? strengthView(reckoned, (id) => a.champion(id)) : null;
   // What the draft of this game said (the "Gelockt" scene), as live/session keeps it through the game.
   const verdict: VerdictLine[] = [
     { icon: 'engage', tone: 'good', title: 'Ihr habt mehr Engage', detail: 'Ihr könnt Kämpfe eröffnen, sie kaum.' },
@@ -530,7 +532,7 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
     ...shown,
     sample: 'Beispieldaten — im Spiel liest die Ansicht Riots Live-Client-Schnittstelle.',
     // After the lane phase the team stand takes the scale's place, as in the live session.
-    strength: late ? null : reckoned ? { ...strengthView(reckoned, (id) => a.champion(id)), phases: sampleStrength(a, 'ahead').phases } : sampleStrength(a, variant),
+    strength: late ? null : reckonedView ? { ...reckonedView, phases: reckonedView.phases ?? sampleStrength(a, 'ahead').phases } : sampleStrength(a, variant),
     team: late ? shown.team : null,
   };
   return {

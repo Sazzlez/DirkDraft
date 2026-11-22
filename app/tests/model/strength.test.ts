@@ -1,12 +1,13 @@
 // The strength scale: you against your lane opponent, from the levels and items on the scoreboard
-// (docs/lane-vergleich.md). The weights are measured (docs/modellpruefung.md, Messung 27); the tests
+// (docs/lane-vergleich.md). The weights are measured per lane and phase (docs/modellpruefung.md,
+// Messung 35), the champions' strengths come with meta.json; the tests
 // pin how the scale reads the game, with weights of their own where the number matters.
 
 import { describe, expect, it } from 'vitest';
 import type { ItemInfo, LiveGameData, LivePlayer } from '../../src/core/game';
 import { Lane } from '../../src/core/model/lane';
-import { DamageType } from '../../src/core/model/metaLookup';
-import { STRENGTH_STEP, STRENGTH_WEIGHTS, strengthOf, teamStandOf } from '../../src/core/strength';
+import { DamageType, MetaLookup, type LaneScaleFile } from '../../src/core/model/metaLookup';
+import { STRENGTH_STEP, STRENGTH_WEIGHTS, laneScaleOf, strengthOf, teamStandOf, type LaneScale } from '../../src/core/strength';
 import { strengthLabel, strengthView, teamStandView } from '../../src/data/gameView';
 import { MetaBuilder } from './helpers';
 
@@ -63,7 +64,10 @@ describe('against the lane opponent', () => {
     expect(s.levelDiff).toBe(1);
     expect(s.worthDiff).toBe(950);
 
-    const w = STRENGTH_WEIGHTS.top;
+    // Level 9 and 8: a mean of 8,5, the middle phase.
+    expect(s.phase).toBe(1);
+    expect(s.duel).toBeNull(); // no strengths in this meta
+    const w = STRENGTH_WEIGHTS[0]![1]!;
     const logOdds = w.level + w.gold * 0.95;
     expect(s.chance).toBeCloseTo(1 / (1 + Math.exp(-logOdds)), 12);
     expect(s.value).toBeCloseTo(Math.min(3, logOdds / STRENGTH_STEP), 12);
@@ -93,11 +97,109 @@ describe('against the lane opponent', () => {
   });
 
   it('is the mirror image from the other side', () => {
-    const weights = { top: { level: 0.4, gold: 0.5 }, jungle: { level: 0, gold: 0 }, mid: { level: 0, gold: 0 }, bot: { level: 0, gold: 0 } };
+    const flat = { level: 0.4, gold: 0.5 };
+    const weights: LaneScale = { weights: [[flat, flat, flat], [], [], []], strength: () => 0, measured: false };
     const mine = strengthOf(top({ level: 7, items: [1036] }, { level: 6, items: [1055] }), meta, ITEMS, null, weights)!;
     const theirs = strengthOf(top({ level: 6, items: [1055] }, { level: 7, items: [1036] }), meta, ITEMS, null, weights)!;
     expect(mine.value).toBeCloseTo(-theirs.value, 12);
     expect(mine.value).toBeCloseTo((0.4 - 0.5 * 0.1) / STRENGTH_STEP, 12);
+  });
+});
+
+describe('by phase and champion', () => {
+  it('weighs a level and items by the phase: in the first levels they count far more', () => {
+    // Level 4 against 3, nothing bought: a mean of 3,5, the early phase.
+    const early = strengthOf(top({ level: 4, items: [] }, { level: 3, items: [] }), meta, ITEMS)!;
+    expect(early.phase).toBe(0);
+    expect(early.value).toBeCloseTo(STRENGTH_WEIGHTS[0]![0]!.level / STRENGTH_STEP, 12);
+    // The same level ahead at 8 against 7 counts less.
+    const later = strengthOf(top({ level: 8, items: [] }, { level: 7, items: [] }), meta, ITEMS)!;
+    expect(later.phase).toBe(1);
+    expect(later.value).toBeLessThan(early.value);
+  });
+
+  // As meta.json brings it: Darius and Jax on top, Jinx, Thresh, Caitlyn and Leona on the bot lane.
+  const laneScale: LaneScaleFile = {
+    duels: 391_952,
+    tau: 0.45,
+    weights: [
+      { lane: 0, phase: 1, level: 0.5, gold: 0.7 },
+      { lane: 3, phase: 1, level: 0.3, gold: 0.25 },
+    ],
+    champions: [
+      { championId: 122, lane: 0, phase: 0, strength: 0.05, duels: 900 },
+      { championId: 122, lane: 0, phase: 1, strength: 0.3, duels: 1500 },
+      { championId: 122, lane: 0, phase: 2, strength: -0.2, duels: 700 },
+      { championId: 24, lane: 0, phase: 1, strength: -0.1, duels: 1400 },
+      { championId: 24, lane: 0, phase: 2, strength: 0.2, duels: 800 },
+      { championId: 222, lane: 3, phase: 1, strength: 0.2, duels: 3000 },
+      { championId: 412, lane: 4, phase: 1, strength: 0.1, duels: 2800 },
+      { championId: 412, lane: 3, phase: 1, strength: 5, duels: 1 }, // Thresh as ADC: not the lane he plays here
+      { championId: 89, lane: 4, phase: 1, strength: -0.1, duels: 2500 },
+    ],
+  };
+  const measured = new MetaLookup({ ...meta.snapshot, laneScale });
+
+  it('adds what the two champions bring in this phase, at equal level and items', () => {
+    const s = strengthOf(top({ level: 8, items: [1036] }, { level: 8, items: [1036] }), measured, ITEMS)!;
+    expect(s.phase).toBe(1);
+    expect(s.duel![0]).toBeCloseTo(0.05, 12);
+    expect(s.duel![1]).toBeCloseTo(0.4, 12);
+    expect(s.duel![2]).toBeCloseTo(-0.4, 12);
+    expect(s.value).toBeCloseTo(0.4 / STRENGTH_STEP, 12);
+    // The file's weights for top in this phase, its own champions' part on top.
+    const ahead = strengthOf(top({ level: 9, items: [1036] }, { level: 8, items: [1036] }), measured, ITEMS)!;
+    expect(ahead.value).toBeCloseTo((0.5 + 0.4) / STRENGTH_STEP, 12);
+    // Where the file has no weights for a lane and phase, the built-in ones stand.
+    expect(laneScaleOf(measured).weights[1]![1]).toEqual(STRENGTH_WEIGHTS[1]![1]);
+  });
+
+  it('counts the bot lane as ADC and support, each on his own lane', () => {
+    const data: LiveGameData = {
+      activePlayer: { riotId: 'Ich#EUW', level: 8 },
+      allPlayers: [
+        row('Jinx', 'ORDER', 'BOTTOM', 8, [1036], 'Ich#EUW'),
+        row('Thresh', 'ORDER', 'UTILITY', 7, []),
+        row('Caitlyn', 'CHAOS', 'BOTTOM', 8, [1036]),
+        row('Leona', 'CHAOS', 'UTILITY', 7, []),
+      ],
+    };
+    const s = strengthOf(data, measured, ITEMS)!;
+    // Jinx 0,2 and Thresh 0,1 against Caitlyn 0 and Leona −0,1.
+    expect(s.duel![1]).toBeCloseTo(0.4, 12);
+    expect(s.value).toBeCloseTo(0.4 / STRENGTH_STEP, 12);
+  });
+
+  it('keeps the built-in weights and shows no duel where meta.json has no strengths', () => {
+    expect(laneScaleOf(meta).measured).toBe(false);
+    expect(laneScaleOf(new MetaLookup({ ...meta.snapshot, laneScale: { ...laneScale, champions: [] } })).measured).toBe(false);
+    const s = strengthOf(top({ level: 8, items: [] }, { level: 8, items: [] }), meta, ITEMS)!;
+    expect(s.duel).toBeNull();
+    expect(s.value).toBe(0);
+  });
+
+  it('shows who is stronger in each phase, and which phase it is now', () => {
+    const champion = (id: number) => ({ id, key: `K${id}`, name: meta.champion(id)?.name ?? `#${id}` });
+    const view = strengthView(strengthOf(top({ level: 8, items: [] }, { level: 8, items: [] }), measured, ITEMS)!, champion);
+    expect(view.phases).toEqual([
+      { label: 'früh · Lvl 1–5', who: 'offen', tone: 'even', now: false },
+      { label: 'Mitte · 6–10', who: 'Darius', tone: 'up', now: true },
+      { label: 'spät · 11+', who: 'Jax', tone: 'down', now: false },
+    ]);
+    const botView = strengthView(
+      strengthOf(
+        {
+          activePlayer: { riotId: 'Ich#EUW', level: 8 },
+          allPlayers: [row('Jinx', 'ORDER', 'BOTTOM', 8, [], 'Ich#EUW'), row('Thresh', 'ORDER', 'UTILITY', 7, []), row('Caitlyn', 'CHAOS', 'BOTTOM', 8, []), row('Leona', 'CHAOS', 'UTILITY', 7, [])],
+        },
+        measured,
+        ITEMS,
+      )!,
+      champion,
+    );
+    expect(botView.phases!.map((p) => p.who)).toEqual(['offen', 'ihr', 'offen']);
+    // Words of who is stronger, never of what to do.
+    expect(JSON.stringify(view.phases)).not.toMatch(/kämpf|fight|passiv|trade|go\b/i);
   });
 });
 
@@ -151,7 +253,8 @@ describe('the bot lane, two against two', () => {
     expect(s.theirs).toEqual({ championIds: [51, 89], levels: [8, 6], worth: 1400 });
     expect(s.levelDiff).toBe(1);
     expect(s.worthDiff).toBe(0);
-    expect(s.value).toBeCloseTo(STRENGTH_WEIGHTS.bot.level / STRENGTH_STEP, 12);
+    expect(s.phase).toBe(1); // 8 + 7 against 8 + 6
+    expect(s.value).toBeCloseTo(STRENGTH_WEIGHTS[3]![1]!.level / STRENGTH_STEP, 12);
   });
 
   it('needs all four positions — the draft\'s single opponent is no two against two', () => {

@@ -4,13 +4,14 @@
 // anyone's pocket, no health, no cooldowns.
 //
 // The number behind it is the chance to win the next duel between the lane opponents, as the
-// collector's duels say (docs/modellpruefung.md, Messung 27): a level and 1.000 gold of items each
-// move the log-odds by a measured weight, per lane; on the bot lane both players of a side count
-// together.
+// collector's duels say (docs/modellpruefung.md, Messung 35): a level and 1.000 gold of items each
+// move the log-odds by a weight measured per lane and phase; on the bot lane both players of a side
+// count together. On top comes how strong each champion is in the duel on its lane in that phase,
+// at equal level and items — measured at export and read from meta.json (`laneScale`).
 
 import { championIdOf, itemWorth, type ItemInfo, type LiveGameData, type LivePlayer } from './game';
 import { Lane, laneFromLcu } from './model/lane';
-import type { MetaLookup } from './model/metaLookup';
+import type { LaneScaleFile, MetaLookup } from './model/metaLookup';
 
 /** Log-odds per level and per 1.000 gold of item worth ahead. */
 export interface StrengthWeights {
@@ -18,24 +19,56 @@ export interface StrengthWeights {
   gold: number;
 }
 
+/** Weights per lane group (0 top, 1 jungle, 2 mid, 3 the bot lane) and phase (0, 1, 2). */
+export type PhaseWeights = readonly (readonly StrengthWeights[])[];
+
+/** The phase of a duel from its players' mean level: under 6, under 11, from 11 — as the export counts it (C# LaneScaleModel.PhaseOf). */
+export const strengthPhaseOf = (meanLevel: number): number => (meanLevel < 6 ? 0 : meanLevel < 11 ? 1 : 2);
+
 /**
- * Measured on 13.11.2026 (Messung 27) on the 10.583 duels between 10:00 and 11:00 of the training
- * games, where the true level is known, and checked on 2.768 duels of held-out games: each step of
- * the scale wins as often as it says. Top, jungle and mid share one pair of weights — weights per
- * lane predict the held-out duels no better (0,0 standard errors), and the jungle alone has 367
- * duels. Bot: both players of a side summed.
- *
- * The window is minute 10 to 11 (levels 6 to 9); early and late game are unchecked. The collector's
- * duels before 13.11.2026 carry the winner's level-up from the kill and cannot be used; measure
- * again over the whole game once 40.000 clean duels are counted (`npm run measure:duels`).
+ * Measured on 22.11.2026 (Messung 35) on 313.859 clean duels of the training games, checked on
+ * 78.093 of held-out games. Used where meta.json brings no `laneScale` of its own (an older file, too
+ * few clean duels); the export measures the same numbers afresh every run. Early a level and 1.000
+ * gold are worth far more than late — the scale with one pair of weights from minute 10–11 said
+ * „Leicht stärker“ in the first minutes where that side won 71 % of the duels.
  */
-const SOLO: StrengthWeights = { level: 0.46, gold: 0.81 };
-export const STRENGTH_WEIGHTS: Record<'top' | 'jungle' | 'mid' | 'bot', StrengthWeights> = {
-  top: SOLO,
-  jungle: SOLO,
-  mid: SOLO,
-  bot: { level: 0.18, gold: 0.41 },
-};
+export const STRENGTH_WEIGHTS: PhaseWeights = [
+  [{ level: 0.78, gold: 1.2 }, { level: 0.38, gold: 0.79 }, { level: 0.41, gold: 0.45 }],
+  [{ level: 1.45, gold: 1.45 }, { level: 0.86, gold: 0.42 }, { level: 0.69, gold: 0.09 }],
+  [{ level: 0.99, gold: 1.42 }, { level: 0.58, gold: 0.65 }, { level: 0.38, gold: 0.29 }],
+  [{ level: 0.48, gold: 0.42 }, { level: 0.29, gold: 0.26 }, { level: 0.2, gold: 0.17 }],
+];
+
+/** What the scale reckons with: the weights, and each champion's duel strength on a lane in a phase. */
+export interface LaneScale {
+  weights: PhaseWeights;
+  /** Log-odds the champion adds in a duel on that lane in that phase; 0 where nothing is measured. */
+  strength: (championId: number, lane: Lane, phase: number) => number;
+  /** Whether the champions' strengths are there (meta.json with `laneScale`). */
+  measured: boolean;
+}
+
+const BUILT_IN: LaneScale = { weights: STRENGTH_WEIGHTS, strength: () => 0, measured: false };
+const scales = new WeakMap<LaneScaleFile, LaneScale>();
+
+/** The lane scale from meta.json, or the built-in weights without champion strengths. */
+export function laneScaleOf(meta: MetaLookup): LaneScale {
+  const file = meta.snapshot.laneScale;
+  if (!file || !Array.isArray(file.weights) || !Array.isArray(file.champions) || file.champions.length === 0) return BUILT_IN;
+  let scale = scales.get(file);
+  if (!scale) {
+    const weights = STRENGTH_WEIGHTS.map((phases, lane) =>
+      phases.map((fallback, phase) => {
+        const w = file.weights.find((x) => x.lane === lane && x.phase === phase);
+        return w && Number.isFinite(w.level) && Number.isFinite(w.gold) ? { level: w.level, gold: w.gold } : fallback;
+      }),
+    );
+    const strengths = new Map(file.champions.filter((c) => Number.isFinite(c.strength)).map((c) => [`${c.championId}:${c.lane}:${c.phase}`, c.strength]));
+    scale = { weights, strength: (id, lane, phase) => strengths.get(`${id}:${lane}:${phase}`) ?? 0, measured: true };
+    scales.set(file, scale);
+  }
+  return scale;
+}
 
 /**
  * Log-odds per step of the scale; ±3 steps is where it ends. On the held-out duels the steps win
@@ -58,7 +91,14 @@ export interface Strength {
   theirs: StrengthSide;
   levelDiff: number;
   worthDiff: number;
-  /** Chance to win the next duel, as level and items say. */
+  /** The phase now, from the lane players' mean level (strengthPhaseOf). */
+  phase: number;
+  /**
+   * The champions' part per phase, own side minus the other, in log-odds at equal level and items
+   * („Dieses Duell“); null without measured strengths.
+   */
+  duel: number[] | null;
+  /** Chance to win the next duel, as level, items and the champions say. */
   chance: number;
   /** −3 … +3, positive is stronger. */
   value: number;
@@ -103,7 +143,7 @@ export function strengthOf(
   meta: MetaLookup,
   items: ReadonlyMap<number, ItemInfo>,
   fallback: { lane: Lane; opponentId: number } | null = null,
-  weights: Record<'top' | 'jungle' | 'mid' | 'bot', StrengthWeights> = STRENGTH_WEIGHTS,
+  scale: LaneScale = laneScaleOf(meta),
 ): Strength | null {
   const me = ownRow(data);
   if (!me || !me.team) return null;
@@ -147,14 +187,27 @@ export function strengthOf(
   const sum = (values: number[]): number => values.reduce((total, v) => total + v, 0);
   const levelDiff = sum(a.levels) - sum(b.levels);
   const worthDiff = a.worth - b.worth;
-  const w = weights[lane === Lane.Top ? 'top' : lane === Lane.Jungle ? 'jungle' : lane === Lane.Mid ? 'mid' : 'bot'];
-  const logOdds = w.level * levelDiff + (w.gold * worthDiff) / 1000;
+  const phase = strengthPhaseOf(sum([...a.levels, ...b.levels]) / (a.levels.length + b.levels.length));
+  const group = lane === Lane.Top ? 0 : lane === Lane.Jungle ? 1 : lane === Lane.Mid ? 2 : 3;
+  const w = scale.weights[group]![phase]!;
+
+  // Each champion on the lane it plays here: the compared lane, on the bot lane ADC and support.
+  const lanesOf = (side: LivePlayer[]): Lane[] => side.map((p) => (lane === Lane.Adc ? laneOf(p) : lane));
+  const mineLanes = lanesOf(mine);
+  const theirLanes = lanesOf(theirs);
+  const duelIn = (p: number): number =>
+    sum(a.championIds.map((id, i) => scale.strength(id, mineLanes[i]!, p))) - sum(b.championIds.map((id, i) => scale.strength(id, theirLanes[i]!, p)));
+  const duel = scale.measured ? [0, 1, 2].map(duelIn) : null;
+
+  const logOdds = w.level * levelDiff + (w.gold * worthDiff) / 1000 + (duel?.[phase] ?? 0);
   return {
     lane,
     mine: a,
     theirs: b,
     levelDiff,
     worthDiff,
+    phase,
+    duel,
     chance: sigmoid(logOdds),
     value: Math.max(-STRENGTH_STEPS, Math.min(STRENGTH_STEPS, logOdds / STRENGTH_STEP)),
   };
@@ -164,9 +217,9 @@ export function strengthOf(
 
 /**
  * When the tile changes from "you against your lane opponent" to "team against team". The lane
- * scale is checked on duels between 10:00 and 11:00 only (Messung 27); at 14:00 the turret plating
- * falls and the lanes break up — a support stood "deutlich stärker" against the enemy bot lane at
- * minute 35 (15.11.2026), from his ADC's items. A convention, not a measured boundary.
+ * scale is checked on the duels before 14:00 (Messung 35); at 14:00 the turret plating falls and the
+ * lanes break up — a support stood "deutlich stärker" against the enemy bot lane at minute 35
+ * (15.11.2026), from his ADC's items. A convention, not a measured boundary.
  */
 export const LANE_PHASE_SECONDS = 14 * 60;
 

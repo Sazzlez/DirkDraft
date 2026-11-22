@@ -3,6 +3,17 @@
 Jede Version hier ist ein Release auf https://github.com/Sazzlez/DirkDraft/releases; installierte
 Kopien melden sie beim nächsten Start.
 
+## Noch nicht veröffentlicht
+
+- **Die Skala „Du gegen …“ kennt die Champions und den Spielabschnitt.** In den ersten Leveln zählt
+  ein Level- oder Item-Vorsprung viel mehr als später; bisher rechnete die Skala überall mit den
+  Gewichten aus Minute 10 und war früh zu vorsichtig. „Leicht stärker“ hieß in den ersten Minuten in
+  Wahrheit 71 % gewonnene Duelle statt 63 %. Jetzt rechnet sie je Lane und Abschnitt und dazu mit der
+  Duell-Stärke beider Champions. Gemessen an rund 390.000 Duellen; die Stufen stimmen auf ein bis zwei
+  Prozentpunkte.
+- **Neu darunter: „Dieses Duell“.** Für früh, Mitte und spät steht, welcher Champion bei gleichem
+  Level und gleichen Items stärker ist, oder „offen“. Die laufende Phase ist hervorgehoben.
+
 ## 2.3.0 — 2026-11-18
 
 Anlass war ein Code-Review von 2.2.0 und des Sammlers.

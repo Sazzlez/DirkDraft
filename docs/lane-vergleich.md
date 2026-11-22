@@ -161,6 +161,14 @@ den Kill an; behoben, saubere Duelle sind an der −2 am Zeilenende zu erkennen.
 messen: Gewichte über das ganze Spiel, Champion-Stärke je Abschnitt (besteht vorläufig), Resistenzen.
 Das Paar „X gegen genau Y“ besteht nicht und erscheint nicht.*
 
+*Stand 22.11.2026 (Messung 35, 391.952 saubere Duelle): Mit einem Gewichtspaar aus Minute 10–11 war
+die Skala in den ersten Leveln zu vorsichtig („Leicht stärker“ gewann 71 % statt 63 %). Jetzt rechnet
+sie mit Gewichten je Lane und Abschnitt (mittleres Level unter 6, unter 11, ab 11) und mit der
+Champion-Stärke je Lane und Abschnitt. Beides misst der Export bei jedem Lauf neu und schreibt es nach
+`meta.json` (`laneScale`). Die Zeile „Dieses Duell“ zeigt je Abschnitt, welcher Champion bei gleichem
+Level und gleichen Items stärker ist, oder „offen“; die laufende Phase ist hervorgehoben. Vor 14:00
+stimmen die Stufen auf ±1–2 Prozentpunkte. Resistenzen und das Paar bleiben draußen.*
+
 Auf zurückgehaltenen Spielen: Gewinnt der Champion, den die Skala oben sieht, das nächste Duell
 tatsächlich öfter — und so oft, wie sie sagt (bei „+2“ etwa so oft, wie die Stufe verspricht)?
 Und schlägt die Variante mit Champion-Stärke die reine Level-plus-Items-Variante? Wenn nicht,
@@ -172,7 +180,8 @@ erscheint nur die einfachere.
    erledigt 08.11.2026.
 2. **Skala aus Level und Itemwert:** nur TypeScript (`core/game.ts`, `data/gameView.ts`, neue
    Kachel); Level, Items, Scores und Position kommen schon an, der Scrubber ersetzt nur Namen.
-3. **Modell mit Champion-Stärke:** nach einer Woche Daten, zuerst prüfen (passt zur Phase-2-Messung).
+3. **Modell mit Champion-Stärke:** nach einer Woche Daten, zuerst prüfen (passt zur Phase-2-Messung) —
+   geprüft und gebaut am 22.11.2026 (Messung 35).
 4. **Dieselben Paarwerte im Draft** (Nutzerwunsch 09.11.2026, vorgemerkt): Das Lane-Matchup im Draft
    zeigt, wer die Duelle in welchem Abschnitt gewinnt (Level 1–5, 6–10, 11+), gemessen aus den
    Solo-Kills, wo sie die Prüfung oben bestehen; sonst nichts. Vor dem Spiel, ohne Anweisung („wer ist

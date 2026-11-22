@@ -103,7 +103,19 @@ export interface MetaSnapshot {
   synergies: SynergyStat[];
   /** Own data only; absent in OP.GG files and in own files from before 07.11.2026. */
   versus?: VersusStat[];
+  /** The lane scale's weights and the champions' duel strength (C# LaneScaleModel); own data from 22.11.2026 on, with enough clean duels. */
+  laneScale?: LaneScaleFile;
   warnings: string[];
+}
+
+/** meta.json's `laneScale` (docs/modellpruefung.md, Messung 35). */
+export interface LaneScaleFile {
+  duels: number;
+  tau: number;
+  /** Lane 0 top, 1 jungle, 2 mid, 3 the bot lane; phase 0 under level 6, 1 under 11, 2 from 11. */
+  weights: { lane: number; phase: number; level: number; gold: number }[];
+  /** Lane 0 top … 4 support; strength in log-odds, drawn to 0. */
+  champions: { championId: number; lane: number; phase: number; strength: number; duels: number }[];
 }
 
 export const emptySnapshot = (): MetaSnapshot => ({

@@ -272,6 +272,12 @@ public sealed class MetaSnapshot
     /// </summary>
     public List<VersusStat> Versus { get; set; } = [];
 
+    /// <summary>
+    /// The lane scale's weights per phase and the champions' duel strength (<see cref="LaneScale"/>),
+    /// own data only and only with enough clean duels; null otherwise, and the app keeps its own weights.
+    /// </summary>
+    public LaneScale? LaneScale { get; set; }
+
     /// <summary>Notes worth showing the user, e.g. which lanes came back without counter data.</summary>
     public List<string> Warnings { get; set; } = [];
 }

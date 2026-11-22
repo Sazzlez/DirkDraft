@@ -30,6 +30,11 @@ sind: Sie werden zur auf derselben Datei gemessenen Duell-Linie geglättet statt
 Listen-Versatz, den OP.GGs Auswahl der auffälligsten Gegner brauchte, und kein Text nennt mehr
 OP.GG. Tiers gibt es keine — das war OP.GGs eigene Einstufung.
 
+Seit 22.11.2026 trägt `meta.json` zusätzlich `laneScale`, sobald der Sammler 40.000 saubere Duelle
+hat (`LaneScaleModel`, `docs/modellpruefung.md` Messung 35). Darin stehen die Gewichte der Lane-Skala
+je Lane und Abschnitt und die Duell-Stärke je Champion, Lane und Abschnitt, rund 145 KB. Ältere Apps
+lesen das Feld nicht und rechnen weiter wie bisher.
+
 **Für die Messung des Draft-Modells** (`docs/draft-konzept.md`, seit 07.11.2026): `versus` zählt je Spiel
 die 20 Gegner-Paare auf verschiedenen Lanes, darunter die Botlane-Kreuzpaare ADC ↔ gegnerischer Support.
 Die App liest das Feld noch nicht (2.0.0 übergeht es). Außerdem legt der Sammler je gezähltem Spiel eine
