@@ -71,8 +71,10 @@ Nur wenn die Messung zeigt, dass es besser vorhersagt (sonst nicht drin):
 
 - **Wo das Gold liegt:** ob 1.000 Gold auf dem ADC oder Midlaner mehr zählen als auf dem Support —
   „ein gefütterter Carry“ statt nur der Teamsumme.
-- **Resistenzen gegen die Schadensart des Gegnerteams** (Rüstung gegen ein AD-lastiges Team).
 - **Atakhan** — nur wenn die Live-API ihn meldet (zu prüfen).
+
+Resistenzen gegen die Schadensart des Gegnerteams sind nicht messbar: Der Teamfight-Teil der
+Spielzeile trägt je Spieler nur Level und Itemwert. Dafür bräuchte er zwei Zahlen mehr je Spieler.
 
 ## Bewusst nicht drin
 
@@ -137,15 +139,22 @@ gezogen wie bei den Duellen). Eine erste Messung ist nach zwei bis drei Tagen si
 Gerechnet wird die Chance, den nächsten Teamfight zu gewinnen, als Log-Odds aus den Faktoren oben;
 die Skala zeigt sie in Stufen (±3; die Stufenbreite legt die Messung fest, bei der Lane-Skala 0,6).
 
-Die Faktoren kommen einzeln dazu; jeder muss auf zurückgehaltenen Spielen (2 von 10) besser
-vorhersagen als die Stufe davor, sonst bleibt er draußen:
+Die Faktoren kommen einzeln dazu. Jeder muss auf zurückgehaltenen Spielen (2 von 10) **mindestens
+zwei Standardfehler** besser vorhersagen als die Stufe davor, sonst bleibt er draußen. Bei „irgendein
+Gewinn“ käme ein Faktor, der nichts sagt, in etwa jedem dritten Lauf durch Zufall hinein.
 
 1. Itemwert + Level, ein Gewicht
-2. Gewichte je Phase oder relativ zum Gesamtwert
-3. \+ Baron, Elder, Drachen, Seele
-4. \+ Champion-Stärke je Phase
-5. \+ Wo das Gold liegt
-6. \+ Resistenzen
+2. Gewichte je Phase, Itemwert relativ zu dem, was die Teams besitzen, oder beides
+3. \+ Baron, Elder, Drachen, Seele, Atakhan
+4. \+ wo das Gold liegt (Itemwert des reichsten Spielers)
+5. \+ Champion-Stärke je Phase, zur 0 gezogen
+
+Gerechnet wird ohne Seite: Jeder Kampf zählt auch gespiegelt, denn die Skala kennt kein Blau und Rot.
+Den Vorteil der Seite weist der Bericht trotzdem aus. Gezählt werden nur Kämpfe:
+- mit mindestens vier gesehenen Spielern je Team (`--min-side`),
+- in die beide Teams vollzählig gingen,
+- ohne AFK-Spieler (einer fünf oder mehr Level unter dem Median des Kampfes),
+- ohne Gleichstand bei den Kills.
 
 **Bestanden** hat sie, wenn das Team, das die Skala vorn sieht, den Teamfight öfter gewinnt — und so
 oft, wie die Stufe sagt, **in jeder Phase** (14–20, 20–30, ab 30). Vorher erscheint kein Urteil; bis
@@ -161,8 +170,11 @@ danach.
 1. **Sammler** (C#, mit Tests): Teamfights aus der Zeitleiste lesen, Spiel-Liste Version 5 —
    umgesetzt 22.11.2026, an einer echten Zeitleiste geprüft (oben). Der Sammler zählt sie erst, wenn
    der Stand auf `master` liegt (jeder Lauf baut von dort).
-2. **Messwerkzeug** `npm run measure:fights` (TypeScript, neben `measure:duels`), Ergebnis als
-   Messung in `docs/modellpruefung.md`.
+2. **Messwerkzeug** `npm run measure:fights -- <games.json.gz> [meta.json]`
+   (`app/tools/measure/fights.ts`, Tests in `app/tests/tools/fights.test.ts`), gebaut am 22.11.2026. Es
+   schreibt den Bericht nach `build/measure-fights.md`. Am Artefakt vom 22.11. läuft es durch und meldet
+   noch keine Teamfights. Das Ergebnis kommt als Messung in `docs/modellpruefung.md`, sobald rund
+   40.000 gezählte Kämpfe da sind (Artefakt holen: `gh run download <Lauf> -n games`).
 3. **Export** der gemessenen Zahlen in die Datendatei (Gewichte, Buff-Werte, Champion-Stärke je Phase).
 4. **App:** `teamStrengthOf` in `core/strength.ts`; die Live-Ereignisse (`DragonKill`, `BaronKill`)
    kommen mit `allgamedata` schon an und müssen nur gelesen werden; Kachel aus `StrengthTile.svelte`

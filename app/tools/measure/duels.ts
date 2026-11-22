@@ -182,7 +182,7 @@ const PLAIN = 2;
 const BY_PHASE = 4;
 
 /** Mean log-loss of two sets of predictions and their difference, the error from whole games (a fight's kills hang together). */
-function compare(duels: readonly Duel[], a: readonly number[], b: readonly number[]): { a: number; b: number; gain: number; error: number } {
+export function compare(duels: readonly { game: number; y: number }[], a: readonly number[], b: readonly number[]): { a: number; b: number; gain: number; error: number } {
   const perGame = new Map<number, { sum: number; n: number }>();
   let lossA = 0;
   let lossB = 0;
@@ -207,7 +207,7 @@ function compare(duels: readonly Duel[], a: readonly number[], b: readonly numbe
 }
 
 /** One duel for the champions' own effects: the keys that speak for blue, the ones for red, and what level and items already say. */
-interface EffectRow {
+export interface EffectRow {
   plus: number[];
   minus: number[];
   offset: number;
@@ -215,7 +215,7 @@ interface EffectRow {
 }
 
 /** Ridge-penalised effects on top of an offset: coordinate-wise Newton steps, each effect drawn to 0 with spread tau. */
-function fitEffects(rows: readonly EffectRow[], keys: number, tau: number, sweeps = 10): Float64Array {
+export function fitEffects(rows: readonly EffectRow[], keys: number, tau: number, sweeps = 10): Float64Array {
   const theta = new Float64Array(keys);
   const z = Float64Array.from(rows, (r) => r.offset);
   const rowsOf: number[][] = Array.from({ length: keys }, () => []);
@@ -252,14 +252,14 @@ function fitEffects(rows: readonly EffectRow[], keys: number, tau: number, sweep
   return theta;
 }
 
-const effectZ = (row: EffectRow, theta: Float64Array): number => {
+export const effectZ = (row: EffectRow, theta: Float64Array): number => {
   let z = row.offset;
   for (const k of row.plus) z += theta[k]!;
   for (const k of row.minus) z -= theta[k]!;
   return z;
 };
 
-const TAUS = [0.03, 0.06, 0.1, 0.15, 0.2, 0.3, 0.45];
+export const TAUS = [0.03, 0.06, 0.1, 0.15, 0.2, 0.3, 0.45];
 
 /**
  * The inner split of the training games, for choosing how far effects are drawn to 0. From the high
@@ -268,14 +268,14 @@ const TAUS = [0.03, 0.06, 0.1, 0.15, 0.2, 0.3, 0.45];
  */
 const isInner = (game: number): boolean => ((Math.imul(game + 13, 2246822519) >>> 16) & 3) === 0;
 
-interface EffectFit {
+export interface EffectFit {
   tau: number;
   theta: Float64Array;
   /** Log-loss on the inner split per tau, the offset alone first. */
   inner: number[];
 }
 
-function chooseEffects(train: readonly Duel[], rows: readonly EffectRow[], keys: number): EffectFit {
+export function chooseEffects(train: readonly { game: number }[], rows: readonly EffectRow[], keys: number): EffectFit {
   const fitRows = rows.filter((_, i) => !isInner(train[i]!.game));
   const checkRows = rows.filter((_, i) => isInner(train[i]!.game));
   const lossOf = (theta: Float64Array | null): number => {
@@ -300,7 +300,7 @@ function chooseEffects(train: readonly Duel[], rows: readonly EffectRow[], keys:
   return { tau: best, theta: best > 0 ? fitEffects(rows, keys, best) : new Float64Array(keys), inner };
 }
 
-class Keys {
+export class Keys {
   private readonly ids = new Map<string, number>();
   readonly names: string[] = [];
   of(key: string, create: boolean): number {
@@ -318,12 +318,12 @@ class Keys {
 }
 
 /** Removes keys that stand on both sides (a mirror duel): they say nothing. */
-function cancel(plus: number[], minus: number[]): { plus: number[]; minus: number[] } {
+export function cancel(plus: number[], minus: number[]): { plus: number[]; minus: number[] } {
   const both = new Set(plus.filter((k) => minus.includes(k)));
   return both.size === 0 ? { plus, minus } : { plus: plus.filter((k) => !both.has(k)), minus: minus.filter((k) => !both.has(k)) };
 }
 
-function options(args: string[]): { positional: string[]; named: Record<string, string> } {
+export function options(args: string[]): { positional: string[]; named: Record<string, string> } {
   const positional: string[] = [];
   const named: Record<string, string> = {};
   for (let i = 0; i < args.length; i++) {

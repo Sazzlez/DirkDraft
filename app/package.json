@@ -17,6 +17,7 @@
     "measure:counters": "node tools/run.mjs tools/measure/counters.ts",
     "measure:phase4": "node tools/run.mjs tools/measure/phase4.ts",
     "measure:duels": "node tools/run.mjs tools/measure/duels.ts",
+    "measure:fights": "node tools/run.mjs tools/measure/fights.ts",
     "measure:combos": "node tools/run.mjs tools/measure/combos.ts"
   },
   "devDependencies": {
