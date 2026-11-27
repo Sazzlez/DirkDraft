@@ -6,9 +6,9 @@
 import { describe, expect, it } from 'vitest';
 import type { ItemInfo, LiveGameData, LivePlayer } from '../../src/core/game';
 import { Lane } from '../../src/core/model/lane';
-import { DamageType, MetaLookup, type LaneScaleFile } from '../../src/core/model/metaLookup';
-import { STRENGTH_STEP, STRENGTH_WEIGHTS, laneScaleOf, strengthOf, teamStandOf, type LaneScale } from '../../src/core/strength';
-import { strengthLabel, strengthView, teamStandView } from '../../src/data/gameView';
+import { DamageType, MetaLookup, type LaneScaleFile, type TeamfightScaleFile } from '../../src/core/model/metaLookup';
+import { STRENGTH_STEP, STRENGTH_WEIGHTS, laneScaleOf, strengthOf, teamBuffsOf, teamStandOf, teamStrengthOf, type LaneScale } from '../../src/core/strength';
+import { strengthLabel, strengthView, teamfightOdds, teamStandView, teamStrengthView } from '../../src/data/gameView';
 import { MetaBuilder } from './helpers';
 
 const ITEMS = new Map<number, ItemInfo>([
@@ -277,8 +277,8 @@ describe('as the tile shows it', () => {
     const view = strengthView(strengthOf(top({ level: 9, items: [3133, 1036, 1001] }, { level: 10, items: [1055, 1036] }), meta, ITEMS)!, champion);
     expect(view.opponents).toEqual([{ id: 24, key: 'K24', name: 'Jax' }]);
     expect(view.rows).toEqual([
-      { label: 'Level', mine: '9', theirs: '10', diff: '−1', tone: 'down' },
-      { label: 'Items', mine: '1.750', theirs: '800', diff: '+950', tone: 'up' },
+      { label: 'Level', value: '−1', tone: 'down' },
+      { label: 'Gold', value: '+950', tone: 'up' },
     ]);
     expect(view.phases).toBeNull();
     // Nothing of a player in it: only champions, numbers and the step.
@@ -297,8 +297,8 @@ describe('as the tile shows it', () => {
     };
     const view = strengthView(strengthOf(data, meta, ITEMS)!, champion);
     expect(view.opponents.map((o) => o.name)).toEqual(['Caitlyn', 'Leona']);
-    expect(view.rows[0]).toEqual({ label: 'Level', mine: '8 + 7', theirs: '8 + 7', diff: '±0', tone: 'even' });
-    expect(view.rows[1]).toEqual({ label: 'Items', mine: '350', theirs: '350', diff: '±0', tone: 'even' });
+    expect(view.rows[0]).toEqual({ label: 'Level', value: '±0', tone: 'even' }); // 8 + 7 against 8 + 7
+    expect(view.rows[1]).toEqual({ label: 'Gold', value: '±0', tone: 'even' });
     expect(view.label).toBe('Ausgeglichen');
   });
 });
@@ -342,5 +342,126 @@ describe('team against team', () => {
     // Nothing bought on either side: the bar stands in the middle.
     const none = { players: 5, level: 5, worth: 0 };
     expect(teamStandView({ mine: none, theirs: none, levelDiff: 0, worthDiff: 0, enemies: [], leaderId: 0 }).rows[1]).toMatchObject({ diff: '±0', tone: 'even', share: 0.5 });
+  });
+});
+
+describe('the teamfight scale', () => {
+  // Weights of its own, so that the numbers are easy to follow; Darius and Jax with a strength in the middle phase.
+  const teamfightScale: TeamfightScaleFile = {
+    fights: 45_447,
+    tau: 0.06,
+    weights: { level: 0.2, gold: 0.05, goldCarry: 0.08, goldRest: 0.02, baron: 0.25, elder: 0.5, dragon: 0.05, soul: 0.35 },
+    champions: [
+      { championId: 122, phase: 1, strength: 0.1, fights: 900 },
+      { championId: 24, phase: 1, strength: -0.08, fights: 800 },
+    ],
+  };
+  const scaled = new MetaLookup({ ...meta.snapshot, teamfightScale });
+  const named = (player: LivePlayer, gameName: string | undefined): LivePlayer => ({ ...player, riotIdGameName: gameName });
+
+  // Minute 24 (1.450 s): Darius 14 and Ahri 13 against Jax 13 and Caitlyn 12. The event feed names
+  // killers by the Riot ID without its tag, as the scrubber writes it.
+  function fight(events: { EventName: string; EventTime: number; KillerName: string; DragonType?: string }[], gameTime = 1450): LiveGameData {
+    return {
+      activePlayer: { riotId: 'Ich#EUW', level: 14 },
+      allPlayers: [
+        named(row('Darius', 'ORDER', 'TOP', 14, [3071], 'Ich#EUW'), 'Ich'),
+        named(row('Ahri', 'ORDER', 'MIDDLE', 13, [3133]), 'Fremd A'),
+        named(row('Jax', 'CHAOS', 'TOP', 13, [3071, 1001]), 'Fremd J'),
+        // No game name: the summoner name stands in.
+        { ...row('Caitlyn', 'CHAOS', 'BOTTOM', 12, [1036]), summonerName: 'Fremd C' },
+      ],
+      gameData: { gameTime },
+      events: { Events: events },
+    };
+  }
+
+  const events = [
+    { EventName: 'DragonKill', EventTime: 300, KillerName: 'Ich', DragonType: 'Fire' },
+    { EventName: 'DragonKill', EventTime: 600, KillerName: 'Fremd C', DragonType: 'Water' },
+    { EventName: 'DragonKill', EventTime: 900, KillerName: 'Fremd A', DragonType: 'Earth' },
+    { EventName: 'DragonKill', EventTime: 1100, KillerName: 'Ich', DragonType: 'Air' },
+    { EventName: 'DragonKill', EventTime: 1250, KillerName: 'Ich', DragonType: 'Elder' }, // 200 s ago: over
+    { EventName: 'DragonKill', EventTime: 1270, KillerName: 'Fremd A', DragonType: 'Hextech' }, // the fourth: the soul
+    { EventName: 'BaronKill', EventTime: 1300, KillerName: 'Fremd J' }, // 150 s ago: still on
+    { EventName: 'DragonKill', EventTime: 1400, KillerName: 'Minion', DragonType: 'Air' }, // nobody the list knows
+  ];
+
+  it('reads the monsters from the event feed: dragons, the soul at four, Baron and the Elder while they last', () => {
+    const buffs = teamBuffsOf(fight(events), 'ORDER');
+    expect(buffs.mine).toEqual({ dragons: 4, soul: true, baron: false, elder: false });
+    expect(buffs.theirs).toEqual({ dragons: 1, soul: false, baron: true, elder: false });
+    // Baron for 180 s, the Elder for 150 s, counted from the kill.
+    expect(teamBuffsOf(fight(events, 1480), 'ORDER').theirs.baron).toBe(true);
+    expect(teamBuffsOf(fight(events, 1481), 'ORDER').theirs.baron).toBe(false);
+    expect(teamBuffsOf(fight(events, 1400), 'ORDER').mine.elder).toBe(true);
+    // Seen from the other team, the same feed.
+    expect(teamBuffsOf(fight(events), 'CHAOS').mine.baron).toBe(true);
+  });
+
+  it('adds up level, items, the monsters and the champions of this phase', () => {
+    const t = teamStrengthOf(fight(events), scaled, ITEMS)!;
+    expect(t.phase).toBe(1);
+    expect(t.stand.mine).toEqual({ players: 2, level: 27, worth: 4100 });
+    expect(t.stand.theirs).toEqual({ players: 2, level: 25, worth: 3650 });
+    expect(t.parts.level).toBeCloseTo(0.4, 12);
+    expect(t.parts.gold).toBeCloseTo(0.036, 12); // all four play carry roles: 450 gold × 0,08
+    expect(t.parts.baron).toBeCloseTo(-0.25, 12);
+    expect(t.parts.elder).toBe(0);
+    expect(t.parts.dragons).toBeCloseTo(0.15, 12);
+    expect(t.parts.soul).toBeCloseTo(0.35, 12);
+    expect(t.parts.champions).toBeCloseTo(0.18, 12);
+    expect(t.value).toBeCloseTo(0.866 / STRENGTH_STEP, 12);
+  });
+
+  it('weighs gold by who holds it: on the carries it counts more than on jungle and support', () => {
+    // The same 3.000 gold on both sides — ours on the support, theirs on the top laner.
+    const split = (positions: boolean): LiveGameData => ({
+      activePlayer: { riotId: 'Ich#EUW', level: 12 },
+      allPlayers: [
+        row('Darius', 'ORDER', positions ? 'TOP' : '', 12, [], 'Ich#EUW'),
+        row('Thresh', 'ORDER', positions ? 'UTILITY' : '', 12, [3071]),
+        row('Jax', 'CHAOS', positions ? 'TOP' : '', 12, [3071]),
+        row('Leona', 'CHAOS', positions ? 'UTILITY' : '', 12, []),
+      ],
+      gameData: { gameTime: 1000 },
+    });
+    const t = teamStrengthOf(split(true), scaled, ITEMS)!;
+    expect(t.stand.worthDiff).toBe(0);
+    // 3.000 more on our support (×0,02), 3.000 more on their top laner (×0,08).
+    expect(t.parts.gold).toBeCloseTo(0.06 - 0.24, 12);
+    expect(teamStrengthView(t).rows.find((r) => r.label === 'Gold')).toMatchObject({ text: '±0', arrows: '·' });
+    // Without positions the summed weight: equal gold, nothing either way.
+    expect(teamStrengthOf(split(false), scaled, ITEMS)!.parts.gold).toBe(0);
+  });
+
+  it('gives no verdict without the measured scale', () => {
+    expect(teamStrengthOf(fight(events), meta, ITEMS)).toBeNull();
+  });
+
+  it('shows the step, its measured odds and the parts, the largest first', () => {
+    const view = teamStrengthView(teamStrengthOf(fight(events), scaled, ITEMS)!);
+    expect(view.label).toBe('Leicht stärker');
+    expect(view.odds).toBe('Teams in dieser Lage gewinnen rund 7 von 10 Teamfights');
+    // Only the differences: no team sums to work out.
+    expect(view.rows).toEqual([
+      { label: 'Level', text: '+2', diff: '', arrows: '▲', tone: 'up' },
+      { label: 'Seele', text: 'ihr', diff: '', arrows: '▲', tone: 'up' },
+      { label: 'Baron', text: 'Gegner', diff: '', arrows: '·', tone: 'even' },
+      { label: 'Champions', text: 'ihr', diff: '', arrows: '·', tone: 'even' },
+      { label: 'Drachen', text: '4 : 1', diff: '', arrows: '·', tone: 'even' },
+      { label: 'Gold', text: '+450', diff: '', arrows: '·', tone: 'even' },
+    ]);
+    // Without a monster on the map there are no rows for them.
+    const quiet = teamStrengthView(teamStrengthOf(fight([]), scaled, ITEMS)!);
+    expect(quiet.rows.map((r) => r.label)).toEqual(['Level', 'Champions', 'Gold']);
+    // Words of who is stronger, never of what to do, and nothing of a player.
+    expect(JSON.stringify(view)).not.toMatch(/kämpf|passiv|engage|Baron machen|erzwing/i);
+    expect(JSON.stringify(view)).not.toMatch(/Ich#|"Ich"|Fremd/);
+  });
+
+  it('says how often teams in that step won, from the measurement', () => {
+    expect([0, 0.4, -0.4].map(teamfightOdds)).toEqual(Array(3).fill('Teams in dieser Lage gewinnen rund 5 von 10 Teamfights'));
+    expect([1, -1, 2, -2, 3, -3].map((v) => teamfightOdds(v).match(/rund (\d+)/)![1])).toEqual(['7', '3', '8', '2', '9', '1']);
   });
 });

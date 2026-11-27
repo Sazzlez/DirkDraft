@@ -265,11 +265,17 @@ internal static class RiotCommand
             meta.Add(metaCounts);
 
             var snapshot = RiotMetaExport.Build(meta.Rows(), champions, patch, tier, buildFile.Platform, buildFile.CollectedAtUtc, DateTimeOffset.UtcNow);
-            // The lane scale from the clean duels of every patch kept (docs/modellpruefung.md, Messung 35).
-            snapshot.LaneScale = LaneScaleModel.Fit([.. state.Games, .. (state.OlderGames ?? []).SelectMany(p => p.Games)]);
+            // The lane scale from the clean duels of every patch kept (docs/modellpruefung.md, Messung 35),
+            // the teamfight scale from the counted teamfights (Messung 36).
+            List<int[]> lines = [.. state.Games, .. (state.OlderGames ?? []).SelectMany(p => p.Games)];
+            snapshot.LaneScale = LaneScaleModel.Fit(lines);
             Console.WriteLine(snapshot.LaneScale is { } scale
                 ? $"Lane-Skala: {scale.Duels:N0} saubere Duelle, {scale.Champions.Count:N0} Champion-Stärken (τ {scale.Tau:0.00})"
                 : $"Lane-Skala: unter {LaneScaleModel.MinimumDuels:N0} sauberen Duellen — nicht exportiert, die App rechnet mit ihren eigenen Gewichten");
+            snapshot.TeamfightScale = TeamfightScaleModel.Fit(lines);
+            Console.WriteLine(snapshot.TeamfightScale is { } fights
+                ? $"Teamfight-Skala: {fights.Fights:N0} gezählte Kämpfe, {fights.Champions.Count:N0} Champion-Stärken (τ {fights.Tau:0.00})"
+                : $"Teamfight-Skala: unter {TeamfightScaleModel.MinimumFights:N0} gezählten Kämpfen — nicht exportiert, die App zeigt nur Level und Items");
             Write(metaPath, JsonSerializer.Serialize(snapshot, MetaJson.Default.MetaSnapshot));
             Console.WriteLine(
                 $"Meta: {snapshot.Games:N0} Spiele, {snapshot.LaneStats.Count} Lane-Zeilen, {snapshot.Matchups.Count:N0} Duelle, "

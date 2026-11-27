@@ -34,13 +34,14 @@ Items) oder steht schon vor dem Spiel fest (Champion-Werte, Statistik aus eigene
    -2   ┃
    -3   ┃
         ┃
- Level   8 : 7      +1
- Items   3.450 : 2.800   +650
+ Level   +1
+ Gold    +650
  Duell   früh Darius · Mitte offen · spät du
 ```
 
 Mitte = ausgeglichen; nach oben stärker, nach unten schwächer, sieben Stufen. Darunter klein, woraus
-sie sich zusammensetzt, damit man ihr nicht blind glauben muss.
+sie sich zusammensetzt, damit man ihr nicht blind glauben muss. Level und Gold (der Itemwert) stehen
+als eigener Vorsprung, nicht als zwei Werte nebeneinander (Nutzerwunsch 27.11.2026).
 
 ### Woraus die Skala rechnet
 

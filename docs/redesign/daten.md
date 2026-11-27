@@ -35,6 +35,10 @@ hat (`LaneScaleModel`, `docs/modellpruefung.md` Messung 35). Darin stehen die Ge
 je Lane und Abschnitt und die Duell-Stärke je Champion, Lane und Abschnitt, rund 145 KB. Ältere Apps
 lesen das Feld nicht und rechnen weiter wie bisher.
 
+Seit 27.11.2026 kommt `teamfightScale` dazu, sobald 20.000 Teamfights gezählt sind
+(`TeamfightScaleModel`, Messung 36). Darin stehen die Gewichte der Teamfight-Skala für Level,
+Itemwert, Baron, Elder, Drachen und Seele und die Teamfight-Stärke je Champion und Phase.
+
 **Für die Messung des Draft-Modells** (`docs/draft-konzept.md`, seit 07.11.2026): `versus` zählt je Spiel
 die 20 Gegner-Paare auf verschiedenen Lanes, darunter die Botlane-Kreuzpaare ADC ↔ gegnerischer Support.
 Die App liest das Feld noch nicht (2.0.0 übergeht es). Außerdem legt der Sammler je gezähltem Spiel eine

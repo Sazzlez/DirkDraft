@@ -308,6 +308,11 @@ export interface GameView {
   strength: StrengthView | null;
   /** Team gegen Team, in the lane scale's place once the lane phase is over or where there is no scale. */
   team: TeamStandView | null;
+  /**
+   * Euer Team im Teamfight (docs/teamfight-skala.md), in the team tile's place where meta.json brings
+   * the measured teamfight scale; null otherwise and during the lane phase.
+   */
+  teamStrength: TeamStrengthView | null;
   /** What the draft said about the two line-ups, kept through the game; empty without a draft. */
   verdict: VerdictLine[];
 }
@@ -318,6 +323,24 @@ export interface TeamStandView {
   rows: { label: string; mine: string; theirs: string; diff: string; tone: 'up' | 'down' | 'even'; share: number }[];
 }
 
+/**
+ * The teamfight scale: up = the own team would win a fight of five against five more often, down =
+ * less often. Describes, never advises; no timer, nothing of who is dead.
+ */
+export interface TeamStrengthView {
+  /** −3 … +3, positive = stronger. */
+  value: number;
+  /** "Stärker" */
+  label: string;
+  /** "Teams in dieser Lage gewinnen rund 7 von 10 Teamfights": the measured share of the step (Messung 36). */
+  odds: string;
+  /**
+   * What it is made of, the largest part first: "Gold +3.300 ▲", "Level −1 ·", "Drachen 3 : 1 ·", "Baron ihr ▲".
+   * `arrows`: the part in steps of the scale — ▲ from half a step, ▲▲ from one and a half, · less.
+   */
+  rows: { label: string; text: string; diff: string; arrows: string; tone: 'up' | 'down' | 'even' }[];
+}
+
 /** The strength scale: up = stronger than the lane opponent, down = weaker. Describes, never advises. */
 export interface StrengthView {
   /** The lane opponent, or the enemy duo on the bot lane. */
@@ -326,8 +349,8 @@ export interface StrengthView {
   value: number;
   /** "Leicht stärker" */
   label: string;
-  /** What the scale is made of: "Level 9 : 8 +1", "Items 3.450 : 2.800 +650". */
-  rows: { label: string; mine: string; theirs: string; diff: string; tone: 'up' | 'down' | 'even' }[];
+  /** What the scale is made of, as the own lead: "Level +1", "Gold +650" (item worth). */
+  rows: { label: string; value: string; tone: 'up' | 'down' | 'even' }[];
   /** How this duel usually goes by phase, from the own count; null while too few duels are counted. */
   phases: { label: string; who: string; tone: 'up' | 'down' | 'even'; now: boolean }[] | null;
 }

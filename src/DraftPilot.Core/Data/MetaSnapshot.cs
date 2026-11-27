@@ -278,6 +278,12 @@ public sealed class MetaSnapshot
     /// </summary>
     public LaneScale? LaneScale { get; set; }
 
+    /// <summary>
+    /// The teamfight scale's weights and the champions' teamfight strength (<see cref="TeamfightScale"/>),
+    /// own data only and only with enough counted fights; null otherwise, and the app shows the plain team tile.
+    /// </summary>
+    public TeamfightScale? TeamfightScale { get; set; }
+
     /// <summary>Notes worth showing the user, e.g. which lanes came back without counter data.</summary>
     public List<string> Warnings { get; set; } = [];
 }

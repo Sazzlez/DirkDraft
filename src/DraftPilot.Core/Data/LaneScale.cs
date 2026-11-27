@@ -50,7 +50,6 @@ public static class LaneScaleModel
     /// <summary>Below this many clean duels nothing is exported and the app keeps its own weights.</summary>
     public const int MinimumDuels = 40_000;
 
-    private const int Sweeps = 10;
 
     /// <summary>The phase of a duel from its players' mean level — the same rule as the app's.</summary>
     public static int PhaseOf(double meanLevel) => meanLevel < 6 ? 0 : meanLevel < 11 ? 1 : 2;
@@ -80,7 +79,9 @@ public static class LaneScaleModel
         {
             for (var phase = 0; phase < 3; phase++)
             {
-                var (level, gold) = FitWeights(duels.Where(d => d.Group == group && d.Phase == phase).ToList());
+                var rows = duels.Where(d => d.Group == group && d.Phase == phase).ToList();
+                var fit = ScaleFit.MirroredLogistic([.. rows.Select(d => new[] { d.DLevel, d.DGold })], [.. rows.Select(d => d.Y)], 2);
+                var (level, gold) = (fit[0], fit[1]);
                 weights.Add(new LaneScaleWeights(group, phase, Math.Round(level, 4), Math.Round(gold, 4)));
             }
         }
@@ -91,7 +92,7 @@ public static class LaneScaleModel
             return w.Level * d.DLevel + w.Gold * d.DGold;
         }
 
-        var theta = FitStrengths(duels, keys.Count, tau, Offset);
+        var theta = ScaleFit.RidgeStrengths(keys.Count, [.. duels.Select(d => (d.Plus, d.Minus, d.Y))], [.. duels.Select(Offset)], tau);
         var count = new int[keys.Count];
         foreach (var d in duels)
         {
@@ -166,83 +167,4 @@ public static class LaneScaleModel
             [.. minus.Where(k => !both.Contains(k))],
             winner < 5 ? 1 : 0);
     }
-
-    /// <summary>Logistic regression without intercept on the duels and their mirror images: Newton steps on two weights.</summary>
-    private static (double Level, double Gold) FitWeights(List<Duel> duels)
-    {
-        double a = 0, b = 0;
-        if (duels.Count == 0)
-            return (a, b);
-        for (var iteration = 0; iteration < 50; iteration++)
-        {
-            double ga = 0, gb = 0, haa = 1e-6, hab = 0, hbb = 1e-6;
-            foreach (var d in duels)
-            {
-                // The duel and its mirror (−x, 1 − y) give the same weight and twice the gradient.
-                var p = Sigmoid(a * d.DLevel + b * d.DGold);
-                var w = p * (1 - p);
-                var r = d.Y - p;
-                ga += 2 * r * d.DLevel;
-                gb += 2 * r * d.DGold;
-                haa += 2 * w * d.DLevel * d.DLevel;
-                hab += 2 * w * d.DLevel * d.DGold;
-                hbb += 2 * w * d.DGold * d.DGold;
-            }
-            var det = haa * hbb - hab * hab;
-            if (Math.Abs(det) < 1e-300)
-                break;
-            var da = (hbb * ga - hab * gb) / det;
-            var db = (haa * gb - hab * ga) / det;
-            a += da;
-            b += db;
-            if (Math.Max(Math.Abs(da), Math.Abs(db)) < 1e-9)
-                break;
-        }
-        return (a, b);
-    }
-
-    /// <summary>
-    /// The champions' strengths on top of the weights: coordinate-wise Newton steps, each strength
-    /// drawn to 0 with spread <paramref name="tau"/> (as <c>fitEffects</c> in app/tools/measure/duels.ts).
-    /// </summary>
-    private static double[] FitStrengths(List<Duel> duels, int keys, double tau, Func<Duel, double> offset)
-    {
-        var theta = new double[keys];
-        var z = duels.Select(offset).ToArray();
-        var rows = new List<(int Duel, int Sign)>[keys];
-        for (var k = 0; k < keys; k++)
-            rows[k] = [];
-        for (var i = 0; i < duels.Count; i++)
-        {
-            foreach (var k in duels[i].Plus)
-                rows[k].Add((i, 1));
-            foreach (var k in duels[i].Minus)
-                rows[k].Add((i, -1));
-        }
-
-        var penalty = 1 / (tau * tau);
-        for (var sweep = 0; sweep < Sweeps; sweep++)
-        {
-            for (var k = 0; k < keys; k++)
-            {
-                if (rows[k].Count == 0)
-                    continue;
-                var gradient = -theta[k] * penalty;
-                var hessian = penalty;
-                foreach (var (i, sign) in rows[k])
-                {
-                    var p = Sigmoid(z[i]);
-                    gradient += sign * (duels[i].Y - p);
-                    hessian += p * (1 - p);
-                }
-                var step = gradient / hessian;
-                theta[k] += step;
-                foreach (var (i, sign) in rows[k])
-                    z[i] += sign * step;
-            }
-        }
-        return theta;
-    }
-
-    private static double Sigmoid(double z) => 1 / (1 + Math.Exp(-z));
 }

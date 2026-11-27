@@ -166,6 +166,10 @@ export interface Features {
   dGold: number;
   /** Item worth, blue minus red, in tenths of what a team owns on average in this fight. */
   dRelative: number;
+  /** Item worth of the carries (top, mid, ADC), blue minus red, in 1.000 gold. */
+  dGoldCarry: number;
+  /** Item worth of jungle and support (and anyone without a lane), blue minus red, in 1.000 gold. */
+  dGoldRest: number;
   /** The richest player's item worth, blue minus red, in 1.000 gold. */
   dCarry: number;
   baron: number;
@@ -184,10 +188,15 @@ export function featuresOf(f: Fight): Features {
   const worthRed = sum(red, (p) => p.gold);
   const mean = (worthBlue + worthRed) / 2;
   const flag = (value: boolean): number => (value ? 1 : 0);
+  const carry = (p: FightPlayer): boolean => p.lane === 0 || p.lane === 2 || p.lane === 3;
+  const carryGold = (p: FightPlayer): number => (carry(p) ? p.gold : 0);
+  const restGold = (p: FightPlayer): number => (carry(p) ? 0 : p.gold);
   return {
     dLevel: sum(blue, (p) => p.level) - sum(red, (p) => p.level),
     dGold: (worthBlue - worthRed) / 1000,
     dRelative: mean > 0 ? (10 * (worthBlue - worthRed)) / mean : 0,
+    dGoldCarry: (sum(blue, carryGold) - sum(red, carryGold)) / 1000,
+    dGoldRest: (sum(blue, restGold) - sum(red, restGold)) / 1000,
     dCarry: (Math.max(...blue.map((p) => p.gold)) - Math.max(...red.map((p) => p.gold))) / 1000,
     baron: flag(f.blue.baron) - flag(f.red.baron),
     elder: flag(f.blue.elder) - flag(f.red.elder),
@@ -207,6 +216,7 @@ interface Variant {
 const byPhase = (value: number, phase: number): number[] => [0, 1, 2].map((p) => (p === phase ? value : 0));
 const perPhase = (name: string): string[] => PHASES.map((p) => `${name} (${p})`);
 const BUFF_COLUMNS = ['Baron', 'Elder', 'Drache', 'Seele', 'Atakhan'];
+const BUFF_NAMES = ['Baron', 'Elder', 'Drachen', 'Seele', 'Atakhan'];
 const buffs = (f: Features): number[] => [f.baron, f.elder, f.dragons, f.soul, f.atakhan];
 
 /** The first rung and its alternatives: the plain weights, per phase, relative to what the teams own. */
@@ -215,9 +225,16 @@ const BASES: Variant[] = [
   { name: 'Itemwert + Level je Phase', columns: [...perPhase('Level'), ...perPhase('1.000 Gold')], row: (f) => [...byPhase(f.dLevel, f.phase), ...byPhase(f.dGold, f.phase)] },
   { name: 'Itemwert relativ + Level', columns: ['Level', '10 % Itemwert'], row: (f) => [f.dLevel, f.dRelative] },
   { name: 'Itemwert relativ + Level je Phase', columns: [...perPhase('Level'), ...perPhase('10 % Itemwert')], row: (f) => [...byPhase(f.dLevel, f.phase), ...byPhase(f.dRelative, f.phase)] },
+  // Gold on the ADC is worth more than on the support (the user's question, 27.11.2026).
+  { name: 'Itemwert nach Rollen + Level', columns: ['Level', '1.000 Gold Top, Mid, ADC', '1.000 Gold Jungle, Support'], row: (f) => [f.dLevel, f.dGoldCarry, f.dGoldRest] },
 ];
 
-const withBuffs = (v: Variant): Variant => ({ name: `${v.name} + Baron, Elder, Drachen, Seele, Atakhan`, columns: [...v.columns, ...BUFF_COLUMNS], row: (f) => [...v.row(f), ...buffs(f)] });
+/** The buffs on top of a variant — those that ever differ between the teams (Atakhan did not once on 27.11.2026). */
+const withBuffs = (v: Variant, active: readonly boolean[]): Variant => ({
+  name: `${v.name} + ${BUFF_NAMES.filter((_, j) => active[j]).join(', ')}`,
+  columns: [...v.columns, ...BUFF_COLUMNS.filter((_, j) => active[j])],
+  row: (f) => [...v.row(f), ...buffs(f).filter((_, j) => active[j])],
+});
 const withCarry = (v: Variant): Variant => ({ name: `${v.name} + wo das Gold liegt`, columns: [...v.columns, 'reichster Spieler, 1.000 Gold'], row: (f) => [...v.row(f), f.dCarry] });
 
 /**
@@ -270,7 +287,8 @@ export async function main(args: string[]): Promise<number> {
   let lines = 0;
   for (const patch of file.patches) {
     const read = readFights(patch.games, lines);
-    all.push(...read.fights);
+    // One at a time: a patch has some hundred thousand fights, too many to spread into push().
+    for (const f of read.fights) all.push(f);
     sampled += read.sampled;
     lines += patch.games.length;
   }
@@ -355,7 +373,9 @@ export async function main(args: string[]): Promise<number> {
   const bases = BASES.map(rungOf);
   // The plain base, unless an alternative beats it clearly; among those that do, the best.
   const base = bases.slice(1).reduce((best, rung) => (better(bases[0]!.heldZ, rung.heldZ) && versus(best.heldZ, rung.heldZ).gain > 0 ? rung : best), bases[0]!);
-  const buffed = rungOf(withBuffs(base.variant));
+  // A buff that never differs between the teams says nothing and has no weight to fit.
+  const activeBuffs = BUFF_COLUMNS.map((_, j) => trainFeatures.some((f) => buffs(f)[j] !== 0));
+  const buffed = rungOf(withBuffs(base.variant, activeBuffs));
   const afterBuffs = better(base.heldZ, buffed.heldZ) ? buffed : base;
   const carried = rungOf(withCarry(afterBuffs.variant));
   const linearBest = better(afterBuffs.heldZ, carried.heldZ) ? carried : afterBuffs;
@@ -398,7 +418,8 @@ export async function main(args: string[]): Promise<number> {
   line(buffed.variant.name, buffed.heldZ, base.heldZ, base.variant.name);
   line(carried.variant.name, carried.heldZ, afterBuffs.heldZ, afterBuffs.variant.name);
   line(`${linearBest.variant.name} + Champion-Stärke je Phase`, championZ, linearBest.heldZ, linearBest.variant.name);
-  report.push('', `**Gewählt: ${finalName}.**`, '');
+  const absent = BUFF_NAMES.filter((_, j) => !activeBuffs[j]);
+  report.push('', `**Gewählt: ${finalName}.**`, ...(absent.length > 0 ? ['', `In keinem Kampf unterschiedlich und deshalb weggelassen: ${absent.join(', ')}.`] : []), '');
 
   // ── The weights ──────────────────────────────────────────────────────────────────────────────
   report.push(

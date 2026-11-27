@@ -98,6 +98,8 @@ describe('which fights count', () => {
     const f = read(...fight(1900, 2, 1, 0, ALL_SEEN, players(12, 8000, { 0: [14, 12000], 7: [11, 6000] })));
     const features = featuresOf(f);
     expect(features).toMatchObject({ dLevel: 3, dGold: 6, dCarry: 4, phase: 2, baron: 0 });
+    // Place 0 is blue's top, place 7 red's mid: both carries; jungle and support even.
+    expect(features).toMatchObject({ dGoldCarry: 6, dGoldRest: 0 });
     // Blue 44.000, red 38.000: 6.000 gold on a mean team worth of 41.000, 1,46 tenths.
     expect(features.dRelative).toBeCloseTo((10 * 6000) / 41000, 6);
   });
@@ -146,7 +148,9 @@ describe('the measurement on a synthetic world', () => {
     expect(await main([gamesPath, '--out', out])).toBe(0);
     const report = readFileSync(out, 'utf8');
     expect(report).toContain('| **gezählt** | 18.000 | 100,0 % |');
-    expect(report).toMatch(/\*\*Gewählt: Itemwert[^*]*\+ Baron, Elder, Drachen, Seele, Atakhan[^*]*\.\*\*/);
+    expect(report).toMatch(/\*\*Gewählt: Itemwert[^*]*\+ Baron[^*]*\.\*\*/);
+    // Only Baron ever differs in this world: the other buffs are left out, and named.
+    expect(report).toContain('In keinem Kampf unterschiedlich und deshalb weggelassen: Elder, Drachen, Seele, Atakhan.');
     // The richest player says nothing here: that rung stays out.
     expect(report).not.toMatch(/Gewählt:[^*]*wo das Gold liegt/);
     // The weight of 1.000 gold comes out near the truth.

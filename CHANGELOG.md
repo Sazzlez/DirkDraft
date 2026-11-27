@@ -13,6 +13,14 @@ Kopien melden sie beim nächsten Start.
   Prozentpunkte.
 - **Neu darunter: „Dieses Duell“.** Für früh, Mitte und spät steht, welcher Champion bei gleichem
   Level und gleichen Items stärker ist, oder „offen“. Die laufende Phase ist hervorgehoben.
+- **Ab Minute 14: „Euer Team im Teamfight“.** Statt nur Level und Items beider Teams nebeneinander
+  zeigt die Kachel jetzt eine Skala: Würde es jetzt zum Teamfight fünf gegen fünf kommen, welches Team
+  gewinnt ihn eher? Darunter steht, wie oft Teams in dieser Lage den Teamfight gewonnen haben, und
+  woraus sich die Stufe zusammensetzt: Gold- und Level-Vorsprung, Baron, Elder, Drachen, Seele und die
+  Champions in dieser Spielphase. Gold auf ADC, Mid und Top zählt dabei gut doppelt so viel wie auf
+  Jungle und Support. Ein gegnerischer ADC mit weniger Gold als euer Support ist also trotzdem der
+  größere Faktor. Gemessen an rund 45.000 Teamfights. Wer gerade tot ist, zählt bewusst nicht, und
+  es gibt keine Timer.
 
 ## 2.3.0 — 2026-11-18
 

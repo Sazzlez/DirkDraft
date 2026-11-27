@@ -39,11 +39,11 @@ Dieselbe senkrechte Skala wie „Du gegen …“ in der Lane-Phase, damit man si
    -2   ┃
    -3   ┃
 
- Items      41.200 : 37.900   +3.300   ▲▲
- Baron      ihr                        ▲
- Drachen    3 : 1                      ▲
- Champions  in dieser Phase Gegner     ▼
- Level      71 : 70           +1       ·
+ Level      +4                         ▲
+ Elder      ihr                        ▲
+ Gold       +3.300                     ·
+ Drachen    3 : 1                      ·
+ Champions  Gegner                     ·
 ```
 
 - **Stufe und Satz:** sieben Stufen wie die Lane-Skala (Ausgeglichen, Leicht / — / Deutlich stärker
@@ -51,8 +51,11 @@ Dieselbe senkrechte Skala wie „Du gegen …“ in der Lane-Phase, damit man si
   gemessene Quote der Stufe aus der Prüfung, nicht die rohe Modellzahl.
 - **Woraus sie sich zusammensetzt:** eine Zeile je Faktor, nach Größe sortiert. Die Pfeile zeigen den
   Anteil des Faktors in Stufen der Skala (▲ ab einer halben Stufe für euch, ▲▲ ab anderthalb; ▼ für
-  die Gegner; · zählt kaum). So sieht man, *warum* die Skala steht, wo sie steht — „Items und Baron
+  die Gegner; · zählt kaum). So sieht man, *warum* die Skala steht, wo sie steht — „Level und Elder
   für euch, die Champions für die Gegner“ —, ohne eine Formel lesen zu müssen.
+- Gold und Level stehen als Vorsprung des eigenen Teams, nicht als zwei Teamsummen; zwei große
+  Zahlen nebeneinander musste man erst selbst verrechnen (Nutzerwunsch 27.11.2026). Gold ist der
+  Itemwert, wie überall in der Spielansicht.
 - Zeilen ohne Inhalt fehlen (kein Baron aktiv → keine Baron-Zeile).
 - Die Gegnerliste darunter (Stufe, Itemwert, „meiste Items“) bleibt wie heute.
 
@@ -70,8 +73,11 @@ Dieselbe senkrechte Skala wie „Du gegen …“ in der Lane-Phase, damit man si
 Nur wenn die Messung zeigt, dass es besser vorhersagt (sonst nicht drin):
 
 - **Wo das Gold liegt:** ob 1.000 Gold auf dem ADC oder Midlaner mehr zählen als auf dem Support —
-  „ein gefütterter Carry“ statt nur der Teamsumme.
-- **Atakhan** — nur wenn die Live-API ihn meldet (zu prüfen).
+  „ein gefütterter Carry“ statt nur der Teamsumme. *Gemessen am 27.11.2026: ja, Gold auf Top, Mid und
+  ADC zählt gut doppelt so viel wie auf Jungle und Support, und die Skala rechnet seitdem so (Messung
+  36, Nachtrag). Der „reichste Spieler“ bringt darüber nichts mehr.*
+- **Atakhan** — nur wenn die Live-API ihn meldet (zu prüfen). *Kam bis 27.11.2026 in keinem
+  gezählten Spiel vor und entfällt (Messung 36).*
 
 Resistenzen gegen die Schadensart des Gegnerteams sind nicht messbar: Der Teamfight-Teil der
 Spielzeile trägt je Spieler nur Level und Itemwert. Dafür bräuchte er zwei Zahlen mehr je Spieler.
@@ -160,6 +166,17 @@ Den Vorteil der Seite weist der Bericht trotzdem aus. Gezählt werden nur Kämpf
 oft, wie die Stufe sagt, **in jeder Phase** (14–20, 20–30, ab 30). Vorher erscheint kein Urteil; bis
 dahin bleibt die heutige Kachel.
 
+**Ergebnis vom 27.11.2026** (`docs/modellpruefung.md`, Messung 36, 45.447 gezählte Kämpfe): **bestanden.**
+- **Was hineinkommt:** Level und Itemwert über alle Phasen gleich gewichtet, der Itemwert nach Rollen
+  getrennt (Top, Mid und ADC 0,066 je 1.000 Gold, Jungle und Support 0,032; Nutzerfrage, Nachtrag
+  vom 27.11.). Dazu Baron, Elder, Drachen und Seele sowie die Champion-Stärke je Phase (klein, keine
+  über ±0,25). Kennt die App die Positionen nicht, rechnet sie mit der Gold-Summe.
+- **Was draußen bleibt:** Gewichte je Phase, Itemwert relativ zum Teamwert und der reichste Spieler.
+  Keines davon sagt messbar besser vorher.
+- **Atakhan** kam in keinem Spiel vor und entfällt.
+- **Stufen:** Mit der Stufenbreite der Lane-Skala (0,6) stimmen sie in jeder Phase oder sind leicht
+  vorsichtig. Ab Minute 30 gewinnt das vorn gesehene Team etwas öfter, als die Skala sagt.
+
 **Grenze, offen gesagt:** Gezählt sind Kämpfe, die stattgefunden haben. Ein Team, das hinten liegt,
 meidet Kämpfe und nimmt eher die an, in denen es eine Chance sieht (Position, Cooldowns). Der gemessene
 Vorteil ist deshalb eher zu klein als zu groß. „Gewonnen“ heißt: mehr Kills im Kampf, nicht das Objekt
@@ -175,9 +192,18 @@ danach.
    schreibt den Bericht nach `build/measure-fights.md`. Am Artefakt vom 22.11. läuft es durch und meldet
    noch keine Teamfights. Das Ergebnis kommt als Messung in `docs/modellpruefung.md`, sobald rund
    40.000 gezählte Kämpfe da sind (Artefakt holen: `gh run download <Lauf> -n games`).
-3. **Export** der gemessenen Zahlen in die Datendatei (Gewichte, Buff-Werte, Champion-Stärke je Phase).
+3. **Export** der gemessenen Zahlen in die Datendatei (Gewichte, Buff-Werte, Champion-Stärke je Phase),
+   wie bei der Lane-Skala (`laneScale` in `meta.json`). — Gebaut am 27.11.2026: `TeamfightScaleModel`,
+   `teamfightScale` in `meta.json` ab 20.000 gezählten Kämpfen.
 4. **App:** `teamStrengthOf` in `core/strength.ts`; die Live-Ereignisse (`DragonKill`, `BaronKill`)
    kommen mit `allgamedata` schon an und müssen nur gelesen werden; Kachel aus `StrengthTile.svelte`
-   abgeleitet. Vorschau zuerst im localhost-Duplikat.
+   abgeleitet. Vorschau zuerst im localhost-Duplikat. — Gebaut am 27.11.2026 (`TeamStrengthTile.svelte`).
+   - **In der Vorschau geprüft:** mit echten Zahlen und mit Beispieldaten, hell und dunkel.
+   - **Aufbau:** Die Zeilen stehen nach Größe sortiert. Baron, Elder, Drachen und Seele erscheinen
+     nur, wenn sie im Spiel sind.
+   - **Killer-Namen:** Im Ereignis-Feed ist der Killer der Spielname ohne Tag. Er passt zum
+     `riotIdGameName` der Spielerliste (in einer Aufzeichnung vom 22.11. geprüft); ohne ihn gilt der
+     Beschwörername.
 5. **Live-Test** mit dem Client — nur nach Rückfrage. Dabei prüfen, welche Ereignisse die Live-API für
-   Drachen, Baron, Elder und Atakhan wirklich liefert.
+   Drachen, Baron, Elder und Atakhan wirklich liefert. *`DragonKill` mit Drachentyp ist in einer
+   Aufzeichnung vom 22.11. belegt; `BaronKill` und Elder noch in keiner.*

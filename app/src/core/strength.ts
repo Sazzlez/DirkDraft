@@ -9,9 +9,9 @@
 // count together. On top comes how strong each champion is in the duel on its lane in that phase,
 // at equal level and items — measured at export and read from meta.json (`laneScale`).
 
-import { championIdOf, itemWorth, type ItemInfo, type LiveGameData, type LivePlayer } from './game';
+import { championIdOf, itemWorth, type ItemInfo, type LiveEvent, type LiveGameData, type LivePlayer } from './game';
 import { Lane, laneFromLcu } from './model/lane';
-import type { LaneScaleFile, MetaLookup } from './model/metaLookup';
+import type { LaneScaleFile, MetaLookup, TeamfightScaleFile } from './model/metaLookup';
 
 /** Log-odds per level and per 1.000 gold of item worth ahead. */
 export interface StrengthWeights {
@@ -258,4 +258,135 @@ export function teamStandOf(data: LiveGameData, meta: MetaLookup, items: Readonl
   const rows = enemies.map((p) => ({ championId: championIdOf(p, meta), level: levelOf(p), worth: itemWorth(owned(p), items) }));
   const leader = rows.reduce<(typeof rows)[number] | null>((best, row) => (row.worth > (best?.worth ?? 0) ? row : best), null);
   return { mine, theirs, levelDiff: mine.level - theirs.level, worthDiff: mine.worth - theirs.worth, enemies: rows, leaderId: leader?.championId ?? 0 };
+}
+
+// ---- the teamfight scale: team against team, with a verdict ----------------------------------------
+
+/** How long Baron's and the Elder's buffs last; the measurement gives them to the whole team, and so does the scale. */
+export const BARON_SECONDS = 180;
+export const ELDER_SECONDS = 150;
+
+/** The phase of the game for the champions' teamfight strength: before minute 20, before minute 30, after (C# TeamfightScaleModel.PhaseOf). */
+export const teamfightPhaseOf = (seconds: number): number => (seconds < 1200 ? 0 : seconds < 1800 ? 1 : 2);
+
+/** What the teamfight scale reckons with (meta.json `teamfightScale`, Messung 36). */
+export interface TeamfightScale {
+  weights: TeamfightScaleFile['weights'];
+  /** Log-odds the champion adds to its team in a fight in that phase; 0 where nothing is measured. */
+  strength: (championId: number, phase: number) => number;
+}
+
+const teamfightScales = new WeakMap<TeamfightScaleFile, TeamfightScale>();
+
+/** The teamfight scale from meta.json, or null — without measured weights the tile gives no verdict. */
+export function teamfightScaleOf(meta: MetaLookup): TeamfightScale | null {
+  const file = meta.snapshot.teamfightScale;
+  const w = file?.weights;
+  if (!file || !w || ![w.level, w.gold, w.baron, w.elder, w.dragon, w.soul].every(Number.isFinite)) return null;
+  let scale = teamfightScales.get(file);
+  if (!scale) {
+    const strengths = new Map((file.champions ?? []).filter((c) => Number.isFinite(c.strength)).map((c) => [`${c.championId}:${c.phase}`, c.strength]));
+    scale = { weights: w, strength: (id, phase) => strengths.get(`${id}:${phase}`) ?? 0 };
+    teamfightScales.set(file, scale);
+  }
+  return scale;
+}
+
+/** What a team brings into a fight from the monsters: as the game's event feed shows them to everybody. */
+export interface TeamBuffs {
+  /** Elemental dragons taken. */
+  dragons: number;
+  /** The first team to four elemental dragons holds the soul. */
+  soul: boolean;
+  /** Baron taken in the last BARON_SECONDS. */
+  baron: boolean;
+  /** The Elder taken in the last ELDER_SECONDS. */
+  elder: boolean;
+}
+
+/**
+ * Both teams' buffs from the event feed. The killer is named as the scrubber writes the Riot ID
+ * without its tag — the same pseudonym as the player's `riotIdGameName`; where a player has none,
+ * the summoner name. A kill by nobody the list knows (a minion's last hit) counts for neither.
+ */
+export function teamBuffsOf(data: LiveGameData, mineTeam: string): { mine: TeamBuffs; theirs: TeamBuffs } {
+  const teamOf = new Map<string, string>();
+  for (const p of data.allPlayers ?? []) {
+    if (!p.team) continue;
+    for (const name of [p.riotIdGameName, p.summonerName, p.riotId, p.riotId?.split('#')[0]]) if (name && !teamOf.has(name)) teamOf.set(name, p.team);
+  }
+  const now = data.gameData?.gameTime ?? 0;
+  const empty = (): TeamBuffs => ({ dragons: 0, soul: false, baron: false, elder: false });
+  const mine = empty();
+  const theirs = empty();
+  const events: LiveEvent[] = [...(data.events?.Events ?? [])].sort((a, b) => (a.EventTime ?? 0) - (b.EventTime ?? 0));
+  for (const e of events) {
+    const team = e.KillerName ? teamOf.get(e.KillerName) : undefined;
+    if (!team) continue;
+    const side = team === mineTeam ? mine : theirs;
+    const ago = now - (e.EventTime ?? 0);
+    if (e.EventName === 'BaronKill' && ago >= 0 && ago <= BARON_SECONDS) side.baron = true;
+    if (e.EventName !== 'DragonKill') continue;
+    if (e.DragonType === 'Elder') {
+      if (ago >= 0 && ago <= ELDER_SECONDS) side.elder = true;
+    } else {
+      side.dragons++;
+      if (side.dragons >= 4 && !mine.soul && !theirs.soul) side.soul = true;
+    }
+  }
+  return { mine, theirs };
+}
+
+export interface TeamStrength {
+  stand: TeamStand;
+  buffs: { mine: TeamBuffs; theirs: TeamBuffs };
+  /** The phase of the game for the champions (teamfightPhaseOf). */
+  phase: number;
+  /** What each factor adds for the own team, in log-odds: the rows of the tile, sorted there by size. */
+  parts: { level: number; gold: number; baron: number; elder: number; dragons: number; soul: number; champions: number };
+  /** Chance to win a teamfight of five against five now, as the measured weights say. */
+  chance: number;
+  /** −3 … +3, positive is stronger; the lane scale's steps (STRENGTH_STEP). */
+  value: number;
+}
+
+/**
+ * The teamfight scale: if all ten met now, which team would win the fight? From the levels and items
+ * on the scoreboard, the monsters in the event feed and the champions — never who is dead now, no
+ * timer, no cooldown (docs/teamfight-skala.md, „Bewusst nicht drin“). Null without the measured scale
+ * in meta.json or without the own row.
+ */
+export function teamStrengthOf(data: LiveGameData, meta: MetaLookup, items: ReadonlyMap<number, ItemInfo>, scale: TeamfightScale | null = teamfightScaleOf(meta)): TeamStrength | null {
+  if (!scale) return null;
+  const stand = teamStandOf(data, meta, items);
+  const me = ownRow(data);
+  if (!stand || !me?.team) return null;
+  const players = data.allPlayers ?? [];
+  const phase = teamfightPhaseOf(data.gameData?.gameTime ?? 0);
+  const champions = (team: (p: LivePlayer) => boolean): number => players.filter(team).reduce((sum, p) => sum + scale.strength(championIdOf(p, meta), phase), 0);
+  const buffs = teamBuffsOf(data, me.team);
+  const flag = (value: boolean): number => (value ? 1 : 0);
+  const w = scale.weights;
+
+  // Gold on top, mid and ADC counts about twice as much as on jungle and support (Messung 36): an
+  // enemy ADC with less gold than our support is still the bigger threat. Where a position is
+  // missing (blind pick, custom game) the summed weight stands in.
+  const carries = new Set<Lane>([Lane.Top, Lane.Mid, Lane.Adc]);
+  const inTeams = players.filter((p) => !!p.team);
+  const byRole = w.goldCarry !== undefined && w.goldRest !== undefined && Number.isFinite(w.goldCarry) && Number.isFinite(w.goldRest) && inTeams.every((p) => laneFromLcu(p.position) !== Lane.Unknown);
+  const goldOf = (carry: boolean): number =>
+    inTeams.reduce((sum, p) => (carries.has(laneFromLcu(p.position)) === carry ? sum + (p.team === me.team ? 1 : -1) * itemWorth(owned(p), items) : sum), 0);
+  const gold = byRole ? (w.goldCarry! * goldOf(true) + w.goldRest! * goldOf(false)) / 1000 : (w.gold * stand.worthDiff) / 1000;
+
+  const parts = {
+    level: w.level * stand.levelDiff,
+    gold,
+    baron: w.baron * (flag(buffs.mine.baron) - flag(buffs.theirs.baron)),
+    elder: w.elder * (flag(buffs.mine.elder) - flag(buffs.theirs.elder)),
+    dragons: w.dragon * (buffs.mine.dragons - buffs.theirs.dragons),
+    soul: w.soul * (flag(buffs.mine.soul) - flag(buffs.theirs.soul)),
+    champions: champions((p) => p.team === me.team) - champions((p) => !!p.team && p.team !== me.team),
+  };
+  const logOdds = Object.values(parts).reduce((sum, v) => sum + v, 0);
+  return { stand, buffs, phase, parts, chance: sigmoid(logOdds), value: Math.max(-STRENGTH_STEPS, Math.min(STRENGTH_STEPS, logOdds / STRENGTH_STEP)) };
 }

@@ -6,6 +6,7 @@
   import SkillGrid from '../build/SkillGrid.svelte';
   import BuyStrip from './BuyStrip.svelte';
   import StrengthTile from './StrengthTile.svelte';
+  import TeamStrengthTile from './TeamStrengthTile.svelte';
   import TeamTile from './TeamTile.svelte';
   import VerdictTile from '../draft/VerdictTile.svelte';
 
@@ -90,10 +91,15 @@
 
   </div>
   <div class="col right">
-  <!-- The lane scale during the lane phase; after it (and where there is none) both teams' numbers. -->
+  <!-- The lane scale during the lane phase; after it (and where there is none) the teamfight scale, or
+       both teams' plain numbers where meta.json has no measured teamfight scale. -->
   {#if game.strength}
   <div class="strength">
     <StrengthTile strength={game.strength} />
+  </div>
+  {:else if game.teamStrength}
+  <div class="strength">
+    <TeamStrengthTile team={game.teamStrength} />
   </div>
   {:else if game.team}
   <div class="strength">

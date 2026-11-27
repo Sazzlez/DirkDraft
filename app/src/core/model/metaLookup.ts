@@ -105,7 +105,23 @@ export interface MetaSnapshot {
   versus?: VersusStat[];
   /** The lane scale's weights and the champions' duel strength (C# LaneScaleModel); own data from 22.11.2026 on, with enough clean duels. */
   laneScale?: LaneScaleFile;
+  /** The teamfight scale's weights and the champions' teamfight strength (C# TeamfightScaleModel); own data from 27.11.2026 on, with enough counted fights. */
+  teamfightScale?: TeamfightScaleFile;
   warnings: string[];
+}
+
+/** meta.json's `teamfightScale` (docs/modellpruefung.md, Messung 36). */
+export interface TeamfightScaleFile {
+  fights: number;
+  tau: number;
+  /**
+   * Log-odds per level (sum of five), per 1.000 gold of items, for Baron, the Elder, per dragon and for
+   * the soul. `goldCarry` and `goldRest`: per 1.000 gold on top, mid and ADC, and on jungle and support
+   * (since 27.11.2026); `gold` is the summed weight for a game without known positions.
+   */
+  weights: { level: number; gold: number; goldCarry?: number; goldRest?: number; baron: number; elder: number; dragon: number; soul: number };
+  /** Phase 0 before minute 20, 1 before minute 30, 2 after; strength in log-odds, drawn to 0. */
+  champions: { championId: number; phase: number; strength: number; fights: number }[];
 }
 
 /** meta.json's `laneScale` (docs/modellpruefung.md, Messung 35). */

@@ -7,10 +7,10 @@ import { LANE_NAMES } from '../core/view';
 import { loadAssets } from './assets';
 import { DraftEngine, stateFromFrame, type DraftFrame } from '../core/engine';
 import type { AramStat } from '../core/model/advisors';
-import { MetaLookup, type MetaSnapshot } from '../core/model/metaLookup';
+import { MetaLookup, type MetaSnapshot, type TeamfightScaleFile } from '../core/model/metaLookup';
 import { laneFromKey } from '../core/model/lane';
 import { gameModel, type LiveGameData } from '../core/game';
-import { strengthOf, teamStandOf } from '../core/strength';
+import { strengthOf, teamStandOf, teamStrengthOf } from '../core/strength';
 import type { PlanOption, RiotBuildPlan } from '../core/riotBuilds';
 import { gameView, strengthView } from './gameView';
 import { SITUATION, SLOT, applySwaps, type RatedSuggestion, type Swap } from '../core/situational';
@@ -420,8 +420,8 @@ function sampleStrength(a: GoldenAdapter, variant: 'ahead' | 'behind' | 'bot'): 
       value: -1.9,
       label: 'Schwächer',
       rows: [
-        { label: 'Level', mine: '5', theirs: '6', diff: '−1', tone: 'down' },
-        { label: 'Items', mine: '1.650', theirs: '2.300', diff: '−650', tone: 'down' },
+        { label: 'Level', value: '−1', tone: 'down' },
+        { label: 'Gold', value: '−650', tone: 'down' },
       ],
       phases: [
         { label: 'früh · Lvl 1–5', who: 'Darius', tone: 'up', now: false },
@@ -435,8 +435,8 @@ function sampleStrength(a: GoldenAdapter, variant: 'ahead' | 'behind' | 'bot'): 
       value: 0.2,
       label: 'Ausgeglichen',
       rows: [
-        { label: 'Level', mine: '8 + 7', theirs: '8 + 7', diff: '±0', tone: 'even' },
-        { label: 'Items', mine: '5.100', theirs: '4.850', diff: '+250', tone: 'up' },
+        { label: 'Level', value: '±0', tone: 'even' },
+        { label: 'Gold', value: '+250', tone: 'up' },
       ],
       phases: null,
     };
@@ -445,8 +445,8 @@ function sampleStrength(a: GoldenAdapter, variant: 'ahead' | 'behind' | 'bot'): 
     value: 1.3,
     label: 'Leicht stärker',
     rows: [
-      { label: 'Level', mine: '9', theirs: '8', diff: '+1', tone: 'up' },
-      { label: 'Items', mine: '3.450', theirs: '2.800', diff: '+650', tone: 'up' },
+      { label: 'Level', value: '+1', tone: 'up' },
+      { label: 'Gold', value: '+650', tone: 'up' },
     ],
     phases: [
       { label: 'früh · Lvl 1–5', who: 'Darius', tone: 'up', now: false },
@@ -455,6 +455,14 @@ function sampleStrength(a: GoldenAdapter, variant: 'ahead' | 'behind' | 'bot'): 
     ],
   };
 }
+
+/** The teamfight scale's weights as measured on 27.11.2026 (Messung 36), for scenes whose meta has none; Jinx as one champion strength. */
+const SAMPLE_TEAMFIGHT_SCALE: TeamfightScaleFile = {
+  fights: 45_447,
+  tau: 0.06,
+  weights: { level: 0.137, gold: 0.048, goldCarry: 0.066, goldRest: 0.032, baron: 0.17, elder: 0.52, dragon: 0.061, soul: 0.27 },
+  champions: [{ championId: 222, phase: 1, strength: 0.1, fights: 2398 }],
+};
 
 function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: MetaLookup, variant: 'ahead' | 'behind' | 'bot' | 'late' = 'ahead'): ViewModel {
   const darius = ref(a, 122);
@@ -470,6 +478,8 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
   const abilities = Object.fromEntries((['Q', 'W', 'E', 'R'] as const).map((k) => [k, { abilityLevel: [...order].filter((c) => c === k).length }]));
   const enemy = (raw: string, items: number[], position: string, level: number) => ({
     rawChampionName: `game_character_displayname_${raw}`,
+    // The name the event feed uses for this player (the scrubber's pseudonym; here the champion).
+    riotIdGameName: raw,
     team: 'CHAOS',
     position,
     level,
@@ -492,6 +502,16 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
           enemy('Morgana', [3190, 3157], 'UTILITY', 11),
         ],
         gameData: { gameTime: 24 * 60 + 10 },
+        // Three dragons to one and Baron 50 seconds ago, as the event feed shows them to everybody.
+        events: {
+          Events: [
+            { EventName: 'DragonKill', EventTime: 360, KillerName: 'LeeSin', DragonType: 'Fire' },
+            { EventName: 'DragonKill', EventTime: 690, KillerName: 'Warwick', DragonType: 'Water' },
+            { EventName: 'DragonKill', EventTime: 1020, KillerName: 'LeeSin', DragonType: 'Earth' },
+            { EventName: 'DragonKill', EventTime: 1360, KillerName: 'Jinx', DragonType: 'Hextech' },
+            { EventName: 'BaronKill', EventTime: 1400, KillerName: 'LeeSin' },
+          ],
+        },
       }
     : {
         activePlayer: { riotId: 'Spieler 1', level: 9, currentGold: 1240, abilities },
@@ -527,13 +547,21 @@ function gameScene(a: GoldenAdapter, plans: { matchupGuide: GoldenPlan }, meta: 
     { icon: 'engage', tone: 'good', title: 'Ihr habt mehr Engage', detail: 'Ihr könnt Kämpfe eröffnen, sie kaum.' },
     { icon: 'scaling', tone: 'warn', title: 'Gegner skalieren besser', detail: 'Früh Druck machen, Objectives nehmen.' },
   ];
-  const shown = gameView(model!, (id) => a.champion(id), 'Darius vs Jax · Toplane', null, situational, null, [], { team: teamStandOf(sample, meta, items), verdict });
+  // After the lane phase the teamfight scale: from the meta's own `teamfightScale` where it has one
+  // (own data), otherwise with the weights of Messung 36 and one sample champion strength.
+  const teamMeta = meta.snapshot.teamfightScale ? meta : new MetaLookup({ ...meta.snapshot, teamfightScale: SAMPLE_TEAMFIGHT_SCALE });
+  const shown = gameView(model!, (id) => a.champion(id), 'Darius vs Jax · Toplane', null, situational, null, [], {
+    team: teamStandOf(sample, meta, items),
+    teamStrength: late ? teamStrengthOf(sample, teamMeta, items) : null,
+    verdict,
+  });
   const game: GameView = {
     ...shown,
     sample: 'Beispieldaten — im Spiel liest die Ansicht Riots Live-Client-Schnittstelle.',
     // After the lane phase the team stand takes the scale's place, as in the live session.
     strength: late ? null : reckonedView ? { ...reckonedView, phases: reckonedView.phases ?? sampleStrength(a, 'ahead').phases } : sampleStrength(a, variant),
     team: late ? shown.team : null,
+    teamStrength: late ? shown.teamStrength : null,
   };
   return {
     moment: 'game',

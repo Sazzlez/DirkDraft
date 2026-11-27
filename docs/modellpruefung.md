@@ -1812,6 +1812,110 @@ auseinanderliegen; das trifft je Phase auf etwa ein Drittel der Matchups zu, die
 0,25. Der Export rechnet die Zahlen vom 22.11. in C# nach (Gewichte auf ±0,02 gleich, etwa 2,5 s für
 392.000 Duelle, 145 KB mehr in `meta.json`).
 
+## 36. Die Teamfight-Skala (27.11.2026)
+
+Die Prüfung aus `docs/teamfight-skala.md` („Rechnung und Prüfung“) mit `npm run measure:fights`
+(`app/tools/measure/fights.ts`) am Artefakt vom 27.11.2026. 32.123 Zeilen tragen seit dem 22.11. den
+Teamfight-Teil (Spiel-Liste Version 5); darin stehen 159.157 Kämpfe mit drei oder mehr je Team ab
+Minute 14, 5,0 je Spiel. Den vollen Bericht schreibt das Werkzeug nach `build/measure-fights.md`.
+
+**Welche Kämpfe zählen.** Die Ausschlüsse werden in dieser Reihenfolge geprüft:
+
+| | Kämpfe | Anteil |
+|---|---:|---:|
+| ein Team ging nicht vollzählig hinein (nach Riots Respawn-Zeit) | 75.781 | 47,6 % |
+| weniger als vier je Team gesehen | 31.798 | 20,0 % |
+| AFK-Spieler (fünf oder mehr Level unter dem Median) | 352 | 0,2 % |
+| gleich viele Kills | 5.779 | 3,6 % |
+| **gezählt** | **45.447** aus 23.283 Spielen | 28,6 % |
+
+Fast jeder zweite Kampf beginnt mit einem Toten. Das sind meist Folgekämpfe kurz nach einem ersten
+Gefecht. Die Skala beschreibt 5 gegen 5 und lernt nur aus solchen Kämpfen.
+
+**Die Leiter auf zurückgehaltenen Spielen** (9.033 Kämpfe aus 2 von 10 Spielen; Münzwurf 0,6931; eine
+Stufe kommt nur mit mindestens zwei Standardfehlern Gewinn dazu):
+
+| Stufe | Log-Loss | Gewinn gegen die Stufe davor | in Standardfehlern | Trefferquote |
+|---|---:|---:|---:|---:|
+| Itemwert + Level | 0,6109 | +0,0822 gegen Münzwurf | +20,8 | 66,5 % |
+| … je Phase | 0,6107 | +0,0002 | +0,7 | 66,4 % |
+| … Itemwert relativ zum Teamwert | 0,6117 | −0,0008 | −2,3 | 66,6 % |
+| **+ Baron, Elder, Drachen, Seele** | 0,6056 | +0,0053 | **+5,1** | 67,1 % |
+| … + wo das Gold liegt (reichster Spieler) | 0,6044 | +0,0013 | +1,8 | 67,0 % |
+| **+ Champion-Stärke je Phase** | 0,6002 | +0,0054 | **+7,8** | 67,8 % |
+
+**Gewählt: Itemwert + Level + Baron, Elder, Drachen, Seele + Champion-Stärke je Phase.**
+
+- **Ein Gewichtspaar reicht** für Itemwert und Level, anders als im Duell. Je Phase oder relativ zum
+  Teamwert sagt nicht besser vorher. Je Level Vorsprung (Summe der fünf) +0,14 Log-Odds, je 1.000 Gold
+  Itemwert +0,05. Beide hängen eng zusammen, das Level trägt den größeren Teil.
+- **Die Buffs zählen:** Elder +0,51, Seele +0,27, Baron +0,17, jeder Drache mehr +0,06. Baron und
+  Elder gelten dabei fürs ganze Team für 180 bzw. 150 Sekunden.
+- **Atakhan kam in keinem der Spiele vor** (kein `ATAKHAN` in den Zeitleisten). Er fällt weg, und die
+  Live-API muss ihn nicht kennen.
+- **Wo das Gold liegt** bleibt knapp unter der Schwelle (+1,8 Standardfehler) und damit draußen.
+- **Champion-Stärke je Phase besteht** (+7,8 Standardfehler), aber mit kleinen Effekten: Die Streuung τ
+  liegt bei 0,06, kein Champion erreicht ±0,25. Stark im Teamfight sind z. B. Viego, Jinx und Kayle
+  spät, Milio, Seraphine und Kassadin; schwach Diana, Lee Sin, Tryndamere, Pantheon und Garen in der
+  Spielmitte sowie Kayle und Draven früh.
+- Die blaue Seite hat keinen messbaren Vorteil (+0,007 ± 0,022).
+
+**Hält die Skala, was sie sagt?** Mit derselben Stufenbreite wie die Lane-Skala (0,6 Log-Odds):
+
+| Stufe des vorn gesehenen Teams | Kämpfe | vorhergesagt | gewonnen | ± |
+|---|---:|---:|---:|---:|
+| Ausgeglichen | 2.340 | 53,7 % | 55,5 % | 2,0 |
+| Leicht stärker | 3.745 | 63,9 % | 65,4 % | 1,6 |
+| Stärker | 2.064 | 75,9 % | 77,3 % | 2,2 |
+| Deutlich stärker | 884 | 86,0 % | 88,6 % | 3,3 |
+
+Je Phase (14–20, 20–30, ab 30 Minuten) gewinnt das vorn gesehene Team in jeder Stufe mindestens so oft,
+wie die Skala sagt. Ab Minute 30 ist sie etwas vorsichtig: Bei 70–80 % vorhergesagt gewannen die Teams
+80 % (± 4,4). Sie verspricht also nirgends zu viel. Etwa ein Viertel der Kämpfe steht auf
+„Ausgeglichen“, 41 % auf „Leicht“, 23 % auf „Stärker“ und 10 % auf „Deutlich“.
+
+**Die Skala besteht damit die Prüfung aus dem Konzept.**
+
+**Nachtrag 27.11.2026: Gold nach Rollen** (Frage des Nutzers: Ist ein gegnerischer ADC mit weniger
+Gold als unser Support trotzdem stärker?). Gemessen an denselben Kämpfen, je 1.000 Gold Itemwert auf
+der Rolle (eigener Spieler minus Gegner auf derselben Rolle): ADC 0,077, Mid 0,063, Top 0,055, Jungle
+0,031, Support 0,030. Gold auf den Carrys zählt also gut doppelt so viel. Als Stufe der Leiter mit zwei
+Gewichten (Top, Mid, ADC zusammen; Jungle und Support zusammen):
+
+| Stufe | Log-Loss | Gewinn | in Standardfehlern |
+|---|---:|---:|---:|
+| Itemwert nach Rollen + Level (gegen eine Summe) | 0,6096 | +0,0013 | **+3,0** |
+| + Baron, Elder, Drachen, Seele | 0,6043 | +0,0053 | +5,1 |
+| + Champion-Stärke je Phase | **0,5995** | +0,0048 | +7,3 |
+
+Gewählt ist seitdem **Itemwert nach Rollen** + Level + Buffs + Champion-Stärke: 0,066 je 1.000 Gold
+auf Top, Mid und ADC, 0,032 auf Jungle und Support. „Wo das Gold liegt“ (der reichste Spieler) bringt
+darüber nichts mehr (+1,1).
+
+Auf der Botlane der Lane-Skala wiegt ADC-Gold ebenfalls mehr als Support-Gold (früh 0,49 gegen
+0,31, ab Level 6 0,38 gegen 0,23). Die Vorhersage der Duelle verbessert das aber nicht messbar (+0,5
+und +1,3 Standardfehler), weil beide Seiten einen ADC und einen Support haben. Die Lane-Skala bleibt
+bei der Summe.
+
+**Umgesetzt (27.11.2026).** Der Export (`TeamfightScaleModel` in `DraftPilot.Core/Data/TeamfightScale.cs`)
+rechnet bei jedem Lauf aus den gezählten Kämpfen:
+- die Gewichte für Level, Itemwert der Carrys, Itemwert von Jungle und Support, Baron, Elder, Drachen
+  und Seele (ohne Seite), dazu das Gewicht der Gold-Summe für Spiele ohne bekannte Positionen;
+- darauf die Champion-Stärke je Phase (τ 0,06).
+
+Beides steht in `meta.json` unter `teamfightScale`, ab 20.000 gezählten Kämpfen. Am Artefakt vom 27.11.
+rechnet C# dieselben Zahlen: 45.447 Kämpfe in 0,9 s; Level 0,146, Gold 0,048, Baron 0,17, Elder
+0,55, Drache 0,055, Seele 0,30. Die App (`teamStrengthOf` in `core/strength.ts`) zeigt damit ab 14:00
+„Euer Team im Teamfight“. Fehlt `teamfightScale`, bleibt es bei Level und Items ohne Urteil.
+
+Die Buffs liest die App aus dem Ereignis-Feed der Live-API:
+- `DragonKill` mit dem Drachentyp, `Elder` für 150 s;
+- `BaronKill` für 180 s;
+- die Seele beim vierten Drachen eines Teams.
+
+Den Killer ordnet sie über den Spielnamen ohne Tag dem Team zu (`riotIdGameName`, sonst der
+Beschwörername). Unter der Stufe steht die gemessene Quote der Stufe aus dieser Messung („rund 7 von 10“).
+
 ## Was offen bleibt (2.0)
 
 - **Seit 2.1 erledigt** (Messung 13 und 21): Die drei geschätzten Gewichte (übrige Gegner 0,35,

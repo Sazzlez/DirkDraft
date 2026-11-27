@@ -13,7 +13,7 @@ import { readComboFile } from '../core/model/kits';
 import { TraitTable } from '../core/model/traits';
 import { momentOf, type GameflowPhase } from '../core/moment';
 import { aramPlan, riotPlan, type RiotBuildPlan } from '../core/riotBuilds';
-import { strengthOf, teamStandOf } from '../core/strength';
+import { strengthOf, teamStandOf, teamStrengthOf } from '../core/strength';
 import { SLOT, SituationTracker, SwapTracker, sameStateEdge, situationalBuild, situationalSuggestions, situationsOf, type RatedSuggestion, type Slot } from '../core/situational';
 import { LANE_NAMES, type BuildView, type ChampionRef, type DataStatus, type Lane as ViewLane, type ViewModel } from '../core/view';
 import { assets } from '../data/assets';
@@ -596,6 +596,8 @@ export class LiveSession {
         moves,
         {
           team: mode === 'lanes' ? teamStandOf(game, meta, items) : null,
+          // Euer Team im Teamfight: only where meta.json brings the measured scale (Messung 36).
+          teamStrength: mode === 'lanes' ? teamStrengthOf(game, meta, items) : null,
           // The draft this game came from: its last frame is kept until the next lobby.
           verdict: mode === 'lanes' && this.lastActive && this.picked?.championId === championId ? this.adapter.verdictLines(this.lastActive) : [],
         },

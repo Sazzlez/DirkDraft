@@ -25,8 +25,20 @@ export interface LivePlayer {
   level?: number;
   items?: LiveItem[];
   riotId?: string;
+  /** The Riot ID without its tag: the name the event feed uses for killers (pseudonymised alike by the scrubber). */
+  riotIdGameName?: string;
   summonerName?: string;
   position?: string;
+}
+
+/** One entry of the game's event feed (`events.Events`); only what the teamfight scale reads. */
+export interface LiveEvent {
+  EventName?: string;
+  /** Seconds of game time. */
+  EventTime?: number;
+  KillerName?: string;
+  /** "Fire", "Earth", "Water", "Air", "Hextech", "Chemtech" or "Elder". */
+  DragonType?: string;
 }
 
 export interface LiveGameData {
@@ -39,6 +51,7 @@ export interface LiveGameData {
   };
   allPlayers?: LivePlayer[];
   gameData?: { gameTime?: number; gameMode?: string };
+  events?: { Events?: LiveEvent[] };
 }
 
 /** Price, recipe and the stats the situations read (Data Dragon item.json). */

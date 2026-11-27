@@ -3,8 +3,8 @@
 import { DAMAGE_HINT_SHARE, type GameModel } from '../core/game';
 import { SITUATION_TEXT, SLOT, type Move, type RatedSuggestion, type SituationalSuggestion } from '../core/situational';
 import { DamageType } from '../core/model/metaLookup';
-import { LANE_PHASE_SECONDS, type Strength, type TeamStand } from '../core/strength';
-import type { ChampionRef, GameView, ItemRef, StrengthView, TeamStandView, Tone, VerdictLine } from '../core/view';
+import { LANE_PHASE_SECONDS, STRENGTH_STEP, type Strength, type TeamStand, type TeamStrength } from '../core/strength';
+import type { ChampionRef, GameView, ItemRef, StrengthView, TeamStandView, TeamStrengthView, Tone, VerdictLine } from '../core/view';
 import { itemName } from './assets';
 
 const item = (id: number): ItemRef => ({ id, name: itemName(id) });
@@ -61,15 +61,11 @@ export function strengthView(strength: Strength, champion: (id: number) => Champ
     opponents: strength.theirs.championIds.map((id) => champion(id) ?? { id, key: '', name: `#${id}` }),
     value: strength.value,
     label: strengthLabel(strength.value),
+    // Only the own lead (on the bot lane both players summed): "9 : 8 +1" and "4.350 : 4.533 −183"
+    // left the reader to work it out. Gold is the item worth.
     rows: [
-      { label: 'Level', mine: strength.mine.levels.join(' + '), theirs: strength.theirs.levels.join(' + '), diff: signed(strength.levelDiff), tone: tone(strength.levelDiff) },
-      {
-        label: 'Items',
-        mine: strength.mine.worth.toLocaleString('de-DE'),
-        theirs: strength.theirs.worth.toLocaleString('de-DE'),
-        diff: signed(strength.worthDiff),
-        tone: tone(strength.worthDiff),
-      },
+      { label: 'Level', value: signed(strength.levelDiff), tone: tone(strength.levelDiff) },
+      { label: 'Gold', value: signed(strength.worthDiff), tone: tone(strength.worthDiff) },
     ],
     // How the champions do in duels by phase (Messung 35): only where meta.json brings their strengths.
     phases: strength.duel
@@ -104,6 +100,50 @@ export function teamStandView(stand: TeamStand): TeamStandView {
 }
 
 /**
+ * How often the team the teamfight scale sees ahead won, per step (Ausgeglichen, Leicht, —, Deutlich):
+ * measured on the held-out fights of 27.11.2026 (docs/modellpruefung.md, Messung 36).
+ */
+export const TEAMFIGHT_ODDS = [0.555, 0.654, 0.773, 0.886];
+
+/** "Teams in dieser Lage gewinnen rund 7 von 10 Teamfights" — the step's measured share, not the model's own number. */
+export function teamfightOdds(value: number): string {
+  const size = Math.abs(value);
+  const step = size < 0.5 ? 0 : size < 1.5 ? 1 : size < 2.5 ? 2 : 3;
+  const share = step === 0 ? 0.5 : value > 0 ? TEAMFIGHT_ODDS[step]! : 1 - TEAMFIGHT_ODDS[step]!;
+  return `Teams in dieser Lage gewinnen rund ${Math.round(share * 10)} von 10 Teamfights`;
+}
+
+/** The teamfight scale (core/strength teamStrengthOf) as the tile shows it: the step, its odds and its parts, the largest first. */
+export function teamStrengthView(team: TeamStrength): TeamStrengthView {
+  const signed = (diff: number): string => (diff === 0 ? '±0' : `${diff > 0 ? '+' : '−'}${Math.abs(diff).toLocaleString('de-DE')}`);
+  const steps = (part: number): number => part / STRENGTH_STEP;
+  const arrows = (part: number): string => (Math.abs(steps(part)) < 0.5 ? '·' : (part > 0 ? '▲' : '▼').repeat(Math.abs(steps(part)) < 1.5 ? 1 : 2));
+  const tone = (part: number): 'up' | 'down' | 'even' => (Math.abs(steps(part)) < 0.5 ? 'even' : part > 0 ? 'up' : 'down');
+  const who = (mine: boolean, theirs: boolean): string => (mine && theirs ? 'beide' : mine ? 'ihr' : 'Gegner');
+  const { stand, buffs, parts } = team;
+  // Only the difference: two team sums ("38.550 : 41.733") left the reader to do the sum himself.
+  // Gold is the item worth, as everywhere in the game view; Level the five levels summed.
+  const rows: { part: number; label: string; text: string; diff: string }[] = [
+    { part: parts.gold, label: 'Gold', text: signed(stand.worthDiff), diff: '' },
+    { part: parts.level, label: 'Level', text: signed(stand.levelDiff), diff: '' },
+  ];
+  if (buffs.mine.baron || buffs.theirs.baron) rows.push({ part: parts.baron, label: 'Baron', text: who(buffs.mine.baron, buffs.theirs.baron), diff: '' });
+  if (buffs.mine.elder || buffs.theirs.elder) rows.push({ part: parts.elder, label: 'Elder', text: who(buffs.mine.elder, buffs.theirs.elder), diff: '' });
+  if (buffs.mine.dragons + buffs.theirs.dragons > 0) rows.push({ part: parts.dragons, label: 'Drachen', text: `${buffs.mine.dragons} : ${buffs.theirs.dragons}`, diff: '' });
+  if (buffs.mine.soul || buffs.theirs.soul) rows.push({ part: parts.soul, label: 'Seele', text: who(buffs.mine.soul, buffs.theirs.soul), diff: '' });
+  rows.push({ part: parts.champions, label: 'Champions', text: Math.abs(parts.champions) < 0.05 ? 'ausgeglichen' : parts.champions > 0 ? 'ihr' : 'Gegner', diff: '' });
+  return {
+    value: team.value,
+    label: strengthLabel(team.value),
+    odds: teamfightOdds(team.value),
+    rows: rows
+      .map((row, index) => ({ row, index }))
+      .sort((a, b) => Math.abs(b.row.part) - Math.abs(a.row.part) || a.index - b.index)
+      .map(({ row }) => ({ label: row.label, text: row.text, diff: row.diff, arrows: arrows(row.part), tone: tone(row.part) })),
+  };
+}
+
+/**
  * `situational`: suggestions from core/situational, or null when there is no situational data —
  * the tile is then left out rather than saying "nothing better" on no evidence.
  */
@@ -117,10 +157,11 @@ export function gameView(
   /** The plan's own late items brought forward for this line-up (core/situational lateOrder). */
   moves: readonly Move[] = [],
   /**
-   * `team`: both teams' levels and items (core/strength teamStandOf). `verdict`: what the draft said
-   * about the two line-ups.
+   * `team`: both teams' levels and items (core/strength teamStandOf). `teamStrength`: the teamfight
+   * scale (teamStrengthOf), where meta.json brings it. `verdict`: what the draft said about the two
+   * line-ups.
    */
-  extra: { team?: TeamStand | null; verdict?: readonly VerdictLine[] } = {},
+  extra: { team?: TeamStand | null; teamStrength?: TeamStrength | null; verdict?: readonly VerdictLine[] } = {},
 ): GameView {
   const me = champion(model.championId) ?? { id: model.championId, key: '', name: `#${model.championId}` };
 
@@ -211,6 +252,7 @@ export function gameView(
     sample: null,
     strength: scale,
     team: !scale && team ? teamStandView(team) : null,
+    teamStrength: !scale && extra.teamStrength ? teamStrengthView(extra.teamStrength) : null,
     // The damage line is the hint above, with the share and the build's own item.
     verdict: (extra.verdict ?? []).filter((line) => line.icon !== 'damage'),
     situational: situational

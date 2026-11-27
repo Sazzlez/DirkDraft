@@ -36,8 +36,7 @@
       <div class="rows num">
         {#each strength.rows as row (row.label)}
           <span class="k">{row.label}</span>
-          <span class="v">{row.mine} : {row.theirs}</span>
-          <span class="d tone-{row.tone}">{row.diff}</span>
+          <span class="d tone-{row.tone}">{row.value}</span>
         {/each}
       </div>
       {#if strength.phases}
@@ -161,7 +160,7 @@
 
   .rows {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 6px 12px;
     font-size: 12.5px;
   }
@@ -172,13 +171,8 @@
     color: var(--fg2);
   }
 
-  .v {
-    font-weight: 600;
-  }
-
   .d {
     font-weight: 700;
-    text-align: right;
   }
 
   .d.tone-up { color: var(--green-text); }
